@@ -1,0 +1,20 @@
+test_stg_customers_full_name:
+  model: analytics_shop.stg_customers
+  inputs:
+    analytics_shop.raw_customers:
+      rows:
+        - customer_id: 1
+          first_name: Ada
+          last_name: Lovelace
+          email: ada@example.com
+          country_code: GB
+          signup_date: 2025-01-01
+          updated_at: 2025-01-01 09:00:00
+  outputs:
+    query:
+      partial: true
+      rows:
+        - customer_id: 1
+          full_name: Ada Lovelace
+          email: ada@example.com
+          country_code: GB

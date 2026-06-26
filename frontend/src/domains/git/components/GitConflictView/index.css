@@ -1,0 +1,136 @@
+.mdbc-conflict-root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  font-size: var(--m-fs-base, 14px);
+}
+
+.mdbc-conflict-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--mdbc-border, #2a2a2a);
+}
+
+.mdbc-conflict-title {
+  font-weight: 600;
+}
+
+.mdbc-conflict-body {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  overflow: hidden;
+}
+
+.mdbc-conflict-filelist {
+  border-right: 1px solid var(--mdbc-border, #2a2a2a);
+  overflow: auto;
+}
+
+.mdbc-conflict-main {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.mdbc-conflict-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--mdbc-border, #2a2a2a);
+}
+
+.mdbc-conflict-file-path {
+  flex: 1;
+  font-family: var(--m-font-editor, var(--m-font-mono));
+  font-size: 0.85em;
+  color: var(--mdbc-text-dim, #888);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mdbc-conflict-progress {
+  color: var(--mdbc-text-dim, #888);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.mdbc-conflict-doc {
+  flex: 1;
+  overflow: auto;
+  padding: 8px 0;
+}
+
+.mdbc-conflict-context,
+.mdbc-conflict-code {
+  margin: 0;
+  padding: 2px 12px;
+  font-family: var(--m-font-editor, var(--m-font-mono));
+  font-size: 0.85em;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.mdbc-conflict-context {
+  color: var(--mdbc-text, #ddd);
+}
+
+.mdbc-conflict-hunk {
+  margin: 8px 12px;
+  border: 1px solid var(--mdbc-border, #2a2a2a);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.mdbc-conflict-hunk.resolved {
+  border-color: #5cb85c;
+}
+
+.mdbc-conflict-hunk-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 8px;
+  background: var(--mdbc-hover, rgba(255, 255, 255, 0.04));
+}
+
+.mdbc-conflict-hunk-label {
+  font-size: 0.85em;
+  color: var(--mdbc-text-dim, #888);
+}
+
+.mdbc-conflict-sides {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+.mdbc-conflict-side {
+  border-top: 1px solid var(--mdbc-border, #2a2a2a);
+}
+
+.mdbc-conflict-side + .mdbc-conflict-side {
+  border-left: 1px solid var(--mdbc-border, #2a2a2a);
+}
+
+.mdbc-conflict-side.active {
+  background: color-mix(in srgb, #5cb85c 10%, transparent);
+}
+
+.mdbc-conflict-side-label {
+  padding: 2px 8px;
+  font-size: 0.78em;
+  color: var(--mdbc-text-dim, #888);
+  border-bottom: 1px solid color-mix(in srgb, var(--mdbc-border, #2a2a2a) 50%, transparent);
+}
+
+.mdbc-git-action-small.selected {
+  background: color-mix(in srgb, #4c8eda 30%, transparent);
+  border-color: #4c8eda;
+}

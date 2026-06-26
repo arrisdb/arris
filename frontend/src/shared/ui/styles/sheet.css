@@ -1,0 +1,63 @@
+/* Glass popovers */
+.mdbc-popover {
+  background: var(--m-bg-surface);
+  backdrop-filter: blur(40px) saturate(160%);
+  -webkit-backdrop-filter: blur(40px) saturate(160%);
+  border: 0.5px solid var(--m-sep-strong);
+  border-radius: 14px;
+  box-shadow: var(--m-shadow-pop);
+}
+.mdbc-sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--m-bg-overlay);
+  backdrop-filter: blur(4px);
+}
+.mdbc-sheet-popover {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  width: var(--mdbc-sheet-width);
+  height: var(--mdbc-sheet-height);
+  max-width: var(--mdbc-sheet-max-width);
+  max-height: var(--mdbc-sheet-max-height);
+  min-width: var(--mdbc-sheet-min-width);
+  min-height: var(--mdbc-sheet-min-height);
+}
+.mdbc-sheet-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 0.5px solid var(--m-sep);
+}
+.mdbc-sheet-title {
+  font-size: var(--m-fs-base);
+  font-weight: 600;
+}
+.mdbc-sheet-body {
+  flex: 1;
+  overflow: auto;
+  padding: 18px;
+}
+.mdbc-sheet-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 18px;
+  border-top: 0.5px solid var(--m-sep);
+}
+.mdbc-spinner {
+  display: inline-block;
+  width: var(--mdbc-spinner-size, 14px);
+  height: var(--mdbc-spinner-size, 14px);
+  border: 2px solid var(--m-fg-4);
+  border-top-color: var(--m-accent);
+  border-radius: 50%;
+  animation: arris-spin 0.7s linear infinite;
+}

@@ -1,0 +1,4 @@
+const CSV_ROW_HEIGHT = 28;
+const CSV_ROW_OVERSCAN = 20;
+
+export { CSV_ROW_HEIGHT, CSV_ROW_OVERSCAN };

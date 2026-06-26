@@ -1,0 +1,236 @@
+---
+import "../../styles/global.css";
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import Screenshot from "../../components/docs/Screenshot/Screenshot.astro";
+import Callout from "../../components/docs/Callout/Callout.astro";
+import Steps from "../../components/docs/Steps/Steps.astro";
+import Step from "../../components/docs/Step/Step.astro";
+---
+
+<DocsLayout
+  title="Connections Overview | Arris Docs"
+  breadcrumbs={[{ label: "Docs", href: "/" }, { label: "Connections" }, { label: "Overview" }]}
+  heading="Connections"
+  lede="Connect to modern data warehouses and systems."
+  tocItems={[
+    { label: "What is a connection?", href: "#overview" },
+    { label: "Adding a connection", href: "#adding" },
+    { label: "Edit your connections", href: "#edit" },
+    { label: "Schemas & tables", href: "#schema" },
+    { label: "Viewing tables", href: "#viewing" },
+    { label: "Show definitions", href: "#definitions" },
+    { label: "Troubleshooting", href: "#troubleshooting" },
+  ]}
+  currentPath="/connections/overview"
+  prev={{ label: "Your first query", href: "/getting-started/first-query", section: "Getting started" }}
+  next={{ label: "Security", href: "/connections/secrets", section: "Connections" }}
+>
+  <!-- What is a connection? -->
+  <h2 id="overview">What is a connection?</h2>
+
+  <p>
+    A <strong>connection</strong> in Arris is a named set of encrypted credentials that tells
+    the app how to reach a single database server or service. Each connection stores the host, port,
+    authentication details, and optional SSH tunnel or SSL configuration.
+    <strong>Passwords are persisted in the macOS Keychain, never written to disk in plain text.</strong>
+  </p>
+
+  <p>
+    Arris ships with bundled drivers for every supported database engine. You do not need to install
+    any external libraries, JDBC jars, or ODBC connectors. Every driver is compiled into the app
+    and versioned alongside it, so there are no compatibility surprises after updates.
+  </p>
+
+  <!-- Adding a connection -->
+  <h2 id="adding">Adding a connection</h2>
+
+  <Steps>
+    <Step num={1} title="Open the new-connection dialog">
+      <p>
+        Click the <strong>+</strong> button at the top of the Connections sidebar. The
+        <strong>New connection</strong> dialog opens.
+      </p>
+
+      <Screenshot
+        src="/screenshots/connections-sidebar.png"
+        alt="The Arris Connections sidebar with a Filter box, a No connections message, and a + button in the top-right"
+        caption="Click the + button at the top of the Connections sidebar to start a new connection."
+      />
+    </Step>
+
+    <Step num={2} title="Pick a database kind">
+      <p>
+        Pick the engine from the <strong>New connection</strong> dialog. Search by name or
+        choose from the grid of supported sources. Each kind comes with a bundled native
+        driver, no extra downloads. The form fields adapt to the selected engine (for
+        example, Snowflake shows an Account field instead of Host/Port).
+      </p>
+
+      <Screenshot
+        src="/screenshots/new-connection-dialog.png"
+        alt="The Arris New connection dialog showing a database search box and a grid of data sources including BigQuery, ClickHouse, DuckDB, Postgres, Snowflake, and more"
+        caption="Search or pick a database kind from the New connection dialog."
+      />
+    </Step>
+
+    <Step num={3} title="Fill in the form or paste a URI">
+      <p>
+        Enter the host, port, database name, and credentials manually, or paste a connection
+        URI into the <strong>URL</strong> field and Arris will parse it automatically. The URL
+        overrides the individual settings above. Supported URI schemes include
+        <code>postgres://</code>, <code>mysql://</code>, <code>mongodb+srv://</code>, and more.
+      </p>
+
+      <Screenshot
+        src="/screenshots/connection-form.png"
+        alt="The Arris New connection form for a Postgres database with Host, Port, Database, User, Password, SSL Mode, Options, SSH Tunnel, and URL fields, plus a Test connection button showing a green Connected status"
+        caption="Fill in the fields or paste a URL, then click Test connection to verify before saving."
+      />
+    </Step>
+
+    <Step num={4} title="Test, then save">
+      <p>
+        Click <strong>Test connection</strong> to verify the connection. If the test passes,
+        click <strong>Save</strong>. The connection appears in the sidebar immediately, and it
+        is ready to be used for queries.
+      </p>
+    </Step>
+  </Steps>
+
+  <!-- Edit your connections -->
+  <h2 id="edit">Edit your connections</h2>
+
+  <p>
+    To change a saved connection, click the <strong>Gear</strong> icon on the connection in the
+    sidebar. The connection form reopens with its current settings, where you can update the host,
+    credentials, SSL, or SSH tunnel and save your changes.
+  </p>
+
+  <!-- Expanding schemas, tables, columns -->
+  <h2 id="schema">Expanding schemas, tables, columns</h2>
+
+  <p>
+    When you connect to a database, Arris fetches its list of schemas (or databases, where
+    applicable) and caches it locally for fast navigation. For sources with many schemas, a
+    schema's tables, views, and columns load on demand the moment you select that schema, so
+    connecting stays fast even against large servers. Embedded and flat sources such as SQLite,
+    DuckDB, and Redis load their whole tree up front.
+  </p>
+
+  <p>
+    Use the <strong>Schemas</strong> selector under a connection to choose which schemas to load.
+    Nothing is selected by default, so the tree starts empty until you pick a schema. Pick one or
+    several, and Arris fetches each one's objects: tables, views, materialized views, routines,
+    sequences, and columns, each with its data type. Your selection is remembered, so reconnecting
+    reloads the same schemas automatically.
+  </p>
+
+  <p>
+    Double-click any table or view to open it in a new tab. The tab shows the first 100 rows
+    with sortable columns and inline filtering.
+  </p>
+
+  <Screenshot
+    src="/screenshots/schema-tree.png"
+    alt="The Arris Connections sidebar showing the example_postgres schema tree expanded: postgres database, public schema, a Tables folder with customers, order_items, orders (with its order_id, customer_id, order_date, status, and amount columns and types), page_events_1m, products, and sales_transactions, plus Sequences and Indexes folders"
+    caption="Expand a connection to walk its databases, schemas, tables, and typed columns."
+  />
+
+  <Callout type="note" title="Schema cache location">
+    Schema metadata is cached at <code>~/Library/Application Support/Arris/cache/*.sqlite</code>.
+    The cache is refreshed automatically when you connect, or manually with the refresh button on each connection.
+    Cache files are excluded from Time Machine by default.
+  </Callout>
+
+  <h3 id="filter">Searching inside a connection</h3>
+
+  <p>
+    Two filter bars keep large trees navigable. The <strong>Filter</strong> box at the top of the
+    sidebar filters the connection list itself, while the <strong>Find object</strong> box under a
+    connection filters its schema tree in place, hiding any database, schema, table, or column whose
+    name does not match as you type.
+  </p>
+
+  <!-- Viewing tables -->
+  <h2 id="viewing">Viewing tables</h2>
+
+  <p>
+    Double-click a table or view in the schema tree to open it in a <strong>table tab</strong>.
+    The tab runs a browse query automatically and shows the rows in the same results grid used by
+    the editor, with sortable columns, an inline filter row, and pagination. A
+    <strong>Refresh table data</strong> button in the tab header re-runs the browse query.
+  </p>
+
+  <!-- SCREENSHOT PLACEHOLDER: a table tab opened from the schema tree, showing browsed rows -->
+
+  <p>
+    Table tabs backed by an editable object (tables, not views) let you change data in place and
+    push it back to the database. Edits are <strong>staged</strong> locally first, so you review
+    everything before anything is written:
+  </p>
+
+  <ul>
+    <li><strong>Edit a cell</strong> &mdash; double-click a cell, type a new value, and commit. The change is staged with a distinct cell style.</li>
+    <li><strong>Insert a row</strong> &mdash; click the insert button (<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block align-text-bottom text-accent-2"><path d="M5 12h14" /><path d="M12 5v14" /></svg>) to add a draft row, then fill in its cells.</li>
+    <li><strong>Delete a row</strong> &mdash; select a row and click the delete button (<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block align-text-bottom text-accent-2"><path d="M5 12h14" /></svg>) to mark it for removal.</li>
+    <li><strong>Reset</strong> (<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block align-text-bottom text-accent-2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /><path d="M3 3v5h5" /></svg>) &mdash; discard every staged change and return to the queried rows.</li>
+    <li><strong>Upload</strong> (<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block align-text-bottom text-accent-2"><path d="m5 12 7-7 7 7" /><path d="M12 19V5" /></svg>) &mdash; apply the staged changes. Arris keys each row by its primary key and generates the matching <code>INSERT</code>, <code>UPDATE</code>, and <code>DELETE</code> statements, which are recorded in the run history.</li>
+  </ul>
+
+  <p>
+    Editing is only available on a table tab. An ordinary query result, a view, or a federated
+    result is read-only.
+  </p>
+
+  <!-- Show definitions -->
+  <h2 id="definitions">Show definitions</h2>
+
+  <p>
+    To read an object's definition, select it in the schema tree and press <kbd>&#8984;B</kbd>, or
+    right-click it and choose <strong>Show Definition</strong>. Arris fetches the object's DDL and
+    opens it in a read-only tab titled <code>&lt;name&gt; (DDL)</code>, marked with a
+    <strong>Read-only</strong> chip.
+  </p>
+
+  <p>
+    Show Definition works on schemas, databases, tables, views, materialized views, foreign tables,
+    sequences, indexes, functions, procedures, triggers, and events. When the engine cannot produce
+    a definition for an object, the tab opens with a note that none is available.
+  </p>
+
+  <!-- SCREENSHOT PLACEHOLDER: a read-only DDL tab opened via Cmd+B / Show Definition -->
+
+  <!-- Troubleshooting -->
+  <h2 id="troubleshooting">Troubleshooting</h2>
+
+  <h3>Connection refused</h3>
+
+  <p>
+    If you see <code>Connection refused</code>, verify that the database server is running and
+    accepting connections on the configured host and port. Common causes include firewall rules
+    blocking the port, or an SSH tunnel that has not been configured. Try connecting with
+    <code>psql</code>, <code>mysql</code>, or <code>mongosh</code> from the same machine to
+    confirm network-level access.
+  </p>
+
+  <h3>Self-signed certificate</h3>
+
+  <p>
+    If the server uses a self-signed or internal CA certificate, Arris will reject the
+    connection by default. To fix this, open the connection settings and add your CA certificate
+    file in the <strong>SSL</strong> configuration. Alternatively, you can enable
+    <strong>Accept invalid certificates</strong> for development environments, but this
+    is not recommended for production connections.
+  </p>
+
+  <h3>Schema cache out of date</h3>
+
+  <p>
+    Arris caches schema metadata for fast navigation. If you have recently created or dropped
+    tables outside of Arris, the sidebar may not reflect those changes immediately. Right-click a
+    schema in the tree and select <strong>Refresh Schema</strong> to re-read just that schema, or
+    click the refresh button on the connection to refresh everything. To keep schemas fresh
+    automatically, set an interval under <strong>Settings &rarr; Connections &rarr; Auto-refresh</strong>.
+  </p>
+
+</DocsLayout>

@@ -1,0 +1,13 @@
+const DBT_SCHEMA_EMPTY_TEXT = "Select a dbt node to view its schema docs.";
+const DBT_SCHEMA_NO_DESCRIPTION_TEXT = "No description.";
+const DBT_SCHEMA_PLACEHOLDER = "—";
+const DBT_SCHEMA_DEPENDS_ON_LABEL = "Depends on";
+const DBT_SCHEMA_COLUMNS_LABEL = "Columns";
+
+export {
+  DBT_SCHEMA_COLUMNS_LABEL,
+  DBT_SCHEMA_DEPENDS_ON_LABEL,
+  DBT_SCHEMA_EMPTY_TEXT,
+  DBT_SCHEMA_NO_DESCRIPTION_TEXT,
+  DBT_SCHEMA_PLACEHOLDER,
+};

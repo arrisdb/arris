@@ -1,0 +1,312 @@
+---
+import "../../styles/global.css";
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import DocTable from "../../components/docs/DocTable/DocTable.astro";
+import Callout from "../../components/docs/Callout/Callout.astro";
+---
+
+<DocsLayout
+  title="Keyboard Shortcuts — Arris Docs"
+  breadcrumbs={[{ label: "Docs", href: "/" }, { label: "Reference" }, { label: "Shortcuts" }]}
+  heading="Keyboard shortcuts"
+  lede="Every shortcut in one place — general navigation, the SQL editor, connections, and tab management."
+  tocItems={[
+    { label: "General", href: "#general" },
+    { label: "Editor", href: "#editor" },
+    { label: "Connections", href: "#connections" },
+    { label: "Tabs & navigation", href: "#navigation" },
+    { label: "Results grid", href: "#results" },
+    { label: "Customization", href: "#customization" },
+  ]}
+  currentPath="/reference/shortcuts"
+  prev={{ label: "AI Agent", href: "/ai/agent", section: "AI" }}
+  next={{ label: "Debug logs", href: "/reference/debug-logs", section: "Reference" }}
+>
+  <h2 id="general">General</h2>
+
+  <DocTable>
+    <thead>
+      <tr>
+        <th>Shortcut</th>
+        <th>Action</th>
+        <th>Context</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="font-medium text-fg"><kbd>&#8984;K</kbd></td>
+        <td>Ask Agent (Codex)</td>
+        <td>Global</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><kbd>&#8984;P</kbd></td>
+        <td>Find table, column, or model</td>
+        <td>Global</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><kbd>&#8984;&#8679;P</kbd></td>
+        <td>Global search across all connections</td>
+        <td>Global</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><kbd>&#8984;N</kbd></td>
+        <td>New editor tab</td>
+        <td>Global</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><kbd>&#8984;W</kbd></td>
+        <td>Close current tab</td>
+        <td>Global</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><kbd>&#8984;,</kbd></td>
+        <td>Open settings</td>
+        <td>Global</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><kbd>&#8984;O</kbd></td>
+        <td>Open project folder</td>
+        <td>Global</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><kbd>&#8984;Q</kbd></td>
+        <td>Quit Arris</td>
+        <td>Global</td>
+      </tr>
+    </tbody>
+  </DocTable>
+
+  <h2 id="editor">Editor</h2>
+
+  <DocTable>
+    <thead>
+      <tr>
+        <th>Shortcut</th>
+        <th>Action</th>
+        <th>Context</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="font-medium text-fg"><kbd>&#8984;&#8617;</kbd></td>
+        <td>Run query (all)</td>
+        <td>Editor</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><kbd>&#8984;&#8679;&#8617;</kbd></td>
+        <td>Run selected text</td>
+        <td>Editor</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><kbd>&#8984;E</kbd></td>
+        <td>EXPLAIN ANALYZE</td>
+        <td>Editor</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><kbd>&#8984;.</kbd></td>
+        <td>Cancel running query</td>
+        <td>Editor</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><kbd>&#8963;Space</kbd></td>
+        <td>Trigger autocomplete</td>
+        <td>Editor</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><kbd>&#8984;/</kbd></td>
+        <td>Toggle line comment</td>
+        <td>Editor</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><kbd>&#8984;D</kbd></td>
+        <td>Select next occurrence</td>
+        <td>Editor</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><kbd>&#8984;&#8679;D</kbd></td>
+        <td>Duplicate line</td>
+        <td>Editor</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><kbd>&#8997;&#8593;</kbd> / <kbd>&#8997;&#8595;</kbd></td>
+        <td>Move line up / down</td>
+        <td>Editor</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><kbd>&#8984;&#8679;K</kbd></td>
+        <td>Delete line</td>
+        <td>Editor</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><kbd>&#8984;Z</kbd></td>
+        <td>Undo</td>
+        <td>Editor</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><kbd>&#8984;&#8679;Z</kbd></td>
+        <td>Redo</td>
+        <td>Editor</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><kbd>&#8984;F</kbd></td>
+        <td>Find and replace</td>
+        <td>Editor</td>
+      </tr>
+    </tbody>
+  </DocTable>
+
+  <h2 id="connections">Connections</h2>
+
+  <DocTable>
+    <thead>
+      <tr>
+        <th>Shortcut</th>
+        <th>Action</th>
+        <th>Context</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="font-medium text-fg"><kbd>&#8984;&#8679;R</kbd></td>
+        <td>Refresh schema cache</td>
+        <td>Sidebar</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><kbd>&#8984;&#8679;N</kbd></td>
+        <td>New connection</td>
+        <td>Sidebar</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><kbd>&#8984;&#8679;C</kbd></td>
+        <td>Duplicate connection</td>
+        <td>Sidebar (connection selected)</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><kbd>&#8984;&#9003;</kbd></td>
+        <td>Delete connection</td>
+        <td>Sidebar (connection selected)</td>
+      </tr>
+    </tbody>
+  </DocTable>
+
+  <h2 id="navigation">Tabs &amp; navigation</h2>
+
+  <DocTable>
+    <thead>
+      <tr>
+        <th>Shortcut</th>
+        <th>Action</th>
+        <th>Context</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="font-medium text-fg"><kbd>&#8984;1</kbd> &ndash; <kbd>&#8984;9</kbd></td>
+        <td>Switch to tab 1&ndash;9</td>
+        <td>Global</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><kbd>&#8984;[</kbd></td>
+        <td>Previous tab</td>
+        <td>Global</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><kbd>&#8984;]</kbd></td>
+        <td>Next tab</td>
+        <td>Global</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><kbd>&#8984;&#8679;[</kbd></td>
+        <td>Move tab left</td>
+        <td>Global</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><kbd>&#8984;&#8679;]</kbd></td>
+        <td>Move tab right</td>
+        <td>Global</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><kbd>&#8984;&#8679;T</kbd></td>
+        <td>Reopen last closed tab</td>
+        <td>Global</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><kbd>&#8984;L</kbd></td>
+        <td>Open lineage explorer</td>
+        <td>dbt project</td>
+      </tr>
+    </tbody>
+  </DocTable>
+
+  <h2 id="results">Results grid</h2>
+
+  <DocTable>
+    <thead>
+      <tr>
+        <th>Shortcut</th>
+        <th>Action</th>
+        <th>Context</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="font-medium text-fg"><kbd>&#8984;C</kbd></td>
+        <td>Copy selected cells</td>
+        <td>Results grid</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><kbd>&#8984;&#8679;E</kbd></td>
+        <td>Export results (CSV / JSON / Parquet)</td>
+        <td>Results grid</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><kbd>&#8984;F</kbd></td>
+        <td>Filter rows</td>
+        <td>Results grid</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><kbd>&#8984;&#8679;H</kbd></td>
+        <td>Open run history</td>
+        <td>Results grid</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><kbd>&#8984;A</kbd></td>
+        <td>Select all rows</td>
+        <td>Results grid</td>
+      </tr>
+    </tbody>
+  </DocTable>
+
+  <Callout type="tip" title="Customizing shortcuts">
+    All keyboard shortcuts can be customized in <strong>Settings &rarr; Keyboard Shortcuts</strong>.
+    You can also view the current shortcut for any action by hovering over its menu item or
+    toolbar button.
+  </Callout>
+
+  <h2 id="customization">Customization</h2>
+
+  <p>
+    Arris supports full keyboard shortcut customization. Open <strong>Settings &rarr;
+    Keyboard Shortcuts</strong> to see all available actions and their current bindings.
+  </p>
+
+  <ul>
+    <li><strong>Rebind</strong> &mdash; click any shortcut to enter a new key combination.</li>
+    <li><strong>Reset</strong> &mdash; right-click a customized shortcut to restore the default.</li>
+    <li><strong>Conflicts</strong> &mdash; if two actions share the same shortcut, a warning badge appears. The action with higher context specificity wins.</li>
+    <li><strong>Export</strong> &mdash; shortcut configurations are stored in <code>settings.json</code> and can be shared across machines by copying the file.</li>
+  </ul>
+
+  <p>
+    Shortcuts follow macOS conventions. The modifier key symbols used throughout the app and this documentation are:
+  </p>
+
+  <ul>
+    <li><kbd>&#8984;</kbd> &mdash; Command</li>
+    <li><kbd>&#8679;</kbd> &mdash; Shift</li>
+    <li><kbd>&#8997;</kbd> &mdash; Option / Alt</li>
+    <li><kbd>&#8963;</kbd> &mdash; Control</li>
+    <li><kbd>&#8617;</kbd> &mdash; Return / Enter</li>
+    <li><kbd>&#9003;</kbd> &mdash; Delete / Backspace</li>
+  </ul>
+</DocsLayout>

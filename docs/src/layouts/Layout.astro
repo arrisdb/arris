@@ -1,0 +1,78 @@
+---
+import { ClientRouter } from 'astro:transitions';
+
+interface Props {
+  title: string;
+}
+const { title } = Astro.props;
+---
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>{title}</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="description" content="A Mac desktop database workbench for the modern data team. Query Postgres, MySQL, MongoDB, DuckDB, and more — together. Federation, dbt, SQLMesh, AI, and visualization in one window." />
+  <link rel="icon" type="image/png" href="/favicon.png" />
+  <ClientRouter />
+  <script>
+    // ClientRouter's scroll restoration can leave a new page slightly scrolled.
+    // Take manual control and force the top on navigation, unless the target
+    // URL points at an in-page anchor. rAF defers past Astro's own restore.
+    history.scrollRestoration = "manual";
+    const resetScroll = () => {
+      if (window.location.hash) return;
+      const toTop = () => {
+        document.documentElement.scrollTop = 0;
+        document.body.scrollTop = 0;
+        window.scrollTo(0, 0);
+      };
+      toTop();
+      requestAnimationFrame(toTop);
+    };
+    document.addEventListener("astro:after-swap", resetScroll);
+    document.addEventListener("astro:page-load", resetScroll);
+  </script>
+  <script>
+    import { initAnalytics, track, ctaPropsFromEl, MixpanelEvent } from '../lib/analytics';
+
+    // Activate once on first load. No token (local/preview) => silent no-op.
+    initAnalytics();
+
+    // Page view fires on the initial load and on every View Transition nav.
+    document.addEventListener('astro:page-load', () => {
+      track(MixpanelEvent.PageView, { path: location.pathname, title: document.title });
+    });
+
+    // Document-level delegation survives ClientRouter swaps, so these bind once.
+    document.addEventListener('click', (e) => {
+      const target = e.target as Element | null;
+
+      const cta = target?.closest?.('[data-mp-cta]');
+      if (cta) {
+        track(MixpanelEvent.CtaClick, ctaPropsFromEl(cta));
+        return;
+      }
+
+      const download = target?.closest?.('[data-mp-download]');
+      if (download) {
+        track(MixpanelEvent.DownloadClick, { arch: download.getAttribute('data-mp-download') });
+        return;
+      }
+
+      const helpful = target?.closest?.('[data-mp-helpful]');
+      if (helpful) {
+        track(MixpanelEvent.PageFeedback, {
+          helpful: helpful.getAttribute('data-mp-helpful') === 'yes',
+          path: location.pathname,
+        });
+        const row = helpful.closest('[data-mp-helpful-row]');
+        if (row) row.setAttribute('data-mp-done', 'true');
+      }
+    });
+  </script>
+</head>
+<body>
+  <slot />
+</body>
+</html>

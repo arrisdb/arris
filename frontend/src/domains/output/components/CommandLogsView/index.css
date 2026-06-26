@@ -1,0 +1,194 @@
+/* Command Logs view — chronological list of collapsible per-command entries */
+.mdbc-cmdlog {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--m-bg-editor);
+}
+
+/* Toolbar (filter, status, pause auto-scroll, clear) */
+.mdbc-cmdlog-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-bottom: 0.5px solid var(--m-sep, rgb(var(--m-overlay-rgb) / 0.07));
+  flex: none;
+}
+.mdbc-cmdlog-search {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+}
+.mdbc-cmdlog-search .mdbc-search {
+  flex: 1;
+  margin: 0;
+}
+.mdbc-cmdlog-tool {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  color: var(--m-fg-4);
+  cursor: pointer;
+}
+.mdbc-cmdlog-tool:hover {
+  color: var(--m-accent);
+  background: rgb(var(--m-overlay-rgb) / 0.08);
+}
+.mdbc-cmdlog-tool.active {
+  color: var(--m-accent);
+}
+
+/* Entry list */
+.mdbc-cmdlog-list {
+  flex: 1;
+  overflow: auto;
+  padding: 10px 12px;
+}
+.mdbc-cmdlog-entry {
+  border: 0.5px solid var(--m-sep, rgb(var(--m-overlay-rgb) / 0.1));
+  border-radius: 6px;
+  background: var(--m-bg-1);
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+.mdbc-cmdlog-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 10px;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.mdbc-cmdlog-header:hover {
+  background: rgb(var(--m-overlay-rgb) / 0.05);
+}
+.mdbc-cmdlog-chevron {
+  flex: none;
+  color: var(--m-fg-4);
+  font-size: var(--m-fs-xxs);
+  user-select: none;
+}
+.mdbc-cmdlog-status {
+  flex: none;
+  display: inline-flex;
+}
+.mdbc-cmdlog-status.success { color: var(--m-green); }
+.mdbc-cmdlog-status.error { color: var(--m-red); }
+.mdbc-cmdlog-status.running {
+  color: var(--m-accent);
+  animation: mdbc-cmdlog-spin 1s linear infinite;
+}
+@keyframes mdbc-cmdlog-spin {
+  to { transform: rotate(360deg); }
+}
+.mdbc-cmdlog-command {
+  font-family: var(--m-font-editor, var(--m-font-mono));
+  font-size: var(--m-fs-sm);
+  color: var(--m-fg);
+  background: var(--m-bg-editor);
+  border: 0.5px solid var(--m-sep, rgb(var(--m-overlay-rgb) / 0.1));
+  border-radius: 4px;
+  padding: 1px 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 60%;
+}
+.mdbc-cmdlog-tab {
+  flex: none;
+  color: var(--m-fg-4);
+  font-size: var(--m-fs-xs);
+  font-family: var(--m-font-editor, var(--m-font-mono));
+  white-space: nowrap;
+}
+.mdbc-cmdlog-meta {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-left: auto;
+  flex: none;
+  color: var(--m-fg-4);
+  font-size: var(--m-fs-xs);
+  font-family: var(--m-font-editor, var(--m-font-mono));
+}
+
+/* Expanded body */
+.mdbc-cmdlog-body {
+  border-top: 0.5px solid var(--m-sep, rgb(var(--m-overlay-rgb) / 0.07));
+  background: var(--m-bg-editor);
+}
+.mdbc-cmdlog-nodes {
+  padding: 6px 10px;
+  border-bottom: 0.5px solid var(--m-sep, rgb(var(--m-overlay-rgb) / 0.07));
+}
+.mdbc-cmdlog-node {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 4px;
+  font-family: var(--m-font-editor, var(--m-font-mono));
+  font-size: var(--m-fs-xs);
+}
+.mdbc-cmdlog-node-status {
+  flex: none;
+  width: 44px;
+  font-weight: 600;
+}
+.mdbc-cmdlog-node.success .mdbc-cmdlog-node-status { color: var(--m-green); }
+.mdbc-cmdlog-node.error .mdbc-cmdlog-node-status { color: var(--m-red); }
+.mdbc-cmdlog-node-name { color: var(--m-fg); }
+.mdbc-cmdlog-node-type { color: var(--m-fg-4); }
+.mdbc-cmdlog-node-duration { margin-left: auto; color: var(--m-fg-4); }
+
+.mdbc-cmdlog-raw {
+  padding: 8px 10px;
+}
+.mdbc-cmdlog-raw-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  min-height: 24px;
+  margin-bottom: 6px;
+  color: var(--m-fg-4);
+  font-size: var(--m-fs-xs);
+}
+.mdbc-cmdlog-raw-label-text {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.mdbc-cmdlog-pre {
+  margin: 0;
+  font-family: var(--m-font-editor, var(--m-font-mono));
+  font-size: var(--m-fs-xs);
+  color: var(--m-fg-3);
+  white-space: pre-wrap;
+  word-break: break-all;
+  overflow-x: auto;
+}
+/* Errored raw output is shown in red to signal failure. */
+.mdbc-cmdlog-pre.error {
+  color: var(--m-red);
+}
+/* Raw query block: capped to MAX_RAW_QUERY_LINES until expanded. */
+.mdbc-cmdlog-pre.capped {
+  max-height: calc(var(--m-fs-xs) * 1.5 * 8);
+  overflow: hidden;
+}
+
+/* ANSI-colored segments inside the raw output block */
+.mdbc-output-segment-style {
+  color: var(--mdbc-output-segment-color);
+  font-weight: var(--mdbc-output-segment-weight);
+}

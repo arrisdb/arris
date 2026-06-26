@@ -1,0 +1,225 @@
+---
+import "../../styles/global.css";
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import DocTable from "../../components/docs/DocTable/DocTable.astro";
+
+import CodeBlock from "../../components/docs/CodeBlock/CodeBlock.astro";
+---
+
+<DocsLayout
+  title="StarRocks - Arris Docs"
+  breadcrumbs={[{ label: "Docs", href: "/" }, { label: "Connections", href: "/connections/overview" }, { label: "StarRocks" }]}
+  heading="StarRocks"
+  tocItems={[
+    { label: "Overview", href: "#overview" },
+    { label: "Driver", href: "#driver" },
+    { label: "Connection fields", href: "#fields" },
+    { label: "URI format", href: "#uri" },
+    { label: "SSL & TLS", href: "#ssl" },
+    { label: "Schema browser", href: "#schema" },
+    { label: "Supported SQL commands", href: "#features" },
+  ]}
+  currentPath="/supported-data-sources/starrocks"
+  prev={{ label: "Snowflake", href: "/supported-data-sources/snowflake", section: "Connections" }}
+  next={{ label: "Trino", href: "/supported-data-sources/trino", section: "Connections" }}
+>
+  <h2 id="overview">
+    <img src="/db-logos/starrocks.png" alt="StarRocks logo" width="32" height="32" class="docLogo" />
+    Overview
+  </h2>
+
+  <p>
+    StarRocks is an open-source, high-performance MPP analytical database built for real-time
+    OLAP. It serves sub-second queries over large datasets with a vectorized execution engine, a
+    cost-based optimizer, and materialized views for query acceleration. StarRocks can query data
+    stored in its own native tables or, through external catalogs, in lakehouse formats like
+    Iceberg, Hudi, Delta Lake, and Hive. It runs self-managed or as the managed CelerData service.
+  </p>
+
+  <p>
+    The frontend (FE) node exposes a MySQL-compatible endpoint on port <code>9030</code>, so Arris
+    connects to StarRocks over the MySQL wire protocol.
+  </p>
+
+  <h2 id="driver">Driver</h2>
+
+  <ul>
+    <li><strong>Crate:</strong> <a href="https://crates.io/crates/mysql_async"><code>mysql_async</code></a></li>
+    <li><strong>Version:</strong> <code>0.36</code></li>
+    <li><strong>Protocol:</strong> MySQL wire protocol on the FE query port <code>9030</code></li>
+  </ul>
+
+  <h2 id="fields">Connection fields</h2>
+
+  <DocTable>
+    <thead>
+      <tr>
+        <th>Field</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="font-medium text-fg">Host</td>
+        <td>Hostname or IP address of the StarRocks FE node.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">Port</td>
+        <td>FE MySQL-protocol query port. Defaults to <code>9030</code>.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">Database</td>
+        <td>Name of the default database to connect to.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">User</td>
+        <td>Authentication username (for example <code>root</code>).</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">Password</td>
+        <td>Authentication password. Stored in the macOS Keychain.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">SSL Mode</td>
+        <td>One of <code>disable</code>, <code>prefer</code>, <code>require</code>, <code>verify-ca</code>, or <code>verify-full</code>.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">Options</td>
+        <td>Additional connection parameters as <code>key1=val1&amp;key2=val2</code>.</td>
+      </tr>
+    </tbody>
+  </DocTable>
+
+  <p>
+    All connections also support an optional <strong>SSH tunnel</strong>. Configure the bastion
+    host, port, user, and private key file under the SSH section of the connection form. See
+    <a href="/connections/ssh-tunnels">SSH tunnels</a> for details.
+  </p>
+
+  <h2 id="uri">URI format</h2>
+
+  <p>
+    Instead of filling in each field individually, you can paste a connection URI into the
+    <strong>Paste URI</strong> field. Arris parses the URI and populates all fields automatically.
+    StarRocks uses the <code>mysql</code> URI scheme because it speaks the MySQL protocol.
+  </p>
+
+  <CodeBlock lang="text" filename="Connection URI">
+    mysql://user:password@host:9030/dbname?ssl-mode=REQUIRED
+  </CodeBlock>
+
+  <h2 id="ssl">SSL &amp; TLS</h2>
+
+  <p>
+    StarRocks supports five SSL modes. Arris defaults to <code>prefer</code>, which uses SSL if
+    the server supports it but falls back to unencrypted if not.
+  </p>
+
+  <DocTable>
+    <thead>
+      <tr>
+        <th>SSL Mode</th>
+        <th>Behavior</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="font-medium text-fg"><code>disable</code></td>
+        <td>Never use SSL. Not recommended for production.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><code>prefer</code></td>
+        <td>Use SSL if available, fall back to unencrypted.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><code>require</code></td>
+        <td>Always use SSL. Fail if the server does not support it.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><code>verify-ca</code></td>
+        <td>Require SSL and verify the server certificate against a CA.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><code>verify-full</code></td>
+        <td>Require SSL, verify the CA, and verify the server hostname matches the certificate.</td>
+      </tr>
+    </tbody>
+  </DocTable>
+
+  <h2 id="schema">Schema browser</h2>
+
+  <p>
+    Once connected, Arris fetches the schema tree from <code>information_schema</code> and groups
+    it by object type. In StarRocks, databases act as schema-level containers, so the tree shows
+    databases at the top level, each containing its own object groups.
+  </p>
+
+  <p>
+    The schema tree displays the following object types, grouped by category:
+  </p>
+
+  <ul>
+    <li><strong>Tables</strong>: base tables (Primary Key, Duplicate Key, Aggregate, and Unique Key models)</li>
+    <li><strong>Views</strong>: logical views and asynchronous materialized views</li>
+  </ul>
+
+  <p>
+    StarRocks has no user-defined stored procedures, triggers, or events, so those groups do not
+    appear. Double-click any table or view to open it in a new tab with browse mode.
+  </p>
+
+  <h2 id="features">Supported SQL commands</h2>
+
+  <DocTable>
+    <thead>
+      <tr>
+        <th>Command</th>
+        <th>Notes</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="font-medium text-fg"><code>SELECT</code></td>
+        <td>Query data with <code>WHERE</code> filters, <code>JOIN</code>s, aggregates, and window functions (<code>ROW_NUMBER</code>, <code>RANK</code>, <code>LAG</code>, <code>LEAD</code>, <code>SUM() OVER</code>).</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><code>INSERT</code></td>
+        <td>Insert single or multiple rows.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><code>UPDATE</code> / <code>DELETE</code></td>
+        <td>Supported on Primary Key tables. Duplicate Key and Aggregate tables do not support row-level <code>UPDATE</code>.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><code>CREATE</code> / <code>DROP</code></td>
+        <td>Create and drop tables, views, and materialized views.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><code>EXPLAIN</code></td>
+        <td>Text execution plans (<code>EXPLAIN</code>, <code>EXPLAIN COSTS</code>, <code>EXPLAIN ANALYZE</code>). StarRocks has no JSON plan format.</td>
+      </tr>
+    </tbody>
+  </DocTable>
+
+  <p>
+    StarRocks does not support interactive multi-statement transactions over a session, so Arris
+    runs each statement in auto-commit mode.
+  </p>
+
+  <h2 id="federation">Federation</h2>
+
+  <p>
+    StarRocks participates in cross-source federated queries. Join a StarRocks table with a table
+    from another connection in a single query:
+  </p>
+
+  <CodeBlock lang="sql" filename="Federated join">
+    SELECT c.first_name, o.amount
+    FROM starrocks_prod.appdb.orders AS o
+    JOIN postgres_prod.public.customers AS c
+      ON c.customer_id = o.customer_id
+    WHERE o.status = 'completed'
+    ORDER BY o.amount DESC
+    LIMIT 20;
+  </CodeBlock>
+</DocsLayout>

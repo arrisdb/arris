@@ -1,0 +1,45 @@
+test_fct_orders_revenue_rollup:
+  model: analytics_shop.fct_orders
+  vars:
+    start: 2025-01-01
+    end: 2025-12-31
+  inputs:
+    analytics_shop.stg_orders:
+      rows:
+        - order_id: 100
+          customer_id: 1
+          order_date: 2025-01-03
+          status: completed
+    analytics_shop.stg_customers:
+      rows:
+        - customer_id: 1
+          full_name: Ada Lovelace
+          country_code: GB
+    analytics_shop.country_codes:
+      rows:
+        - country_code: GB
+          country_name: United Kingdom
+          region: Europe
+    analytics_shop.stg_order_items:
+      rows:
+        - order_item_id: 1
+          order_id: 100
+          product_id: 1
+          quantity: 2
+          line_revenue: 258.00
+        - order_item_id: 2
+          order_id: 100
+          product_id: 2
+          quantity: 1
+          line_revenue: 49.00
+  outputs:
+    query:
+      partial: true
+      rows:
+        - order_id: 100
+          customer_name: Ada Lovelace
+          country_name: United Kingdom
+          region: Europe
+          item_count: 2
+          total_units: 3
+          order_revenue: 307.00

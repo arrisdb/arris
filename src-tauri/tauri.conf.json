@@ -1,0 +1,55 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Arris",
+  "version": "0.6.0",
+  "identifier": "app.arrisdb.desktop",
+  "build": {
+    "frontendDist": "../frontend/dist",
+    "devUrl": "http://localhost:5173",
+    "beforeDevCommand": "npm --prefix \"$(git rev-parse --show-toplevel)/frontend\" run dev",
+    "beforeBuildCommand": "npm --prefix \"$(git rev-parse --show-toplevel)/frontend\" run build"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Arris",
+        "width": 1400,
+        "height": 900,
+        "minWidth": 1100,
+        "minHeight": 700,
+        "decorations": true,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": [
+      "dmg",
+      "app"
+    ],
+    "createUpdaterArtifacts": true,
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.png"
+    ],
+    "macOS": {
+      "minimumSystemVersion": "12.0",
+      "entitlements": "entitlements.plist"
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDlBMjM4RTRDNTMyNDdGNEIKUldSTGZ5UlRUSTRqbWtrcENoS3BxOXNCcFVLUC9PcUJRUmwyVy9aT3ZzRG1mRndMdk9TT1RBTXAK",
+      "endpoints": [
+        "https://github.com/arrisdb/arris/releases/latest/download/latest.json"
+      ]
+    }
+  }
+}

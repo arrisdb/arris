@@ -1,0 +1,29 @@
+/* Terminal view */
+.mdbc-terminal {
+  position: relative;
+  height: 100%;
+  min-height: 0;
+  background: var(--m-bg-editor);
+  overflow: hidden;
+}
+.mdbc-terminal-host {
+  height: 100%;
+  min-height: 0;
+  padding: 8px 10px;
+  box-sizing: border-box;
+}
+.mdbc-terminal .xterm {
+  height: 100%;
+}
+.mdbc-terminal-error {
+  position: absolute;
+  inset: 8px 10px auto 10px;
+  padding: 8px 10px;
+  border: 0.5px solid rgba(255,95,95,0.35);
+  border-radius: var(--m-r-xs);
+  background: rgba(70, 20, 24, 0.92);
+  color: var(--m-red);
+  font-family: var(--m-font-editor, var(--m-font-mono));
+  font-size: var(--m-fs-xs);
+  word-break: break-word;
+}

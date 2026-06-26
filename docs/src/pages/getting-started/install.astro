@@ -1,0 +1,109 @@
+---
+import "../../styles/global.css";
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import Steps from "../../components/docs/Steps/Steps.astro";
+import Step from "../../components/docs/Step/Step.astro";
+import Screenshot from "../../components/docs/Screenshot/Screenshot.astro";
+---
+
+<DocsLayout
+  title="Install Arris | Arris Docs"
+  breadcrumbs={[{ label: "Docs", href: "/" }, { label: "Getting started" }, { label: "Install" }]}
+  heading="Install Arris"
+  lede="Download and install Arris in under a minute."
+  tocItems={[
+    { label: "System requirements", href: "#requirements" },
+    { label: "Download", href: "#download" },
+    { label: "First launch", href: "#first-launch" },
+    { label: "Welcome screen", href: "#welcome-screen" },
+    { label: "Updating", href: "#updating" },
+    { label: "Uninstalling", href: "#uninstalling" },
+  ]}
+  currentPath="/getting-started/install"
+  next={{ label: "Your first query", href: "/getting-started/first-query", section: "Getting started" }}
+>
+  <h2 id="requirements">System requirements</h2>
+
+  <ul>
+    <li><strong>macOS 12 (Monterey)</strong> or later</li>
+    <li><strong>Apple Silicon</strong> (M1 and later) or <strong>Intel</strong> (x86_64)</li>
+    <li>No additional runtimes, JVMs, or drivers required. Everything is bundled.</li>
+  </ul>
+
+  <h2 id="download">Download</h2>
+
+  <p>
+    The recommended way to install Arris is to download the latest release directly from
+    the official website:
+  </p>
+
+  <p>
+    <strong><a href="https://arrisdb.app/download" class="text-accent-2 hover:text-fg transition-colors">arrisdb.app/download</a></strong>
+  </p>
+
+  <p>
+    The download page detects your architecture automatically and offers the correct
+    <code>.dmg</code> file. Open the disk image and drag <strong>Arris.app</strong> into
+    your <strong>Applications</strong> folder.
+  </p>
+
+  <h2 id="first-launch">First launch</h2>
+
+  <Steps>
+    <Step num={1} title="Gatekeeper prompt">
+      <p>
+        On the first launch, macOS Gatekeeper will ask you to confirm that you want to open
+        an app downloaded from the internet. Click <strong>Open</strong> to proceed. Arris
+        is signed and notarized by Apple, so this prompt appears only once.
+      </p>
+    </Step>
+
+    <Step num={2} title="Keychain access">
+      <p>
+        Arris stores database passwords in the macOS Keychain. On first launch, the system
+        will prompt you to allow Keychain access. Click <strong>Always Allow</strong> so you
+        do not need to re-authorize on every connection.
+      </p>
+    </Step>
+
+  </Steps>
+
+  <h2 id="welcome-screen">Welcome screen</h2>
+
+  <p>
+    Once permissions are granted, Arris opens on the Welcome screen. It is the launchpad for
+    everything you do next.
+  </p>
+
+  <Screenshot
+    src="/screenshots/welcome-screen.png"
+    alt="The Arris Welcome screen showing new project options, open existing, and recent projects"
+    caption="The Welcome screen: start a new project, open an existing folder, or jump back into recent work."
+  />
+
+  <ul>
+    <li><strong>New project</strong> scaffolds an empty workspace or a sample dbt or SQLMesh project to explore.</li>
+    <li><strong>Open existing</strong> opens a local folder or clones a Git repository straight into Arris.</li>
+    <li><strong>Pick up where you left off</strong> lists your recent projects so you can resume in one click.</li>
+  </ul>
+
+  <h2 id="updating">Updating</h2>
+
+  <p>
+    Arris includes a built-in auto-updater. A button at the right end of the top bar checks for
+    updates: click <strong>Check for updates</strong> and it reports either that you are on the
+    latest version or that a new one is ready. When an update is available the button becomes
+    <strong>Update to vX.Y.Z</strong>; click it to download and install. The app restarts
+    automatically with your tabs and connections preserved.
+  </p>
+
+  <h2 id="uninstalling">Uninstalling</h2>
+
+  <p>
+    To remove Arris, drag <strong>Arris.app</strong> from <code>/Applications</code> to
+    the Trash. Application data is stored in
+    <code>~/Library/Application Support/Arris/</code>. Delete this folder to remove
+    all cached schemas, query history, and settings. Keychain entries are removed automatically
+    when the app is deleted.
+  </p>
+</DocsLayout>

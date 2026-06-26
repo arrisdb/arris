@@ -1,0 +1,17 @@
+test_stg_order_items_line_revenue:
+  model: analytics_shop.stg_order_items
+  inputs:
+    analytics_shop.raw_order_items:
+      rows:
+        - order_item_id: 1
+          order_id: 100
+          product_id: 1
+          quantity: 2
+          unit_price: 49.00
+  outputs:
+    query:
+      partial: true
+      rows:
+        - order_item_id: 1
+          unit_price: 49.00
+          line_revenue: 98.00

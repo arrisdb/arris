@@ -1,0 +1,42 @@
+/* ─── Number Stepper ──────────────────────────────────────────────── */
+.mdbc-stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  height: 28px;
+  border: 0.5px solid var(--m-sep-strong);
+  border-radius: 6px;
+  background: rgb(var(--m-overlay-rgb) / 0.03);
+  overflow: hidden;
+}
+.mdbc-stepper-btn {
+  display: flex; align-items: center; justify-content: center;
+  width: 28px; height: 100%;
+  border: none; background: transparent;
+  color: var(--m-fg-2); cursor: pointer;
+  font-size: var(--m-fs-lg); font-weight: 500;
+  line-height: 1;
+}
+.mdbc-stepper-btn:hover { background: rgb(var(--m-overlay-rgb) / 0.08); color: var(--m-fg); }
+.mdbc-stepper-btn:active { background: rgb(var(--m-overlay-rgb) / 0.12); }
+.mdbc-stepper-btn:disabled { opacity: 0.3; cursor: default; pointer-events: none; }
+.mdbc-stepper-input {
+  width: 48px; height: 100%;
+  border: none; border-left: 0.5px solid var(--m-sep-strong); border-right: 0.5px solid var(--m-sep-strong);
+  background: transparent;
+  color: var(--m-fg);
+  font-family: var(--m-font);
+  font-size: var(--m-fs-md);
+  text-align: center;
+  outline: none;
+  -moz-appearance: textfield;
+}
+.mdbc-stepper-input::-webkit-inner-spin-button,
+.mdbc-stepper-input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.mdbc-stepper-input:focus { background: rgb(var(--m-overlay-rgb) / 0.05); }
+.mdbc-stepper-suffix {
+  padding: 0 6px 0 0;
+  font-family: var(--m-font);
+  font-size: var(--m-fs-sm);
+  color: var(--m-fg-3);
+}

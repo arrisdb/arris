@@ -1,0 +1,132 @@
+/* Split button: primary action + chevron dropdown. Menu reuses .mdbc-select-menu. */
+.mdbc-splitbtn {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+/* Cap menu height so a long action list scrolls instead of running off-screen;
+   the trigger also flips the menu upward when there's no room below. */
+.mdbc-splitbtn-menu {
+  max-height: calc(100vh - 16px);
+  overflow-y: auto;
+}
+.mdbc-splitbtn.full {
+  display: flex;
+  width: 100%;
+}
+.mdbc-splitbtn.full .mdbc-splitbtn-primary {
+  flex: 1;
+  justify-content: center;
+}
+.mdbc-splitbtn-primary,
+.mdbc-splitbtn-toggle {
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--m-fs-sm);
+  color: var(--m-fg);
+  background: rgb(var(--m-overlay-rgb) / 0.08);
+  border: 0.5px solid var(--m-sep-strong);
+  cursor: pointer;
+  font-weight: 600;
+}
+.mdbc-splitbtn-primary {
+  padding: 0 10px;
+  border-radius: var(--m-r-control) 0 0 var(--m-r-control);
+}
+.mdbc-splitbtn-toggle {
+  padding: 0 6px;
+  border-radius: 0 var(--m-r-control) var(--m-r-control) 0;
+  border-left: 0.5px solid var(--m-sep-strong);
+}
+.mdbc-splitbtn-primary:hover:not(:disabled),
+.mdbc-splitbtn-toggle:hover {
+  background: rgb(var(--m-overlay-rgb) / 0.12);
+}
+.mdbc-splitbtn-primary:disabled {
+  opacity: 0.45;
+  cursor: default;
+  filter: none;
+}
+.mdbc-splitbtn-caret {
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 4px solid currentColor;
+}
+.mdbc-splitbtn-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 32px;
+  width: 100%;
+  height: 30px;
+  padding: 0 10px;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  color: var(--m-fg);
+  font-family: var(--m-font);
+  font-size: var(--m-fs-md);
+  cursor: pointer;
+}
+.mdbc-splitbtn-item:not(.disabled):hover {
+  background: rgb(var(--m-overlay-rgb) / 0.08);
+}
+.mdbc-splitbtn-item.disabled {
+  opacity: 0.4;
+  pointer-events: none;
+}
+.mdbc-splitbtn-item.active {
+  color: var(--m-accent-2);
+}
+.mdbc-splitbtn-item-main {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.mdbc-splitbtn-item-label {
+  white-space: nowrap;
+}
+.mdbc-splitbtn-item-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.mdbc-splitbtn-scope {
+  font-family: var(--m-font);
+  font-size: var(--m-fs-xs);
+  color: var(--m-fg-2);
+  background: rgb(var(--m-overlay-rgb) / 0.06);
+  border: 0.5px solid var(--m-sep);
+  border-radius: 4px;
+  padding: 1px 6px;
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mdbc-splitbtn-shortcut {
+  font-family: var(--m-font);
+  font-size: var(--m-fs-xs);
+  color: var(--m-fg-3);
+}
+.mdbc-splitbtn-scope-input {
+  width: 240px;
+  padding: 2px 6px;
+  background: rgb(var(--m-overlay-rgb) / 0.06);
+  border: 0.5px solid var(--m-sep);
+  border-radius: 4px;
+  color: var(--m-fg);
+  font-family: var(--m-font);
+  font-size: var(--m-fs-xs);
+  outline: none;
+}
+.mdbc-splitbtn-scope-input:focus {
+  border-color: var(--m-accent);
+  background: rgb(var(--m-overlay-rgb) / 0.04);
+}

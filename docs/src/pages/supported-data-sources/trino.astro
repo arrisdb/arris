@@ -1,0 +1,168 @@
+---
+import "../../styles/global.css";
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import DocTable from "../../components/docs/DocTable/DocTable.astro";
+import CodeBlock from "../../components/docs/CodeBlock/CodeBlock.astro";
+---
+
+<DocsLayout
+  title="Trino — Arris Docs"
+  breadcrumbs={[{ label: "Docs", href: "/" }, { label: "Connections", href: "/connections/overview" }, { label: "Trino" }]}
+  heading="Trino"
+  tocItems={[
+    { label: "Overview", href: "#overview" },
+    { label: "Driver", href: "#driver" },
+    { label: "Connection fields", href: "#fields" },
+    { label: "URI format", href: "#uri" },
+    { label: "SSL & TLS", href: "#ssl" },
+    { label: "Schema browser", href: "#schema" },
+    { label: "Supported SQL commands", href: "#features" },
+  ]}
+  currentPath="/supported-data-sources/trino"
+  prev={{ label: "StarRocks", href: "/supported-data-sources/starrocks", section: "Connections" }}
+  next={{ label: "Editor", href: "/querying/editor", section: "Querying" }}
+>
+  <h2 id="overview">
+    <img src="/db-logos/trino.png" alt="Trino logo" width="32" height="32" class="docLogo" />
+    Overview
+  </h2>
+
+  <p>
+    Trino is a distributed SQL query engine built for fast analytics over large data sets.
+    Rather than storing data itself, Trino federates queries across many connectors &mdash;
+    Hive, Iceberg, PostgreSQL, MySQL, Kafka, object stores, and dozens more &mdash; under a
+    single ANSI SQL interface. Its model is <code>catalog</code> &rarr; <code>schema</code> &rarr;
+    <code>table</code>, where each catalog is a configured connector to an underlying system.
+    Trino runs as a coordinator plus worker cluster and is the open-source engine behind Starburst.
+  </p>
+
+  <h2 id="driver">Driver</h2>
+
+  <ul>
+    <li><strong>Crate:</strong> <a href="https://crates.io/crates/reqwest"><code>reqwest</code></a></li>
+    <li><strong>Version:</strong> <code>0.13</code></li>
+  </ul>
+
+  <h2 id="fields">Connection fields</h2>
+
+  <DocTable>
+    <thead>
+      <tr>
+        <th>Field</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="font-medium text-fg">Host</td>
+        <td>Trino coordinator hostname.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">Port</td>
+        <td>Coordinator HTTP port. Use <code>8443</code> for HTTPS clusters.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">Catalog</td>
+        <td>Default catalog (connector) for unqualified queries, e.g. <code>tpch</code> or <code>memory</code>.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">Schema</td>
+        <td>Default schema within the catalog. Stored in <code>options</code> as <code>schema=NAME</code>.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">User</td>
+        <td>Trino user, sent as the <code>X-Trino-User</code> header.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">Password</td>
+        <td>Optional password for HTTP basic auth. Stored in the macOS Keychain.</td>
+      </tr>
+    </tbody>
+  </DocTable>
+
+  <p>
+    All connections also support an optional <strong>SSH tunnel</strong>. Configure the bastion
+    host, port, user, and private key file under the SSH section of the connection form. See
+    <a href="/connections/ssh-tunnels">SSH tunnels</a> for details.
+  </p>
+
+  <h2 id="uri">URI format</h2>
+
+  <p>
+    Instead of filling in each field individually, you can paste a connection URI into the
+    <strong>Paste URI</strong> field. Arris parses the URI and populates all fields automatically.
+  </p>
+
+  <CodeBlock lang="text" filename="Connection URI">
+    trino://user:password@host:8080/catalog?schema=default
+  </CodeBlock>
+
+  <p>
+    The path segment maps to the default catalog and the <code>schema</code> query parameter sets
+    the default schema. Cluster URLs copied from a managed Trino or Starburst deployment can be
+    pasted directly &mdash; Arris extracts the host, port, and catalog automatically.
+  </p>
+
+  <h2 id="ssl">SSL &amp; TLS</h2>
+
+  <p>
+    Set <strong>SSL Mode</strong> to a TLS-enabling value to connect over <code>https</code>; combined with a password
+    this sends HTTP basic auth credentials securely to the coordinator. Production Trino clusters
+    typically expose HTTPS on port <code>8443</code>, while a local development cluster serves
+    plain <code>http</code> on <code>8080</code>.
+  </p>
+
+  <h2 id="schema">Schema browser</h2>
+
+  <p>
+    Once connected, Arris runs <code>SHOW CATALOGS</code> to list the catalogs as top-level
+    nodes. Pick one in the <strong>Catalogs</strong> selector and Arris queries that catalog's
+    <code>information_schema</code> to load its schemas, their tables and views, and each column
+    with its type. Catalogs load on demand, so connecting stays fast even against a server with
+    many connectors. Each schema groups its objects by category.
+  </p>
+
+  <ul>
+    <li><strong>Tables</strong> &mdash; base tables</li>
+    <li><strong>Views</strong> &mdash; views</li>
+  </ul>
+
+  <p>
+    Double-click any table or view to open it in a new tab with browse mode.
+  </p>
+
+
+
+  <h2 id="features">Supported SQL commands</h2>
+
+  <DocTable>
+    <thead>
+      <tr>
+        <th>Command</th>
+        <th>Notes</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="font-medium text-fg"><code>SELECT</code></td>
+        <td>Query data with <code>WHERE</code> filters, <code>JOIN</code>s, aggregates, and window functions.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><code>INSERT</code></td>
+        <td>On connectors that allow writes.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><code>UPDATE</code></td>
+        <td>On connectors that allow writes.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><code>DELETE</code></td>
+        <td>On connectors that allow writes.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><code>CREATE</code> / <code>DROP</code></td>
+        <td>On connectors that allow writes.</td>
+      </tr>
+    </tbody>
+  </DocTable>
+</DocsLayout>

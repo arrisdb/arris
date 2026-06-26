@@ -1,0 +1,34 @@
+version: 2
+
+models:
+  - name: stg_orders
+    description: Staged orders with renamed columns
+    columns:
+      - name: order_id
+        description: Primary key
+        tests:
+          - unique
+          - not_null
+      - name: customer_id
+        description: FK to customers
+      - name: order_date
+        description: Date of order
+      - name: status
+        description: Order status
+      - name: amount
+        description: Total in cents
+
+  - name: stg_customers
+    description: Staged customer data
+    columns:
+      - name: customer_id
+        description: Primary key
+        tests:
+          - unique
+          - not_null
+      - name: first_name
+        description: First name
+      - name: last_name
+        description: Last name
+      - name: email
+        description: Email address

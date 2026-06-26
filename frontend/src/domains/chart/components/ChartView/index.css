@@ -1,0 +1,52 @@
+.mdbc-chart-view {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+.mdbc-chart-title {
+  flex: 0 0 auto;
+  text-align: center;
+  font-size: var(--m-fs-md);
+  font-weight: 600;
+  color: var(--m-fg-1, #e8e8ea);
+  padding: 6px 8px 0;
+}
+.mdbc-chart-view-body {
+  flex: 1;
+  min-height: 0;
+  padding: 8px;
+}
+.mdbc-chart-empty {
+  height: 100%;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: var(--m-fg-3, #888);
+}
+.mdbc-chart-empty-label {
+  font-size: var(--m-fs-sm);
+}
+.mdbc-chart-kpi-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 4px;
+}
+.mdbc-chart-kpi-value {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.mdbc-chart-kpi-label {
+  font-size: var(--m-fs-sm);
+  color: var(--m-fg-3, #888);
+}
+.mdbc-chart-kpi-value-style {
+  font-size: var(--mdbc-chart-kpi-font-size);
+  color: var(--mdbc-chart-kpi-color);
+}

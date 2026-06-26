@@ -1,0 +1,148 @@
+---
+import '../styles/global.css';
+import Layout from './Layout.astro';
+import Nav from '../components/Nav/Nav.astro';
+import DocsSidebar from '../components/docs/DocsSidebar/DocsSidebar.astro';
+import DocsTOC from '../components/docs/DocsTOC/DocsTOC.astro';
+import ArticleFooter from '../components/docs/ArticleFooter/ArticleFooter.astro';
+import styles from './DocsLayout.module.css';
+
+interface Props {
+  title: string;
+  breadcrumbs: { label: string; href?: string }[];
+  heading: string;
+  lede?: string;
+  meta?: { author: string; updated: string; readTime: string };
+  tocItems: { label: string; href: string; level?: number }[];
+  currentPath: string;
+  prev?: { label: string; href: string; section: string };
+  next?: { label: string; href: string; section: string };
+}
+
+const { title, breadcrumbs, heading, lede, meta, tocItems, currentPath, prev, next } = Astro.props;
+---
+
+<Layout title={title}>
+  <Nav active="docs" docs />
+
+  <div class:list={["max-w-[1400px] mx-auto px-8", styles.docs]} data-docs-root>
+    <!-- Mobile backdrop for the sidebar drawer -->
+    <div class:list={[styles.backdrop]} data-docs-backdrop></div>
+
+    <!-- Left sidebar -->
+    <div class:list={[styles.sideColumn]}>
+      <DocsSidebar currentPath={currentPath} />
+    </div>
+
+    <!-- Main article -->
+    <article class:list={[styles.article]}>
+      <!-- Breadcrumbs -->
+      <nav class:list={[styles.crumbs]}>
+        {breadcrumbs.map((crumb, i) => (
+          <>
+            {i > 0 && <span class:list={[styles.crumbSep]}>/</span>}
+            {crumb.href ? (
+              <a href={crumb.href} class:list={[styles.crumbLink]}>{crumb.label}</a>
+            ) : (
+              <span class:list={[styles.crumbCurrent]}>{crumb.label}</span>
+            )}
+          </>
+        ))}
+      </nav>
+
+      <!-- Heading -->
+      <h1 class:list={[styles.heading]}>{heading}</h1>
+
+      <!-- Lede -->
+      {lede && <p class:list={[styles.lede]} set:html={lede} />}
+
+      <!-- Meta line -->
+      {meta && (
+        <div class:list={[styles.meta]}>
+          <div class:list={[styles.avatar]} />
+          <span>{meta.author}</span>
+          <span class:list={[styles.metaDot]} />
+          <span>Updated {meta.updated}</span>
+          <span class:list={[styles.metaDot]} />
+          <span>{meta.readTime}</span>
+          <span class:list={[styles.metaDot]} />
+          <a
+            href="https://github.com/arrisdb/arris"
+            class:list={[styles.metaLink, "inline-flex items-center gap-1.5"]}
+          >
+            <svg width="12" height="12" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
+            </svg>
+            Edit on GitHub
+          </a>
+        </div>
+      )}
+
+      <!-- Page content -->
+      <slot />
+
+      <!-- Prev/Next footer -->
+      <ArticleFooter prev={prev} next={next} />
+    </article>
+
+    <!-- Right TOC -->
+    <div class:list={[styles.tocColumn]}>
+      <DocsTOC items={tocItems} />
+    </div>
+  </div>
+</Layout>
+
+<script>
+  // Re-bind on every navigation: ClientRouter swaps the nav + docs DOM on each
+  // view transition, so listeners bound once on first load would go stale.
+  function initDocsDrawer() {
+    const root = document.querySelector('[data-docs-root]');
+    // The docs drawer is opened by the nav hamburger (rendered in Nav.astro).
+    const toggle = document.querySelector('[data-docs-nav-toggle]');
+    const backdrop = document.querySelector('[data-docs-backdrop]');
+    if (!root || !toggle || !backdrop) return;
+    const setOpen = (open: boolean) => {
+      root.classList.toggle('docs-drawer-open', open);
+      toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    };
+    toggle.addEventListener('click', () => setOpen(!root.classList.contains('docs-drawer-open')));
+    backdrop.addEventListener('click', () => setOpen(false));
+    // Close after navigating to a docs page from the drawer.
+    root.querySelectorAll('[data-docs-sidebar] a').forEach((link) => {
+      link.addEventListener('click', () => setOpen(false));
+    });
+  }
+
+  document.addEventListener('astro:page-load', initDocsDrawer);
+</script>
+
+<script>
+  import { track, MixpanelEvent } from '../lib/analytics';
+
+  // Track which doc sections a reader actually scrolls into view. Rebuilt on
+  // every navigation since the article (and its headings) is swapped out.
+  let sectionObserver: IntersectionObserver | undefined;
+
+  function initSectionTracking() {
+    sectionObserver?.disconnect();
+    const headings = document.querySelectorAll('article :is(h2, h3)[id]');
+    if (!headings.length) return;
+
+    const seen = new Set<string>();
+    sectionObserver = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          const id = entry.target.id;
+          if (entry.isIntersecting && !seen.has(id)) {
+            seen.add(id);
+            track(MixpanelEvent.SectionViewed, { section: id, path: location.pathname });
+          }
+        }
+      },
+      { threshold: 0.5 },
+    );
+    headings.forEach((h) => sectionObserver!.observe(h));
+  }
+
+  document.addEventListener('astro:page-load', initSectionTracking);
+</script>

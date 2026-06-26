@@ -1,0 +1,1 @@
+export const DEFAULT_RESULTS_PAGE_SIZE = 100;

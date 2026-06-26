@@ -1,0 +1,52 @@
+{
+  "metadata": {
+    "dbt_schema_version": "https://schemas.getdbt.com/dbt/run-results/v6.json",
+    "dbt_version": "1.12.0b1",
+    "generated_at": "2026-05-29T12:00:00.000000Z",
+    "invocation_id": "00000000-0000-0000-0000-000000000000"
+  },
+  "results": [
+    {
+      "status": "pass",
+      "timing": [],
+      "thread_id": "Thread-1",
+      "execution_time": 0.042,
+      "adapter_response": {},
+      "message": null,
+      "failures": 0,
+      "unique_id": "test.jaffle_shop.unique_dim_customers_customer_id.abc123"
+    },
+    {
+      "status": "fail",
+      "timing": [],
+      "thread_id": "Thread-2",
+      "execution_time": 0.071,
+      "adapter_response": {},
+      "message": "Got 3 results, configured to fail if != 0",
+      "failures": 3,
+      "unique_id": "test.jaffle_shop.not_null_dim_customers_customer_id.def456"
+    },
+    {
+      "status": "error",
+      "timing": [],
+      "thread_id": "Thread-3",
+      "execution_time": 0.013,
+      "adapter_response": {},
+      "message": "Database Error: relation does not exist",
+      "failures": null,
+      "unique_id": "model.jaffle_shop.broken_model"
+    },
+    {
+      "status": "success",
+      "timing": [],
+      "thread_id": "Thread-4",
+      "execution_time": 1.234,
+      "adapter_response": {"_message": "SELECT 100", "rows_affected": 100, "code": "SELECT"},
+      "message": "SELECT 100",
+      "failures": null,
+      "unique_id": "model.jaffle_shop.dim_customers"
+    }
+  ],
+  "elapsed_time": 2.5,
+  "args": {"which": "test"}
+}

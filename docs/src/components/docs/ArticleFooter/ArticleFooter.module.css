@@ -1,0 +1,115 @@
+.footer {
+  margin-top: 60px;
+  padding-top: 32px;
+  border-top: 0.5px solid rgba(255, 255, 255, 0.06);
+}
+
+.helpful {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 28px;
+}
+
+.helpfulLabel {
+  font-size: 13px;
+  color: var(--color-fg-3);
+}
+
+.helpfulBtn {
+  padding: 6px 14px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 0.5px solid rgba(255, 255, 255, 0.08);
+  font-size: 12.5px;
+  color: var(--color-fg-3);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.helpfulBtn:hover {
+  background: var(--color-accent-tint);
+  border-color: rgba(124, 140, 255, 0.4);
+  color: var(--color-fg);
+}
+
+.helpfulThanks {
+  display: none;
+  font-size: 13px;
+  color: var(--color-fg-3);
+}
+
+/* Once feedback is submitted, swap the prompt for a thank-you. */
+.helpful[data-mp-done] .helpfulLabel,
+.helpful[data-mp-done] .helpfulBtn {
+  display: none;
+}
+
+.helpful[data-mp-done] .helpfulThanks {
+  display: inline;
+}
+
+.pagination {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding-top: 22px;
+  border-top: 0.5px solid rgba(255, 255, 255, 0.06);
+}
+
+.paginationEnd {
+  justify-content: flex-end;
+}
+
+.paginationStart {
+  justify-content: flex-start;
+}
+
+.pageLink {
+  flex: 1;
+  min-width: 0;
+  padding: 14px 18px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 0.5px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.pageLink:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+.pageLinkNext {
+  text-align: right;
+  align-items: flex-end;
+}
+
+.pageLinkSolo {
+  flex: 0 0 auto;
+  width: 320px;
+  max-width: 60%;
+}
+
+.pageLinkLabel {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-fg-4);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.pageLinkTitle {
+  font-size: 14.5px;
+  color: var(--color-fg);
+  font-weight: 500;
+}
+
+.pageLinkSection {
+  font-size: 11px;
+  color: var(--color-fg-4);
+  margin-top: 2px;
+}

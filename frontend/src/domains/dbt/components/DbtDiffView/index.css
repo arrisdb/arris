@@ -1,0 +1,137 @@
+.mdbc-diff-view {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  overflow: auto;
+  height: 100%;
+}
+
+.mdbc-diff-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.mdbc-diff-chip {
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 0.5px solid var(--m-sep);
+  font-size: var(--m-fs-xs);
+  white-space: nowrap;
+}
+
+.mdbc-diff-chip.added {
+  color: var(--m-success, #2ea043);
+  border-color: var(--m-success, #2ea043);
+}
+
+.mdbc-diff-chip.removed {
+  color: var(--m-danger, #d1242f);
+  border-color: var(--m-danger, #d1242f);
+}
+
+.mdbc-diff-chip.updated {
+  color: var(--m-warning, #bf8700);
+  border-color: var(--m-warning, #bf8700);
+}
+
+.mdbc-diff-chip.mode {
+  color: var(--m-fg-3);
+}
+
+.mdbc-diff-chip.key {
+  color: var(--m-fg-3);
+  font-family: var(--m-font-editor, var(--m-font-mono));
+}
+
+.mdbc-diff-schema {
+  font-size: var(--m-fs-xs);
+  color: var(--m-fg-3);
+}
+
+.mdbc-diff-updated {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-top: 0.5px solid var(--m-sep);
+  padding-top: 10px;
+}
+
+.mdbc-diff-updated-heading {
+  margin: 0;
+  font-size: var(--m-fs-xs);
+  font-weight: 600;
+  color: var(--m-fg-2);
+}
+
+.mdbc-diff-row-old-label {
+  color: var(--m-danger, #d1242f);
+  font-family: var(--m-font-editor, var(--m-font-mono));
+}
+
+.mdbc-diff-row-new-label {
+  color: var(--m-success, #2ea043);
+  font-family: var(--m-font-editor, var(--m-font-mono));
+}
+
+/* One row per key. A changed cell shows old (red, struck through) → new (green)
+   inline, git-style; unchanged cells render plainly. */
+.mdbc-diff-cell-changed {
+  white-space: nowrap;
+}
+
+.mdbc-diff-old {
+  background: rgb(209 36 47 / 0.16);
+  color: var(--m-danger, #d1242f);
+  text-decoration: line-through;
+  padding: 0 4px;
+  border-radius: 3px;
+}
+
+.mdbc-diff-new {
+  background: rgb(46 160 67 / 0.16);
+  color: var(--m-success, #2ea043);
+  padding: 0 4px;
+  border-radius: 3px;
+  margin-left: 6px;
+}
+
+.mdbc-diff-new::before {
+  content: "→";
+  margin-right: 6px;
+  color: var(--m-fg-4);
+  text-decoration: none;
+}
+
+.mdbc-diff-sample-title {
+  margin: 0 0 4px;
+  font-size: var(--m-fs-xs);
+  font-weight: 600;
+  color: var(--m-fg-2);
+}
+
+.mdbc-diff-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--m-fs-xs);
+  font-family: var(--m-font-editor, var(--m-font-mono));
+}
+
+.mdbc-diff-table th,
+.mdbc-diff-table td {
+  padding: 2px 8px;
+  border: 0.5px solid var(--m-sep);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.mdbc-diff-table th {
+  color: var(--m-fg-3);
+  font-weight: 600;
+}
+
+.mdbc-diff-empty {
+  font-size: var(--m-fs-xs);
+  color: var(--m-fg-4);
+}

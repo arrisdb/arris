@@ -1,0 +1,200 @@
+---
+import "../../styles/global.css";
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import DocTable from "../../components/docs/DocTable/DocTable.astro";
+
+import CodeBlock from "../../components/docs/CodeBlock/CodeBlock.astro";
+---
+
+<DocsLayout
+  title="MySQL — Arris Docs"
+  breadcrumbs={[{ label: "Docs", href: "/" }, { label: "Connections", href: "/connections/overview" }, { label: "MySQL" }]}
+  heading="MySQL"
+  tocItems={[
+    { label: "Overview", href: "#overview" },
+    { label: "Driver", href: "#driver" },
+    { label: "Connection fields", href: "#fields" },
+    { label: "URI format", href: "#uri" },
+    { label: "SSL & TLS", href: "#ssl" },
+    { label: "Schema browser", href: "#schema" },
+    { label: "Supported SQL commands", href: "#features" },
+  ]}
+  currentPath="/supported-data-sources/mysql"
+  prev={{ label: "MSSQL", href: "/supported-data-sources/mssql", section: "Connections" }}
+  next={{ label: "Oracle", href: "/supported-data-sources/oracle", section: "Connections" }}
+>
+  <h2 id="overview">
+    <img src="/db-logos/mysql.png" alt="MySQL logo" width="32" height="32" class="docLogo" />
+    Overview
+  </h2>
+
+  <p>
+    MySQL is an open-source relational database and one of the most widely deployed database
+    engines in the world. It powers web applications, SaaS platforms, and data warehouses with
+    features like InnoDB transactions, replication, JSON support, and full-text search. MySQL is
+    available as a managed service on Amazon RDS, Aurora, Google Cloud SQL, Azure Database,
+    PlanetScale, and Vitess.
+  </p>
+
+  <h2 id="driver">Driver</h2>
+
+  <ul>
+    <li><strong>Crate:</strong> <a href="https://crates.io/crates/mysql_async"><code>mysql_async</code></a></li>
+    <li><strong>Version:</strong> <code>0.36</code></li>
+  </ul>
+
+  <h2 id="fields">Connection fields</h2>
+
+  <DocTable>
+    <thead>
+      <tr>
+        <th>Field</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="font-medium text-fg">Host</td>
+        <td>Hostname or IP address of the MySQL server.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">Port</td>
+        <td>TCP port the server listens on.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">Database</td>
+        <td>Name of the default database to connect to.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">User</td>
+        <td>Authentication username.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">Password</td>
+        <td>Authentication password. Stored in the macOS Keychain.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">SSL Mode</td>
+        <td>One of <code>disable</code>, <code>prefer</code>, <code>require</code>, <code>verify-ca</code>, or <code>verify-full</code>.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">Options</td>
+        <td>Additional connection parameters as <code>key1=val1&amp;key2=val2</code>.</td>
+      </tr>
+    </tbody>
+  </DocTable>
+
+  <p>
+    All connections also support an optional <strong>SSH tunnel</strong>. Configure the bastion
+    host, port, user, and private key file under the SSH section of the connection form. See
+    <a href="/connections/ssh-tunnels">SSH tunnels</a> for details.
+  </p>
+
+  <h2 id="uri">URI format</h2>
+
+  <p>
+    Instead of filling in each field individually, you can paste a connection URI into the
+    <strong>Paste URI</strong> field. Arris parses the URI and populates all fields automatically.
+  </p>
+
+  <CodeBlock lang="text" filename="Connection URI">
+    mysql://user:password@host:3306/dbname?ssl-mode=REQUIRED
+  </CodeBlock>
+
+  <h2 id="ssl">SSL &amp; TLS</h2>
+
+  <p>
+    MySQL supports five SSL modes. Arris defaults to <code>prefer</code>, which uses
+    SSL if the server supports it but falls back to unencrypted if not.
+  </p>
+
+  <DocTable>
+    <thead>
+      <tr>
+        <th>SSL Mode</th>
+        <th>Behavior</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="font-medium text-fg"><code>disable</code></td>
+        <td>Never use SSL. Not recommended for production.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><code>prefer</code></td>
+        <td>Use SSL if available, fall back to unencrypted.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><code>require</code></td>
+        <td>Always use SSL. Fail if the server does not support it.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><code>verify-ca</code></td>
+        <td>Require SSL and verify the server certificate against a CA.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><code>verify-full</code></td>
+        <td>Require SSL, verify the CA, and verify the server hostname matches the certificate.</td>
+      </tr>
+    </tbody>
+  </DocTable>
+
+  <h2 id="schema">Schema browser</h2>
+
+  <p>
+    Once connected, Arris fetches the schema tree from <code>information_schema</code> and
+    organizes it into groups. In MySQL, databases act as schema-level containers &mdash; the tree
+    shows databases at the top level, each containing its own object groups.
+  </p>
+
+  <p>
+    The schema tree displays the following object types, grouped by category:
+  </p>
+
+  <ul>
+    <li><strong>Tables</strong> &mdash; regular tables</li>
+    <li><strong>Views</strong> &mdash; views</li>
+    <li><strong>Routines</strong> &mdash; functions and stored procedures</li>
+    <li><strong>Events</strong> &mdash; scheduled events</li>
+    <li><strong>Triggers</strong> &mdash; table-level triggers</li>
+  </ul>
+
+  <p>
+    Double-click any table or view to open it in a new tab with browse mode.
+  </p>
+
+
+
+  <h2 id="features">Supported SQL commands</h2>
+
+  <DocTable>
+    <thead>
+      <tr>
+        <th>Command</th>
+        <th>Notes</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="font-medium text-fg"><code>SELECT</code></td>
+        <td>Query data with <code>WHERE</code> filters, <code>JOIN</code>s, aggregates, and window functions.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><code>INSERT</code></td>
+        <td>Insert single or multiple rows.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><code>UPDATE</code></td>
+        <td>Update existing rows.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><code>DELETE</code></td>
+        <td>Delete rows.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><code>CREATE</code> / <code>DROP</code></td>
+        <td>Create and drop tables, views, and other schema objects.</td>
+      </tr>
+    </tbody>
+  </DocTable>
+</DocsLayout>

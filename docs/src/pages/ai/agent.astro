@@ -1,0 +1,201 @@
+---
+import "../../styles/global.css";
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import DocTable from "../../components/docs/DocTable/DocTable.astro";
+import Screenshot from "../../components/docs/Screenshot/Screenshot.astro";
+---
+
+<DocsLayout
+  title="AI Agent — Arris Docs"
+  breadcrumbs={[{ label: "Docs", href: "/" }, { label: "AI" }, { label: "AI Agent" }]}
+  heading="AI Agent"
+  lede="Ask the agent to write, explain, and fix SQL in a right-sidebar chat that already knows your open file and schema. Choose Codex or Claude as the provider."
+  tocItems={[
+    { label: "Choosing a provider", href: "#cli" },
+    { label: "Privacy", href: "#privacy" },
+    { label: "Opening the agent", href: "#opening" },
+    { label: "Editor context", href: "#context" },
+    { label: "Asking a question", href: "#asking" },
+    { label: "Working with replies", href: "#replies" },
+    { label: "Sharing query results", href: "#share" },
+  ]}
+  currentPath="/ai/agent"
+  prev={{ label: "SQLMesh", href: "/analytics-engineering/sqlmesh", section: "Analytics engineering" }}
+  next={{ label: "Keyboard shortcuts", href: "/reference/shortcuts", section: "Reference" }}
+>
+  <h2 id="cli">Choosing a provider</h2>
+
+  <p>
+    The agent runs a local CLI, and you pick which one from the dropdown in the pane header. Two
+    providers are supported: OpenAI's <strong>Codex CLI</strong> (<code>codex</code>) and Anthropic's
+    <strong>Claude CLI</strong> (<code>claude -p</code>). The choice is global and remembered across
+    restarts. Either binary runs locally but acts as a client: it sends each prompt to its vendor's
+    hosted models in the cloud and streams the reply back. Arris shells out to the binary rather than
+    calling an API itself, so there is no API key to enter or manage inside Arris.
+  </p>
+
+  <p>
+    The provider, model, and authentication all come from that CLI's own configuration: Codex reads
+    <code>~/.codex/config.toml</code> and Claude reads <code>~/.claude/settings.json</code>, which is
+    why the header shows whatever model you have set there. As the info icon notes, Codex
+    <em>&ldquo;needs an active Codex (ChatGPT) subscription or an <code>OPENAI_API_KEY</code>&rdquo;</em>
+    and Claude <em>&ldquo;needs an active Claude subscription or an <code>ANTHROPIC_API_KEY</code>&rdquo;</em>.
+  </p>
+
+  <p>
+    Make sure the selected CLI is installed and on your <code>PATH</code>. If Arris cannot find it,
+    the input is disabled and shows, for example, <em>&ldquo;Codex CLI not found on PATH. Install it
+    to use the agent.&rdquo;</em> Authentication is not pre-checked: if the CLI is signed out, the
+    turn still runs and its error (for example, a not-logged-in message) streams back into the
+    conversation.
+  </p>
+
+  <p>
+    Arris runs each CLI with guardrails suited to query writing: a <strong>read-only</strong> mode so
+    the agent cannot touch your filesystem (Codex uses a read-only sandbox, Claude has its file and
+    shell tools disabled), <strong>no auto-approval</strong> so it never proceeds with a privileged
+    action on its own, and <strong>project docs disabled</strong> so any <code>AGENTS.md</code> or
+    <code>CLAUDE.md</code> files in your repos cannot derail a turn. Your global model and
+    credentials still apply.
+  </p>
+
+  <h2 id="privacy">Privacy</h2>
+
+  <p>
+    Arris does not operate a cloud service for the agent and never sees your prompts: it hands them
+    to your local CLI (Codex or Claude), which sends them to that vendor's cloud under your own
+    account. What Arris puts into a turn is scoped to what you can see:
+  </p>
+
+  <ul>
+    <li>Your prompt, plus the active <strong>file</strong> and <strong>selection</strong> chips.</li>
+    <li>The connection's <strong>schema as DDL</strong> (table and view names, columns, and types) and its <strong>dialect</strong>, capped in size so a huge schema cannot blow the context window.</li>
+  </ul>
+
+  <p>
+    Your <strong>row data is never sent automatically</strong>. Result rows leave your machine only
+    when you explicitly click <strong>Run &amp; share</strong> on a SQL block. Database passwords and
+    connection credentials are never included. Whatever the selected CLI does with the prompt is
+    governed by that CLI's own configuration and privacy model.
+  </p>
+
+  <h2 id="opening">Opening the agent</h2>
+
+  <p>
+    The <strong>Agent</strong> lives in the right sidebar, where it shares space with the
+    connections tree, the chart editor, and pinned queries. Open it with <kbd>&#8984;8</kbd>
+    (<strong>Show Agent</strong>) or by clicking the agent icon in the right-sidebar switcher at
+    the bottom. <kbd>&#8984;K</kbd> (<strong>Ask Agent</strong>) also brings it up so you can start
+    typing right away.
+  </p>
+
+  <p>
+    The pane header reads <strong>AGENT</strong> with an info icon, a <strong>provider dropdown</strong>
+    (Codex or Claude), and the active model shown beside it (for example <code>gpt-5.5</code> or
+    <code>claude-opus-4-8</code>). The model name is read from the selected CLI's configuration, not
+    chosen inside Arris. Switching the dropdown re-checks that CLI and updates the model. Once a
+    conversation has started, a trash icon clears it.
+  </p>
+
+  <Screenshot
+    src="/screenshots/agent-pane.png"
+    alt="The Arris Agent pane in the right sidebar with the AGENT header, a provider dropdown set to Codex, the active model beside it, a stg_invoices.sql context chip, the empty state 'Ask the agent about your SQL', and the 'Ask the agent…' input at the bottom"
+    caption="The Agent pane: the provider dropdown and model in the header, the attached file chip, the empty state, and the input box with the right-sidebar pane switcher below."
+  />
+
+  <h2 id="context">Editor context</h2>
+
+  <p>
+    The agent reads your editor automatically, so you rarely have to paste code. Just under the
+    header, Arris shows <strong>context chips</strong> for what it will send with your next message:
+  </p>
+
+  <ul>
+    <li><strong>File</strong> &mdash; the active editor tab, labeled with its file name (e.g. <code>stg_invoices.sql</code>). The whole file is included.</li>
+    <li><strong>Selection</strong> &mdash; when you have text highlighted, a second chip appears as <em>selection &middot; N lines</em> and only that range is sent.</li>
+  </ul>
+
+  <p>
+    The chips update as you switch tabs or change your selection. Click the <strong>&times;</strong>
+    on a chip to drop it from the next message if you would rather not include that context. When a
+    connection is active, the agent is also given your database <strong>schema and dialect</strong>
+    (see <a href="#privacy">Privacy</a>) so the SQL it writes matches your tables and syntax.
+  </p>
+
+  <h2 id="asking">Asking a question</h2>
+
+  <p>
+    Type into the box at the bottom (<em>Ask the agent&hellip;</em>) and press
+    <kbd>&#8984;&#8617;</kbd> to send. The empty state sums up what it is for:
+    <em>&ldquo;Ask the agent about your SQL. Write, explain, or fix a query.&rdquo;</em> Good prompts
+    look like <em>&ldquo;write a query for the top 10 customers by revenue this quarter&rdquo;</em>,
+    <em>&ldquo;explain what this CTE does&rdquo;</em>, or <em>&ldquo;why is this join returning
+    duplicates?&rdquo;</em>
+  </p>
+
+  <p>
+    Each conversation is tied to the active connection, so switching connections gives you a
+    separate thread, and follow-up messages continue the same provider session with full context of
+    the exchange so far. Switching providers mid-thread starts a fresh session, since one provider
+    cannot resume another's. While the agent is working, an animated indicator shows in the stream
+    with a red
+    <strong>Stop</strong> button to cancel the turn. Replies arrive as a mix of prose, fenced SQL
+    blocks, and collapsible cards for any tool steps the agent ran.
+  </p>
+
+  <h2 id="replies">Working with replies</h2>
+
+  <p>
+    Every SQL block in a reply is rendered as a read-only, syntax-highlighted snippet with action
+    buttons so you can move it into your editor without copy and paste:
+  </p>
+
+  <DocTable>
+    <thead>
+      <tr>
+        <th>Action</th>
+        <th>What it does</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="font-medium text-fg">Insert at cursor</td>
+        <td>Drops the SQL into the active editor at the cursor position and highlights what was inserted.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">Replace selection</td>
+        <td>Swaps your highlighted text for the SQL. With nothing selected, it replaces the whole document.</td>
+      </tr>
+    </tbody>
+  </DocTable>
+
+  <p>
+    Nothing is written to your editor until you click one of these, and nothing runs on its own. You
+    review the SQL, place it, and execute it yourself with <kbd>&#8984;&#8617;</kbd> as usual.
+  </p>
+
+  <Screenshot
+    src="/screenshots/agent-reply.png"
+    alt="An AI Agent reply: the user message 'Monthly sales broken down by product category and customer, order by sales amount in descending order', a syntax-highlighted SELECT query with Insert at cursor and Replace selection buttons, and a closing note 'Returns monthly sales by product category and customer, highest sales first.'"
+    caption="A reply &mdash; the request, a syntax-highlighted SQL block with Insert at cursor and Replace selection, and a short explanation below it."
+  />
+
+  <h2 id="share">Sharing query results</h2>
+
+  <p>
+    When a connection is active, each SQL block also offers to run itself and feed the output back to
+    the agent, which is how you turn a one-shot answer into a back-and-forth:
+  </p>
+
+  <ul>
+    <li><strong>Run &amp; share 100 rows</strong>, which runs the query locally and sends the first 100 rows back to the agent as the next message.</li>
+    <li><strong>Run &amp; share full results</strong>, which sends the entire result set. Arris warns that <em>&ldquo;all rows can be slow on large tables and consumes far more agent tokens.&rdquo;</em></li>
+  </ul>
+
+  <Screenshot
+    src="/screenshots/agent-share.png"
+    alt="An AI Agent turn with a SQL block, the Run & share 100 rows and Run & share full results buttons with the token warning, a collapsed 'Shared 3 rows × 2 cols' card, and the agent's final answer naming the top categories"
+    caption="Run &amp; share runs the query locally and feeds the rows back as a 'Shared N rows × M cols' card, which the agent then reasons over to give a final answer."
+  />
+
+</DocsLayout>

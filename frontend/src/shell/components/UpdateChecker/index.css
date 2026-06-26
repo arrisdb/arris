@@ -1,0 +1,11 @@
+/* Compact sizing for the update button when it sits in the 34px top bar.
+   Styling otherwise comes from the shared `mdbc-btn primary`. */
+/* Compound `.mdbc-btn.mdbc-topbar-update` (specificity 0,2,0) so these compact
+   overrides beat the base `.mdbc-btn` rule (0,1,0) regardless of stylesheet load
+   order — a plain `.mdbc-topbar-update` ties on specificity and loses to whichever
+   sheet loads last. */
+.mdbc-btn.mdbc-topbar-update {
+  flex-shrink: 0;
+  height: 24px;
+  font-size: var(--m-fs-xs);
+}

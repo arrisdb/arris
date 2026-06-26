@@ -1,0 +1,326 @@
+.mdbc-agent-pane {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+/* Info hint next to the pane title: clarifies the Codex subscription need. */
+.mdbc-agent-info {
+  margin-left: 5px;
+  font-size: var(--m-fs-xs);
+  color: var(--m-fg-4);
+  cursor: help;
+}
+
+/* Active provider + model (e.g. "Codex · gpt-5.5"), shown right of the title. */
+.mdbc-agent-model {
+  margin-left: auto;
+  font-size: var(--m-fs-xs);
+  color: var(--m-fg);
+  font-family: var(--m-font-mono);
+}
+
+/* Context chips */
+.mdbc-agent-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 6px 10px;
+  border-bottom: 0.5px solid var(--m-sep);
+}
+
+.mdbc-agent-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 6px;
+  font-size: var(--m-fs-xs, 11px);
+  color: var(--m-fg-2);
+  background: rgb(var(--m-overlay-rgb) / 0.05);
+  border: 0.5px solid var(--m-sep);
+  border-radius: var(--m-r-control);
+}
+
+.mdbc-agent-chip-remove {
+  border: 0;
+  background: transparent;
+  color: var(--m-fg-4);
+  cursor: pointer;
+  padding: 0;
+  font-size: var(--m-fs-xs);
+  line-height: 1;
+}
+
+/* Message stream */
+.mdbc-agent-stream {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 12px 10px;
+}
+
+/* Rows keep their natural height — never let the column flex compress a tall SQL
+   block (which would clip its action buttons). The stream scrolls instead. */
+.mdbc-agent-stream > * {
+  flex-shrink: 0;
+}
+
+.mdbc-agent-msg {
+  font-size: var(--m-fs-sm);
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-width: 85%;
+  padding: 7px 10px;
+  border-radius: var(--m-r-control);
+}
+
+.mdbc-agent-msg.user {
+  align-self: flex-end;
+  background: rgb(var(--m-accent-rgb) / 0.18);
+  color: var(--m-fg);
+}
+
+/* Agent replies get their own bubble too, so the conversation reads as a
+   back-and-forth instead of loose unframed text. Neutral fill keeps the user's
+   accent bubble visually dominant. */
+.mdbc-agent-msg.agent {
+  align-self: flex-start;
+  background: rgb(var(--m-overlay-rgb) / 0.06);
+  color: var(--m-fg);
+}
+
+.mdbc-agent-tool {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 5px 8px;
+  font-size: var(--m-fs-xs, 11px);
+  background: rgb(var(--m-overlay-rgb) / 0.04);
+  border: 0.5px solid var(--m-sep);
+  border-radius: var(--m-r-control);
+}
+
+.mdbc-agent-tool-name {
+  color: var(--m-accent);
+  font-family: var(--m-font-mono);
+}
+
+.mdbc-agent-tool-summary {
+  color: var(--m-fg-4);
+}
+
+.mdbc-agent-sql {
+  border: 0.5px solid var(--m-sep);
+  border-radius: var(--m-r-control);
+  overflow: hidden;
+  background: var(--m-bg-editor, rgba(0, 0, 0, 0.18));
+}
+
+/* Read-only CodeMirror host: same syntax palette as the editor, no chrome. The
+   view must grow to fit its content — no inner scroll region — so the whole
+   snippet and the action buttons below it stay visible; the message stream is
+   the only thing that scrolls. */
+.mdbc-agent-sql-view .cm-editor {
+  background: transparent;
+  font-size: var(--m-fs-xs, 12px);
+  height: auto;
+  max-height: none;
+}
+
+.mdbc-agent-sql-view .cm-scroller {
+  overflow: visible;
+}
+
+.mdbc-agent-sql-view .cm-content {
+  padding: 8px;
+  font-family: var(--m-font-mono);
+}
+
+.mdbc-agent-sql-view .cm-editor.cm-focused {
+  outline: none;
+}
+
+/* Actions wrap so the buttons never get clipped when the pane is narrow. */
+.mdbc-agent-sql-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 6px 8px;
+  border-top: 0.5px solid var(--m-sep);
+}
+
+.mdbc-agent-sql-actions .mdbc-btn {
+  flex: 1 1 auto;
+  min-width: 0;
+  justify-content: center;
+  text-align: center;
+}
+
+/* Share buttons take a full row each — the labels are long and shouldn't be
+   squeezed onto the Insert/Replace line. */
+.mdbc-agent-share-btn {
+  flex: 1 1 100%;
+  justify-content: center;
+  /* Long labels wrap instead of clipping when the pane is narrow. */
+  height: auto;
+  min-height: 24px;
+  padding: 4px 8px;
+  white-space: normal;
+  text-align: center;
+  line-height: 1.3;
+}
+
+/* "Full results" caveat, shown under the share buttons. */
+.mdbc-agent-share-warn {
+  padding: 6px 8px 8px;
+  font-size: var(--m-fs-xs, 11px);
+  color: var(--m-warn, #d08770);
+}
+
+/* Connection picker shown under a SQL block when the conversation has no
+   connection — running & sharing needs one, so prompt the user to pick. */
+.mdbc-agent-share-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px 8px 8px;
+}
+
+.mdbc-agent-share-hint {
+  font-size: var(--m-fs-xs, 11px);
+  color: var(--m-warn, #d08770);
+}
+
+/* Shared result set: a collapsed disclosure so a 100-row table doesn't dominate
+   the conversation. Aligns like a user message — it's data the user sent. */
+.mdbc-agent-result {
+  align-self: flex-end;
+  max-width: 85%;
+  font-size: var(--m-fs-xs, 12px);
+  background: rgb(var(--m-accent-rgb) / 0.12);
+  border: 0.5px solid var(--m-sep);
+  border-radius: var(--m-r-control);
+  overflow: hidden;
+}
+
+.mdbc-agent-result-summary {
+  padding: 6px 10px;
+  color: var(--m-fg-2);
+  cursor: pointer;
+  user-select: none;
+}
+
+.mdbc-agent-result-table {
+  margin: 0;
+  padding: 8px 10px;
+  max-height: 240px;
+  overflow: auto;
+  font-family: var(--m-font-mono);
+  font-size: var(--m-fs-xs, 11px);
+  white-space: pre;
+  border-top: 0.5px solid var(--m-sep);
+}
+
+/* Working indicator: animated dots + an inline Stop button. */
+.mdbc-agent-typing {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--m-fg-4);
+}
+
+.mdbc-agent-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mdbc-agent-dots span {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--m-fg-3);
+  animation: mdbc-agent-bounce 1.2s infinite ease-in-out both;
+}
+
+.mdbc-agent-dots span:nth-child(1) {
+  animation-delay: -0.32s;
+}
+
+.mdbc-agent-dots span:nth-child(2) {
+  animation-delay: -0.16s;
+}
+
+@keyframes mdbc-agent-bounce {
+  0%,
+  80%,
+  100% {
+    transform: scale(0.4);
+    opacity: 0.4;
+  }
+  40% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* Clear sits at the far right of the header, after the model label. */
+.mdbc-agent-clear {
+  margin-left: 8px;
+  font-size: var(--m-fs-xs);
+}
+
+/* Input */
+.mdbc-agent-input {
+  border-top: 0.5px solid var(--m-sep);
+  padding: 8px 10px;
+}
+
+.mdbc-agent-unavailable {
+  color: var(--m-red);
+  font-size: var(--m-fs-xs, 11px);
+  margin-bottom: 6px;
+}
+
+/* Empty conversation: a centered hint so the pane never reads as broken. */
+.mdbc-agent-empty {
+  margin: auto;
+  max-width: 340px;
+  padding: 16px 8px;
+  text-align: center;
+}
+
+.mdbc-agent-empty-title {
+  font-size: var(--m-fs-md, 15px);
+  color: var(--m-fg-2);
+  margin-bottom: 8px;
+}
+
+.mdbc-agent-empty-text {
+  font-size: var(--m-fs-xs, 11px);
+  line-height: 1.5;
+  color: var(--m-fg-4);
+}
+
+/* The agent input is a growable textarea, so the canonical search pill must
+   stretch with it instead of clamping to its rigid single-line height. Drop the
+   pill's own margin — the .mdbc-agent-input padding owns the 10px inset. */
+.mdbc-agent-input .mdbc-search {
+  height: auto;
+  align-items: stretch;
+  margin: 0;
+  padding: 6px 8px;
+}
+
+.mdbc-agent-textarea {
+  resize: none;
+  min-height: 32px;
+  max-height: 120px;
+  padding: 2px 0;
+  line-height: 1.4;
+}

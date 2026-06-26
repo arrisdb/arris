@@ -1,0 +1,52 @@
+/* components sqlmesh */
+.mdbc-connection-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px 10px;
+}
+.mdbc-sqlmesh-run-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px 6px;
+}
+.mdbc-sqlmesh-run-bar .mdbc-splitbtn.full {
+  flex: 1;
+  width: auto;
+  min-width: 0;
+}
+.mdbc-sqlmesh-project-success {
+  color: var(--m-green);
+}
+.mdbc-sqlmesh-project-error {
+  color: var(--m-red);
+}
+.mdbc-sqlmesh-project-actions {
+  display: flex;
+  gap: 4px;
+}
+.mdbc-sqlmesh-project-fill {
+  flex: 1;
+}
+.mdbc-sqlmesh-project-file-child {
+  padding-left: 8px;
+  font-weight: 600;
+}
+.mdbc-sqlmesh-project-file-nested {
+  padding-left: 8px;
+}
+.mdbc-sqlmesh-project-code-text {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.mdbc-sqlmesh-project-small-link {
+  margin-top: 4px;
+  font-size: var(--m-fs-xxs);
+}
+.mdbc-sqlmesh-project-file-icon-color {
+  color: var(--mdbc-sqlmesh-project-file-icon-color);
+}
+.mdbc-sqlmesh-project-model-icon-color {
+  color: var(--mdbc-sqlmesh-project-model-icon-color);
+}

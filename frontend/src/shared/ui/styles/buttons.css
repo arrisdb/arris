@@ -1,0 +1,146 @@
+/* Toolbars */
+.mdbc-runbar {
+  height: 36px;
+  padding: 0 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border-bottom: 0.5px solid var(--m-sep);
+  background: transparent;
+}
+.mdbc-runbar-sep {
+  width: 1px;
+  height: 18px;
+  background: var(--m-sep-strong, rgb(var(--m-overlay-rgb) / 0.12));
+  margin: 0 4px;
+  flex-shrink: 0;
+}
+.mdbc-btn-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border: 0.5px solid var(--m-sep-strong, rgb(var(--m-overlay-rgb) / 0.12));
+  border-radius: var(--m-r-control);
+  background: rgb(var(--m-overlay-rgb) / 0.04);
+}
+.mdbc-btn-group.plain {
+  border-color: transparent;
+  background: transparent;
+}
+.mdbc-btn.icon-only {
+  padding: 0;
+  width: 28px;
+  height: 28px;
+  justify-content: center;
+}
+.mdbc-spin,
+.mdbc-btn.icon-only .mdbc-spin {
+  animation: mdbc-spin 1s linear infinite;
+}
+.mdbc-dbt-section {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--m-fs-sm);
+  color: var(--m-text-secondary, #a0a0aa);
+}
+.mdbc-dbt-section img {
+  width: 14px;
+  height: 14px;
+  object-fit: contain;
+}
+.mdbc-btn.text-only {
+  background: transparent;
+  border: none;
+  padding: 0 6px;
+  height: 24px;
+  font-size: var(--m-fs-sm);
+  color: var(--m-fg);
+  cursor: pointer;
+  border-radius: 4px;
+}
+.mdbc-btn.text-only:hover { background: rgb(var(--m-overlay-rgb) / 0.08); }
+.mdbc-btn.text-only.active { color: var(--m-accent-2); background: var(--m-accent-tint); }
+.mdbc-btn.text-only:disabled { opacity: 0.4; cursor: default; }
+.mdbc-btn.text-only:disabled:hover { background: transparent; }
+
+.mdbc-btn {
+  height: 26px;
+  padding: 0 10px;
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: var(--m-fs-md);
+  color: var(--m-fg);
+  background: rgb(var(--m-overlay-rgb) / 0.05);
+  border: 0.5px solid var(--m-sep-strong);
+  border-radius: var(--m-r-control);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.mdbc-btn:hover { background: rgb(var(--m-overlay-rgb) / 0.08); }
+.mdbc-btn.primary {
+  background: rgb(var(--m-overlay-rgb) / 0.08);
+  border-color: var(--m-sep-strong);
+  color: var(--m-fg);
+  font-weight: 600;
+}
+.mdbc-btn.primary:hover { background: rgb(var(--m-overlay-rgb) / 0.12); }
+.mdbc-btn.primary:disabled { opacity: 0.45; cursor: default; }
+.mdbc-btn.primary:disabled:hover { background: rgb(var(--m-overlay-rgb) / 0.08); }
+.mdbc-btn.ghost {
+  background: transparent; border-color: transparent; color: var(--m-fg-2);
+}
+.mdbc-btn.ghost:hover { background: rgb(var(--m-overlay-rgb) / 0.05); color: var(--m-fg); }
+.mdbc-btn.ghost.active { background: var(--m-accent-tint); color: var(--m-accent-2); border-color: rgb(var(--m-accent-rgb) / 0.35); }
+.mdbc-btn.ghost:disabled { opacity: 0.3; cursor: default; pointer-events: none; }
+.mdbc-btn.ghost:disabled:hover { background: transparent; }
+.mdbc-btn.danger { color: var(--m-red); }
+.mdbc-btn.icon-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.mdbc-chip {
+  height: 26px; padding: 0 10px;
+  border-radius: var(--m-r-control);
+  background: rgb(var(--m-overlay-rgb) / 0.04);
+  border: 0.5px solid var(--m-sep);
+  font-size: var(--m-fs-xs);
+  color: var(--m-fg-2);
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: var(--m-font);
+  cursor: pointer;
+}
+.mdbc-chip.clickable { cursor: pointer; }
+.mdbc-chip.small { font-size: var(--m-fs-xxs); }
+.mdbc-chip.active {
+  background: var(--m-accent-tint);
+  border-color: rgb(var(--m-accent-rgb) / 0.35);
+  color: var(--m-accent-2);
+}
+.mdbc-chip .ledot { width: 6px; height: 6px; border-radius: 50%; }
+.mdbc-chip.success .ledot { background: var(--m-green); box-shadow: 0 0 4px rgba(91,227,154,0.4); }
+.mdbc-chip.error .ledot { background: var(--m-red); }
+.mdbc-chip.pending .ledot { background: var(--m-yellow); }
+.mdbc-chip-close {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 14px; height: 14px; border-radius: 50%;
+  font-size: var(--m-fs-sm); line-height: 1; cursor: pointer;
+  color: var(--m-fg-3); margin-left: -2px;
+}
+.mdbc-chip-close:hover { background: rgb(var(--m-overlay-rgb) / 0.12); color: var(--m-fg); }
+/* Pinned run chips read as "stuck" — a warmer tint + accent border so they
+   stand apart from the chronological chips they sort ahead of. */
+.mdbc-chip.pinned {
+  background: rgb(var(--m-accent-rgb) / 0.10);
+  border-color: rgb(var(--m-accent-rgb) / 0.30);
+}
+.mdbc-chip.pinned.active {
+  background: var(--m-accent-tint);
+  border-color: rgb(var(--m-accent-rgb) / 0.45);
+}
+.mdbc-chip-rename {
+  background: transparent; border: 0; outline: 0;
+  color: inherit; font: inherit; min-width: 80px; width: 12ch;
+}

@@ -1,0 +1,91 @@
+/* JetBrains-style editable table: a thin toolbar above a bordered grid with a
+   header row and selectable body rows. Tokens only; mirrors the chrome used by
+   panes and forms so it drops into any surface. */
+
+.mdbc-editable-table {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--m-sep);
+  border-radius: var(--m-r-xs);
+  overflow: hidden;
+}
+
+.mdbc-editable-table-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px 4px;
+  border-bottom: 1px solid var(--m-sep);
+}
+
+.mdbc-editable-table-grid {
+  display: flex;
+  flex-direction: column;
+}
+
+.mdbc-editable-table-row {
+  display: grid;
+  grid-template-columns: repeat(var(--mdbc-et-cols, 1), 1fr);
+  align-items: stretch;
+}
+
+.mdbc-editable-table-row.head {
+  border-bottom: 1px solid var(--m-sep);
+}
+
+.mdbc-editable-table-body .mdbc-editable-table-row:not(:last-child) {
+  border-bottom: 1px solid var(--m-sep);
+}
+
+.mdbc-editable-table-body .mdbc-editable-table-row:not(.editing) {
+  cursor: pointer;
+}
+
+.mdbc-editable-table-row.selected {
+  background: var(--m-fg-4);
+}
+
+.mdbc-editable-table-cell {
+  padding: 4px 8px;
+  color: var(--m-fg);
+  font-size: var(--m-fs-xs);
+  border-right: 1px solid var(--m-sep);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mdbc-editable-table-cell:last-child {
+  border-right: none;
+}
+
+.mdbc-editable-table-cell.head {
+  color: var(--m-fg-3);
+  font-weight: 600;
+}
+
+.mdbc-editable-table-input {
+  width: 100%;
+  padding: 4px 8px;
+  border: none;
+  border-right: 1px solid var(--m-sep);
+  background: transparent;
+  color: var(--m-fg);
+  font-size: var(--m-fs-xs);
+  outline: none;
+}
+
+.mdbc-editable-table-input:last-child {
+  border-right: none;
+}
+
+.mdbc-editable-table-input:focus {
+  background: var(--m-fg-4);
+}
+
+.mdbc-editable-table-empty {
+  padding: 24px 8px;
+  text-align: center;
+  color: var(--m-fg-3);
+  font-size: var(--m-fs-sm);
+}

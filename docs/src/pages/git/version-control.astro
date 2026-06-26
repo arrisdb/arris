@@ -1,0 +1,271 @@
+---
+import "../../styles/global.css";
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import DocTable from "../../components/docs/DocTable/DocTable.astro";
+import Screenshot from "../../components/docs/Screenshot/Screenshot.astro";
+---
+
+<DocsLayout
+  title="Version control — Arris Docs"
+  breadcrumbs={[{ label: "Docs", href: "/" }, { label: "Git" }, { label: "Version control" }]}
+  heading="Version control"
+  lede="Track changes to your files with built-in Git support without leaving Arris."
+  tocItems={[
+    { label: "Overview", href: "#overview" },
+    { label: "Opening a repository", href: "#opening" },
+    { label: "File status", href: "#status" },
+    { label: "Staging & committing", href: "#staging" },
+    { label: "Syncing with the remote", href: "#syncing" },
+    { label: "Branches & worktrees", href: "#branches" },
+    { label: "Merge conflicts", href: "#conflicts" },
+    { label: "Commit history", href: "#history" },
+    { label: "Remotes", href: "#remotes" },
+    { label: "Diff viewer", href: "#diff" },
+    { label: "Editor gutter", href: "#gutter" },
+    { label: "Keyboard shortcuts", href: "#shortcuts" },
+  ]}
+  currentPath="/git/version-control"
+  prev={{ label: "Cross-source queries", href: "/querying/cross-source", section: "Querying" }}
+  next={{ label: "dbt projects", href: "/analytics-engineering/dbt", section: "Analytics engineering" }}
+>
+  <h2 id="overview">Overview</h2>
+
+  <p>
+    Arris includes a built-in Git client powered by <a href="https://crates.io/crates/gix" class="text-accent-2 hover:text-fg transition-colors" target="_blank" rel="noopener"><code>gix</code></a>, a pure-Rust Git
+    implementation, with the system <code>git</code> CLI used for a few operations such as
+    fetch, pull, and merge. When you open a project folder that contains a <code>.git</code>
+    directory, the Git changes pane activates automatically. You can stage hunks or whole files,
+    write commits, fetch, pull, push, switch branches, resolve merge conflicts, browse history,
+    and review diffs &mdash; all without switching to a terminal or external Git client.
+  </p>
+
+  <Screenshot
+    src="/screenshots/git-changes.png"
+    alt="The Arris Git changes pane on the left with a changed file, Stage All / Unstage All, a Push button and commit box, next to a side-by-side diff of the selected file in the main area"
+    caption="The Git changes pane on the left &mdash; file changes, sync actions, and the commit box &mdash; with the selected file's diff open alongside it."
+  />
+
+  <h2 id="opening">Opening a repository</h2>
+
+  <p>
+    Git features activate when you open a project folder (<kbd>&#8984;O</kbd>) that is inside a
+    Git repository. Arris detects the <code>.git</code> directory and loads the current branch,
+    file statuses, and recent commit history. If the folder is not a Git repository, the Git
+    changes pane stays empty.
+  </p>
+
+  <p>
+    You can also clone a repository directly from Arris. On the welcome screen, click
+    <strong>Clone&hellip;</strong> under <strong>Open existing</strong>, then provide the remote
+    URL and a destination path. Arris clones the repository and opens it as a project
+    automatically.
+  </p>
+
+  <h2 id="status">File status</h2>
+
+  <p>
+    Arris color-codes Git status directly in the <strong>project file tree</strong>, so you can
+    spot edits while browsing without opening the Git pane. Rather than a letter badge, a changed
+    file's <strong>name is tinted by its status</strong>, and its parent folders inherit the tint:
+  </p>
+
+  <DocTable>
+    <thead>
+      <tr>
+        <th>Git status</th>
+        <th>How Arris shows it</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="font-medium text-fg">Modified</td>
+        <td>The file name is tinted yellow.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">Added / Untracked</td>
+        <td>The file name is tinted green &mdash; new content, whether or not it is staged yet.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">Deleted</td>
+        <td>The folder with deleted files is tinted red.</td>
+      </tr>
+    </tbody>
+  </DocTable>
+
+  <Screenshot
+    src="/screenshots/git-file-tree.png"
+    alt="The Arris project file tree showing dim_customers.sql tinted yellow for modified and new_model.sql tinted green for a newly added file"
+    caption="Git status is color-coded in the project file tree &mdash; yellow for modified (dim_customers.sql), green for new (new_model.sql)."
+  />
+
+  <p>
+    The Git changes pane uses the same color coding and lists every changed file as a tree, with
+    <strong>Stage All</strong> / <strong>Unstage All</strong> actions, a per-file checkbox to stage
+    or unstage, and diff stats (<code>+N</code> <code>&minus;N</code>) for the lines added and
+    removed. Status comes from Git's porcelain output, so a file can carry separate index and
+    working-tree states &mdash; for example, staged <em>and</em> then modified again.
+  </p>
+
+  <h2 id="staging">Staging &amp; committing</h2>
+
+  <p>
+    You can stage at the file level or the hunk level:
+  </p>
+
+  <ul>
+    <li><strong>Stage or unstage a file</strong> &mdash; toggle the checkbox next to a file. Checked means staged into the index.</li>
+    <li><strong>Stage All</strong> / <strong>Unstage All</strong> &mdash; move every changed file in or out of the index at once.</li>
+    <li><strong>Discard changes</strong> &mdash; from a file's context menu, revert it to the last committed state.</li>
+    <li><strong>Stage or discard a single hunk</strong> &mdash; use the diff viewer or the editor gutter to stage or revert one hunk at a time without touching the rest of the file.</li>
+  </ul>
+
+  <p>
+    Once at least one file is staged, type a message in the commit box at the bottom of the pane
+    and press <kbd>&#8984;&#8617;</kbd> or click <strong>Commit</strong>. The
+    <strong>Commit</strong> button is enabled only when the index has staged files and the message
+    is non-empty. The commit is created locally and the file list refreshes immediately.
+  </p>
+
+  <h2 id="syncing">Syncing with the remote</h2>
+
+  <p>
+    Sync actions live in a split-button in the pane header. The primary action runs on click; the
+    dropdown exposes the full set:
+  </p>
+
+  <DocTable>
+    <thead>
+      <tr>
+        <th>Action</th>
+        <th>What it does</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="font-medium text-fg">Fetch</td>
+        <td>Fetch all remotes without changing your working tree.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">Pull</td>
+        <td>Pull from the upstream branch and merge into the current branch.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">Pull from&hellip;</td>
+        <td>Pull from a specific remote and branch.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">Push</td>
+        <td>Push local commits to the upstream branch.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">Push to&hellip;</td>
+        <td>Push to a specific remote and branch.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">Force push</td>
+        <td>Force-push the current branch (enabled only when an upstream is configured).</td>
+      </tr>
+    </tbody>
+  </DocTable>
+
+  <p>
+    An ahead/behind indicator shows how many commits your branch is ahead of or behind the
+    remote, so you know when to push or pull. If a pull produces conflicts, Arris opens the
+    conflict resolver automatically.
+  </p>
+
+  <h2 id="branches">Branches &amp; worktrees</h2>
+
+  <p>
+    The top bar shows the current branch name. Click it to open the branch picker, which lists
+    local and remote branches with their upstream tracking status. Type to filter, then select a
+    branch to check it out. You can also delete a branch from the picker.
+  </p>
+
+  <p>
+    If your project uses Git worktrees, the top bar also shows a worktree picker. It lists each
+    worktree with its path and branch, and lets you switch between them.
+  </p>
+
+  <h2 id="conflicts">Merge conflicts</h2>
+
+  <p>
+    When a merge or rebase leaves conflicts, the Git changes pane shows a banner reporting that a
+    merge or rebase is in progress along with the number of conflicted files. Click
+    <strong>Resolve Conflicts</strong> to open the three-way resolver.
+  </p>
+
+  <ul>
+    <li><strong>Use Ours</strong> &mdash; keep the version from your current branch (HEAD).</li>
+    <li><strong>Use Theirs</strong> &mdash; keep the incoming version being merged.</li>
+    <li><strong>Both</strong> &mdash; keep both sides, then edit the merged result by hand.</li>
+  </ul>
+
+  <p>
+    The resolver shows the base, <em>ours</em>, and <em>theirs</em> versions side by side. After
+    every file is resolved, <strong>Continue</strong> commits the merge; <strong>Abort</strong>
+    discards it and returns to the pre-merge state.
+  </p>
+
+  <h2 id="history">Commit history</h2>
+
+  <p>
+    A footer at the bottom of the changes pane shows the most recent commit. Click the history
+    button (<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block align-text-bottom text-accent-2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /><path d="M3 3v5h5" /><path d="M12 7v5l4 2" /></svg>)
+    next to it to open the history view: the full commit graph, each commit with its summary,
+    author, timestamp, and branch and tag refs, laid out as a graph. Filter the graph with the
+    search box to find commits by summary or author.
+  </p>
+
+  <p>
+    Select any commit to see its full metadata and the list of files it changed, then open a file
+    to view that commit's per-file diff hunks.
+  </p>
+
+  <h2 id="remotes">Remotes</h2>
+
+  <p>
+    A collapsible <strong>Remotes</strong> section in the changes pane lists every configured
+    remote with its URL. Edit a URL inline and save it on blur or by pressing
+    <kbd>&#8617;</kbd>. If a push fails because a GitHub repository has moved, Arris detects the
+    new location and offers a one-click update to the remote URL.
+  </p>
+
+  <h2 id="diff">Diff viewer</h2>
+
+  <p>
+    Click any changed file in the Git changes pane to open a side-by-side diff in the main content
+    area. The diff viewer shows:
+  </p>
+
+  <ul>
+    <li><strong>Added lines</strong> highlighted in green</li>
+    <li><strong>Deleted lines</strong> highlighted in red</li>
+    <li><strong>Modified lines</strong> highlighted on both sides</li>
+    <li><strong>Unchanged context</strong> collapsed into foldable sections (e.g., <em>&ldquo;&#x22EF; 12 unchanged lines &#x22EF;&rdquo;</em>)</li>
+  </ul>
+
+  <p>
+    Line numbers are shown on both the old and new sides, and the diff is computed per hunk so the
+    output matches what you would see from <code>git diff</code> in a terminal.
+  </p>
+
+  <h2 id="gutter">Editor gutter</h2>
+
+  <p>
+    When you edit a tracked file with uncommitted changes, the SQL editor draws inline diff markers
+    in the gutter next to the line numbers:
+  </p>
+
+  <ul>
+    <li><strong>Green bar</strong> &mdash; newly added lines</li>
+    <li><strong>Yellow bar</strong> &mdash; modified lines</li>
+    <li><strong>Red bar</strong> &mdash; a deletion at this point in the file</li>
+  </ul>
+
+  <p>
+    The markers update in real time as you type, giving you a constant view of what has changed
+    since the last commit. Click a marker to stage or revert that hunk straight from the gutter.
+  </p>
+
+</DocsLayout>

@@ -1,0 +1,426 @@
+services:
+  postgres:
+    image: postgres:18
+    container_name: arris-pg
+    environment:
+      POSTGRES_PASSWORD: test
+      POSTGRES_DB: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./initdb/postgres.sql:/docker-entrypoint-initdb.d/01-sample.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+
+  # Amazon Redshift has no official Docker image. Redshift speaks the PostgreSQL
+  # wire protocol, so local dev/tests use a Postgres container on the Redshift
+  # default port 5439 as a stand-in.
+  redshift:
+    image: postgres:18
+    container_name: arris-redshift
+    environment:
+      POSTGRES_PASSWORD: test
+      POSTGRES_DB: dev
+    ports:
+      - "5439:5432"
+    volumes:
+      - ./initdb/redshift.sql:/docker-entrypoint-initdb.d/01-sample.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+
+  # Amazon DynamoDB Local — serverless NoSQL emulator for the dynamodb driver.
+  # The emulator accepts any non-empty credentials; point a connection at region
+  # us-east-1 with endpoint http://localhost:8000 and any access key / secret.
+  dynamodb:
+    image: amazon/dynamodb-local:latest
+    container_name: arris-dynamodb
+    command: ["-jar", "DynamoDBLocal.jar", "-sharedDb", "-inMemory"]
+    ports:
+      - "8000:8000"
+
+  # One-shot seeder: creates the sample `Orders` table and a couple of items so
+  # the connection has something to browse and query immediately.
+  dynamodb-init:
+    image: amazon/aws-cli:latest
+    container_name: arris-dynamodb-init
+    depends_on:
+      - dynamodb
+    environment:
+      AWS_ACCESS_KEY_ID: dummy
+      AWS_SECRET_ACCESS_KEY: dummy
+      AWS_DEFAULT_REGION: us-east-1
+    entrypoint: ["/bin/sh", "/init/dynamodb-init.sh"]
+    volumes:
+      - ./initdb/dynamodb-init.sh:/init/dynamodb-init.sh:ro
+
+  # ---------------------------------------------------------------------------
+  # SSL-enabled Postgres for exercising the connection SSL Mode + cert fields.
+  # Listens on 5433 (the plain `postgres` above stays on 5432). A one-shot
+  # cert-gen sibling mints a CA + a localhost server cert + a certuser client
+  # cert into ./initdb/postgres-ssl/certs (host-visible) so you can point
+  # Arris's CA / client certificate / client key fields straight at them.
+  #
+  #   Connect: host localhost, port 5433, db postgres, user postgres / pw test
+  #     Disabled / Preferred / Required -> connect, no cert files needed
+  #     Verify CA                       -> CA certificate = initdb/postgres-ssl/certs/ca.crt
+  #     Verify Identity                 -> same CA (server SAN = localhost)
+  #     mTLS                            -> user certuser (no password), client
+  #                                        certificate/key = certs/client.{crt,key}
+  # ---------------------------------------------------------------------------
+  postgres-ssl-certs:
+    image: postgres:18
+    container_name: arris-pg-ssl-certs
+    entrypoint: ["/bin/sh", "/opt/gen-certs.sh"]
+    volumes:
+      - ./initdb/postgres-ssl/gen-certs.sh:/opt/gen-certs.sh:ro
+      - ./initdb/postgres-ssl/certs:/client
+      - pgssl-server:/server
+    restart: "no"
+
+  postgres-ssl:
+    image: postgres:18
+    container_name: arris-pg-ssl
+    depends_on:
+      postgres-ssl-certs:
+        condition: service_completed_successfully
+    environment:
+      POSTGRES_PASSWORD: test
+      POSTGRES_DB: postgres
+    ports:
+      - "5433:5432"
+    volumes:
+      - ./initdb/postgres.sql:/docker-entrypoint-initdb.d/01-sample.sql:ro
+      - ./initdb/postgres-ssl/init-certuser.sql:/docker-entrypoint-initdb.d/02-certuser.sql:ro
+      - ./initdb/postgres-ssl/pg_hba.conf:/etc/pg-ssl/pg_hba.conf:ro
+      - ./initdb/postgres-ssl/certs:/certs:ro
+      - pgssl-server:/server:ro
+    command:
+      - -c
+      - ssl=on
+      - -c
+      - ssl_cert_file=/server/server.crt
+      - -c
+      - ssl_key_file=/server/server.key
+      - -c
+      - ssl_ca_file=/certs/ca.crt
+      - -c
+      - hba_file=/etc/pg-ssl/pg_hba.conf
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:25.3
+    container_name: arris-clickhouse
+    environment:
+      CLICKHOUSE_DB: demo
+      CLICKHOUSE_PASSWORD: test
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    volumes:
+      - ./initdb/clickhouse.sql:/docker-entrypoint-initdb.d/01-sample.sql:ro
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    healthcheck:
+      test: ["CMD-SHELL", "clickhouse-client --password test --query 'SELECT 1' || exit 1"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+
+  mongodb:
+    image: mongo:8
+    container_name: arris-mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - ./initdb/mongo.js:/docker-entrypoint-initdb.d/01-sample.js:ro
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.runCommand({ ping: 1 }).ok"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+
+  mysql:
+    image: mysql:8.4
+    container_name: arris-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: test
+      MYSQL_DATABASE: appdb
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./initdb/mysql.sql:/docker-entrypoint-initdb.d/01-sample.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-ptest"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  # StarRocks speaks the MySQL wire protocol on the FE query port 9030.
+  # The all-in-one image bundles one FE + one BE; it has no initdb hook, so the
+  # canonical sample dataset is seeded by the `starrocks-init` sidecar once the
+  # cluster is healthy.
+  starrocks:
+    image: starrocks/allin1-ubuntu:3.3-latest
+    container_name: arris-starrocks
+    ports:
+      - "9030:9030"
+      - "8030:8030"
+    healthcheck:
+      test: ["CMD-SHELL", "mysql -h127.0.0.1 -P9030 -uroot -e 'SELECT 1' || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 60
+
+  starrocks-init:
+    image: mysql:8.4
+    container_name: arris-starrocks-init
+    depends_on:
+      starrocks:
+        condition: service_healthy
+    volumes:
+      - ./initdb/starrocks.sql:/seed.sql:ro
+    # The FE answers `SELECT 1` (the healthcheck) before the BE has registered,
+    # but the seed's `CREATE TABLE ... replication_num = 1` needs a live BE. Wait
+    # for one to report `Alive: true` before loading the dataset.
+    entrypoint:
+      - sh
+      - -c
+      - >-
+        echo 'Waiting for StarRocks backend to register...';
+        until mysql -hstarrocks -P9030 -uroot -e 'SHOW BACKENDS\G' 2>/dev/null | grep -q 'Alive: true'; do
+          sleep 3;
+        done;
+        echo 'Backend alive; seeding appdb...';
+        mysql --skip-comments -hstarrocks -P9030 -uroot < /seed.sql
+    restart: "no"
+
+  mariadb:
+    image: mariadb:11
+    container_name: arris-mariadb
+    environment:
+      MARIADB_ROOT_PASSWORD: test
+      MARIADB_DATABASE: appdb
+    ports:
+      - "3307:3306"
+    volumes:
+      - ./initdb/mariadb.sql:/docker-entrypoint-initdb.d/01-sample.sql:ro
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  redis:
+    image: redis:8
+    container_name: arris-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+
+  redis-init:
+    image: redis:8
+    container_name: arris-redis-init
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./initdb/redis-init.sh:/opt/redis-init.sh:ro
+    entrypoint: ["/bin/bash", "/opt/redis-init.sh"]
+    restart: "no"
+
+  mssql:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: arris-mssql
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "Test@1234"
+    ports:
+      - "1433:1433"
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'Test@1234' -C -Q 'SELECT 1' || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  mssql-init:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: arris-mssql-init
+    depends_on:
+      mssql:
+        condition: service_healthy
+    volumes:
+      - ./initdb/mssql.sql:/opt/mssql-init.sql:ro
+    entrypoint: ["/opt/mssql-tools18/bin/sqlcmd", "-S", "mssql", "-U", "sa", "-P", "Test@1234", "-C", "-i", "/opt/mssql-init.sql"]
+    restart: "no"
+
+  kafka:
+    image: apache/kafka:3.9.0
+    container_name: arris-kafka
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:19092,CONTROLLER://:9093,EXTERNAL://:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:19092,EXTERNAL://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:19092 --list || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  schema-registry:
+    image: confluentinc/cp-schema-registry:7.9.0
+    container_name: arris-schema-registry
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: kafka:19092
+    ports:
+      - "8081:8081"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8081/ || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  kafka-init:
+    image: confluentinc/cp-kafka:7.9.0
+    container_name: arris-kafka-init
+    depends_on:
+      kafka:
+        condition: service_healthy
+      schema-registry:
+        condition: service_healthy
+    volumes:
+      - ./initdb/kafka-init.sh:/opt/kafka-init.sh:ro
+    entrypoint: ["/bin/bash", "/opt/kafka-init.sh"]
+    restart: "no"
+
+  oracle:
+    image: gvenzl/oracle-free:23-slim
+    container_name: arris-oracle
+    environment:
+      ORACLE_PASSWORD: test
+      APP_USER: appuser
+      APP_USER_PASSWORD: test
+    ports:
+      - "1521:1521"
+    healthcheck:
+      test: ["CMD-SHELL", "healthcheck.sh"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+  oracle-init:
+    image: gvenzl/oracle-free:23-slim
+    container_name: arris-oracle-init
+    depends_on:
+      oracle:
+        condition: service_healthy
+    volumes:
+      - ./initdb/oracle.sql:/opt/oracle-init.sql:ro
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        echo "GRANT CREATE VIEW, CREATE MATERIALIZED VIEW TO appuser;" | sqlplus -S system/test@oracle:1521/FREEPDB1 &&
+        sqlplus -S appuser/test@oracle:1521/FREEPDB1 @/opt/oracle-init.sql
+    restart: "no"
+
+  elasticsearch:
+    image: elasticsearch:8.18.0
+    container_name: arris-elasticsearch
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      ES_JAVA_OPTS: "-Xms256m -Xmx256m"
+    ports:
+      - "9200:9200"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  elasticsearch-init:
+    image: curlimages/curl:latest
+    container_name: arris-elasticsearch-init
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    volumes:
+      - ./initdb/elasticsearch-init.sh:/opt/elasticsearch-init.sh:ro
+    entrypoint: ["/bin/sh", "/opt/elasticsearch-init.sh"]
+    restart: "no"
+
+  trino:
+    image: trinodb/trino:latest
+    container_name: arris-trino
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./initdb/trino:/etc/trino/catalog:ro
+    healthcheck:
+      test: ["CMD", "trino", "--execute", "SELECT 1"]
+      interval: 5s
+      timeout: 10s
+      retries: 30
+
+  # SSH bastion for exercising the SSH-tunnel connection feature. It sits on the
+  # default compose network, so it can reach every database container by its
+  # service name (e.g. `postgres:5432`, `mysql:3306`) — names that do NOT resolve
+  # from the host. Point a connection's DB host at one of those service names and
+  # enable the SSH tunnel (host `localhost`, port 2222, user/password below) and
+  # the only way the connection can succeed is through this bastion.
+  #
+  # The image ships `AllowTcpForwarding no`; mounting a snippet into
+  # `/config/sshd/sshd_config.d/` makes the init re-enable the `Include` directive
+  # and turn forwarding on.
+  ssh-bastion:
+    image: linuxserver/openssh-server:latest
+    container_name: arris-ssh-bastion
+    environment:
+      PASSWORD_ACCESS: "true"
+      USER_NAME: tunnel
+      USER_PASSWORD: tunnel
+      PUID: "1000"
+      PGID: "1000"
+    ports:
+      - "2222:2222"
+    volumes:
+      - ./initdb/ssh/forwarding.conf:/config/sshd/sshd_config.d/forwarding.conf:ro
+
+volumes:
+  # Holds the SSL Postgres server cert/key with postgres-owned 0600 perms, which
+  # a macOS bind mount can't preserve. Bind mounts are fine for the CA/client
+  # material (no strict perm requirements), so those stay under initdb/.
+  pgssl-server:

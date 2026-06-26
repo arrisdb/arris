@@ -1,0 +1,91 @@
+/* === federation DAG progress === */
+.mdbc-fed-container {
+  flex: 1;
+  overflow: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.mdbc-fed-dag {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(var(--fed-cols), auto);
+  grid-template-rows: repeat(var(--fed-rows), 1fr);
+  align-items: center;
+  gap: 16px 48px;
+  padding: 24px 32px;
+}
+.mdbc-fed-svg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+}
+.mdbc-fed-node {
+  z-index: 1;
+  grid-column: var(--fed-col);
+  grid-row: var(--fed-row);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 10px 16px;
+  border-radius: 8px;
+  border: 2px solid #6b7280;
+  background: var(--mdbc-bg-secondary);
+  min-width: 120px;
+  max-width: 260px;
+  text-align: center;
+  overflow-wrap: anywhere;
+  transition: border-color 0.3s, background 0.3s, box-shadow 0.3s;
+}
+.mdbc-fed-node-label {
+  font-size: var(--m-fs-sm);
+  font-weight: 600;
+  color: var(--mdbc-fg);
+  white-space: pre-line;
+  line-height: 1.3;
+}
+.mdbc-fed-node-detail {
+  font-size: var(--m-fs-xs);
+  color: var(--mdbc-fg-muted);
+  white-space: pre-line;
+  line-height: 1.3;
+}
+.mdbc-fed-node-metrics {
+  font-size: var(--m-fs-xs);
+  color: var(--mdbc-fg-muted);
+  margin-top: 2px;
+}
+.mdbc-fed-node-waiting {
+  border-color: #6b7280;
+}
+.mdbc-fed-node-waiting .mdbc-fed-node-label,
+.mdbc-fed-node-waiting .mdbc-fed-node-detail {
+  color: #9ca3af;
+}
+.mdbc-fed-node-running {
+  border-color: #a78bfa;
+  background: color-mix(in srgb, #a78bfa 12%, var(--mdbc-bg-secondary));
+  box-shadow: 0 0 12px color-mix(in srgb, #a78bfa 30%, transparent);
+  animation: mdbc-fed-pulse 1.5s ease-in-out infinite;
+}
+.mdbc-fed-node-running .mdbc-fed-node-label {
+  color: #c4b5fd;
+}
+.mdbc-fed-node-done {
+  border-color: #22c55e;
+  background: color-mix(in srgb, #22c55e 8%, var(--mdbc-bg-secondary));
+}
+.mdbc-fed-node-done .mdbc-fed-node-label {
+  color: #4ade80;
+}
+.mdbc-fed-node-error {
+  border-color: #ef4444;
+  background: color-mix(in srgb, #ef4444 8%, var(--mdbc-bg-secondary));
+}
+@keyframes mdbc-fed-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+/* === end federation DAG progress === */

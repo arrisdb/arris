@@ -1,0 +1,38 @@
+[workspace]
+resolver = "3"
+members = [
+    "crates/arris-engines",
+]
+exclude = ["src-tauri", ".claude"]
+
+[workspace.package]
+version = "0.6.0"
+edition = "2024"
+rust-version = "1.92"
+license = "AGPL-3.0-only"
+authors = ["Arris contributors"]
+repository = "https://github.com/arrisdb/arris"
+
+[workspace.dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_with = "3.12"
+uuid = { version = "1.11", features = ["v4", "serde"] }
+thiserror = "2.0"
+anyhow = "1.0"
+async-trait = "0.1"
+tokio = { version = "1.43", features = ["full"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+indexmap = { version = "2.7", features = ["serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+url = "2.5"
+percent-encoding = "2.3"
+reqwest = { version = "0.13", default-features = false, features = ["rustls", "json"] }
+serde_yml = "0.0.12"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+strip = "symbols"

@@ -1,0 +1,79 @@
+---
+import "../../styles/global.css";
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import CodeBlock from "../../components/docs/CodeBlock/CodeBlock.astro";
+import Screenshot from "../../components/docs/Screenshot/Screenshot.astro";
+---
+
+<DocsLayout
+  title="SSH Tunnels | Arris Docs"
+  breadcrumbs={[{ label: "Docs", href: "/" }, { label: "Connections" }, { label: "SSH tunnels" }]}
+  heading="SSH tunnels"
+  lede="Reach databases behind firewalls by routing the connection through a bastion host."
+  tocItems={[
+    { label: "SSH tunnels", href: "#ssh-tunnels" },
+    { label: "When to use SSH", href: "#when-to-use-ssh" },
+  ]}
+  currentPath="/connections/ssh-tunnels"
+  prev={{ label: "Security", href: "/connections/secrets", section: "Connections" }}
+  next={{ label: "SSL", href: "/connections/ssl", section: "Connections" }}
+>
+  <h2 id="ssh-tunnels">SSH tunnels</h2>
+
+  <p>
+    Arris can open an SSH tunnel before connecting to a database, routing all traffic
+    through a secure channel to a bastion host. Configure the tunnel in the
+    <strong>SSH Tunnel</strong> tab of the connection form. The following fields are available:
+  </p>
+
+  <ul>
+    <li><strong>SSH Host</strong> &mdash; the hostname or IP address of the bastion server.</li>
+    <li><strong>SSH Port</strong> &mdash; the SSH port on the bastion (default <code>22</code>).</li>
+    <li><strong>SSH User</strong> &mdash; the username for SSH authentication.</li>
+  </ul>
+
+  <p>
+    For authentication, Arris supports two methods:
+  </p>
+
+  <ul>
+    <li><strong>Password</strong> &mdash; enter the SSH password directly. It is stored in the macOS Keychain, never on disk.</li>
+    <li><strong>Private key file</strong> &mdash; select an SSH private key file (e.g., <code>~/.ssh/id_ed25519</code>). If the key is passphrase-protected, enter the passphrase and it will be stored in the Keychain.</li>
+  </ul>
+
+  <p>
+    A private key takes priority when both are supplied; in that case the password field is
+    treated as the key's passphrase.
+  </p>
+
+  <p>
+    The tunnel is opened on demand when you connect and closed automatically when the
+    connection is released. Arris allocates a random local port for each tunnel, so
+    multiple SSH-tunneled connections can run simultaneously without port conflicts.
+  </p>
+
+  <Screenshot
+    src="/screenshots/ssh-tunnel-fields.png"
+    alt="The Arris SSH Tunnel section of the connection form with an enabled SSH Tunnel toggle and SSH Host, SSH Port, SSH User, SSH Password, and Private Key fields"
+    caption="Enable the SSH Tunnel toggle, then fill in the bastion host, port, user, and either a password or a private key."
+  />
+
+  <h2 id="when-to-use-ssh">When to use SSH</h2>
+
+  <p>
+    Use an SSH tunnel when the database server is not directly reachable from your machine.
+    Common scenarios include:
+  </p>
+
+  <ul>
+    <li><strong>Private VPC</strong> &mdash; the database is inside a cloud VPC with no public IP. You SSH to a bastion host that has access to the internal network.</li>
+    <li><strong>Firewall restrictions</strong> &mdash; the database port is blocked by a firewall, but SSH (port 22) is allowed.</li>
+    <li><strong>Corporate VPN alternative</strong> &mdash; instead of connecting to a VPN, you can tunnel through a jump server that your team maintains.</li>
+  </ul>
+
+  <p>
+    If the database is directly reachable (e.g., a local development server, a cloud database
+    with a public endpoint, or you are already on the VPN), you do not need an SSH tunnel.
+    Use <a href="/connections/ssl">SSL/TLS</a> instead to encrypt the connection.
+  </p>
+</DocsLayout>

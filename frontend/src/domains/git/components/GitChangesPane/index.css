@@ -1,0 +1,310 @@
+/* ── Git diff view ── */
+.git-diff-view {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--m-bg-window);
+  overflow: hidden;
+}
+.git-diff-toolbar {
+  display: flex;
+  align-items: center;
+  padding: 8px 14px;
+  border-bottom: 0.5px solid var(--m-sep);
+  background: var(--m-bg-window);
+  gap: 4px;
+  flex: none;
+  font-size: var(--m-fs-sm);
+}
+.git-diff-content {
+  flex: 1;
+  overflow: auto;
+  min-height: 0;
+}
+.git-diff-file {
+  border-bottom: 0.5px solid var(--m-sep);
+}
+.git-diff-file-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: rgb(var(--m-overlay-rgb) / 0.03);
+  border-bottom: 0.5px solid var(--m-sep);
+  cursor: pointer;
+  user-select: none;
+  font-size: var(--m-fs-sm);
+}
+.git-diff-file-header:hover {
+  background: rgb(var(--m-overlay-rgb) / 0.05);
+}
+.git-diff-table-wrap {
+  overflow-x: auto;
+}
+.git-diff-no-preview {
+  padding: 14px;
+  color: var(--m-fg-4);
+  font-size: var(--m-fs-sm);
+}
+.git-diff-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--m-font-editor, var(--m-font-mono));
+  font-size: var(--m-fs-sm);
+  line-height: 1.5;
+  /* Fixed layout: line-number columns take their fixed width and the two code
+     columns split the remaining space equally — old and new stay the same
+     width regardless of content. */
+  table-layout: fixed;
+}
+.git-diff-col-ln {
+  width: 44px;
+}
+.git-diff-col-code {
+  width: auto;
+}
+.git-diff-ln {
+  width: 32px;
+  min-width: 32px;
+  text-align: right;
+  padding: 0 4px;
+  color: var(--m-fg-4);
+  user-select: none;
+  vertical-align: top;
+  border-right: 0.5px solid var(--m-sep);
+  font-size: var(--m-fs-xs);
+}
+.git-diff-code {
+  padding: 0 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  vertical-align: top;
+}
+.git-diff-code pre {
+  margin: 0;
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.git-diff-row.git-diff-del .git-diff-old {
+  background: rgba(255,107,107,0.12);
+  color: var(--m-fg);
+}
+.git-diff-row.git-diff-del .git-diff-new {
+  background: transparent;
+}
+.git-diff-row.git-diff-add .git-diff-new {
+  background: rgba(91,227,154,0.12);
+  color: var(--m-fg);
+}
+.git-diff-row.git-diff-add .git-diff-old {
+  background: transparent;
+}
+.git-diff-row.git-diff-mod .git-diff-old {
+  background: rgba(255,107,107,0.12);
+}
+.git-diff-row.git-diff-mod .git-diff-new {
+  background: rgba(91,227,154,0.12);
+}
+.git-diff-row.git-diff-ctx .git-diff-old,
+.git-diff-row.git-diff-ctx .git-diff-new {
+  background: transparent;
+  color: var(--m-fg-3);
+}
+.git-diff-fold td {
+  text-align: center;
+  padding: 4px 0;
+  font-size: var(--m-fs-xxs);
+  color: var(--m-fg-4);
+  background: rgb(var(--m-overlay-rgb) / 0.02);
+  border-top: 0.5px solid var(--m-sep);
+  border-bottom: 0.5px solid var(--m-sep);
+}
+
+.react-grid-item.react-grid-placeholder {
+  background: var(--m-accent);
+  border-radius: var(--m-r-sm);
+}
+
+.mdbc-git-change-row-indent {
+  padding-left: 8px;
+}
+.mdbc-git-change-checkbox {
+  /* Appearance comes from the shared `.mdbc-checkbox`. This rule only handles
+     row layout: sit at the right edge, 8px gap after the +N −N stats. */
+  margin-left: 8px;
+}
+.mdbc-git-change-row-meta {
+  font-size: var(--m-fs-xxs);
+  color: var(--m-fg-4);
+  margin-left: auto;
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.mdbc-git-success-text {
+  color: var(--m-green);
+}
+.mdbc-git-error-text {
+  color: var(--m-red);
+}
+.mdbc-git-changes-root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.mdbc-git-changes-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 6px;
+}
+.mdbc-git-changes-list {
+  flex: 1;
+  overflow: auto;
+  min-height: 0;
+}
+.mdbc-git-full-width {
+  width: 100%;
+}
+.mdbc-git-change-path {
+  font-size: var(--m-fs-xxs);
+  color: var(--m-fg-4);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mdbc-git-diff-icon-cell {
+  width: 16px;
+  text-align: center;
+  color: var(--m-fg-4);
+}
+.mdbc-git-diff-file-name {
+  font-weight: 600;
+  color: var(--m-fg);
+}
+.mdbc-git-diff-muted-meta {
+  color: var(--m-fg-4);
+  margin-left: 8px;
+}
+.mdbc-git-diff-hunk-title {
+  font-weight: 600;
+}
+.mdbc-git-change-status-color {
+  color: var(--mdbc-git-change-status-color);
+  /* Grow the filename so the diff stats + checkbox cluster at the right edge,
+     even on rows without diff stats (new/untracked files). */
+  flex: 1;
+  min-width: 0;
+}
+
+/* Repository-moved prompt: shown when GitHub returns a new push location. */
+.mdbc-git-remote-moved {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: var(--m-fs-xxs);
+  color: var(--m-fg-3);
+  line-height: 1.4;
+}
+.mdbc-git-remote-moved code {
+  font-family: var(--m-font-editor, var(--m-font-mono));
+  color: var(--m-fg);
+  word-break: break-all;
+}
+
+/* Collapsible Remotes section under the footer. Header mirrors the sidebar
+   "SQL CONSOLES"-style disclosure: uppercase, dim, chevron + label. */
+.mdbc-git-remotes-section {
+  margin-top: 6px;
+}
+.mdbc-git-remotes-head {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 0;
+  font-size: var(--m-fs-xxs);
+  font-weight: 600;
+  color: var(--m-fg-3);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+}
+.mdbc-git-remotes-head:hover {
+  color: var(--m-fg-2);
+}
+.mdbc-git-remotes {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-bottom: 4px;
+}
+/* One URL input per remote; edits commit on blur / Enter — no Save button. */
+.mdbc-git-remote-input {
+  width: 100%;
+}
+
+/* Commit box: no drag-resize handle, fixed at the box's max height (overrides
+   .mdbc-pane-textarea's resize/min-height via the compound selector). */
+.mdbc-pane-textarea.mdbc-git-commit-box {
+  resize: none;
+  height: 120px;
+  min-height: 120px;
+  max-height: 120px;
+}
+.mdbc-git-commit-row {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+/* Publish Branch / Push sits at the left end, Commit at the right. When the
+   split button is absent (no remote) Commit stays right via flex-end. */
+.mdbc-git-commit-row .mdbc-splitbtn {
+  margin-right: auto;
+}
+
+/* Smaller text on the Git pane action buttons: Stage All / Unstage All,
+   Commit, and the Publish Branch / Push split button. */
+.mdbc-git-changes-actions .mdbc-btn,
+.mdbc-git-commit-row .mdbc-btn,
+.mdbc-git-commit-row .mdbc-splitbtn-primary {
+  font-size: var(--m-fs-xs);
+}
+
+/* Footer row under the Commit button: latest commit message (truncated) on
+   the left, History button pinned to the right. */
+.mdbc-git-history-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.mdbc-git-history-footer-msg {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--m-fg-4);
+  font-size: var(--m-fs-xs);
+}
+
+.mdbc-git-conflict-banner {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  margin-bottom: 8px;
+  border: 1px solid #e0a13c;
+  border-radius: 6px;
+  background: color-mix(in srgb, #e0a13c 12%, transparent);
+  font-size: var(--m-fs-xs);
+}

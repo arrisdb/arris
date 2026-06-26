@@ -1,0 +1,35 @@
+import type { SslMode } from "../../CombinedConnectionsTree/types";
+import { Field, FormRow, Select } from "@shared/ui";
+import { SshSection } from "./sshSection";
+import type { FieldsProps } from "./types";
+import { SSL_MODES } from "./types";
+
+export function ElasticsearchFields({ config, patch, showSsh, setShowSsh }: FieldsProps) {
+  return (
+    <>
+      <FormRow label="Host">
+        <Field value={config.host} onChange={(v) => patch("host", v)} monospace />
+      </FormRow>
+      <FormRow label="Port">
+        <Field value={String(config.port)} onChange={(v) => patch("port", Number(v) || 0)} monospace />
+      </FormRow>
+      <FormRow label="User">
+        <Field value={config.user} onChange={(v) => patch("user", v)} monospace />
+      </FormRow>
+      <FormRow label="Password">
+        <Field type="password" value={config.password} onChange={(v) => patch("password", v)} monospace />
+      </FormRow>
+      <FormRow label="SSL Mode">
+        <Select
+          value={config.sslMode}
+          options={SSL_MODES.map((m) => ({ value: m, label: m }))}
+          onChange={(v) => patch("sslMode", v as SslMode)}
+        />
+      </FormRow>
+      <FormRow label="Options">
+        <Field value={config.options} onChange={(v) => patch("options", v)} placeholder="key1=val1&key2=val2" monospace />
+      </FormRow>
+      <SshSection config={config} patch={patch} showSsh={showSsh} setShowSsh={setShowSsh} />
+    </>
+  );
+}

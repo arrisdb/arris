@@ -1,0 +1,90 @@
+---
+import { Code } from 'astro:components';
+import styles from './CodeBlock.module.css';
+
+interface Props {
+  lang: string;
+  filename?: string;
+  meta?: string;
+}
+
+const { lang, filename, meta } = Astro.props;
+
+// Slot children are authored as plain text (some blocks wrap their content in a
+// `{`...`}` expression to protect literal braces from Astro's parser). Render the
+// slot to a string, strip any stray tags, decode HTML entities, and dedent so the
+// build-time Shiki highlighter receives clean source.
+const ENTITIES: Record<string, string> = {
+  '&amp;': '&',
+  '&lt;': '<',
+  '&gt;': '>',
+  '&quot;': '"',
+  '&#39;': "'",
+  '&nbsp;': ' ',
+};
+function decodeEntities(value: string): string {
+  return value
+    .replace(/&#(\d+);/g, (_, code) => String.fromCodePoint(Number(code)))
+    .replace(/&(?:amp|lt|gt|quot|#39|nbsp);/g, (entity) => ENTITIES[entity] ?? entity);
+}
+function dedent(value: string): string {
+  const lines = value.replace(/\r\n/g, '\n').split('\n');
+  while (lines.length && lines[0].trim() === '') lines.shift();
+  while (lines.length && lines[lines.length - 1].trim() === '') lines.pop();
+  const indents = lines
+    .filter((line) => line.trim().length > 0)
+    .map((line) => line.match(/^\s*/)![0].length);
+  const min = indents.length ? Math.min(...indents) : 0;
+  return lines.map((line) => line.slice(min)).join('\n');
+}
+
+const rendered = await Astro.slots.render('default');
+const code = dedent(decodeEntities(rendered.replace(/<[^>]+>/g, '')));
+
+// Map the display label to a Shiki language id; anything unknown renders as
+// plain text (no tokens, but still consistent styling).
+const SHIKI_LANGS = new Set([
+  'sql', 'json', 'bash', 'shell', 'typescript', 'javascript',
+  'tsx', 'jsx', 'toml', 'yaml', 'python', 'rust',
+]);
+const shikiLang = SHIKI_LANGS.has(lang) ? lang : 'text';
+---
+
+<div class={styles.code}>
+  <div class={styles.codeHead}>
+    <span class={styles.lang}>{lang}</span>
+    {filename && <span>{filename}</span>}
+    {meta && <span class={styles.meta}>{meta}</span>}
+    <button class={styles.copy} type="button" data-copy>Copy</button>
+  </div>
+  <Code code={code} lang={shikiLang} theme="tokyo-night" />
+</div>
+
+<script>
+  import styles from './CodeBlock.module.css';
+
+  function initCopyButtons() {
+    document.querySelectorAll<HTMLButtonElement>(`.${styles.copy}`).forEach((btn) => {
+      if (btn.dataset.bound) return;
+      btn.dataset.bound = 'true';
+      btn.addEventListener('click', async () => {
+        const pre = btn.closest(`.${styles.code}`)?.querySelector('pre');
+        if (!pre) return;
+        try {
+          await navigator.clipboard.writeText((pre.textContent ?? '').trim());
+          btn.textContent = 'Copied';
+          btn.classList.add(styles.copied);
+          window.setTimeout(() => {
+            btn.textContent = 'Copy';
+            btn.classList.remove(styles.copied);
+          }, 1500);
+        } catch {
+          /* clipboard unavailable */
+        }
+      });
+    });
+  }
+
+  initCopyButtons();
+  document.addEventListener('astro:page-load', initCopyButtons);
+</script>

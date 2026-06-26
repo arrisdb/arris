@@ -1,0 +1,381 @@
+---
+import "../../styles/global.css";
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import DocTable from "../../components/docs/DocTable/DocTable.astro";
+import CodeBlock from "../../components/docs/CodeBlock/CodeBlock.astro";
+import Screenshot from "../../components/docs/Screenshot/Screenshot.astro";
+---
+
+<DocsLayout
+  title="dbt — Arris Docs"
+  breadcrumbs={[{ label: "Docs", href: "/" }, { label: "Analytics engineering" }, { label: "dbt" }]}
+  heading="dbt"
+  lede="Create, open, browse, run, compile, document, and trace dbt models directly from Arris."
+  tocItems={[
+    { label: "Creating a project", href: "#creating" },
+    { label: "Opening a project", href: "#opening" },
+    { label: "The dbt config pane", href: "#config" },
+    { label: "The dbt view", href: "#view" },
+    { label: "Running commands", href: "#commands" },
+    { label: "Command logs", href: "#logs" },
+    { label: "Compiling models", href: "#compile" },
+    { label: "Docs", href: "#docs" },
+    { label: "Lineage", href: "#lineage" },
+    { label: "Diff", href: "#diff" },
+  ]}
+  currentPath="/analytics-engineering/dbt"
+  prev={{ label: "Version control", href: "/git/version-control", section: "Git" }}
+  next={{ label: "SQLMesh", href: "/analytics-engineering/sqlmesh", section: "Analytics engineering" }}
+>
+  <h2 id="creating">Creating a project</h2>
+
+  <p>
+    Start a new dbt project from the welcome screen. Under <strong>NEW PROJECT</strong>, click the
+    <strong>dbt</strong> card (<em>Sample dbt project</em>). Arris asks for a
+    <strong>Project name</strong> and a <strong>Location</strong> (use the folder button to browse),
+    then <strong>Create</strong> scaffolds a ready-to-run project in a new folder under that
+    location.
+  </p>
+
+  <Screenshot
+    src="/screenshots/welcome-new-project.png"
+    alt="The Arris welcome screen with a NEW PROJECT row of cards: Empty project, dbt, and SQLMesh"
+    caption="The welcome screen's NEW PROJECT cards &mdash; pick dbt to scaffold a sample dbt project."
+  />
+
+  <p>
+    The scaffold writes a minimal <code>dbt_project.yml</code>, a <code>profiles.yml</code> wired to
+    a local DuckDB target so the project runs with no external database, and one example model at
+    <code>models/example_model.sql</code>. Arris opens the project as soon as it is created, so you
+    can run <code>dbt run</code> against the sample model immediately and bind a real database later
+    from the <a href="#config">Connection picker</a>.
+  </p>
+
+  <h2 id="opening">Opening a project</h2>
+
+  <p>
+    To open an existing project, use <strong>OPEN EXISTING</strong> on the welcome screen and pick
+    the folder that contains your <code>dbt_project.yml</code>. Arris recognizes the
+    <code>dbt_project.yml</code> marker, scans the project, and reads each node's YAML metadata
+    (descriptions and column definitions). Once detected, a <strong>dbt</strong> view becomes
+    available in the left sidebar.
+  </p>
+
+  <p>
+    Until a folder with a <code>dbt_project.yml</code> is open, the dbt view stays empty and prompts
+    you to open one.
+  </p>
+
+  <h2 id="config">The dbt config pane</h2>
+
+  <p>
+    The dbt view opens with a collapsible status card at the top: the <strong>dbt</strong> badge
+    shows the detected CLI version and a <em>profile · target</em> summary, with a reload button to
+    rescan. Expand it to configure how Arris invokes dbt:
+  </p>
+
+  <DocTable>
+    <thead>
+      <tr>
+        <th>Setting</th>
+        <th>What it controls</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="font-medium text-fg">Project</td>
+        <td>Which dbt root to use, shown only when the folder contains more than one <code>dbt_project.yml</code>.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">Profile</td>
+        <td>The profile to run with, loaded from the project's <code>profiles.yml</code> or <code>~/.dbt/profiles.yml</code>.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">Target</td>
+        <td>The output target defined under the selected profile (for example <code>dev</code> or <code>prod</code>).</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">dbt binary</td>
+        <td>Path to the dbt executable. Defaults to <code>dbt</code> on your <code>PATH</code>; use the folder button to point at a specific install.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">Connection</td>
+        <td>A database connection bound to the project, used for model preview and diff against the live table.</td>
+      </tr>
+    </tbody>
+  </DocTable>
+
+  <p>
+    The card also has one-click shortcuts to open <code>profiles.yml</code> and
+    <code>dbt_project.yml</code> in the editor. If the dbt CLI check fails, the error is shown inline
+    with a <strong>Show full error</strong> toggle. Your project, profile, target, and binary
+    selections persist across sessions.
+  </p>
+
+  <Screenshot
+    src="/screenshots/dbt-config-pane.png"
+    alt="The expanded dbt config card showing the dbt version badge, profile · target summary, Profile and Target dropdowns, the dbt binary path, profiles.yml and dbt_project.yml shortcuts, and the Connection picker"
+    caption="The dbt config card expanded &mdash; profile, target, dbt binary, file shortcuts, and the Connection picker."
+  />
+
+  <h2 id="view">The dbt view</h2>
+
+  <p>
+    When Arris detects a dbt project, the left sidebar header shows a segmented control
+    to switch the files pane between <strong>Project</strong> (the raw file tree) and
+    <strong>dbt</strong>. Click <strong>dbt</strong> to open the model tree, which lists every node
+    grouped by kind with a count per section:
+  </p>
+
+  <DocTable>
+    <thead>
+      <tr>
+        <th>Section</th>
+        <th>What it holds</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="font-medium text-fg">Models</td>
+        <td>The <code>SELECT</code> statements that dbt materializes as tables or views. The core transformations of the project.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">Incremental</td>
+        <td>Models with an <code>incremental</code> materialization, split into their own group so they read distinctly from the rest.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">Sources</td>
+        <td>The raw warehouse tables that models read from, read from the <code>sources:</code> blocks in your schema YAML and referenced with <code>source()</code>.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">Seeds</td>
+        <td>CSV files in the project that dbt loads into the warehouse as tables, used for small static reference data.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">Snapshots</td>
+        <td>Tables that capture how a mutable source row changes over time, recording slowly changing dimension history.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">Tests</td>
+        <td>Standalone data tests &mdash; the <code>.sql</code> assertion files under your test path &mdash; that pass or fail when run.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">Macros</td>
+        <td>Reusable Jinja snippets that generate SQL, callable from models to keep transformations DRY.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">Analyses</td>
+        <td>Ad-hoc <code>.sql</code> files that dbt compiles but does not materialize, for one-off queries kept under version control.</td>
+      </tr>
+    </tbody>
+  </DocTable>
+
+  <p>
+    Use the filter box to narrow the tree by name. Single-click a node to select it; double-click to
+    open its file in the editor.
+  </p>
+
+  <Screenshot
+    src="/screenshots/dbt-view-tree.png"
+    alt="The dbt model tree with a filter box and sections Models, Incremental, Sources, Seeds, and Tests, each showing a count and its nodes"
+    caption="The dbt model tree &mdash; nodes grouped by kind with a per-section count, filterable by name."
+  />
+
+  <h2 id="commands">Running commands</h2>
+
+  <p>
+    dbt commands are available in two places. The <strong>run bar</strong> at the top of the dbt view
+    exposes <strong>Run</strong>, <strong>Test</strong>, and <strong>Build</strong> as a split-button
+    with an editable selector field. Leave the selector empty to run the whole project, or type a
+    node selector to scope the command. The info button next to the bar documents the selector
+    syntax:
+  </p>
+
+  <DocTable>
+    <thead>
+      <tr>
+        <th>Selector</th>
+        <th>Meaning</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>model</code></td>
+        <td>Run a specific model.</td>
+      </tr>
+      <tr>
+        <td><code>model+</code></td>
+        <td>Run the model and its descendants.</td>
+      </tr>
+      <tr>
+        <td><code>+model</code></td>
+        <td>Run the model and its ancestors.</td>
+      </tr>
+      <tr>
+        <td><code>@model</code></td>
+        <td>Run the model, its parents, and its children.</td>
+      </tr>
+    </tbody>
+  </DocTable>
+
+  <p>
+    The second place is the <strong>dbt toolbar</strong> in the editor: open a model and a
+    <strong>dbt</strong> section appears in the console toolbar. For a model it offers the full set
+    of actions &mdash; <strong>Run</strong>, <strong>Test</strong>, <strong>Build</strong>,
+    <strong>Compile</strong>, <strong>Docs</strong>, <strong>Lineage</strong>,
+    <strong>Preview</strong>, and <strong>Diff</strong>. For a test file it offers the applicable
+    subset: <strong>Test</strong>, <strong>Build</strong>, <strong>Compile</strong>, and
+    <strong>Lineage</strong>. The split-button remembers the action you last picked as its primary
+    button, and the selector applies to the run just like in the pane. <strong>Preview</strong> runs
+    the model's SQL against the bound connection, and <strong>Diff</strong> compares the model's new
+    output against its production table.
+  </p>
+
+  <Screenshot
+    src="/screenshots/dbt-command-menu.png"
+    alt="The dbt toolbar split-button menu open, listing Run, Test, Build, Compile, Docs, Lineage, Preview, and Diff with their keyboard shortcuts, the selector field set to dim_customers"
+    caption="The dbt toolbar split-button menu &mdash; every model action with its shortcut, and the selector applied to the run."
+  />
+
+  <h2 id="logs">Command logs</h2>
+
+  <p>
+    Every command's output streams into the <strong>Command logs</strong> panel at the bottom of the
+    window, newest run on top. Each entry records the exact command, its status, duration, and
+    timestamp, plus a per-node breakdown parsed from dbt's <code>run_results.json</code> (model name,
+    type, status, and time) and the raw stdout/stderr with ANSI colors preserved. Filter entries with
+    the search box or the status dropdown, and clear the history with the trash button. See
+    <a href="/querying/command-logs">Command logs</a> for the full reference.
+  </p>
+
+  <Screenshot
+    src="/screenshots/dbt-command-logs.png"
+    alt="The Command logs panel with a filter box and status filter, a dbt compile entry expanded to show its raw output, and dbt docs generate and dbt run entries below with their durations and timestamps"
+    caption="The Command logs panel &mdash; each run with its command, status, duration, and timestamp, expandable to the raw output."
+  />
+
+  <h2 id="compile">Compiling models</h2>
+
+  <p>
+    <strong>Compile</strong> renders a model's Jinja into final SQL and opens a
+    <strong>Compiled SQL</strong> preview alongside the editor. The preview has buttons to
+    <strong>Recompile</strong>, <strong>Copy SQL</strong>, and close it, and it flags a
+    <strong>Stale</strong> chip when you edit the model after compiling and a <strong>Compiling</strong>
+    chip while a recompile is in flight. If a compile fails, the preview points you to the error in
+    the command logs below.
+  </p>
+
+  <Screenshot
+    src="/screenshots/dbt-compile.png"
+    alt="A dbt model on the left and the Compiled SQL pane on the right, where ref() calls have been resolved to fully-qualified postgres.public table names"
+    caption="Compile renders the model's Jinja into final SQL &mdash; here ref() calls resolve to fully-qualified table names."
+  />
+
+  <h2 id="docs">Docs</h2>
+
+  <p>
+    <strong>Docs</strong> generates the dbt documentation (the <code>manifest.json</code> and
+    <code>catalog.json</code> artifacts) and renders the current model's docs in a side panel. The
+    panel shows the model name with its materialization and resource-type badges, the
+    <code>database.schema</code> relation, the description, a <strong>Columns</strong> table (name,
+    type, description), and a <strong>Depends on</strong> list of upstream nodes. It surfaces a
+    <strong>Stale</strong> chip after edits, a <strong>Generating</strong> chip while running, and a
+    <strong>Regenerate</strong> button. If the manifest uses an untested schema version, a warning
+    notes some fields may be missing.
+  </p>
+
+  <Screenshot
+    src="/screenshots/dbt-docs.png"
+    alt="A dbt model open in the editor with the Docs panel alongside it, showing the dim_customers model with a table badge, the postgres.public_marts relation, a description, a Columns table, and a Depends on list"
+    caption="The Docs panel beside a model &mdash; materialization and resource-type badges, the relation, description, Columns table, and Depends on list."
+  />
+
+  <h2 id="lineage">Lineage</h2>
+
+  <p>
+    <strong>Lineage</strong> opens a directed acyclic graph of the model's dependencies, rendered as
+    a draggable node graph. Each node is a model that lists its columns, and the model you opened is
+    marked <strong>CURRENT</strong>. Toggle it from the <strong>Lineage</strong> button in the dbt
+    toolbar while a model is open; the graph rebuilds from your current model definitions each time.
+  </p>
+
+  <p>
+    For <strong>column-level lineage</strong>, click a <strong>column name</strong> inside a node.
+    Arris traces just that column and highlights the upstream and downstream columns it flows through,
+    so you can follow a single field across the graph rather than the whole model.
+  </p>
+
+  <Screenshot
+    src="/screenshots/dbt-lineage.png"
+    alt="The lineage graph for dim_customers (marked CURRENT) with stg_customers and stg_orders upstream; the last_name column is selected, highlighting last_name in both dim_customers and stg_customers"
+    caption="Column-level lineage &mdash; clicking last_name highlights that column across the models it flows through."
+  />
+
+  <ul>
+    <li><strong>Depth</strong> &mdash; choose <strong>1</strong>, <strong>2</strong>, or <strong>3</strong> to limit how many hops of upstream and downstream models are shown around the current model.</li>
+    <li><strong>Orientation</strong> &mdash; toggle between <strong>Horizontal</strong> and <strong>Vertical</strong> layout.</li>
+    <li><strong>Pan</strong> &mdash; drag the canvas background to move the viewport.</li>
+    <li><strong>Zoom</strong> &mdash; scroll, or use the bottom-right controls, to zoom in and out.</li>
+    <li><strong>Rearrange</strong> &mdash; drag any node to reposition it; layout otherwise arranges nodes automatically.</li>
+    <li><strong>Open a node</strong> &mdash; double-click a node to focus that model.</li>
+  </ul>
+
+  <h2 id="diff">Diff</h2>
+
+  <p>
+    <strong>Diff</strong> compares a model's <em>new</em> output &mdash; the version you are editing
+    &mdash; against the table already in production, so you can see exactly what a change does to the
+    data before you run it. It needs a database <a href="#config">connection</a> bound to the project;
+    today the diff targets Postgres and DuckDB, and other dialects show a notice instead. Toggling
+    <strong>Diff</strong> in the dbt toolbar opens a config strip below it:
+  </p>
+
+  <DocTable>
+    <thead>
+      <tr>
+        <th>Control</th>
+        <th>What it does</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="font-medium text-fg">Compute</td>
+        <td><strong>Inline (compile)</strong> diffs the model's compiled SQL as a subquery without writing anything; <strong>Materialize (temp table)</strong> writes the new side to a temporary table first, which is steadier for heavy models.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">Sample rows</td>
+        <td>How many differing rows to pull into each sample grid. Defaults to 50; the counts above the samples are always exact.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">Primary keys</td>
+        <td>Optional comma-separated key columns (for example <code>id, region</code>). They switch the diff from a row-set comparison to a keyed one &mdash; see below.</td>
+      </tr>
+    </tbody>
+  </DocTable>
+
+  <p>
+    Press <strong>Run diff</strong> and the result renders in the bottom results pane. How it counts
+    changes depends on whether you supplied keys:
+  </p>
+
+  <ul>
+    <li><strong>Keyless</strong> &mdash; with no primary keys, Arris does a full-row set difference (<code>EXCEPT</code> both ways). A row whose values changed shows up as one <strong>removed</strong> plus one <strong>added</strong>, and there are no &ldquo;updated&rdquo; rows.</li>
+    <li><strong>Keyed</strong> &mdash; with primary keys, rows are matched by key, so a value change counts once as <strong>updated</strong> rather than as a remove plus an add.</li>
+  </ul>
+
+  <p>
+    The summary line shows the prod and new row totals and chips for
+    <strong>+added</strong>, <strong>&minus;removed</strong>, and (when keyed)
+    <strong>~updated</strong>, plus the compute mode and key columns. A schema-change line lists any
+    added or removed columns. Below it, sample grids list <strong>Added (in new, not prod)</strong>
+    and <strong>Removed (in prod, not new)</strong> rows; for a keyed diff, an
+    <strong>Updated</strong> grid shows each changed cell inline, git-style, with the old value struck
+    through in red and the new value in green.
+  </p>
+
+  <Screenshot
+    src="/screenshots/dbt-diff-results.png"
+    alt="A keyed dbt diff result with summary chips (prod 19, new 19, +0 added, -0 removed, ~12 updated, inline, key: customer_id), empty Added and Removed sections, and an Updated grid where total_amount cells show the old value struck through in red and the new value in green"
+    caption="A keyed diff result &mdash; summary chips, empty Added/Removed, and an Updated grid showing each changed cell as old (red, struck through) to new (green)."
+  />
+</DocsLayout>

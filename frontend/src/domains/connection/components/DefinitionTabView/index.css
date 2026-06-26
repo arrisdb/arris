@@ -1,0 +1,27 @@
+/* Read-only DDL tab. A column-flex root so the editor fills the pane's full
+   height even when the definition is a single line (otherwise the CodeMirror
+   `height: 100%` collapses to one row inside the non-flex `.mdbc-tab-content`).
+   A thin bar below the tab row carries the "Read-only" chip. */
+.mdbc-definition-view {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+.mdbc-definition-bar {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--m-sep);
+  background: var(--m-bg-toolbar);
+}
+/* The chip is informational, not actionable — no hover/pointer affordance. */
+.mdbc-definition-chip {
+  cursor: default;
+}
+.mdbc-definition-view > .mdbc-editor-layout {
+  min-height: 0;
+}

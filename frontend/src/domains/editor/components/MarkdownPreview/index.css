@@ -1,0 +1,121 @@
+.mdbc-markdown-preview {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  overflow: auto;
+  padding: 16px 22px;
+  font-family: var(--m-font);
+  font-size: var(--m-fs-sm);
+  line-height: 1.6;
+  color: var(--m-fg);
+  background: var(--m-bg-editor);
+}
+
+.mdbc-markdown-preview > :first-child {
+  margin-top: 0;
+}
+
+.mdbc-markdown-preview h1,
+.mdbc-markdown-preview h2,
+.mdbc-markdown-preview h3,
+.mdbc-markdown-preview h4,
+.mdbc-markdown-preview h5,
+.mdbc-markdown-preview h6 {
+  margin: 1.4em 0 0.5em;
+  line-height: 1.25;
+  font-weight: 600;
+  color: var(--m-fg);
+}
+
+.mdbc-markdown-preview h1 {
+  font-size: 1.7em;
+  padding-bottom: 0.3em;
+  border-bottom: 1px solid var(--m-sep);
+}
+
+.mdbc-markdown-preview h2 {
+  font-size: 1.4em;
+  padding-bottom: 0.25em;
+  border-bottom: 1px solid var(--m-sep);
+}
+
+.mdbc-markdown-preview h3 {
+  font-size: 1.2em;
+}
+
+.mdbc-markdown-preview p {
+  margin: 0.6em 0;
+}
+
+.mdbc-markdown-preview a {
+  color: var(--m-accent);
+  text-decoration: none;
+}
+
+.mdbc-markdown-preview a:hover {
+  text-decoration: underline;
+}
+
+.mdbc-markdown-preview ul,
+.mdbc-markdown-preview ol {
+  margin: 0.6em 0;
+  padding-left: 1.6em;
+}
+
+.mdbc-markdown-preview li {
+  margin: 0.2em 0;
+}
+
+.mdbc-markdown-preview blockquote {
+  margin: 0.8em 0;
+  padding: 0.1em 1em;
+  border-left: 3px solid var(--m-sep-strong);
+  color: var(--m-fg-2);
+}
+
+.mdbc-markdown-preview hr {
+  margin: 1.4em 0;
+  border: none;
+  border-top: 1px solid var(--m-sep);
+}
+
+.mdbc-markdown-preview code {
+  font-family: var(--m-font-editor);
+  font-size: 0.88em;
+  padding: 0.15em 0.4em;
+  border-radius: 4px;
+  background: var(--m-bg-card);
+}
+
+.mdbc-markdown-preview pre {
+  margin: 0.8em 0;
+  padding: 12px 14px;
+  overflow: auto;
+  border-radius: 6px;
+  background: var(--m-bg-card);
+  border: 1px solid var(--m-sep);
+}
+
+.mdbc-markdown-preview pre code {
+  padding: 0;
+  background: none;
+  font-size: 0.88em;
+  line-height: 1.5;
+}
+
+.mdbc-markdown-preview table {
+  margin: 0.8em 0;
+  border-collapse: collapse;
+  font-size: 0.95em;
+}
+
+.mdbc-markdown-preview th,
+.mdbc-markdown-preview td {
+  padding: 6px 12px;
+  border: 1px solid var(--m-sep);
+}
+
+.mdbc-markdown-preview th {
+  background: var(--m-bg-card);
+  font-weight: 600;
+}

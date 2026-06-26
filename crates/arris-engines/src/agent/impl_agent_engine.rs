@@ -1,0 +1,342 @@
+//! The agent engine: a stateless orchestrator for agentic SQL sessions.
+//!
+//! Each turn builds a self-contained prompt (role + schema + the user's request),
+//! spawns the selected provider's CLI (`codex` or `claude`) in a read-only mode,
+//! and streams its parsed events as [`AgentEvent`]s. The agent only writes or
+//! explains SQL — it needs no live database access, so there is no MCP server:
+//! the schema is inlined into the prompt and the CLI runs with file writes and
+//! tools disabled.
+
+use std::fmt::Write as _;
+use std::path::PathBuf;
+use std::process::Stdio;
+
+use tokio::io::{AsyncBufReadExt, BufReader};
+use tokio::process::Command;
+use tokio::sync::{mpsc, oneshot};
+
+use super::constants::SCHEMA_PROMPT_MAX_BYTES;
+use super::errors::AgentError;
+use super::types::{AgentEvent, AgentProvider};
+use crate::{DatabaseKind, Engine, SchemaNode, SchemaNodeKind};
+
+/// Orchestrates agentic SQL sessions for writing and explaining queries.
+/// Stateless: each turn spawns the selected provider's CLI (`codex` or `claude`)
+/// with a self-contained prompt (no live database access, no MCP server).
+pub struct AgentEngine;
+
+impl AgentEngine {
+    pub fn new() -> Self {
+        Self
+    }
+
+    // ── agent process ────────────────────────────────────────────────────────
+
+    /// Start one agent turn with `provider`'s CLI. Spawns it with a
+    /// self-contained prompt (the `dialect` schema DDL plus the user's request)
+    /// and streams parsed events. `resume_session` continues an existing
+    /// conversation (the session id must come from the same provider).
+    ///
+    /// The CLI runs read-only so it cannot touch the filesystem, and project
+    /// docs are disabled so the user's repo/global instructions can't derail a
+    /// query-writing turn.
+    pub async fn send(
+        &self,
+        provider: AgentProvider,
+        dialect: Option<DatabaseKind>,
+        schema_ddl: String,
+        user_prompt: String,
+        resume_session: Option<String>,
+        cancel: oneshot::Receiver<()>,
+    ) -> Result<mpsc::Receiver<AgentEvent>, AgentError> {
+        let (tx, rx) = mpsc::channel(64);
+        let prompt = Self::build_prompt(dialect, &schema_ddl, &user_prompt);
+        let cwd = Self::working_dir()?;
+        let cli = provider.cli();
+        let binary = cli.binary();
+
+        let mut cmd = Command::new(binary);
+        cmd.current_dir(&cwd);
+        cli.configure(&mut cmd, &prompt, resume_session.as_deref());
+        // The CLI may drain stdin for extra input; an inherited GUI stdin never
+        // reaches EOF and blocks forever, so close it explicitly.
+        cmd.stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+
+        let mut child = cmd.spawn().map_err(|e| match e.kind() {
+            std::io::ErrorKind::NotFound => AgentError::CliNotFound(provider),
+            _ => AgentError::Io(e),
+        })?;
+        let stdout = child.stdout.take().expect("stdout piped");
+        let stderr = child.stderr.take().expect("stderr piped");
+
+        // Drain stderr concurrently — an unread pipe fills its OS buffer and
+        // deadlocks the CLI mid-write. Echo it to the dev console and keep the
+        // tail to surface the real reason if the CLI exits non-zero.
+        let stderr_task = tokio::spawn(async move {
+            let mut buf = String::new();
+            let mut lines = BufReader::new(stderr).lines();
+            while let Ok(Some(line)) = lines.next_line().await {
+                eprintln!("[agent:{binary}] {line}");
+                buf.push_str(&line);
+                buf.push('\n');
+            }
+            buf
+        });
+
+        tokio::spawn(async move {
+            let mut lines = BufReader::new(stdout).lines();
+            let mut cancel = cancel;
+            // True when the user pressed Stop: kill the CLI and report a clean
+            // finish instead of the non-zero "killed" exit as an error.
+            let mut cancelled = false;
+            loop {
+                tokio::select! {
+                    _ = &mut cancel => {
+                        let _ = child.kill().await;
+                        cancelled = true;
+                        break;
+                    }
+                    line = lines.next_line() => {
+                        match line {
+                            Ok(Some(line)) => {
+                                if let Some(event) = cli.parse_line(&line) {
+                                    if tx.send(event).await.is_err() {
+                                        break;
+                                    }
+                                }
+                            }
+                            _ => break,
+                        }
+                    }
+                }
+            }
+            let status = child.wait().await;
+            let stderr_out = stderr_task.await.unwrap_or_default();
+            if !cancelled {
+                if let Ok(status) = status {
+                    if !status.success() {
+                        let code = status.code().unwrap_or(-1);
+                        let detail = stderr_out.trim();
+                        // Scan the whole stderr for an auth signature — the 401
+                        // can be a few lines above the tail (cf-ray etc.).
+                        let friendly = cli.friendly_error(detail);
+                        let message = if !friendly.is_empty() && friendly != detail {
+                            friendly
+                        } else if detail.is_empty() {
+                            format!("{binary} exited with status {code}")
+                        } else {
+                            format!(
+                                "{binary} exited with status {code}: {}",
+                                detail.lines().last().unwrap_or(detail)
+                            )
+                        };
+                        let _ = tx.send(AgentEvent::Error { message }).await;
+                    }
+                }
+            }
+            let _ = tx.send(AgentEvent::Done).await;
+        });
+
+        Ok(rx)
+    }
+
+    /// A throwaway, empty working directory for the CLI. Kept empty so the CLI
+    /// has nothing local to scan; everything it needs is in the prompt.
+    fn working_dir() -> Result<PathBuf, AgentError> {
+        let dir = std::env::temp_dir().join("arris-agent");
+        std::fs::create_dir_all(&dir)?;
+        Ok(dir)
+    }
+}
+
+// ── prompt construction ──────────────────────────────────────────────────────
+
+impl AgentEngine {
+    /// Build the full prompt: role, schema snapshot, rules, and the user's
+    /// request. Self-contained so the turn needs no tools or file access.
+    pub(super) fn build_prompt(
+        dialect: Option<DatabaseKind>,
+        schema_ddl: &str,
+        user_prompt: &str,
+    ) -> String {
+        let name = dialect.map(Self::dialect_name).unwrap_or("SQL");
+        let schema = if schema_ddl.len() > SCHEMA_PROMPT_MAX_BYTES {
+            let mut truncated: String = schema_ddl.chars().take(SCHEMA_PROMPT_MAX_BYTES).collect();
+            truncated.push_str("\n-- (schema truncated)\n");
+            truncated
+        } else {
+            schema_ddl.to_string()
+        };
+        format!(
+            "You are a SQL assistant embedded in a database client. You ONLY write \
+             or explain SQL queries for the user's {name} database — nothing else. \
+             Do not run shell commands, read files, or do unrelated work.\n\n\
+             # Database schema ({name})\n\
+             {schema}\n\n\
+             # Rules\n\
+             - Use dialect-appropriate {name} syntax and the tables/columns above.\n\
+             - When you write a query, return exactly one ```sql fenced block, then \
+             one short sentence describing it. The user reviews and applies it.\n\
+             - When asked to explain a query, describe what it does in plain prose; \
+             include SQL only if you are proposing a revision.\n\
+             - You cannot execute anything — never claim you ran a query.\n\n\
+             # Request\n\
+             {user_prompt}\n",
+        )
+    }
+
+    fn dialect_name(kind: DatabaseKind) -> &'static str {
+        match kind {
+            DatabaseKind::Postgres => "PostgreSQL",
+            DatabaseKind::Mysql => "MySQL",
+            DatabaseKind::Mariadb => "MariaDB",
+            DatabaseKind::Sqlite => "SQLite",
+            DatabaseKind::Mssql => "SQL Server (T-SQL)",
+            DatabaseKind::Oracle => "Oracle",
+            DatabaseKind::Bigquery => "BigQuery",
+            DatabaseKind::Redshift => "Redshift",
+            DatabaseKind::Snowflake => "Snowflake",
+            DatabaseKind::Clickhouse => "ClickHouse",
+            DatabaseKind::Duckdb => "DuckDB",
+            DatabaseKind::Redis => "Redis",
+            DatabaseKind::Kafka => "Kafka",
+            DatabaseKind::Mongodb => "MongoDB",
+            DatabaseKind::Mixpanel => "Mixpanel",
+            DatabaseKind::Elasticsearch => "Elasticsearch",
+            DatabaseKind::Trino => "Trino",
+            DatabaseKind::Dynamodb => "DynamoDB",
+            DatabaseKind::Starrocks => "StarRocks",
+        }
+    }
+
+    /// Render a schema node tree as commented DDL for the prompt.
+    pub fn schema_ddl(&self, nodes: &[SchemaNode]) -> String {
+        let mut out = String::new();
+        for node in nodes {
+            Self::write_ddl_node(&mut out, node, &[]);
+        }
+        out
+    }
+
+    fn write_ddl_node(out: &mut String, node: &SchemaNode, parent_names: &[&str]) {
+        match node.kind {
+            SchemaNodeKind::Database | SchemaNodeKind::Schema => {
+                let label = if node.kind == SchemaNodeKind::Database {
+                    "Database"
+                } else {
+                    "Schema"
+                };
+                let _ = writeln!(out, "-- {}: {}", label, node.name);
+                let names: Vec<&str> = parent_names
+                    .iter()
+                    .copied()
+                    .chain(std::iter::once(node.name.as_str()))
+                    .collect();
+                for child in &node.children {
+                    Self::write_ddl_node(out, child, &names);
+                }
+            }
+            SchemaNodeKind::Table | SchemaNodeKind::ForeignTable => {
+                let qualified = Self::qualified_name(parent_names, &node.name);
+                let columns = Self::collect_columns(&node.children);
+                if columns.is_empty() {
+                    let _ = writeln!(out, "CREATE TABLE {} ();\n", qualified);
+                } else {
+                    let _ = writeln!(out, "CREATE TABLE {} (", qualified);
+                    for (i, (name, typ)) in columns.iter().enumerate() {
+                        let comma = if i + 1 < columns.len() { "," } else { "" };
+                        let _ = writeln!(out, "    {} {}{}", name, typ, comma);
+                    }
+                    let _ = writeln!(out, ");\n");
+                }
+            }
+            SchemaNodeKind::View | SchemaNodeKind::MaterializedView => {
+                let qualified = Self::qualified_name(parent_names, &node.name);
+                let kind_label = if node.kind == SchemaNodeKind::MaterializedView {
+                    "Materialized View"
+                } else {
+                    "View"
+                };
+                let _ = writeln!(out, "-- {}: {}", kind_label, qualified);
+                let columns = Self::collect_columns(&node.children);
+                if !columns.is_empty() {
+                    let _ = writeln!(out, "-- Columns:");
+                    for (name, typ) in &columns {
+                        let _ = writeln!(out, "--   {} {}", name, typ);
+                    }
+                }
+                let _ = writeln!(out);
+            }
+            SchemaNodeKind::Collection => {
+                let _ = writeln!(out, "-- Collection: {}\n", node.name);
+            }
+            _ => {}
+        }
+    }
+
+    fn collect_columns(children: &[SchemaNode]) -> Vec<(&str, String)> {
+        children
+            .iter()
+            .filter(|c| c.kind == SchemaNodeKind::Column)
+            .map(|c| {
+                let typ = c.detail.as_deref().unwrap_or("UNKNOWN").to_string();
+                (c.name.as_str(), typ)
+            })
+            .collect()
+    }
+
+    fn qualified_name(parents: &[&str], name: &str) -> String {
+        match parents.last().copied() {
+            Some(s) => format!("{}.{}", s, name),
+            None => name.to_string(),
+        }
+    }
+}
+
+impl Default for AgentEngine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Engine for AgentEngine {
+    fn name(&self) -> &str {
+        "agent"
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn build_prompt_inlines_schema_and_request() {
+        let prompt = AgentEngine::build_prompt(
+            Some(DatabaseKind::Postgres),
+            "CREATE TABLE users (id INT);",
+            "list all users",
+        );
+        assert!(prompt.contains("PostgreSQL"));
+        assert!(prompt.contains("CREATE TABLE users (id INT);"));
+        assert!(prompt.contains("list all users"));
+        assert!(prompt.contains("```sql"));
+    }
+
+    #[test]
+    fn build_prompt_without_dialect_uses_generic_sql() {
+        // No connection selected: the agent still writes/explains generic SQL.
+        let prompt = AgentEngine::build_prompt(None, "", "write a select");
+        assert!(prompt.contains("SQL"));
+        assert!(!prompt.contains("PostgreSQL"));
+        assert!(prompt.contains("write a select"));
+    }
+
+    #[test]
+    fn build_prompt_truncates_oversized_schema() {
+        let huge = "x".repeat(SCHEMA_PROMPT_MAX_BYTES + 1000);
+        let prompt = AgentEngine::build_prompt(Some(DatabaseKind::Sqlite), &huge, "go");
+        assert!(prompt.contains("(schema truncated)"));
+    }
+}

@@ -1,0 +1,249 @@
+/* Top bar — project + git branch chrome below native OS titlebar. */
+.mdbc-topbar {
+  position: relative;
+  z-index: 10;
+  height: 34px;
+  min-height: 34px;
+  padding: 0 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 0.5px solid var(--m-sep);
+  background: var(--m-bg-window);
+  color: var(--m-fg);
+}
+/* styles/app.css applies `.mdbc-window > * { z-index: 1 }` to every pane,
+   tying the top bar to the editor pane (which paints later in the DOM and
+   covers the branch/worktree popover). This higher-specificity rule wins
+   regardless of source order, lifting the top bar's stacking context — and
+   the popover within it — above the content panes. */
+.mdbc-window > .mdbc-topbar {
+  z-index: 20;
+}
+.mdbc-topbar-left {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.mdbc-topbar-right {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.mdbc-topbar-project {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--m-fs-xs);
+  font-weight: 600;
+  color: var(--m-fg);
+}
+.mdbc-topbar-branch {
+  flex: 0 1 auto;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--m-fg-2);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font: inherit;
+  font-size: var(--m-fs-xs);
+  font-family: var(--m-font);
+  cursor: pointer;
+}
+.mdbc-topbar-branch span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mdbc-topbar-branch:hover:not(:disabled) {
+  color: var(--m-fg);
+}
+.mdbc-topbar-branch:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.mdbc-topbar-default-branch {
+  color: var(--m-fg-3);
+}
+.mdbc-topbar-separator {
+  color: var(--m-fg-4);
+  flex-shrink: 0;
+}
+.mdbc-topbar-popover-anchor {
+  position: relative;
+  flex: 0 1 auto;
+  min-width: 0;
+  display: flex;
+}
+.mdbc-branch-popover {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 50;
+  width: min(540px, calc(100vw - 24px));
+  max-height: min(520px, calc(100vh - 72px));
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  background: var(--m-bg-surface);
+  border: 0.5px solid var(--m-sep-strong);
+  border-radius: 8px;
+  box-shadow: 0 18px 48px rgba(0,0,0,0.45);
+  color: var(--m-fg);
+}
+.mdbc-branch-tabs {
+  width: max-content;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border: 0.5px solid var(--m-sep);
+  border-radius: 6px;
+  background: rgb(var(--m-overlay-rgb) / 0.025);
+}
+.mdbc-branch-tabs button {
+  height: 24px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--m-fg-2);
+  font: inherit;
+  font-size: var(--m-fs-xs);
+  cursor: pointer;
+}
+.mdbc-branch-tabs button.active {
+  background: rgb(var(--m-overlay-rgb) / 0.07);
+  color: var(--m-accent-2);
+}
+.mdbc-branch-list {
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.mdbc-branch-row {
+  height: 30px;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--m-fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.mdbc-branch-row:hover,
+.mdbc-branch-row.selected {
+  background: rgb(var(--m-accent-rgb) / 0.16);
+}
+.mdbc-branch-row:disabled {
+  opacity: 0.65;
+  cursor: default;
+}
+/* Row + its hover-revealed remove button share one relative track so the bin
+   icon overlays the row's right edge without nesting buttons. */
+.mdbc-branch-row-wrap {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+}
+.mdbc-branch-row-wrap .mdbc-branch-row {
+  flex: 1;
+  min-width: 0;
+}
+.mdbc-branch-remove {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  transform: translateY(-50%);
+  width: 22px;
+  height: 22px;
+  color: var(--m-fg);
+  opacity: 0;
+}
+.mdbc-branch-row-wrap:hover .mdbc-branch-remove,
+.mdbc-branch-remove:focus-visible {
+  opacity: 1;
+}
+.mdbc-branch-check {
+  width: 14px;
+  flex-shrink: 0;
+  color: var(--m-accent-2);
+  font-size: var(--m-fs-xs);
+  text-align: center;
+}
+.mdbc-branch-icon {
+  flex-shrink: 0;
+  color: var(--m-fg-3);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.mdbc-branch-row.mdbc-branch-row-tall {
+  height: auto;
+  min-height: 44px;
+  padding: 6px 10px;
+  align-items: flex-start;
+}
+.mdbc-branch-row-tall .mdbc-branch-check,
+.mdbc-branch-row-tall .mdbc-branch-icon {
+  margin-top: 4px;
+}
+.mdbc-branch-row-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+.mdbc-branch-row-detail .mdbc-branch-name {
+  font-weight: 600;
+}
+.mdbc-branch-row-sub {
+  font-size: var(--m-fs-xxs);
+  font-family: var(--m-font);
+  color: var(--m-fg-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mdbc-branch-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--m-fs-sm);
+  font-family: var(--m-font);
+}
+.mdbc-branch-meta {
+  flex-shrink: 0;
+  color: var(--m-fg-3);
+  font-size: var(--m-fs-xs);
+}
+.mdbc-branch-empty,
+.mdbc-branch-error {
+  padding: 8px 12px;
+  color: var(--m-fg-3);
+  font-size: var(--m-fs-sm);
+}
+.mdbc-branch-error {
+  color: var(--m-red);
+}

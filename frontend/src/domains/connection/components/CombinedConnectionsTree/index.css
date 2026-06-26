@@ -1,0 +1,265 @@
+/* ─────────────── Connection cards (right sidebar) ─────────────── */
+
+/* Connection card — tree-style collapsible row per connection. */
+.mdbc-conn-card {
+  overflow: hidden;
+  padding: 4px 0;
+}
+.mdbc-conn-card + .mdbc-conn-card {
+  border-top: 0.5px solid var(--m-sep);
+}
+
+.mdbc-conn-card-head {
+  width: 100%;
+  background: transparent;
+  border: 0;
+  padding: 6px 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: default;
+  text-align: left;
+  color: inherit;
+}
+.mdbc-conn-card-head:hover { background: rgb(var(--m-overlay-rgb) / 0.04); }
+/* The header doubles as the drag-to-reorder handle. */
+.mdbc-conn-card-head { cursor: grab; }
+.mdbc-conn-card-head:active { cursor: grabbing; }
+
+/* Floating chip rendered in the DragOverlay while reordering — clearly
+   elevated above the list so the drag is unmistakable as it follows the
+   cursor. */
+.mdbc-conn-card.dragging-overlay {
+  background: var(--m-bg-card);
+  border: 1px solid var(--m-accent);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.45), 0 0 0 1px var(--m-accent-glow);
+  cursor: grabbing;
+  width: 240px;
+}
+.mdbc-conn-card.dragging-overlay .mdbc-conn-card-head:hover { background: transparent; }
+
+.mdbc-conn-card-body {
+  padding: 0 0 6px;
+  background: transparent;
+}
+.mdbc-conn-card-badge {
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  background: rgb(var(--m-overlay-rgb) / 0.06);
+  color: var(--m-fg);
+  box-shadow: inset 0 0 0 0.5px rgb(var(--m-overlay-rgb) / 0.06);
+}
+.mdbc-conn-card-meta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+.mdbc-conn-card-name {
+  font-size: var(--m-fs-md);
+  font-weight: 600;
+  color: var(--m-fg);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mdbc-conn-card-sub {
+  font-size: var(--m-fs-xxs);
+  color: var(--m-fg-3);
+  font-family: var(--m-font);
+  display: inline-flex;
+  align-items: center;
+}
+.mdbc-conn-card-tools {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex: none;
+}
+.mdbc-conn-card-btn {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--m-fg-2);
+  cursor: pointer;
+}
+.mdbc-conn-card-btn:hover { background: rgb(var(--m-overlay-rgb) / 0.08); color: var(--m-fg); }
+.mdbc-conn-card-btn.spinning svg { animation: mdbc-spin 0.8s linear infinite; }
+@keyframes mdbc-spin { to { transform: rotate(360deg); } }
+
+/* Query Tabs section pinned at the bottom of the right sidebar. Fixed height
+   (user-resizable via top edge handle) with an internal scroll list, plus a
+   collapse toggle in the header. */
+.mdbc-consoles {
+  position: relative;
+  border-top: 0.5px solid var(--m-sep);
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  background: transparent;
+}
+.mdbc-consoles-resizer {
+  position: absolute;
+  top: -3px;
+  left: 0;
+  right: 0;
+  height: 6px;
+  cursor: ns-resize;
+  z-index: 2;
+  background: transparent;
+}
+.mdbc-consoles-resizer:hover { background: rgb(var(--m-accent-rgb) / 0.18); }
+.mdbc-consoles-head {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 14px;
+  font-size: var(--m-fs-xxs);
+  font-weight: 600;
+  color: var(--m-fg-3);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  flex: none;
+}
+.mdbc-consoles-head:hover { color: var(--m-fg-2); }
+.mdbc-consoles-list {
+  flex: 1;
+  overflow: auto;
+  padding-bottom: 4px;
+  min-height: 0;
+  scrollbar-gutter: stable;
+}
+
+.mdbc-connections-toolbar-spacer {
+  flex: 1;
+}
+.mdbc-connections-live-dot {
+  width: 6px;
+  height: 6px;
+  margin-left: 6px;
+}
+.mdbc-conn-card-body .mdbc-connections-error-text {
+  color: var(--m-red, #ff6b6b);
+  font-size: var(--m-fs-xxs);
+  white-space: pre-wrap;
+}
+.mdbc-connection-editor-test-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+.mdbc-connection-editor-test-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.mdbc-connection-editor-spacer {
+  flex: 1;
+}
+.mdbc-connection-editor-success {
+  font-size: var(--m-fs-sm);
+  color: var(--m-green, #4ade80);
+}
+.mdbc-connection-editor-error {
+  font-size: var(--m-fs-sm);
+  color: var(--m-red, #ff6b6b);
+  word-break: break-word;
+}
+.mdbc-connection-editor-driver-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.mdbc-connection-editor-driver-field {
+  flex: 1;
+}
+.mdbc-connection-editor-error-banner {
+  margin-top: 12px;
+  padding: 8px 10px;
+  background: rgba(255,107,107,0.1);
+  border: 0.5px solid rgba(255,107,107,0.4);
+  border-radius: 8px;
+  color: var(--m-red, #ff6b6b);
+  font-size: var(--m-fs-sm);
+}
+.mdbc-uri-section {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--m-sep, rgb(var(--m-overlay-rgb) / 0.08));
+}
+.mdbc-uri-field {
+  width: 100%;
+}
+.mdbc-uri-help {
+  font-size: var(--m-fs-xs, 11px);
+  color: var(--m-fg-3, #888);
+  margin-top: 4px;
+}
+.mdbc-row.mdbc-schema-row {
+  cursor: default;
+  padding-left: 8px;
+}
+.mdbc-row.mdbc-schema-row.selected {
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: none;
+}
+.mdbc-row.mdbc-schema-row.selected .ico {
+  color: var(--m-fg-3);
+}
+.mdbc-row.mdbc-schema-row .chev {
+  width: 14px;
+  color: var(--m-fg-4);
+  display: inline-flex;
+  cursor: pointer;
+  flex: none;
+}
+.mdbc-row.mdbc-schema-row .name {
+  flex: 0 0 auto;
+  overflow: visible;
+  text-overflow: unset;
+}
+.mdbc-row.mdbc-schema-row .meta {
+  margin-left: 6px;
+  font-size: var(--m-fs-xxs);
+  max-width: none;
+  overflow: hidden;
+  text-overflow: unset;
+  white-space: nowrap;
+  flex: 0 1 auto;
+}
+.mdbc-tree-guide {
+  width: 10px;
+  align-self: stretch;
+  position: relative;
+  flex: none;
+}
+.mdbc-tree-guide::before {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.mdbc-connect-hint-icon {
+  vertical-align: text-bottom;
+  opacity: 0.7;
+}

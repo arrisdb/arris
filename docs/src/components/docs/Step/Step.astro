@@ -1,0 +1,18 @@
+---
+import styles from './Step.module.css';
+
+interface Props {
+  num: number;
+  title: string;
+}
+
+const { num, title } = Astro.props;
+---
+
+<div class={styles.step}>
+  <div class={styles.stepNum}>{num}</div>
+  <div>
+    <h4 class={styles.stepTitle}>{title}</h4>
+    <slot />
+  </div>
+</div>

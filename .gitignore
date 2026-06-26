@@ -1,0 +1,59 @@
+# Rust
+target/
+**/*.rs.bk
+*.pdb
+.cargo/config.toml
+
+# Node / Vite
+node_modules
+frontend/dist/
+frontend/dist-ssr/
+*.local
+.vite/
+
+# Tauri
+src-tauri/target/
+src-tauri/gen/schemas/
+src-tauri/.tauri/
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# App local data
+.arris/
+
+# Env / Credentials
+.env
+.env.local
+.env.*.local
+*.json.key
+*-credentials*.json
+*-service-account*.json
+bigquery-testing-*.json
+
+# Local planning / design notes
+local/
+tmp/
+
+# Python bytecode caches
+__pycache__/
+*.pyc
+
+# Generated SSL test certs for the postgres-ssl compose service
+fixtures/initdb/postgres-ssl/certs/
+
+# Release artifacts
+release/
+
+# Marketing site — maintained in a separate private repo
+/marketing/

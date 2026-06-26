@@ -1,0 +1,111 @@
+import type { MouseEvent, RefObject } from "react";
+import type { KeymapAction } from "@shared/settings";
+import type { ContextMenuItem } from "@shared/ui/ContextMenu";
+import type { EditorTab } from "@shell/types";
+import type { DbtDocs } from "@shared";
+import type { EditorHandle } from "@domains/editor/utils/ui/setup";
+import type { DatabaseKind, EditorConnectionSummary } from "../ConnectionIndicator/types";
+import type { DbtDiffRunConfig } from "../SlimDiff/types";
+import type { MarkdownViewMode } from "../../../MarkdownPreview/types";
+
+interface ToolCommand {
+  type: string;
+}
+
+interface EditorContextMenu {
+  state: { x: number; y: number } | null;
+  open: (event: MouseEvent, context: null) => void;
+  close: () => void;
+}
+
+interface ConsoleTabViewProps {
+  activeTab: EditorTab | null;
+  groupId: string;
+  focusGroup: (groupId: string) => void;
+  editorHostRef: RefObject<HTMLDivElement>;
+  editorHandleRef: RefObject<EditorHandle | null>;
+  editorMenu: EditorContextMenu;
+  editorCtxItems: ContextMenuItem[];
+  onEditorContextMenu: (event: MouseEvent) => void;
+  onEditorContextMenuClose: () => void;
+  runActiveTab: () => void;
+  shortcut: (action: KeymapAction) => string | undefined;
+  tabConnection: { kind: DatabaseKind } | undefined;
+  tabConnectionId: string | null | undefined;
+  connections: EditorConnectionSummary[];
+  switchMongoQueryMode: (kind: "mongodb" | "mongoshell") => void;
+  switchEsQueryMode: (kind: "elasticsearch" | "esrest") => void;
+  switchRedisQueryMode: (kind: "redis" | "rediscli") => void;
+  currentDbtNodeName: string | null;
+  currentDbtNodeId: string | null;
+  isDbtModel: boolean;
+  runningCommand: ToolCommand | null;
+  dbtSelector: string;
+  setDbtSelector: (value: string) => void;
+  dbtPrimaryAction: string | null;
+  setDbtPrimaryAction: (id: string) => void;
+  showCompiled: boolean;
+  setShowCompiled: (value: boolean) => void;
+  setShowLineage: (updater: (value: boolean) => boolean) => void;
+  showLineage: boolean;
+  showTransaction: boolean;
+  onToggleTransaction: () => void;
+  isCompiling: boolean;
+  handleDbtRun: (select?: string) => void;
+  handleDbtTest: (select?: string) => void;
+  handleDbtBuild: (select?: string) => void;
+  handleDbtCompile: () => void;
+  handleDbtPreview: () => void;
+  showDiffConfig: boolean;
+  onToggleDiffConfig: () => void;
+  onRunDiff: (config: DbtDiffRunConfig) => void;
+  isDiffing: boolean;
+  isPreviewing: boolean;
+  compiledSql: Record<string, string | undefined>;
+  compiledStale: Record<string, boolean | undefined>;
+  compileError: boolean;
+  showDocs: boolean;
+  setShowDocs: (value: boolean) => void;
+  isGeneratingDocs: boolean;
+  handleDbtDocs: () => void;
+  regenerateDocs: () => void;
+  docs: DbtDocs | null;
+  docsStale: boolean;
+  docsError: boolean;
+  currentSqlMeshModelName: string | null;
+  isSqlMeshModel: boolean;
+  isSqlMeshPythonModel: boolean;
+  isSqlMeshTestFile: boolean;
+  currentSqlMeshTestName: string | null;
+  handleSmTestAtCursor: () => void;
+  handleSmTestFile: () => void;
+  smRunningCommand: ToolCommand | null;
+  smSelector: string;
+  setSmSelector: (value: string) => void;
+  smPrimaryAction: string | null;
+  setSmPrimaryAction: (id: string) => void;
+  showRendered: boolean;
+  setShowRendered: (value: boolean) => void;
+  isRendering: boolean;
+  renderError: boolean;
+  handleSmPlan: (select: string) => void;
+  handleSmRun: (select: string) => void;
+  handleSmTest: () => void;
+  handleSmRender: () => void;
+  handleSmLint: () => void;
+  handleSmAudit: () => void;
+  handleSmPreview: () => void;
+  renderedSql: Record<string, string | undefined>;
+  renderedStale: Record<string, boolean | undefined>;
+  onSelectConnection: (connectionId: string) => void;
+  isFederation: boolean;
+  onToggleFederation: () => void;
+  onNewTab: () => void;
+  isMarkdown: boolean;
+  showRunBar: boolean;
+  markdownView: MarkdownViewMode;
+  onSetMarkdownView: (mode: MarkdownViewMode) => void;
+  markdownSource: string;
+}
+
+export type { ConsoleTabViewProps, EditorContextMenu, ToolCommand };

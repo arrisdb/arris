@@ -1,0 +1,285 @@
+---
+import "../../styles/global.css";
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import DocTable from "../../components/docs/DocTable/DocTable.astro";
+import CodeBlock from "../../components/docs/CodeBlock/CodeBlock.astro";
+import Screenshot from "../../components/docs/Screenshot/Screenshot.astro";
+---
+
+<DocsLayout
+  title="SQLMesh — Arris Docs"
+  breadcrumbs={[{ label: "Docs", href: "/" }, { label: "Analytics engineering" }, { label: "SQLMesh" }]}
+  heading="SQLMesh"
+  lede="Create, open, browse, plan, run, test, render, and trace SQLMesh models directly from Arris without leaving the editor."
+  tocItems={[
+    { label: "Creating a project", href: "#creating" },
+    { label: "Opening a project", href: "#opening" },
+    { label: "The SQLMesh config pane", href: "#config" },
+    { label: "The SQLMesh view", href: "#view" },
+    { label: "Running commands", href: "#commands" },
+    { label: "Environments", href: "#environments" },
+    { label: "Plans", href: "#plans" },
+    { label: "Command logs", href: "#logs" },
+    { label: "Rendering SQL", href: "#render" },
+    { label: "Lineage", href: "#lineage" },
+  ]}
+  currentPath="/analytics-engineering/sqlmesh"
+  prev={{ label: "dbt", href: "/analytics-engineering/dbt", section: "Analytics engineering" }}
+  next={{ label: "AI Agent", href: "/ai/agent", section: "AI" }}
+>
+  <h2 id="creating">Creating a project</h2>
+
+  <p>
+    Start a new SQLMesh project from the welcome screen. Under <strong>NEW PROJECT</strong>, click
+    the <strong>SQLMesh</strong> card (<em>Sample SQLMesh project</em>). Arris asks for a
+    <strong>Project name</strong> and a <strong>Location</strong> (use the folder button to browse),
+    then <strong>Create</strong> scaffolds the project in a new folder under that location.
+  </p>
+
+  <p>
+    The scaffold creates a <code>models/</code> folder and a <code>config.yaml</code> wired to a
+    local DuckDB gateway, so the project is usable with no external database. Arris opens the project
+    as soon as it is created, and you can bind a real database later from the
+    <a href="#config">Connection picker</a>.
+  </p>
+
+  <Screenshot
+    src="/screenshots/sqlmesh-welcome-new-project.png"
+    alt="The Arris welcome screen NEW PROJECT row with three cards: Empty project, dbt, and SQLMesh (Sample SQLMesh project)"
+    caption="The welcome screen's NEW PROJECT cards &mdash; pick SQLMesh to scaffold a sample SQLMesh project."
+  />
+
+  <h2 id="opening">Opening a project</h2>
+
+  <p>
+    To open an existing project, use <strong>OPEN EXISTING</strong> on the welcome screen and pick the
+    folder that contains your SQLMesh <code>config.yaml</code> (or <code>config.yml</code>). Arris
+    recognizes that marker, scans the project, and reads your models. Once detected, a
+    <strong>SQLMesh</strong> view becomes available in the left sidebar.
+  </p>
+
+  <p>
+    SQLMesh calls its own CLI under the hood for plan, run, test, and render. The detected CLI
+    version is shown on the config card; if <code>sqlmesh</code> is not on your <code>PATH</code>,
+    point the <strong>sqlmesh binary</strong> field at your install.
+  </p>
+
+  <h2 id="config">The SQLMesh config pane</h2>
+
+  <p>
+    The SQLMesh view opens with a collapsible status card at the top: the <strong>sqlmesh</strong>
+    badge shows the detected CLI version and the selected gateway, with a reload button to rescan.
+    Expand it to configure how Arris invokes SQLMesh:
+  </p>
+
+  <DocTable>
+    <thead>
+      <tr>
+        <th>Setting</th>
+        <th>What it controls</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="font-medium text-fg">Project</td>
+        <td>Which SQLMesh root to use, shown only when the folder contains more than one <code>config.yaml</code>.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">Environment</td>
+        <td>The virtual environment to target, with its expiry date. A <strong>Promote to prod</strong> button promotes the current environment to <code>prod</code>.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">Gateway</td>
+        <td>The gateway (database connection) to run against, read from <code>config.yaml</code> and shown as <em>name (connection type)</em>.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">sqlmesh binary</td>
+        <td>Path to the SQLMesh executable. Defaults to <code>sqlmesh</code> on your <code>PATH</code>; use the folder button to point at a specific install.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">Connection</td>
+        <td>A database connection bound to the project, used to preview model data.</td>
+      </tr>
+    </tbody>
+  </DocTable>
+
+  <p>
+    The card also has a one-click shortcut to open <code>config.yaml</code> in the editor. If the
+    SQLMesh CLI check fails, the error is shown inline with a <strong>Show full error</strong>
+    toggle. Your project, environment, gateway, and binary selections persist across sessions.
+  </p>
+
+  <Screenshot
+    src="/screenshots/sqlmesh-config-pane.png"
+    alt="The SQLMesh config pane expanded, showing the sqlmesh 0.235.4 badge with the postgres gateway, the Project, Gateway, and sqlmesh binary fields, a config.yaml shortcut, the Connection picker (prod_postgres), and a Plan run button at the bottom"
+    caption="The SQLMesh config pane &mdash; CLI version and gateway badge, Project / Gateway / sqlmesh binary fields, the config.yaml shortcut, and the Connection picker, with the Plan run button below."
+  />
+
+  <h2 id="view">The SQLMesh view</h2>
+
+  <p>
+    When Arris detects a SQLMesh project, the left sidebar header shows a segmented control
+    to switch the files pane between <strong>Project</strong> (the raw file tree) and
+    <strong>SQLMesh</strong>. Click <strong>SQLMesh</strong> to open the model tree, which groups
+    models by kind with a count per section:
+  </p>
+
+  <DocTable>
+    <thead>
+      <tr>
+        <th>Section</th>
+        <th>What it holds</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="font-medium text-fg">Incremental</td>
+        <td>Models with an <code>INCREMENTAL_BY_TIME_RANGE</code> or <code>INCREMENTAL_BY_UNIQUE_KEY</code> kind, which load only new or changed rows on each run.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">Full</td>
+        <td>Models with a <code>FULL</code> kind, fully rebuilt from scratch every run. This is also the fallback bucket for any model whose kind Arris does not recognize.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">SCD Type 2</td>
+        <td>Slowly changing dimension models (<code>SCD_TYPE_2_BY_TIME</code> / <code>SCD_TYPE_2_BY_COLUMN</code>) that track row history over time.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">Views</td>
+        <td>Models with a <code>VIEW</code> kind, materialized as a database view rather than a table.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">Seeds</td>
+        <td>Models with a <code>SEED</code> kind, loaded from a static CSV file checked into the project.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">External</td>
+        <td>Models with an <code>EXTERNAL</code> kind, describing tables managed outside SQLMesh so their columns and lineage are known.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">Python</td>
+        <td>Models defined in Python with the <code>@model</code> decorator instead of SQL, grouped together regardless of their underlying kind.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">Tests</td>
+        <td>SQLMesh test files (model unit tests) defined in YAML, listed in a separate section below the models.</td>
+      </tr>
+    </tbody>
+  </DocTable>
+
+  <p>
+    Use the filter box to narrow the tree by name. Single-click a model to select it; double-click to
+    open its file in the editor. Right-clicking a model opens its context menu.
+  </p>
+
+  <!-- SCREENSHOT: SQLMesh view in the left sidebar with the Project / SQLMesh segmented control, the Plan/Run/Test bar, the filter box, and the grouped model tree (Incremental, Full, SCD Type 2, ...). -->
+
+  <h2 id="commands">Running commands</h2>
+
+  <p>
+    SQLMesh commands are available in two places. The <strong>run bar</strong> at the top of the
+    SQLMesh view runs <strong>Plan</strong>, <strong>Run</strong>, and <strong>Test</strong> against
+    the whole project as a split-button.
+  </p>
+
+  <p>
+    The second place is the <strong>SQLMesh toolbar</strong> in the editor: open a model and a
+    <strong>sqlmesh</strong> section appears in the console toolbar with <strong>Plan</strong>,
+    <strong>Test</strong>, <strong>Render</strong>, <strong>Lineage</strong>, and
+    <strong>Preview</strong>. The split-button remembers the action you last picked as its primary
+    button. Only <strong>Plan</strong> takes a selector field, which accepts the same graph syntax as
+    dbt (<code>+model</code>, <code>model+</code>, wildcards, <code>tag:</code>) and maps to
+    <code>--select-model</code>. <strong>Preview</strong> renders the model's SQL with a row limit
+    and runs it against the bound connection; it is unavailable for Python models, which have no
+    renderable SQL. For test files, the toolbar instead lets you run the test under the cursor or all
+    tests in the file.
+  </p>
+
+  <Screenshot
+    src="/screenshots/sqlmesh-command-menu.png"
+    alt="The editor toolbar for a SQLMesh model showing the sqlmesh: split-button set to Plan, with the dropdown open listing Plan, Test, Render, Lineage, and Preview alongside their keyboard shortcuts"
+    caption="The sqlmesh: split-button in the editor toolbar &mdash; Plan, Test, Render, Lineage, and Preview, each with a keyboard shortcut."
+  />
+
+  <h2 id="environments">Environments</h2>
+
+  <p>
+    SQLMesh <strong>environments</strong> are virtual namespaces such as <code>dev</code> and
+    <code>prod</code>. When the project has more than the default environment, an
+    <strong>Environment</strong> dropdown appears in the config pane; switch the active environment
+    there, and each one shows its expiry date. When a development environment is ready,
+    <strong>Promote to prod</strong> promotes it so its changes become the production state. The
+    active <strong>gateway</strong> determines which database the plan and run operations target.
+  </p>
+
+  <h2 id="plans">Plans</h2>
+
+  <p>
+    A <strong>plan</strong> is the core of the SQLMesh workflow: it compares your local model
+    definitions against the target environment and works out the changes and backfills needed.
+    Running <strong>Plan</strong> in Arris invokes <code>sqlmesh plan</code> for the selected
+    environment (and selector) and streams the full output to the command logs, so you can review the
+    diff and the backfill plan inline.
+  </p>
+
+  <!-- SCREENSHOT: command logs showing a `sqlmesh plan` run with the diff and backfill output. -->
+
+  <h2 id="logs">Command logs</h2>
+
+  <p>
+    Every command's output streams into the <strong>Command logs</strong> panel at the bottom of the
+    window, newest run on top. Each entry records the exact command, its status, duration, and
+    timestamp, alongside the raw stdout/stderr with ANSI colors preserved. Filter entries with the
+    search box or the status dropdown, and clear the history with the trash button. See
+    <a href="/querying/command-logs">Command logs</a> for the full reference.
+  </p>
+
+  <!-- SCREENSHOT: Command logs panel with a sqlmesh run entry expanded, showing the raw output. -->
+
+  <h2 id="render">Rendering SQL</h2>
+
+  <p>
+    SQLMesh models use macros, references, and other expressions that make the raw SQL hard to read.
+    <strong>Render</strong> compiles a model into its final SQL and opens a <strong>Compiled SQL</strong>
+    preview alongside the editor, fully expanded with macros resolved and references substituted. The
+    preview has buttons to recompile, copy the SQL, and close it, and it flags a <strong>Stale</strong>
+    chip when you edit the model after rendering. If a render fails, the preview points you to the
+    error in the command logs below.
+  </p>
+
+  <Screenshot
+    src="/screenshots/sqlmesh-render.png"
+    alt="A SQLMesh model open in the editor with the sqlmesh: toolbar set to Render, and a Compiled SQL panel alongside showing the model's final SQL with macros resolved and columns fully qualified"
+    caption="Render opens a Compiled SQL panel beside the model &mdash; macros resolved and references fully qualified, with Recompile, Copy, and Close controls in its header."
+  />
+
+  <h2 id="lineage">Lineage</h2>
+
+  <p>
+    <strong>Lineage</strong> opens a directed acyclic graph of the model's dependencies, rendered as a
+    draggable node graph. The model you opened it from is tagged with a <strong>CURRENT</strong> badge.
+    <strong>Click a column name</strong> in any node to trace its <strong>column-level lineage</strong>:
+    Arris highlights that column and every upstream and downstream column it flows through, so you can
+    follow a single field across models.
+  </p>
+
+  <ul>
+    <li><strong>Depth</strong> &mdash; choose <strong>1</strong>, <strong>2</strong>, or <strong>3</strong> hops to control how far up and downstream the graph expands from the current model.</li>
+    <li><strong>Orientation</strong> &mdash; flip the layout between <strong>Vertical</strong> and <strong>Horizontal</strong> with the orientation toggle.</li>
+    <li><strong>Pan</strong> &mdash; drag the canvas background to move the viewport.</li>
+    <li><strong>Zoom</strong> &mdash; scroll, or use the bottom-right controls, to zoom in and out.</li>
+    <li><strong>Rearrange</strong> &mdash; drag any node to reposition it; layout otherwise arranges nodes automatically.</li>
+    <li><strong>Open a node</strong> &mdash; double-click a node to focus that model.</li>
+  </ul>
+
+  <p>
+    Toggle the lineage view from the <strong>Lineage</strong> button in the SQLMesh toolbar while a
+    model is open. The graph rebuilds from your current model definitions each time it is opened.
+  </p>
+
+  <Screenshot
+    src="/screenshots/sqlmesh-lineage.png"
+    alt="A SQLMesh column-level lineage graph with the Depth 1/2/3 selector and a Vertical orientation toggle, showing source public.customers feeding stg_customers (tagged CURRENT) and then dim_customers, with the first_name column highlighted across all three nodes"
+    caption="Column-level lineage &mdash; first_name highlighted from source through stg_customers (CURRENT) to dim_customers, with Depth and orientation controls at the top."
+  />
+</DocsLayout>

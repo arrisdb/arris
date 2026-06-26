@@ -1,0 +1,4 @@
+/* Horizontal separator between collapsible sections (Data, Axes, etc.). */
+.mdbc-chart-section + .mdbc-chart-section {
+  border-top: 0.5px solid var(--m-sep);
+}

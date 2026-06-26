@@ -1,0 +1,266 @@
+/* === Git gutter (editor) === */
+.cm-git-gutter {
+  width: 4px !important;
+  min-width: 4px !important;
+  padding: 0 !important;
+  margin-right: 4px;
+  cursor: pointer;
+}
+.cm-git-gutter .cm-gutterElement {
+  padding: 0 !important;
+  min-width: 4px !important;
+}
+.cm-git-added {
+  width: 4px;
+  height: 100%;
+  background: var(--m-green, #5be39a);
+  border-radius: 1px;
+  cursor: pointer;
+}
+.cm-git-modified {
+  width: 4px;
+  height: 100%;
+  background: var(--m-yellow, #ffd960);
+  border-radius: 1px;
+  cursor: pointer;
+}
+.cm-git-deleted {
+  width: 4px;
+  height: 100%;
+  background: var(--m-red, #ff6b6b);
+  border-radius: 1px;
+  cursor: pointer;
+}
+
+/* === Git line backgrounds (editor, Zed-style) === */
+.cm-git-line-added {
+  background: rgba(91,227,154,0.12) !important;
+}
+.cm-git-line-modified {
+  background: rgba(255,217,96,0.12) !important;
+}
+
+/* === Git inline diff (editor, Zed-style) === */
+.cm-git-inline-diff {
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+  margin-left: calc(-1 * var(--git-gutter-offset, 0px));
+  padding-left: calc(var(--git-gutter-offset, 0px) - 4px);
+  border-left: 4px solid var(--m-yellow, #ffd960);
+}
+.cm-git-inline-diff.pure-del {
+  border-left-color: var(--m-red, #ff6b6b);
+}
+.cm-git-inline-del {
+  padding: 0 2px 0 6px;
+  background: rgba(255,107,107,0.15);
+  color: var(--m-fg-1, #e0e0e4);
+  white-space: pre;
+}
+
+/* Per-hunk Stage / Restore action bar (Zed-style), shown above an expanded hunk. */
+.cm-git-hunk-actions {
+  display: flex;
+  gap: 4px;
+  justify-content: flex-end;
+  margin-left: calc(-1 * var(--git-gutter-offset, 0px));
+  padding: 2px 8px 2px 0;
+}
+.cm-git-hunk-btn {
+  font-family: var(--m-font);
+  font-size: var(--m-fs-xxs, 11px);
+  line-height: 1.4;
+  padding: 1px 8px;
+  border: 0.5px solid var(--m-sep, rgb(var(--m-overlay-rgb) / 0.15));
+  border-radius: var(--m-r-sm, 4px);
+  background: var(--m-bg-surface, #26262b);
+  color: var(--m-fg-2, #c8c8d0);
+  cursor: pointer;
+}
+.cm-git-hunk-btn:hover {
+  background: var(--m-bg-hover, rgb(var(--m-overlay-rgb) / 0.08));
+  color: var(--m-fg, #ececf1);
+}
+
+/* Statement highlight — bounding box around current SQL statement at cursor.
+   Line decoration sets --stmt-w (longest-line width in ch units).
+   ::after pseudo-element draws a fixed-width rectangle around the block. */
+.cm-line.cm-stmt-first,
+.cm-line.cm-stmt-mid,
+.cm-line.cm-stmt-last,
+.cm-line.cm-stmt-only {
+  position: relative;
+}
+.cm-line.cm-stmt-first::after,
+.cm-line.cm-stmt-mid::after,
+.cm-line.cm-stmt-last::after,
+.cm-line.cm-stmt-only::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: var(--stmt-w);
+  pointer-events: none;
+  border-left: 1px solid rgb(var(--m-accent-rgb) / 0.3);
+  border-right: 1px solid rgb(var(--m-accent-rgb) / 0.3);
+}
+.cm-line.cm-stmt-first::after {
+  border-top: 1px solid rgb(var(--m-accent-rgb) / 0.3);
+}
+.cm-line.cm-stmt-last::after {
+  border-bottom: 1px solid rgb(var(--m-accent-rgb) / 0.3);
+}
+.cm-line.cm-stmt-only::after {
+  border-top: 1px solid rgb(var(--m-accent-rgb) / 0.3);
+  border-bottom: 1px solid rgb(var(--m-accent-rgb) / 0.3);
+}
+
+/* === Run-status indicators (editor) ===
+   Icon lives in its own gutter (right of the line numbers) so it sits beside
+   the number without indenting the code; the live timer is inline at the end
+   of the running statement's first line. */
+@keyframes mdbc-run-spin { to { transform: rotate(360deg); } }
+.cm-run-gutter {
+  min-width: 16px;
+}
+.cm-run-gutter .cm-gutterElement {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.cm-run-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 12px;
+  height: 12px;
+  vertical-align: middle;
+}
+.cm-run-running {
+  box-sizing: border-box;
+  border: 1.5px solid var(--m-fg-4, #6c6c75);
+  border-top-color: var(--m-accent, #7c8cff);
+  border-radius: 50%;
+  animation: mdbc-run-spin 0.7s linear infinite;
+}
+.cm-run-success::before {
+  content: "✓";
+  color: var(--m-green, #5be39a);
+  font-size: var(--m-fs-xxs);
+  font-weight: 700;
+}
+.cm-run-error::before {
+  content: "✕";
+  color: var(--m-red, #ff6b6b);
+  font-size: var(--m-fs-xxs);
+  font-weight: 700;
+}
+.cm-run-timer {
+  margin-left: 8px;
+  color: var(--m-fg-3, #a0a0aa);
+  font-size: 0.9em;
+  user-select: none;
+}
+
+.mdbc-sidebar-section-fixed {
+  flex: none;
+}
+.mdbc-tab-inline-rename-input {
+  flex: 1;
+  background: transparent;
+  border: 1px solid var(--m-accent, #7c8cff);
+  border-radius: 4px;
+  color: var(--m-text-primary, #e6e6ea);
+  padding: 1px 4px;
+  font-size: inherit;
+  font-family: inherit;
+}
+.mdbc-csv-table-root {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+}
+.mdbc-csv-table-info {
+  font-size: var(--m-fs-sm);
+  color: var(--m-text-secondary, #a0a0aa);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.mdbc-csv-table-meta {
+  font-size: var(--m-fs-xxs);
+  color: var(--m-text-secondary, #a0a0aa);
+}
+.mdbc-csv-table-toolbar-spacer {
+  flex: 1;
+}
+.mdbc-csv-table-empty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--m-text-tertiary, #6c6c75);
+  font-size: var(--m-fs-md);
+}
+.mdbc-csv-table-scroll {
+  flex: 1;
+  overflow: auto;
+}
+.mdbc-csv-table-row-number-header {
+  width: 48px;
+}
+.mdbc-csv-table-action-header {
+  width: 36px;
+}
+.mdbc-csv-table-icon-button {
+  padding: 2px;
+}
+.mdbc-csv-cell-input {
+  width: 100%;
+  min-width: 0;
+  background: transparent;
+  color: inherit;
+  border: 0;
+  outline: 0;
+  padding: 0;
+  font-family: inherit;
+  font-size: inherit;
+}
+.mdbc-csv-table-fill-hidden {
+  flex: 1;
+  overflow: hidden;
+}
+.mdbc-tabbar-leading-icon {
+  display: inline-flex;
+  margin-right: 4px;
+  opacity: 0.6;
+}
+.mdbc-tabbar-rename-input {
+  flex: 1;
+  background: transparent;
+  border: 1px solid var(--m-accent, #7c8cff);
+  border-radius: 4px;
+  color: var(--m-text-primary, #e6e6ea);
+  padding: 1px 4px;
+  font-size: inherit;
+  font-family: inherit;
+  outline: none;
+  min-width: 40px;
+  max-width: 160px;
+}
+.mdbc-sidebar-section-height {
+  height: var(--mdbc-sidebar-section-height);
+}
+.mdbc-row-action-cursor {
+  cursor: var(--mdbc-row-action-cursor);
+}
+.mdbc-csv-table-font-size {
+  font-size: var(--mdbc-csv-table-font-size);
+}
+.mdbc-csv-cell-edit-state {
+  cursor: var(--mdbc-csv-cell-cursor);
+  caret-color: var(--mdbc-csv-cell-caret-color);
+}

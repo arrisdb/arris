@@ -1,0 +1,28 @@
+---
+import styles from './DocsTOC.module.css';
+
+interface Props {
+  items: { label: string; href: string; level?: number }[];
+}
+
+const { items } = Astro.props;
+---
+
+<aside class:list={[styles.toc]}>
+  <h5 class:list={[styles.title]}>On this page</h5>
+
+  <nav>
+    {items.map((item) => (
+      <a
+        href={item.href}
+        class:list={[
+          styles.tocLink,
+          item.level === 3 && styles.tocLinkL3,
+        ]}
+      >
+        {item.label}
+      </a>
+    ))}
+  </nav>
+
+</aside>

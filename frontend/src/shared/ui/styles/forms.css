@@ -1,0 +1,87 @@
+/* Form fields */
+.mdbc-field {
+  width: 100%;
+  outline: none;
+  height: 34px;
+  background: rgb(var(--m-overlay-rgb) / 0.04);
+  border: 0.5px solid var(--m-sep-strong);
+  border-radius: 10px;
+  padding: 0 12px;
+  font-family: var(--m-font);
+  font-size: var(--m-fs-lg);
+  color: var(--m-fg);
+  display: flex; align-items: center;
+}
+.mdbc-field.mono { font-family: var(--m-font-editor, var(--m-font-mono)); }
+.mdbc-field::placeholder { color: var(--m-placeholder); }
+.mdbc-field.focus {
+  border-color: var(--m-accent);
+  box-shadow: 0 0 0 4px rgb(var(--m-accent-rgb) / 0.18);
+  background: rgb(var(--m-accent-rgb) / 0.06);
+}
+.mdbc-path-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+.mdbc-path-field .mdbc-field { flex: 1; min-width: 0; }
+.mdbc-shell-control {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.mdbc-form-row {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: 12px;
+  align-items: center;
+  padding: 6px 0;
+}
+.mdbc-form-row-label {
+  font-size: var(--m-fs-sm);
+  color: var(--m-fg-2);
+  text-align: left;
+}
+.mdbc-form-row-control {
+  display: flex;
+  align-items: center;
+  min-height: 32px;
+}
+.mdbc-toggle {
+  position: relative;
+  display: inline-block;
+  flex-shrink: 0;
+  width: 36px;
+  height: 20px;
+  padding: 0;
+  border: 0.5px solid var(--m-sep);
+  border-radius: 999px;
+  background: rgb(var(--m-overlay-rgb) / 0.14);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.mdbc-toggle.checked { background: var(--m-accent); }
+.mdbc-toggle-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: white;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.3);
+  transition: left 0.15s ease;
+}
+.mdbc-toggle.checked .mdbc-toggle-knob { left: 18px; }
+.mdbc-keymap-recording {
+  border-color: rgb(var(--m-accent-rgb) / 0.55);
+  background: rgb(var(--m-accent-rgb) / 0.14);
+  color: var(--m-accent);
+  animation: mdbc-keymap-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes mdbc-keymap-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgb(var(--m-accent-rgb) / 0.12); }
+  50% { box-shadow: 0 0 0 4px rgb(var(--m-accent-rgb) / 0.18); }
+}

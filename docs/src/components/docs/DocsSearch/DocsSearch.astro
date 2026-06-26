@@ -1,0 +1,217 @@
+---
+import { docsNav } from "../../../data/docs-nav";
+import styles from "./DocsSearch.module.css";
+
+const searchIndex = docsNav.flatMap((group) =>
+  group.items.map((item) => ({
+    label: item.label,
+    href: item.href,
+    section: group.title,
+  }))
+);
+---
+
+<div id="docs-search-overlay" class:list={[styles.overlay]} data-search-index={JSON.stringify(searchIndex)}>
+  <div class:list={[styles.modal]}>
+    <div class:list={[styles.inputRow]}>
+      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" class:list={[styles.searchIcon]}>
+        <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+      </svg>
+      <input
+        id="docs-search-input"
+        class:list={[styles.input]}
+        type="text"
+        placeholder="Search docs…"
+        autocomplete="off"
+        spellcheck="false"
+      />
+      <span class:list={[styles.kbd]}>Esc</span>
+    </div>
+    <div id="docs-search-results" class:list={[styles.results]}></div>
+    <div id="docs-search-empty" class:list={[styles.empty]} style="display:none;">
+      No results found.
+    </div>
+    <div id="docs-search-hint" class:list={[styles.footer]}>
+      <span class:list={[styles.footerItem]}><kbd class:list={[styles.footerKbd]}>&uarr;&darr;</kbd> Navigate</span>
+      <span class:list={[styles.footerItem]}><kbd class:list={[styles.footerKbd]}>&crarr;</kbd> Open</span>
+      <span class:list={[styles.footerItem]}><kbd class:list={[styles.footerKbd]}>Esc</kbd> Close</span>
+    </div>
+  </div>
+</div>
+
+<script>
+  let docsSearchTeardown: (() => void) | null = null;
+
+  function initDocsSearch() {
+    docsSearchTeardown?.();
+    docsSearchTeardown = null;
+
+    const overlay = document.getElementById("docs-search-overlay");
+    if (!overlay) return;
+    const input = document.getElementById("docs-search-input") as HTMLInputElement;
+    const resultsContainer = document.getElementById("docs-search-results")!;
+    const emptyState = document.getElementById("docs-search-empty")!;
+    const searchIndex: { label: string; href: string; section: string }[] = JSON.parse(
+      overlay.dataset.searchIndex || "[]"
+    );
+
+    let activeIndex = 0;
+    let currentResults: typeof searchIndex = [];
+
+    function open() {
+      overlay.classList.add("is-open");
+      input.value = "";
+      render(searchIndex);
+      requestAnimationFrame(() => input.focus());
+    }
+
+    function close() {
+      overlay.classList.remove("is-open");
+      input.value = "";
+      activeIndex = 0;
+    }
+
+    function navigate(href: string) {
+      close();
+      window.location.href = href;
+    }
+
+    function score(item: typeof searchIndex[0], query: string): number {
+      const label = item.label.toLowerCase();
+      const section = item.section.toLowerCase();
+      const q = query.toLowerCase();
+
+      if (label === q) return 100;
+      if (label.startsWith(q)) return 80;
+      if (label.includes(q)) return 60;
+      if (section.toLowerCase().includes(q)) return 40;
+
+      const words = q.split(/\s+/);
+      const allMatch = words.every((w) => label.includes(w) || section.includes(w));
+      if (allMatch) return 30;
+
+      return 0;
+    }
+
+    function render(items: typeof searchIndex) {
+      currentResults = items;
+      activeIndex = 0;
+
+      if (items.length === 0) {
+        resultsContainer.innerHTML = "";
+        emptyState.style.display = "block";
+        return;
+      }
+
+      emptyState.style.display = "none";
+      resultsContainer.innerHTML = items
+        .map(
+          (item, i) =>
+            `<a href="${item.href}" class="docs-search-result${i === 0 ? " is-active" : ""}" data-index="${i}">
+              <span class="docs-search-result-label">${highlight(item.label, input.value)}</span>
+              <span class="docs-search-result-section">${item.section}</span>
+            </a>`
+        )
+        .join("");
+    }
+
+    function highlight(text: string, query: string): string {
+      if (!query.trim()) return text;
+      const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const re = new RegExp(`(${escaped})`, "gi");
+      return text.replace(re, "<mark>$1</mark>");
+    }
+
+    function updateActive() {
+      const items = resultsContainer.querySelectorAll(".docs-search-result");
+      items.forEach((el, i) => {
+        el.classList.toggle("is-active", i === activeIndex);
+      });
+      items[activeIndex]?.scrollIntoView({ block: "nearest" });
+    }
+
+    input.addEventListener("input", () => {
+      const q = input.value.trim();
+      if (!q) {
+        render(searchIndex);
+        return;
+      }
+      const scored = searchIndex
+        .map((item) => ({ item, s: score(item, q) }))
+        .filter((x) => x.s > 0)
+        .sort((a, b) => b.s - a.s)
+        .map((x) => x.item);
+      render(scored);
+    });
+
+    overlay.addEventListener("click", (e) => {
+      if (e.target === overlay) close();
+    });
+
+    const onKeydown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        if (overlay.classList.contains("is-open")) {
+          close();
+        } else {
+          open();
+        }
+        return;
+      }
+
+      if (!overlay.classList.contains("is-open")) return;
+
+      if (e.key === "Escape") {
+        e.preventDefault();
+        close();
+        return;
+      }
+
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        if (currentResults.length > 0) {
+          activeIndex = (activeIndex + 1) % currentResults.length;
+          updateActive();
+        }
+        return;
+      }
+
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        if (currentResults.length > 0) {
+          activeIndex = (activeIndex - 1 + currentResults.length) % currentResults.length;
+          updateActive();
+        }
+        return;
+      }
+
+      if (e.key === "Enter") {
+        e.preventDefault();
+        if (currentResults[activeIndex]) {
+          navigate(currentResults[activeIndex].href);
+        }
+        return;
+      }
+    };
+    document.addEventListener("keydown", onKeydown);
+    docsSearchTeardown = () => document.removeEventListener("keydown", onKeydown);
+
+    resultsContainer.addEventListener("click", (e) => {
+      const link = (e.target as HTMLElement).closest(".docs-search-result") as HTMLAnchorElement | null;
+      if (link) {
+        e.preventDefault();
+        navigate(link.href);
+      }
+    });
+
+    const trigger = document.getElementById("docs-search-trigger");
+    if (trigger) {
+      trigger.addEventListener("click", (e) => {
+        e.preventDefault();
+        open();
+      });
+    }
+  }
+
+  document.addEventListener("astro:page-load", initDocsSearch);
+</script>

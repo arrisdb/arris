@@ -1,0 +1,31 @@
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0 22px;
+  font-size: 14px;
+}
+
+.table th,
+.table td {
+  text-align: left;
+  padding: 11px 14px;
+  border-bottom: 0.5px solid rgba(255, 255, 255, 0.06);
+}
+
+.table th {
+  font-size: 11.5px;
+  color: var(--color-fg-3);
+  font-weight: 600;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.table td {
+  color: var(--color-fg-2);
+}
+
+.cellFirst {
+  color: var(--color-fg);
+  font-weight: 500;
+}

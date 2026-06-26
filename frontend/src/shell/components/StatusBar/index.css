@@ -1,0 +1,46 @@
+/* Status bar — slim, glass */
+.mdbc-status {
+  height: calc(var(--m-fs-base) + 16px);
+  padding: 0 14px;
+  border-top: 0.5px solid var(--m-sep);
+  background: var(--m-bg-window);
+  display: flex; align-items: center; justify-content: space-between; gap: 14px;
+  font-size: var(--m-fs-sm); color: var(--m-fg-3);
+  font-family: var(--m-font);
+}
+.mdbc-status-btn {
+  appearance: none;
+  height: calc(var(--m-fs-base) + 8px);
+  padding: 0 6px;
+  border: 0;
+  background: transparent;
+  color: var(--m-fg-3);
+  border-radius: 6px;
+  display: inline-flex; align-items: center; gap: 4px;
+  font: inherit; cursor: pointer;
+}
+.mdbc-status-btn:hover { background: rgb(var(--m-overlay-rgb) / 0.06); color: var(--m-fg); }
+.mdbc-status-btn.on { background: rgb(var(--m-accent-rgb) / 0.18); color: var(--m-accent); }
+.mdbc-status-btn.disabled,
+.mdbc-status-btn:disabled { opacity: 0.3; cursor: default; pointer-events: none; }
+.mdbc-status-rail {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.mdbc-status-rail-right { margin-left: auto; }
+.mdbc-status-activity {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--m-fg-3);
+  font-size: var(--m-fs-sm);
+  padding: 0 8px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  max-width: 260px;
+}
+.mdbc-status-activity svg { flex-shrink: 0; }
+@keyframes mdbc-spin { to { transform: rotate(360deg); } }
+.mdbc-spin { animation: mdbc-spin 1s linear infinite; }

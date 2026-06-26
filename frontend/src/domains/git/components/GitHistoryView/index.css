@@ -1,0 +1,323 @@
+.mdbc-git-history-root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  font-size: var(--m-fs-base, 14px);
+}
+
+.mdbc-git-history-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--mdbc-border, #2a2a2a);
+}
+
+.mdbc-git-history-search {
+  flex: 1;
+}
+
+.mdbc-git-action-small.mdbc-git-history-refresh {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px;
+  color: var(--m-fg-2);
+}
+
+.mdbc-git-action-small.mdbc-git-history-refresh:hover {
+  color: var(--m-fg);
+}
+
+.mdbc-git-history-loading-more {
+  padding: 8px 12px;
+  text-align: center;
+  color: var(--mdbc-text-dim, #888);
+  font-size: 0.85em;
+}
+
+/* Shared grid for the header row and every commit row. Columns:
+   Graph · Description · Branch refs · Date · Author · Commit. */
+.mdbc-git-history-head,
+.mdbc-git-history-row {
+  display: grid;
+  grid-template-columns: minmax(48px, max-content) 1fr minmax(0, max-content) 190px 140px 80px;
+  align-items: center;
+  gap: 12px;
+  padding: 0 12px;
+}
+
+/* Ref badges sit in their own column to the right of the description, next to
+   the Date column — keeps the commit message readable and left-aligned. */
+.mdbc-git-history-refs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  overflow: hidden;
+}
+
+.mdbc-git-history-head {
+  height: 26px;
+  border-bottom: 1px solid var(--mdbc-border, #2a2a2a);
+  color: var(--mdbc-text-dim, #888);
+  text-transform: none;
+  font-size: 0.85em;
+}
+
+/* Body holds the scrolling commit list and, when a commit is selected, the
+   detail panel to its right. */
+.mdbc-git-history-body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.mdbc-git-history-list {
+  flex: 1;
+  overflow: auto;
+  min-width: 0;
+}
+
+.mdbc-git-history-row {
+  /* Height must match ROW_HEIGHT in component.tsx (SVG lane geometry). */
+  height: 28px;
+  border-bottom: 1px solid color-mix(in srgb, var(--mdbc-border, #2a2a2a) 40%, transparent);
+  cursor: pointer;
+}
+
+.mdbc-git-history-row:hover {
+  background: var(--mdbc-hover, rgba(255, 255, 255, 0.04));
+}
+
+.mdbc-git-history-row.is-selected {
+  background: var(--mdbc-selected, rgba(255, 255, 255, 0.08));
+}
+
+.mdbc-git-history-graph {
+  display: flex;
+  align-items: stretch;
+  align-self: stretch;
+  overflow: visible;
+}
+
+/* The cell SVG stretches to the full row height (preserveAspectRatio="none")
+   so each lane segment touches the next row's — continuous lanes, no dashes. */
+.mdbc-git-graph-cell {
+  display: block;
+  height: 100%;
+  overflow: visible;
+}
+
+.mdbc-git-history-desc {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.mdbc-git-history-summary {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mdbc-git-history-date,
+.mdbc-git-history-author {
+  color: var(--mdbc-text-dim, #888);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mdbc-git-history-hash {
+  color: var(--mdbc-text-dim, #888);
+  font-family: var(--m-font-editor, var(--m-font-mono));
+  white-space: nowrap;
+}
+
+/* Ref badges on commits, tinted with the commit's lane color (--mdbc-ref-color)
+   so a chip matches the lane/dot it sits on in the graph. */
+.mdbc-git-ref-badge {
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 0.8em;
+  white-space: nowrap;
+  border: 1px solid var(--mdbc-ref-color, #4c8eda);
+  color: color-mix(in srgb, var(--mdbc-ref-color, #4c8eda) 70%, #ffffff);
+  background: color-mix(in srgb, var(--mdbc-ref-color, #4c8eda) 22%, transparent);
+}
+
+.mdbc-git-ref-badge.is-head {
+  font-weight: 600;
+}
+
+/* === Commit detail panel === */
+.mdbc-commit-detail-panel {
+  position: relative;
+  flex: 0 0 auto;
+  width: var(--commit-detail-width);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-left: 1px solid var(--mdbc-border, #2a2a2a);
+}
+
+.mdbc-commit-detail-resizer {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -3px;
+  width: 6px;
+  cursor: col-resize;
+  z-index: 2;
+}
+
+.mdbc-commit-detail-close {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 1;
+}
+
+.mdbc-commit-detail-scroll {
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+  padding: 8px 12px 12px;
+}
+
+.mdbc-commit-detail-sep {
+  margin: 10px 0;
+  border: 0;
+  border-top: 1px solid var(--mdbc-border, #2a2a2a);
+}
+
+.mdbc-commit-detail-muted {
+  color: var(--mdbc-text-dim, #888);
+  font-size: 0.85em;
+}
+
+.mdbc-commit-detail-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 0;
+  color: var(--mdbc-text-dim, #888);
+  font-size: 0.85em;
+}
+
+.mdbc-commit-detail-sha {
+  font-family: var(--m-font-editor, var(--m-font-mono));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mdbc-commit-detail-link {
+  color: var(--mdbc-accent, #4c8eda);
+  text-decoration: none;
+}
+
+.mdbc-commit-detail-link:hover {
+  text-decoration: underline;
+}
+
+.mdbc-commit-detail-message {
+  margin: 0 0 12px;
+}
+
+.mdbc-commit-detail-summary {
+  font-weight: 600;
+  color: var(--m-fg);
+}
+
+.mdbc-commit-detail-body {
+  margin: 6px 0 0;
+  font-family: inherit;
+  font-size: 0.85em;
+  white-space: pre-wrap;
+  color: var(--mdbc-text-dim, #aaa);
+}
+
+.mdbc-commit-detail-files-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 10px;
+  border-top: 1px solid var(--mdbc-border, #2a2a2a);
+  color: var(--mdbc-text-dim, #888);
+  font-size: 0.85em;
+}
+
+.mdbc-commit-detail-files {
+  display: flex;
+  flex-direction: column;
+  margin-top: 6px;
+}
+
+.mdbc-commit-file-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 3px 4px;
+  border: none;
+  background: none;
+  color: var(--m-fg-2);
+  text-align: left;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.mdbc-commit-file-row:hover {
+  background: var(--mdbc-hover, rgba(255, 255, 255, 0.06));
+}
+
+.mdbc-commit-file-name {
+  flex: 0 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.85em;
+}
+
+.mdbc-commit-file-dir {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--mdbc-text-dim, #888);
+  font-size: 0.85em;
+}
+
+.mdbc-commit-file-stat {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 6px;
+  font-size: 0.85em;
+}
+
+.mdbc-commit-stat-add {
+  color: var(--mdbc-git-add, #5cb85c);
+}
+
+.mdbc-commit-stat-del {
+  color: var(--mdbc-git-del, #e8643c);
+}
+
+.mdbc-commit-detail-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  padding: 8px;
+  border-top: 1px solid var(--mdbc-border, #2a2a2a);
+}
+
+.mdbc-commit-detail-actions .mdbc-btn {
+  justify-content: center;
+  text-decoration: none;
+}

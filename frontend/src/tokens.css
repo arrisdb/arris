@@ -1,0 +1,321 @@
+/* Arris — Design tokens
+   Shared layout tokens in :root, color palettes in [data-theme] selectors.
+*/
+
+:root {
+  /* Type — only two configurable font roles exist:
+     --m-font        UI font: all chrome (labels, panes, menus, buttons, trees).
+                     Settings > Fonts > "UI font family" overrides this on :root.
+     --m-font-editor editor/code font: every monospace/code/data surface
+                     (editors, results grid, plans, logs, diffs, terminal).
+                     Settings > Fonts > "Editor font family" sets this on :root.
+     --m-font-mono is NOT used directly by components — it exists only as the
+     mono fallback baked into the --m-font-editor declaration. The
+     fontTokens.test.ts guard enforces that components reference only
+     var(--m-font) or var(--m-font-editor, var(--m-font-mono)). */
+  --m-font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro", system-ui, sans-serif;
+  --m-font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+
+  /* Type sizes — every chrome literal derives from --m-fs-base.
+     Settings > Fonts > "UI text size" overrides --m-fs-base on :root. */
+  --m-fs-base: 14px;
+  --m-fs-2xs: calc(var(--m-fs-base) - 5px);
+  --m-fs-xxs: calc(var(--m-fs-base) - 2px);
+  --m-fs-xs:  calc(var(--m-fs-base) - 1.5px);
+  --m-fs-sm:  calc(var(--m-fs-base) - 1px);
+  --m-fs-md:  calc(var(--m-fs-base) - 0.5px);
+  --m-fs-lg:  var(--m-fs-base);
+  --m-fs-xl:  calc(var(--m-fs-base) + 2px);
+  --m-fs-body: var(--m-fs-base);
+
+  /* Icon sizes (track UI scale). */
+  --m-icon-xs: calc(var(--m-fs-base) - 2px);
+  --m-icon-sm: calc(var(--m-fs-base) + 0px);
+  --m-icon-md: calc(var(--m-fs-base) + 4px);
+
+  /* Radii */
+  --m-r-xs: 6px;
+  --m-r-sm: 8px;
+  --m-r-md: 12px;
+  --m-r-lg: 16px;
+  --m-r-xl: 22px;
+  --m-r-2xl: 28px;
+
+  /* Shared radius for interactive controls — inputs, buttons, chips, selects,
+     textareas, search. Matches the Connections filter input. */
+  --m-r-control: var(--m-r-sm);
+}
+
+/* ─── Neon (default — the original vibe-coded palette) ─── */
+[data-theme="neon"] {
+  --m-bg-app: #0c0c0e;
+  --m-bg-window: #1c1b24;
+  --m-bg-sidebar: #1c1b24;
+  --m-bg-titlebar: #1c1b24;
+  --m-bg-toolbar: #1c1b24;
+  --m-bg-surface: #1c1b24;
+  --m-bg-surface-2: #1d1d22;
+  --m-bg-card: rgba(255,255,255,0.04);
+  --m-bg-card-hover: rgba(255,255,255,0.07);
+  --m-bg-editor: #1c1b24;
+
+  --m-sep: rgba(255,255,255,0.07);
+  --m-sep-strong: rgba(255,255,255,0.12);
+  --m-sep-glass: rgba(255,255,255,0.05);
+
+  --m-fg: #f5f5f7;
+  --m-fg-2: rgba(245,245,247,0.72);
+  --m-fg-3: rgba(245,245,247,0.5);
+  --m-fg-4: rgba(245,245,247,0.32);
+  --m-placeholder: rgba(245,245,247,0.2);
+
+  /* syntax highlighting (Tokyo Night) */
+  --m-syn-keyword: #bb9af7;
+  --m-syn-builtin: #7dcfff;
+  --m-syn-function: #7aa2f7;
+  --m-syn-type: #2ac3de;
+  --m-syn-string: #9ece6a;
+  --m-syn-number: #ff9e64;
+  --m-syn-constant: #e0af68;
+  --m-syn-comment: #565f89;
+  --m-syn-operator: #89ddff;
+  --m-syn-punctuation: #a9b1d6;
+  --m-syn-bracket: #9aa5ce;
+  --m-syn-variable: #e0af68;
+  --m-syn-property: #73daca;
+
+  --m-accent: #7c8cff;
+  --m-accent-2: #a78bff;
+  --m-accent-tint: rgba(124,140,255,0.16);
+  --m-accent-glow: 0 0 0 1px rgba(124,140,255,0.35), 0 4px 12px rgba(124,140,255,0.12);
+  --m-accent-rgb: 124 140 255;
+  --m-overlay-rgb: 255 255 255;
+  --m-bg-overlay: rgba(12,12,14,0.45);
+  --m-bg-tooltip: rgba(28,28,32,0.92);
+
+  --m-green: #5be39a;
+  --m-yellow: #ffd960;
+  --m-red: #ff6b6b;
+  --m-orange: #ffa14a;
+  --m-pink: #ff7ab2;
+  --m-teal: #7adce4;
+
+  --m-db-postgres: #6aa1ff;
+  --m-db-snowflake: #5ad6f4;
+  --m-db-mongo: #74d39c;
+  --m-db-clickhouse: #ffd960;
+  --m-db-redis: #ff7a7a;
+  --m-db-bigquery: #6aa1ff;
+  --m-db-duckdb: #ffc266;
+  --m-db-federation: #c39bff;
+  --m-db-mixpanel: #a78bff;
+
+  --m-scrollbar-thumb: rgba(255,255,255,0.08);
+  --m-scrollbar-thumb-hover: rgba(255,255,255,0.14);
+
+  --m-shadow-window: 0 30px 80px rgba(0,0,0,0.55), 0 0 0 0.5px rgba(255,255,255,0.06) inset;
+  --m-shadow-card: 0 1px 0 rgba(255,255,255,0.05) inset, 0 4px 16px rgba(0,0,0,0.3);
+  --m-shadow-pop: 0 24px 60px rgba(0,0,0,0.6), 0 0 0 0.5px rgba(255,255,255,0.08);
+}
+
+/* ─── Classic Dark — muted, professional, VS Code / Darcula inspired ─── */
+[data-theme="classicDark"] {
+  --m-bg-app: #181818;
+  --m-bg-window: #1e1e1e;
+  --m-bg-sidebar: #252526;
+  --m-bg-titlebar: #323233;
+  --m-bg-toolbar: #2d2d2d;
+  --m-bg-surface: #252526;
+  --m-bg-surface-2: #2d2d2d;
+  --m-bg-card: rgba(255,255,255,0.04);
+  --m-bg-card-hover: rgba(255,255,255,0.07);
+  --m-bg-editor: #1e1e1e;
+
+  --m-sep: rgba(255,255,255,0.08);
+  --m-sep-strong: rgba(255,255,255,0.13);
+  --m-sep-glass: rgba(255,255,255,0.05);
+
+  --m-fg: #d4d4d4;
+  --m-fg-2: rgba(212,212,212,0.72);
+  --m-fg-3: rgba(212,212,212,0.5);
+  --m-fg-4: rgba(212,212,212,0.32);
+  --m-placeholder: rgba(212,212,212,0.2);
+
+  /* syntax highlighting (Tokyo Night) */
+  --m-syn-keyword: #bb9af7;
+  --m-syn-builtin: #7dcfff;
+  --m-syn-function: #7aa2f7;
+  --m-syn-type: #2ac3de;
+  --m-syn-string: #9ece6a;
+  --m-syn-number: #ff9e64;
+  --m-syn-constant: #e0af68;
+  --m-syn-comment: #565f89;
+  --m-syn-operator: #89ddff;
+  --m-syn-punctuation: #a9b1d6;
+  --m-syn-bracket: #9aa5ce;
+  --m-syn-variable: #e0af68;
+  --m-syn-property: #73daca;
+
+  --m-accent: #569cd6;
+  --m-accent-2: #9cdcfe;
+  --m-accent-tint: rgba(86,156,214,0.16);
+  --m-accent-glow: 0 0 0 1px rgba(86,156,214,0.35), 0 4px 12px rgba(86,156,214,0.12);
+  --m-accent-rgb: 86 156 214;
+  --m-overlay-rgb: 255 255 255;
+  --m-bg-overlay: rgba(0,0,0,0.45);
+  --m-bg-tooltip: rgba(30,30,30,0.92);
+
+  --m-green: #6a9955;
+  --m-yellow: #dcdcaa;
+  --m-red: #f44747;
+  --m-orange: #ce9178;
+  --m-pink: #c586c0;
+  --m-teal: #4ec9b0;
+
+  --m-db-postgres: #569cd6;
+  --m-db-snowflake: #4ec9b0;
+  --m-db-mongo: #6a9955;
+  --m-db-clickhouse: #dcdcaa;
+  --m-db-redis: #f44747;
+  --m-db-bigquery: #569cd6;
+  --m-db-duckdb: #ce9178;
+  --m-db-federation: #c586c0;
+  --m-db-mixpanel: #9cdcfe;
+
+  --m-scrollbar-thumb: rgba(255,255,255,0.10);
+  --m-scrollbar-thumb-hover: rgba(255,255,255,0.16);
+
+  --m-shadow-window: 0 20px 60px rgba(0,0,0,0.5), 0 0 0 0.5px rgba(255,255,255,0.05) inset;
+  --m-shadow-card: 0 1px 0 rgba(255,255,255,0.04) inset, 0 4px 12px rgba(0,0,0,0.25);
+  --m-shadow-pop: 0 16px 48px rgba(0,0,0,0.55), 0 0 0 0.5px rgba(255,255,255,0.06);
+}
+
+/* ─── Light — clean, minimal, high contrast ─── */
+[data-theme="light"] {
+  --m-bg-app: #f0f0f0;
+  --m-bg-window: #ffffff;
+  --m-bg-sidebar: #f5f5f5;
+  --m-bg-titlebar: #e8e8e8;
+  --m-bg-toolbar: #f0f0f0;
+  --m-bg-surface: #ffffff;
+  --m-bg-surface-2: #f5f5f5;
+  --m-bg-card: rgba(0,0,0,0.03);
+  --m-bg-card-hover: rgba(0,0,0,0.06);
+  --m-bg-editor: #ffffff;
+
+  --m-sep: rgba(0,0,0,0.09);
+  --m-sep-strong: rgba(0,0,0,0.15);
+  --m-sep-glass: rgba(0,0,0,0.05);
+
+  --m-fg: #141414;
+  --m-fg-2: rgba(20,20,20,0.86);
+  --m-fg-3: rgba(20,20,20,0.72);
+  --m-fg-4: rgba(20,20,20,0.55);
+  --m-placeholder: rgba(20,20,20,0.38);
+
+  /* syntax highlighting (dark, saturated — readable on white) */
+  --m-syn-keyword: #9a3fb5;
+  --m-syn-builtin: #0e7490;
+  --m-syn-function: #6639ba;
+  --m-syn-type: #0a6e5e;
+  --m-syn-string: #1a7f37;
+  --m-syn-number: #b5530a;
+  --m-syn-constant: #9a6700;
+  --m-syn-comment: #57606a;
+  --m-syn-operator: #0550ae;
+  --m-syn-punctuation: #24292f;
+  --m-syn-bracket: #6e7781;
+  --m-syn-variable: #0a3069;
+  --m-syn-property: #116329;
+
+  --m-accent: #0066cc;
+  --m-accent-2: #0055aa;
+  --m-accent-tint: rgba(0,102,204,0.12);
+  --m-accent-glow: 0 0 0 1px rgba(0,102,204,0.3), 0 4px 12px rgba(0,102,204,0.1);
+  --m-accent-rgb: 0 102 204;
+  --m-overlay-rgb: 0 0 0;
+  --m-bg-overlay: rgba(0,0,0,0.25);
+  --m-bg-tooltip: rgba(50,50,50,0.92);
+
+  --m-green: #22863a;
+  --m-yellow: #b08800;
+  --m-red: #d73a49;
+  --m-orange: #e36209;
+  --m-pink: #d63384;
+  --m-teal: #0d8a72;
+
+  --m-db-postgres: #0066cc;
+  --m-db-snowflake: #0d8a72;
+  --m-db-mongo: #22863a;
+  --m-db-clickhouse: #b08800;
+  --m-db-redis: #d73a49;
+  --m-db-bigquery: #0066cc;
+  --m-db-duckdb: #e36209;
+  --m-db-federation: #8250df;
+  --m-db-mixpanel: #6639ba;
+
+  --m-scrollbar-thumb: rgba(0,0,0,0.12);
+  --m-scrollbar-thumb-hover: rgba(0,0,0,0.22);
+
+  --m-shadow-window: 0 20px 60px rgba(0,0,0,0.12), 0 0 0 0.5px rgba(0,0,0,0.08) inset;
+  --m-shadow-card: 0 1px 3px rgba(0,0,0,0.08), 0 1px 0 rgba(0,0,0,0.04);
+  --m-shadow-pop: 0 16px 48px rgba(0,0,0,0.16), 0 0 0 0.5px rgba(0,0,0,0.1);
+}
+
+/* ─── Editor colour schemes ───────────────────────────────────────────────
+   Independent of the app theme. Each scheme (default "oneDark") redefines the
+   full `--m-syn-*` token palette. These selectors share specificity with the
+   theme blocks above but come later in source order, so they win. Per-token
+   overrides set as inline custom properties on the root element beat both
+   (see styles/theme.ts). */
+
+/* ─── Dracula ─── */
+[data-color-scheme="dracula"] {
+  --m-syn-keyword: #ff79c6;
+  --m-syn-builtin: #8be9fd;
+  --m-syn-function: #50fa7b;
+  --m-syn-type: #8be9fd;
+  --m-syn-string: #f1fa8c;
+  --m-syn-number: #bd93f9;
+  --m-syn-constant: #bd93f9;
+  --m-syn-comment: #6272a4;
+  --m-syn-operator: #ff79c6;
+  --m-syn-punctuation: #f8f8f2;
+  --m-syn-bracket: #f8f8f2;
+  --m-syn-variable: #ffb86c;
+  --m-syn-property: #f1fa8c;
+}
+
+/* ─── Monokai ─── */
+[data-color-scheme="monokai"] {
+  --m-syn-keyword: #f92672;
+  --m-syn-builtin: #66d9ef;
+  --m-syn-function: #a6e22e;
+  --m-syn-type: #66d9ef;
+  --m-syn-string: #e6db74;
+  --m-syn-number: #ae81ff;
+  --m-syn-constant: #ae81ff;
+  --m-syn-comment: #75715e;
+  --m-syn-operator: #f92672;
+  --m-syn-punctuation: #f8f8f2;
+  --m-syn-bracket: #f8f8f2;
+  --m-syn-variable: #fd971f;
+  --m-syn-property: #e6db74;
+}
+
+/* ─── One Dark ─── */
+[data-color-scheme="oneDark"] {
+  --m-syn-keyword: #c678dd;
+  --m-syn-builtin: #56b6c2;
+  --m-syn-function: #61afef;
+  --m-syn-type: #e5c07b;
+  --m-syn-string: #98c379;
+  --m-syn-number: #d19a66;
+  --m-syn-constant: #d19a66;
+  --m-syn-comment: #5c6370;
+  --m-syn-operator: #56b6c2;
+  --m-syn-punctuation: #abb2bf;
+  --m-syn-bracket: #abb2bf;
+  --m-syn-variable: #e06c75;
+  --m-syn-property: #abb2bf;
+}
