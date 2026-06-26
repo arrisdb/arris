@@ -1,0 +1,40 @@
+version: 2
+
+sources:
+  - name: public
+    description: Canonical sample dataset shared across every docker-compose engine
+    tables:
+      - name: customers
+        description: Canonical customer records
+        columns:
+          - name: customer_id
+            description: Primary key
+            tests:
+              - unique
+              - not_null
+          - name: first_name
+            description: Customer first name
+          - name: last_name
+            description: Customer last name
+          - name: email
+            description: Email address
+          - name: country_code
+            description: ISO country code
+          - name: signup_date
+            description: Date the customer signed up
+      - name: orders
+        description: Canonical order records
+        columns:
+          - name: order_id
+            description: Primary key
+            tests:
+              - unique
+              - not_null
+          - name: customer_id
+            description: Foreign key to customers
+          - name: order_date
+            description: Date the order was placed
+          - name: status
+            description: Order status
+          - name: amount
+            description: Order total in dollars

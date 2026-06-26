@@ -1,0 +1,85 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg-app: #08080a;
+  --color-bg-window: #161618;
+  --color-bg-sidebar: rgba(28,28,32,0.55);
+  --color-bg-titlebar: rgba(20,20,22,0.55);
+  --color-bg-editor: #131316;
+  --color-bg-card: rgba(255,255,255,0.04);
+  --color-bg-card-hover: rgba(255,255,255,0.07);
+
+  --color-sep: rgba(255,255,255,0.07);
+  --color-sep-strong: rgba(255,255,255,0.12);
+
+  --color-fg: #f5f5f7;
+  --color-fg-2: rgba(245,245,247,0.72);
+  --color-fg-3: rgba(245,245,247,0.5);
+  --color-fg-4: rgba(245,245,247,0.32);
+
+  --color-accent: #7c8cff;
+  --color-accent-2: #a78bff;
+  --color-accent-tint: rgba(124,140,255,0.16);
+
+  --color-green: #5be39a;
+  --color-yellow: #ffd960;
+  --color-red: #ff6b6b;
+  --color-orange: #ffa14a;
+  --color-teal: #7adce4;
+
+  --color-db-postgres: #6aa1ff;
+  --color-db-snowflake: #5ad6f4;
+  --color-db-mongo: #74d39c;
+  --color-db-clickhouse: #ffd960;
+  --color-db-redis: #ff7a7a;
+  --color-db-redshift: #ff6b6b;
+  --color-db-bigquery: #6aa1ff;
+  --color-db-duckdb: #ffc266;
+  --color-db-federation: #c39bff;
+  --color-db-mysql: #5ad6f4;
+  --color-db-kafka: #ffa14a;
+  --color-db-mixpanel: #a78bff;
+  --color-db-elasticsearch: #ffd960;
+  --color-db-mssql: #ff7a7a;
+  --color-db-oracle: #ff7a7a;
+  --color-db-sqlite: #7adce4;
+
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro", system-ui, sans-serif;
+  --font-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro", system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+}
+
+html, body {
+  background: var(--color-bg-app);
+  margin: 0;
+  color: var(--color-fg);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Reserve the scrollbar gutter so short and tall pages don't shift the
+   layout horizontally when navigating between them. */
+html {
+  scrollbar-gutter: stable;
+}
+
+body {
+  background: var(--color-bg-app);
+  min-height: 100vh;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.docLogo {
+  display: inline-block;
+  vertical-align: middle;
+  margin-right: 10px;
+  border-radius: 6px;
+}

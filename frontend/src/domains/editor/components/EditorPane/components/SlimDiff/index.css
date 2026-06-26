@@ -1,0 +1,48 @@
+.mdbc-diffbar {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  padding: 6px 10px;
+  border-top: 0.5px solid var(--m-sep);
+  background: rgb(var(--m-overlay-rgb) / 0.02);
+}
+
+.mdbc-diffbar-label {
+  align-self: center;
+  font-weight: 600;
+  font-size: var(--m-fs-xs);
+  color: var(--m-fg-2);
+}
+
+.mdbc-diffbar-field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: var(--m-fs-2xs);
+  color: var(--m-fg-3);
+}
+
+.mdbc-diffbar-sample {
+  width: 72px;
+  -moz-appearance: textfield;
+}
+
+.mdbc-diffbar-sample::-webkit-outer-spin-button,
+.mdbc-diffbar-sample::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.mdbc-diffbar-keys {
+  width: 160px;
+}
+
+.mdbc-diffbar-notice {
+  align-self: center;
+  font-size: var(--m-fs-xs);
+  color: var(--m-fg-3);
+}
+
+.mdbc-diffbar-notice.error {
+  color: var(--m-red);
+}

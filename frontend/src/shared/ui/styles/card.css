@@ -1,0 +1,8 @@
+/* Card */
+.mdbc-card {
+  background: var(--m-bg-surface);
+  border: 0.5px solid var(--m-sep);
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: var(--m-shadow-card);
+}

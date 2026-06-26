@@ -1,0 +1,136 @@
+/* components lineage */
+.mdbc-lineage-empty {
+  padding: 32px;
+  color: var(--m-fg-3, #a0a0aa);
+  font-size: var(--m-fs-sm);
+  text-align: center;
+}
+.mdbc-lineage-root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+}
+.mdbc-lineage-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-bottom: 0.5px solid var(--m-sep, rgb(var(--m-overlay-rgb) / 0.06));
+  font-size: var(--m-fs-xs);
+  color: var(--m-fg-3, #a0a0aa);
+}
+.mdbc-lineage-toolbar-button {
+  min-width: 26px;
+  height: 22px;
+  padding: 0 6px;
+  font-size: var(--m-fs-xs);
+}
+.mdbc-lineage-canvas-wrap {
+  flex: 1;
+  min-height: 0;
+}
+.mdbc-lineage-canvas {
+  height: 100%;
+  width: 100%;
+}
+.mdbc-lineage-node-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow: hidden;
+}
+.mdbc-lineage-node-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+}
+.mdbc-lineage-node-kind {
+  font-size: var(--m-fs-xxs);
+  color: var(--m-fg-3, #a0a0aa);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.mdbc-lineage-focus-chip {
+  font-size: var(--m-fs-2xs);
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: var(--m-accent, #7c8cff);
+  background: rgb(var(--m-accent-rgb) / 0.14);
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+.mdbc-lineage-node-label {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0 12px;
+}
+
+.mdbc-lineage-toolbar-sep {
+  width: 1px;
+  height: 14px;
+  background: var(--m-sep, rgb(var(--m-overlay-rgb) / 0.06));
+  margin: 0 2px;
+}
+
+/* column lineage */
+.mdbc-lineage-col-loading {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: var(--m-fs-xs);
+  color: var(--m-fg-3, #a0a0aa);
+  border-top: 0.5px solid var(--m-sep, rgb(var(--m-overlay-rgb) / 0.06));
+  margin-top: 4px;
+}
+.mdbc-lineage-col-loading-spinner {
+  width: 12px;
+  height: 12px;
+  border: 1.5px solid var(--m-fg-3, #a0a0aa);
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: mdbc-spin 0.8s linear infinite;
+}
+@keyframes mdbc-spin {
+  to { transform: rotate(360deg); }
+}
+.mdbc-lineage-col-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin-top: 4px;
+  border-top: 0.5px solid var(--m-sep, rgb(var(--m-overlay-rgb) / 0.06));
+  padding-top: 4px;
+}
+.mdbc-lineage-col-row {
+  display: flex;
+  align-items: center;
+  padding: 2px 12px;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background 0.1s, opacity 0.15s;
+}
+.mdbc-lineage-col-row:hover {
+  background: rgb(var(--m-overlay-rgb) / 0.08);
+}
+.mdbc-lineage-col-row.highlighted {
+  background: var(--m-accent-tint, rgb(var(--m-accent-rgb) / 0.16));
+}
+.mdbc-lineage-col-row.dimmed {
+  opacity: 0.4;
+}
+.mdbc-lineage-col-name {
+  font-size: var(--m-fs-xs);
+  color: var(--m-fg-2, #c8c8cc);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mdbc-lineage-col-row.highlighted .mdbc-lineage-col-name {
+  color: var(--m-accent, #7c8cff);
+  font-weight: 600;
+}

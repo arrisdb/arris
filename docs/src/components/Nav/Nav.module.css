@@ -1,0 +1,308 @@
+.nav {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  border-bottom: 0.5px solid rgba(255, 255, 255, 0.06);
+  background: rgba(8, 8, 10, 0.55);
+  backdrop-filter: blur(24px) saturate(160%);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+}
+
+.navDocs {
+  z-index: 50;
+  background: rgba(8, 8, 10, 0.7);
+}
+
+.container {
+  max-width: 1400px;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 32px;
+  padding-right: 32px;
+  display: flex;
+  align-items: center;
+  height: 56px;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.logoMark {
+  width: 26px;
+  height: 26px;
+  object-fit: contain;
+  display: block;
+}
+
+.brandName {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--color-fg);
+}
+
+.version {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--color-fg-3);
+  padding: 2px 7px;
+  border: 1px solid var(--color-sep);
+  border-radius: 999px;
+  text-decoration: none;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.version:hover {
+  color: var(--color-fg);
+  border-color: var(--color-sep-strong);
+}
+
+.navLinks {
+  display: flex;
+  gap: 22px;
+  margin-left: 40px;
+}
+
+.link {
+  display: inline-block;
+  min-width: 76px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--color-fg-2);
+  transition: color 0.15s ease;
+}
+
+.link:hover {
+  color: var(--color-fg);
+}
+
+.linkActive {
+  color: var(--color-fg);
+  position: relative;
+}
+
+.linkActive::after {
+  content: "";
+  position: absolute;
+  bottom: -18px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--color-accent-2);
+  border-radius: 1px;
+}
+
+.ctaGroup {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* ── Docs search trigger (docs variant only) ──────────────────────────────── */
+
+.search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  min-width: 260px;
+  padding: 0 14px;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 0.5px solid rgba(255, 255, 255, 0.08);
+  color: var(--color-fg-4);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.search:hover {
+  border-color: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.searchText {
+  font-size: 12.5px;
+  color: var(--color-fg-4);
+  white-space: nowrap;
+}
+
+.kbd {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  line-height: 1;
+  background: rgba(255, 255, 255, 0.08);
+  border: 0.5px solid rgba(255, 255, 255, 0.1);
+  border-radius: 5px;
+  padding: 2px 6px;
+  color: var(--color-fg-4);
+}
+
+.github {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  border: 0.5px solid transparent;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.githubIcon {
+  display: block;
+  opacity: 0.7;
+  transition: opacity 0.15s ease;
+}
+
+.github:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.github:hover .githubIcon {
+  opacity: 1;
+}
+
+/* ── Hamburger menu ────────────────────────────────────────────────────────
+   Desktop: toggle hidden, .menu transparent (its children flow into the
+   container flex row exactly as before via display: contents). */
+
+.menuToggle {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  margin-left: auto;
+  border-radius: 8px;
+  color: var(--color-fg-2);
+  background: transparent;
+  border: 0.5px solid transparent;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.menuToggle:hover {
+  color: var(--color-fg);
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.menuToggleIcon {
+  display: block;
+}
+
+.menu {
+  display: contents;
+}
+
+/* ── Docs nav variant ──────────────────────────────────────────────────────
+   Desktop layout matches the marketing nav: Docs + Download links on the left,
+   search on the right. The hamburger is hidden until mobile. */
+
+.docsLinks {
+  display: flex;
+  gap: 22px;
+  margin-left: 40px;
+}
+
+.docsCta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-left: auto;
+}
+
+/* The hamburger lives in docsCta; on mobile the Download link owns the auto
+   margin, so the toggle must not also push itself away from it. */
+.docsCta .menuToggle {
+  margin-left: 0;
+}
+
+/* ── Tablet & mobile: collapse links + CTA into a dropdown panel ──────────── */
+
+@media (max-width: 768px) {
+  .menuToggle {
+    display: inline-flex;
+  }
+
+  .menu {
+    display: none;
+    position: absolute;
+    top: 56px;
+    left: 0;
+    right: 0;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+    padding: 14px 20px 18px;
+    background: rgba(8, 8, 10, 0.94);
+    backdrop-filter: blur(24px) saturate(160%);
+    -webkit-backdrop-filter: blur(24px) saturate(160%);
+    border-bottom: 0.5px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .container:global(.nav-open) .menu {
+    display: flex;
+  }
+
+  .navLinks {
+    flex-direction: column;
+    gap: 2px;
+    margin-left: 0;
+    align-items: stretch;
+  }
+
+  .link {
+    min-width: 0;
+    text-align: left;
+    font-size: 15px;
+    padding: 10px 4px;
+  }
+
+  /* The desktop active underline is positioned for the horizontal bar; drop
+     it in the vertical dropdown. */
+  .linkActive::after {
+    display: none;
+  }
+
+  .ctaGroup {
+    margin-left: 0;
+    margin-top: 6px;
+  }
+
+  .search {
+    min-width: 0;
+    width: 100%;
+  }
+
+  /* Docs nav: hide the Docs link + search; keep Download inline next to the
+     hamburger, which opens the docs sidebar drawer. */
+  .docsLinks,
+  .docsCta {
+    display: contents;
+  }
+
+  .docsOnly,
+  .docsCta .search {
+    display: none;
+  }
+
+  .downloadLink {
+    margin-left: auto;
+  }
+}
+
+@media (max-width: 480px) {
+  .container {
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+}

@@ -1,0 +1,285 @@
+/* Settings list rows - Zed-like split copy/control layout. */
+.mdbc-settings-list {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding-right: 12px;
+}
+.mdbc-settings-section {
+  display: flex;
+  flex-direction: column;
+}
+.mdbc-settings-section + .mdbc-settings-section,
+.mdbc-settings-row + .mdbc-settings-section {
+  margin-top: 20px;
+}
+.mdbc-settings-section-header {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 8px;
+}
+.mdbc-settings-section-title {
+  color: var(--m-fg);
+  font-size: var(--m-fs-sm);
+  font-weight: 600;
+  letter-spacing: 0;
+}
+.mdbc-settings-section-description {
+  color: var(--m-fg-3);
+  font-size: var(--m-fs-xs);
+  line-height: 1.3;
+  letter-spacing: 0;
+}
+.mdbc-settings-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(160px, max-content);
+  gap: 24px;
+  align-items: center;
+  min-height: 52px;
+  padding: 11px 0;
+  border-bottom: 0.5px solid var(--m-sep);
+}
+.mdbc-settings-row-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.mdbc-settings-row-label {
+  color: var(--m-fg);
+  font-size: var(--m-fs-sm);
+  font-weight: 500;
+  letter-spacing: 0;
+}
+.mdbc-settings-row-description {
+  color: var(--m-fg-3);
+  font-size: var(--m-fs-xs);
+  line-height: 1.3;
+  letter-spacing: 0;
+}
+.mdbc-settings-row-control {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+.mdbc-settings-row-control .mdbc-field {
+  width: min(320px, 100%);
+}
+.mdbc-settings-toggle {
+  position: relative;
+  width: 34px;
+  height: 20px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.mdbc-settings-toggle input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.mdbc-settings-toggle-track {
+  position: absolute;
+  inset: 0;
+  border-radius: 10px;
+  background: var(--m-fg-4);
+  transition: background 0.15s;
+}
+.mdbc-settings-toggle input:checked + .mdbc-settings-toggle-track {
+  background: var(--m-accent);
+}
+.mdbc-settings-toggle-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.15s;
+}
+.mdbc-settings-toggle input:checked + .mdbc-settings-toggle-track .mdbc-settings-toggle-thumb {
+  transform: translateX(14px);
+}
+.mdbc-settings-toggle input:focus-visible + .mdbc-settings-toggle-track {
+  box-shadow: var(--m-accent-glow);
+}
+.mdbc-sheet-resize-handle {
+  position: absolute;
+  z-index: 2;
+}
+.mdbc-sheet-resize-handle.n,
+.mdbc-sheet-resize-handle.s {
+  left: 14px;
+  right: 14px;
+  height: 8px;
+  cursor: ns-resize;
+}
+.mdbc-sheet-resize-handle.n { top: 0; }
+.mdbc-sheet-resize-handle.s { bottom: 0; }
+.mdbc-sheet-resize-handle.e,
+.mdbc-sheet-resize-handle.w {
+  top: 14px;
+  bottom: 14px;
+  width: 8px;
+  cursor: ew-resize;
+}
+.mdbc-sheet-resize-handle.e { right: 0; }
+.mdbc-sheet-resize-handle.w { left: 0; }
+.mdbc-sheet-resize-handle.ne,
+.mdbc-sheet-resize-handle.nw,
+.mdbc-sheet-resize-handle.se,
+.mdbc-sheet-resize-handle.sw {
+  width: 18px;
+  height: 18px;
+}
+.mdbc-sheet-resize-handle.ne {
+  top: 0;
+  right: 0;
+  cursor: nesw-resize;
+}
+.mdbc-sheet-resize-handle.nw {
+  top: 0;
+  left: 0;
+  cursor: nwse-resize;
+}
+.mdbc-sheet-resize-handle.se {
+  right: 0;
+  bottom: 0;
+  cursor: nwse-resize;
+}
+.mdbc-sheet-resize-handle.sw {
+  left: 0;
+  bottom: 0;
+  cursor: nesw-resize;
+}
+
+.mdbc-settings-layout {
+  display: flex;
+  gap: 18px;
+  height: 100%;
+  min-height: 0;
+}
+.mdbc-settings-nav {
+  width: 160px;
+  border-right: 0.5px solid var(--m-sep, rgb(var(--m-overlay-rgb) / 0.07));
+  padding-right: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.mdbc-settings-nav-item {
+  width: 100%;
+  text-align: left;
+  margin: 0;
+}
+.mdbc-settings-content {
+  flex: 1;
+  overflow: auto;
+}
+.mdbc-settings-form-reset {
+  padding: 0;
+}
+.mdbc-settings-pane-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 12px;
+}
+.mdbc-settings-keymap-category {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+.mdbc-settings-keymap-category-header {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border-bottom: 0.5px solid var(--m-sep);
+  padding-bottom: 6px;
+  margin-bottom: 4px;
+}
+.mdbc-settings-keymap-category-title {
+  color: var(--m-fg);
+  font-size: var(--m-fs-xl);
+  font-weight: 600;
+  letter-spacing: 0;
+}
+.mdbc-settings-keymap-category-description {
+  color: var(--m-fg-3);
+  font-size: var(--m-fs-xs);
+  line-height: 1.3;
+  letter-spacing: 0;
+}
+.mdbc-settings-keymap-row {
+  display: grid;
+  grid-template-columns: minmax(150px, 1fr) minmax(190px, 210px) 28px 28px;
+  gap: 8px;
+  align-items: center;
+}
+.mdbc-settings-keymap-action-label {
+  font-size: var(--m-fs-sm);
+}
+.mdbc-settings-keymap-shortcut-button {
+  width: 100%;
+  height: 30px;
+  justify-content: center;
+  cursor: pointer;
+  font-size: var(--m-fs-sm);
+  line-height: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mdbc-settings-keymap-empty-shortcut {
+  color: var(--m-fg-4);
+}
+.mdbc-settings-keymap-conflict-banner {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+  padding: 7px 9px;
+  border: 0.5px solid rgba(255,95,95,0.32);
+  border-radius: var(--m-r-xs);
+  background: rgba(255,95,95,0.08);
+}
+.mdbc-settings-keymap-conflict-message {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--m-fs-xs);
+  color: var(--m-fg-2);
+}
+.mdbc-settings-keymap-conflict-title {
+  color: var(--m-red);
+  font-weight: 600;
+}
+.mdbc-settings-keymap-conflict-actions {
+  display: inline-flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.mdbc-settings-keymap-conflict-action {
+  height: 24px;
+  padding: 0 8px;
+}
+.mdbc-settings-keymap-row-height {
+  min-height: var(--mdbc-settings-keymap-row-min-height);
+}
+.mdbc-settings-keymap-reset-button {
+  visibility: var(--mdbc-settings-keymap-reset-visibility);
+}
+.mdbc-settings-keymap-clear-button {
+  visibility: var(--mdbc-settings-keymap-clear-visibility);
+}
+.mdbc-settings-keymap-conflict-offset {
+  margin-top: var(--mdbc-settings-keymap-conflict-margin-top);
+}
+

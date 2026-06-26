@@ -1,0 +1,548 @@
+/* ─────────────── Reusable utility classes ─────────────── */
+
+/* Pane wrapper — applied to sidebar containers (left/right) so every panel
+   shares the same opaque background, hairline border, and column layout. */
+.mdbc-pane {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--m-bg-sidebar);
+  overflow: hidden;
+  border-top: 0.5px solid var(--m-sep);
+}
+.mdbc-pane.right { border-left: 0.5px solid var(--m-sep); }
+.mdbc-pane.left  { border-right: 0.5px solid var(--m-sep); }
+@keyframes mdbc-pane-flash {
+  0%, 100% { background-color: transparent; }
+  50% { background-color: rgb(var(--m-accent-rgb) / 0.13); }
+}
+.mdbc-pane.flash { animation: mdbc-pane-flash 1.5s ease-in-out 2; }
+
+/* One-shot accent glow — e.g. chart editor pane when "Edit Chart" is clicked. */
+@keyframes mdbc-shine {
+  0%   { box-shadow: inset 0 0 0 0 rgb(var(--m-accent-rgb) / 0); }
+  25%  { box-shadow: inset 0 0 0 2px rgb(var(--m-accent-rgb) / 0.6), inset 0 0 22px 0 rgb(var(--m-accent-rgb) / 0.22); }
+  100% { box-shadow: inset 0 0 0 0 rgb(var(--m-accent-rgb) / 0); }
+}
+.mdbc-shine { animation: mdbc-shine 0.7s ease-out; }
+
+/* Pane footer — pinned section at the bottom of the pane (below scrollable body). */
+.mdbc-pane-footer {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-top: 0.5px solid var(--m-sep);
+  padding: 8px 12px;
+}
+.mdbc-pane-footer .mdbc-settings-row {
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+  min-height: unset;
+  padding: 0;
+  border-bottom: none;
+}
+
+/* Pane body — scrollable content area below the pinned header. */
+.mdbc-pane-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+/* Pane header — uppercase title strip used at the top of every sidebar. */
+.mdbc-pane-header {
+  padding: 6px 14px 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.mdbc-pane-title {
+  font-size: var(--m-fs-xxs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--m-fg-3);
+}
+
+/* Segmented button selector — rounded pill group inside pane header. */
+.mdbc-segmented {
+  display: flex;
+  width: 100%;
+  background: rgb(var(--m-overlay-rgb) / 0.06);
+  border-radius: 6px;
+  padding: 2px;
+  gap: 2px;
+}
+.mdbc-segmented button {
+  all: unset;
+  flex: 1;
+  text-align: center;
+  padding: 3px 10px;
+  font-size: var(--m-fs-xxs);
+  font-weight: 500;
+  color: var(--m-fg-3);
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background 0.1s, color 0.1s;
+}
+.mdbc-segmented button:hover {
+  background: rgb(var(--m-overlay-rgb) / 0.06);
+}
+.mdbc-segmented button.active {
+  background: var(--m-accent-tint);
+  color: var(--m-accent);
+  font-weight: 600;
+}
+/* Compact variant — sizes to content instead of filling the row (toolbar use). */
+.mdbc-segmented-compact {
+  width: auto;
+}
+.mdbc-segmented-compact button {
+  flex: 0 0 auto;
+}
+
+/* Section header — uppercase label inside a pane (e.g. "Branches"). */
+.mdbc-section-head {
+  padding: 10px 14px 6px;
+  font-size: var(--m-fs-xxs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--m-fg-3);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.mdbc-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px 6px;
+  font-size: var(--m-fs-xxs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--m-fg-3);
+}
+
+/* Inline icon button — small square chrome button (22/28px variants). */
+.mdbc-icon-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--m-fg-2);
+  background: transparent;
+  cursor: pointer;
+  border: 0;
+  padding: 0;
+  font-size: var(--m-icon-md);
+  line-height: 1;
+}
+.mdbc-icon-btn:hover { background: rgb(var(--m-overlay-rgb) / 0.06); color: var(--m-fg); }
+.mdbc-icon-btn.xs { width: 22px; height: 22px; border-radius: 4px; font-size: var(--m-icon-xs); }
+.mdbc-icon-btn.square { width: 24px; height: 24px; border-radius: 0; color: var(--m-fg-2); }
+.mdbc-icon-btn.lg { width: 32px; height: 32px; border-radius: 8px; font-size: calc(var(--m-fs-base) + 6px); }
+.mdbc-icon-btn.on { background: var(--m-accent-tint); color: var(--m-accent); }
+
+/* Pane form — vertical stack for settings/config inside sidebar panes.
+   Used by dbt config, git commit, agents MCP info, etc. */
+.mdbc-pane-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px 10px 10px;
+}
+.mdbc-pane-label {
+  font-size: var(--m-fs-xxs);
+  color: var(--m-fg-3);
+  font-weight: 500;
+}
+.mdbc-pane-input {
+  width: 100%;
+  background: rgb(var(--m-overlay-rgb) / 0.04);
+  border: 0.5px solid var(--m-sep);
+  border-radius: var(--m-r-control);
+  padding: 5px 8px;
+  font-size: var(--m-fs-xs);
+  color: var(--m-fg);
+  font-family: var(--m-font);
+  outline: none;
+}
+.mdbc-pane-input:focus {
+  border-color: rgb(var(--m-accent-rgb) / 0.45);
+  box-shadow: 0 0 0 3px rgb(var(--m-accent-rgb) / 0.12);
+}
+.mdbc-pane-input::placeholder { color: var(--m-placeholder); }
+.mdbc-pane-select {
+  width: 100%;
+  appearance: none;
+  background: rgb(var(--m-overlay-rgb) / 0.04);
+  border: 0.5px solid var(--m-sep);
+  border-radius: var(--m-r-control);
+  padding: 5px 24px 5px 8px;
+  font-size: var(--m-fs-xs);
+  color: var(--m-fg);
+  font-family: var(--m-font);
+  outline: none;
+  cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23a0a0aa' fill='none' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+}
+.mdbc-pane-select:focus {
+  border-color: rgb(var(--m-accent-rgb) / 0.45);
+  box-shadow: 0 0 0 3px rgb(var(--m-accent-rgb) / 0.12);
+}
+.mdbc-pane-select option {
+  background: var(--m-bg-surface);
+  color: var(--m-fg);
+}
+.mdbc-pane-form .mdbc-select {
+  width: 100%;
+  display: flex;
+  height: 28px;
+  padding: 0 8px;
+  border: 0.5px solid var(--m-sep);
+  border-radius: var(--m-r-control);
+  font-size: var(--m-fs-xs);
+}
+.mdbc-pane-form .mdbc-select:focus-visible,
+.mdbc-pane-form .mdbc-select.open {
+  outline: none;
+}
+.mdbc-pane-form .mdbc-select-label {
+  flex: 1;
+  text-align: left;
+}
+.mdbc-pane-form .mdbc-select-caret {
+  margin-left: auto;
+}
+.mdbc-pane-textarea {
+  width: 100%;
+  background: rgb(var(--m-overlay-rgb) / 0.04);
+  border: 0.5px solid var(--m-sep);
+  border-radius: var(--m-r-control);
+  padding: 6px 8px;
+  font-size: var(--m-fs-xs);
+  color: var(--m-fg);
+  font-family: var(--m-font);
+  outline: none;
+  resize: vertical;
+  min-height: 50px;
+  max-height: 120px;
+}
+.mdbc-pane-textarea:focus {
+  border-color: rgb(var(--m-accent-rgb) / 0.45);
+  box-shadow: 0 0 0 3px rgb(var(--m-accent-rgb) / 0.12);
+}
+.mdbc-pane-textarea::placeholder { color: var(--m-placeholder); }
+.mdbc-pane-error {
+  padding: 4px 10px;
+  font-size: var(--m-fs-xxs);
+  color: var(--m-red);
+  line-height: 1.4;
+}
+.mdbc-pane-actions {
+  border-top: 0.5px solid var(--m-sep);
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.mdbc-pane-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: var(--m-fs-xxs);
+  color: var(--m-fg-3);
+  padding: 0;
+}
+
+/* Empty / placeholder text — used when a pane has no content yet. */
+.mdbc-empty {
+  padding: 12px 14px;
+  font-size: var(--m-fs-sm);
+  color: var(--m-fg-3);
+  line-height: 1.5;
+}
+
+/* Inline accent link inside text. */
+.mdbc-link {
+  color: var(--m-accent);
+  text-decoration: underline;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  font: inherit;
+}
+.mdbc-link:hover { color: var(--m-accent-2); }
+
+/* Status dot — small colored circle (used for connection state, etc). */
+.mdbc-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+}
+.mdbc-status-dot.live { background: var(--m-green); box-shadow: 0 0 4px rgba(91,227,154,0.4); }
+.mdbc-status-dot.idle { background: var(--m-fg-4); }
+
+/* Add-tab button at the trailing edge of a tab strip. */
+.mdbc-tab-x {
+  background: transparent;
+  border: 0;
+  padding: 0;
+}
+
+/* Status card — compact tool status at top of dbt/sqlmesh project panes. */
+.mdbc-status-card {
+  margin: 0 10px 6px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgb(var(--m-overlay-rgb) / 0.03);
+  border: 0.5px solid var(--m-sep);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.mdbc-status-card-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--m-fs-sm);
+  min-width: 0;
+  cursor: pointer;
+}
+.mdbc-status-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 6px;
+  border-top: 0.5px dashed var(--m-sep);
+}
+.mdbc-tool-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 7px;
+  border-radius: 4px;
+  font-size: var(--m-fs-xxs);
+  font-family: var(--m-font);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  flex: none;
+}
+.mdbc-tool-badge.dbt {
+  background: rgba(255, 107, 71, 0.14);
+  color: #ff8c5a;
+  border: 0.5px solid rgba(255, 107, 71, 0.3);
+}
+.mdbc-tool-badge.sqlmesh {
+  background: rgb(var(--m-accent-rgb) / 0.14);
+  color: var(--m-accent);
+  border: 0.5px solid rgb(var(--m-accent-rgb) / 0.3);
+}
+.mdbc-tool-badge .version {
+  opacity: 0.7;
+}
+.mdbc-status-config {
+  color: var(--m-fg-3);
+  font-size: var(--m-fs-xxs);
+  font-family: var(--m-font);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.mdbc-status-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 2px;
+  flex: none;
+}
+.mdbc-status-warn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--m-fs-xxs);
+  color: var(--m-orange);
+}
+.mdbc-status-warn-msg {
+  color: var(--m-fg);
+}
+.mdbc-status-warn-action {
+  margin-left: auto;
+  color: var(--m-accent);
+  font-size: var(--m-fs-xxs);
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+}
+.mdbc-status-warn-action:hover {
+  color: var(--m-accent-2);
+}
+.mdbc-status-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 6px;
+  border-top: 0.5px dashed var(--m-sep);
+  font-size: var(--m-fs-xxs);
+}
+.mdbc-status-footer .mdbc-config-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--m-fg-3);
+  font-family: var(--m-font);
+  text-decoration: underline;
+  text-decoration-color: var(--m-sep-strong, var(--m-sep));
+  text-underline-offset: 2px;
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: var(--m-fs-xxs);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.mdbc-status-footer .mdbc-config-link:hover {
+  color: var(--m-fg-2);
+}
+.mdbc-config-links {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 8px;
+  margin-top: 2px;
+  border-top: 0.5px dashed var(--m-sep);
+}
+.mdbc-config-link-group {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.mdbc-config-link-group .mdbc-config-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--m-fg-3);
+  font-family: var(--m-font);
+  text-decoration: underline;
+  text-decoration-color: var(--m-sep-strong, var(--m-sep));
+  text-underline-offset: 2px;
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: var(--m-fs-xxs);
+  white-space: nowrap;
+}
+.mdbc-config-link-group .mdbc-config-link:hover {
+  color: var(--m-fg-2);
+}
+.mdbc-config-link-path {
+  color: var(--m-fg-4);
+  font-family: var(--m-font);
+  font-size: var(--m-fs-xxs);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding-left: 15px;
+}
+.mdbc-status-footer .mdbc-conn-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--m-green);
+  font-size: var(--m-fs-xxs);
+}
+
+/* Section count — right-aligned count badge in section headers. */
+.mdbc-section-count {
+  margin-left: auto;
+  font-size: var(--m-fs-xxs);
+  color: var(--m-fg-4);
+  font-family: var(--m-font);
+  font-weight: 500;
+}
+
+/* File type label — right-aligned type indicator on file rows. */
+.mdbc-file-type {
+  margin-left: auto;
+  font-size: var(--m-fs-xxs);
+  color: var(--m-fg-4);
+  font-family: var(--m-font);
+  text-transform: lowercase;
+  flex: none;
+  max-width: 40%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ─── Syntax colour customisation (Settings → Appearance) ─── */
+.mdbc-syntax-swatch-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2px 24px;
+}
+.mdbc-syntax-swatch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 0;
+}
+.mdbc-syntax-swatch-label {
+  font-weight: 600;
+  color: var(--m-syn-swatch);
+}
+.mdbc-syntax-swatch {
+  width: 32px;
+  height: 18px;
+  flex: none;
+  padding: 0;
+  border: 1px solid var(--m-sep-strong);
+  border-radius: var(--m-r-control);
+  background: var(--m-syn-swatch);
+  cursor: pointer;
+}
+.mdbc-syntax-swatch-pop {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+}
+.mdbc-syntax-color-input {
+  width: 100%;
+  height: 30px;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+.mdbc-syntax-hex-input {
+  width: 100%;
+}
+.mdbc-syntax-swatch-reset {
+  align-self: flex-end;
+  padding: 2px 4px;
+  border: none;
+  background: none;
+  color: var(--m-accent);
+  font: inherit;
+  cursor: pointer;
+}
+.mdbc-syntax-swatch-reset:disabled {
+  color: var(--m-fg-4);
+  cursor: default;
+}

@@ -1,0 +1,37 @@
+test_dim_products_sales_rollup:
+  model: analytics_shop.dim_products
+  inputs:
+    analytics_shop.stg_products:
+      rows:
+        - product_id: 1
+          product_name: Mechanical Keyboard
+          category: Peripherals
+          price: 129.00
+        - product_id: 2
+          product_name: Wireless Mouse
+          category: Peripherals
+          price: 49.00
+    analytics_shop.stg_order_items:
+      rows:
+        - order_item_id: 1
+          order_id: 100
+          product_id: 1
+          quantity: 2
+          line_revenue: 258.00
+        - order_item_id: 2
+          order_id: 101
+          product_id: 1
+          quantity: 1
+          line_revenue: 129.00
+  outputs:
+    query:
+      partial: true
+      rows:
+        - product_id: 1
+          times_ordered: 2
+          units_sold: 3
+          total_revenue: 387.00
+        - product_id: 2
+          times_ordered: 0
+          units_sold: 0
+          total_revenue: 0.00

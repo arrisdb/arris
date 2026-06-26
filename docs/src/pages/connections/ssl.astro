@@ -1,0 +1,60 @@
+---
+import "../../styles/global.css";
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import Callout from "../../components/docs/Callout/Callout.astro";
+import Screenshot from "../../components/docs/Screenshot/Screenshot.astro";
+---
+
+<DocsLayout
+  title="SSL | Arris Docs"
+  breadcrumbs={[{ label: "Docs", href: "/" }, { label: "Connections" }, { label: "SSL" }]}
+  heading="SSL"
+  lede="Encrypt connections with SSL/TLS and verify server certificates."
+  tocItems={[
+    { label: "SSL certificates", href: "#ssl-certificates" },
+  ]}
+  currentPath="/connections/ssl"
+  prev={{ label: "SSH tunnels", href: "/connections/ssh-tunnels", section: "Connections" }}
+  next={{ label: "BigQuery", href: "/supported-data-sources/bigquery", section: "Supported data sources" }}
+>
+  <h2 id="ssl-certificates">SSL certificates</h2>
+
+  <p>
+    SSL/TLS encrypts the connection between Arris and the database server, preventing
+    eavesdropping and man-in-the-middle attacks. Set the <strong>SSL Mode</strong> field
+    in the connection form to choose how strictly the server certificate is checked.
+  </p>
+
+  <p>
+    Arris offers five SSL modes:
+  </p>
+
+  <ul>
+    <li><strong>Disabled</strong>: no TLS. The connection runs in plaintext.</li>
+    <li><strong>Preferred</strong>: encrypt when the server supports it, otherwise fall back to plaintext (the default).</li>
+    <li><strong>Required</strong>: encrypt, but do not verify the server certificate.</li>
+    <li><strong>Verify CA</strong>: encrypt and verify the server certificate chain against your CA.</li>
+    <li><strong>Verify Identity</strong>: encrypt and verify both the certificate chain and the server hostname.</li>
+  </ul>
+
+  <p>
+    The verify modes (and mutual TLS) read certificate files from disk:
+  </p>
+
+  <ul>
+    <li><strong>CA certificate</strong> (<code>ca.crt</code>): the certificate authority that signed the server's certificate. Required for "Verify CA" and "Verify Identity".</li>
+    <li><strong>Client certificate</strong> (<code>client.crt</code>): your client certificate, used when the server requires mutual TLS (mTLS).</li>
+    <li><strong>Client key</strong> (<code>client.key</code>): the private key for your client certificate.</li>
+  </ul>
+
+  <p>
+    Provide these as file paths or use the browse button to select them. Arris reads the
+    files at connection time and does not copy them elsewhere.
+  </p>
+
+  <Screenshot
+    src="/screenshots/ssl-fields.png"
+    alt="The Arris SSL section of the connection form with an SSL Mode dropdown set to preferred, and CA Cert, Client Cert, Client Key, and Options fields"
+    caption="Pick an SSL Mode, then supply the CA and client certificate paths for the verify and mTLS modes."
+  />
+</DocsLayout>

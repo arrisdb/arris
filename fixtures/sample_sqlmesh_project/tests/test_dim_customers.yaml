@@ -1,0 +1,83 @@
+test_dim_customers_rollup:
+  model: analytics_shop.dim_customers
+  inputs:
+    analytics_shop.stg_customers:
+      rows:
+        - customer_id: 1
+          first_name: Ada
+          last_name: Lovelace
+          email: ada@example.com
+          country_code: GB
+          signup_date: 2025-01-01
+        - customer_id: 2
+          first_name: Grace
+          last_name: Hopper
+          email: grace@example.com
+          country_code: US
+          signup_date: 2025-01-02
+    analytics_shop.stg_orders:
+      rows:
+        - order_id: 100
+          customer_id: 1
+          order_date: 2025-01-03
+          status: completed
+          amount: 12.99
+        - order_id: 101
+          customer_id: 1
+          order_date: 2025-01-04
+          status: shipped
+          amount: 20.99
+    analytics_shop.country_codes:
+      rows:
+        - country_code: GB
+          country_name: United Kingdom
+          region: Europe
+        - country_code: US
+          country_name: United States
+          region: North America
+  outputs:
+    query:
+      partial: true
+      rows:
+        - customer_id: 1
+          country_name: United Kingdom
+          order_count: 2
+          lifetime_value: 33.98
+          most_recent_order_date: 2025-01-04
+        - customer_id: 2
+          country_name: United States
+          order_count: 0
+          lifetime_value: 0.0
+
+test_dim_customers_unknown_country:
+  model: analytics_shop.dim_customers
+  inputs:
+    analytics_shop.stg_customers:
+      rows:
+        - customer_id: 3
+          first_name: Katherine
+          last_name: Johnson
+          email: katherine@example.com
+          country_code: ZZ
+          signup_date: 2025-01-03
+    analytics_shop.stg_orders:
+      rows:
+        - order_id: 200
+          customer_id: 3
+          order_date: 2025-01-10
+          status: completed
+          amount: 50.00
+    analytics_shop.country_codes:
+      rows:
+        - country_code: US
+          country_name: United States
+          region: North America
+  outputs:
+    query:
+      partial: true
+      rows:
+        - customer_id: 3
+          country_name:
+          region:
+          order_count: 1
+          lifetime_value: 50.00

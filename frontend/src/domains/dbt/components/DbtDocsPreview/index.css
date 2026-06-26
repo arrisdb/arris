@@ -1,0 +1,126 @@
+.mdbc-docs-preview {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: var(--m-bg-surface);
+}
+
+.mdbc-docs-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--m-sep);
+}
+
+.mdbc-docs-title {
+  font-size: var(--m-fs-sm);
+  font-weight: 600;
+  color: var(--m-fg-2);
+}
+
+.mdbc-docs-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 12px 14px;
+}
+
+.mdbc-docs-warning {
+  margin-bottom: 12px;
+  padding: 6px 10px;
+  border-radius: var(--m-r-sm);
+  background: rgba(255, 217, 96, 0.12);
+  color: var(--m-yellow);
+  font-size: var(--m-fs-xs);
+}
+
+.mdbc-docs-model-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.mdbc-docs-model-name {
+  font-size: var(--m-fs-md);
+  font-weight: 600;
+  color: var(--m-fg);
+}
+
+.mdbc-docs-badge {
+  padding: 1px 7px;
+  border-radius: var(--m-r-xs);
+  background: var(--m-accent-tint);
+  color: var(--m-accent);
+  font-size: var(--m-fs-xxs);
+  text-transform: lowercase;
+}
+
+.mdbc-docs-badge.subtle {
+  background: var(--m-bg-surface-2);
+  color: var(--m-fg-3);
+}
+
+.mdbc-docs-relation {
+  font-size: var(--m-fs-xs);
+  margin-bottom: 8px;
+}
+
+.mdbc-docs-description {
+  margin: 0 0 12px;
+  font-size: var(--m-fs-sm);
+  color: var(--m-fg-2);
+  line-height: 1.5;
+}
+
+.mdbc-docs-section-title {
+  margin: 14px 0 6px;
+  font-size: var(--m-fs-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--m-fg-3);
+}
+
+.mdbc-docs-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--m-fs-sm);
+}
+
+.mdbc-docs-table th {
+  text-align: left;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--m-sep);
+  color: var(--m-fg-3);
+  font-weight: 500;
+  font-size: var(--m-fs-xs);
+}
+
+.mdbc-docs-table td {
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--m-sep-glass);
+  color: var(--m-fg-2);
+  vertical-align: top;
+}
+
+.mdbc-docs-table td.mono,
+.mdbc-docs-deps li.mono {
+  font-family: var(--m-font-editor, var(--m-font-mono));
+  font-size: var(--m-fs-xs);
+  color: var(--m-fg);
+}
+
+.mdbc-docs-table td.quiet {
+  color: var(--m-fg-3);
+}
+
+.mdbc-docs-deps {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}

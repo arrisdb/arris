@@ -1,0 +1,155 @@
+---
+import "../../styles/global.css";
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import DocTable from "../../components/docs/DocTable/DocTable.astro";
+import Screenshot from "../../components/docs/Screenshot/Screenshot.astro";
+---
+
+<DocsLayout
+  title="Results viewer — Arris Docs"
+  breadcrumbs={[{ label: "Docs", href: "/" }, { label: "Querying" }, { label: "Results viewer" }]}
+  heading="Results viewer"
+  lede="A virtualized results grid with sorting, filtering, CSV / JSON export, and a built-in chart view."
+  tocItems={[
+    { label: "Overview", href: "#overview" },
+    { label: "View modes", href: "#views" },
+    { label: "Working with the grid", href: "#grid" },
+    { label: "Exporting", href: "#export" },
+    { label: "Charts", href: "#charts" },
+    { label: "Chart types", href: "#chart-types" },
+    { label: "Chart configuration", href: "#chart-config" },
+  ]}
+  currentPath="/querying/results"
+  prev={{ label: "Editor", href: "/querying/editor", section: "Querying" }}
+  next={{ label: "Command logs", href: "/querying/command-logs", section: "Querying" }}
+>
+  <h2 id="overview">Overview</h2>
+
+  <p>
+    Query results render in a pane below the editor. The grid is virtualized with
+    <code>@tanstack/react-virtual</code>, so only the visible rows are drawn and large result sets
+    scroll smoothly. Results are paginated, with a selectable page size of 25, 50, 100, 250, or
+    500 rows.
+  </p>
+
+  <Screenshot
+    src="/screenshots/results-grid.png"
+    alt="The Arris results grid showing an orders query with typed column headers and virtualized rows"
+    caption="Query results render in a virtualized grid with typed column headers and selectable page size."
+  />
+
+  <h2 id="views">View modes</h2>
+
+  <p>
+    The results toolbar switches the pane between two modes:
+  </p>
+
+  <ul>
+    <li><strong>Table</strong> &mdash; the default grid of rows and columns.</li>
+    <li><strong>Chart</strong> &mdash; a visualization of the current result (see below).</li>
+  </ul>
+
+  <h2 id="grid">Working with the grid</h2>
+
+  <ul>
+    <li><strong>Sort</strong> &mdash; click a column header to sort ascending, again for descending, again to clear. Sorting is client-side over the loaded rows.</li>
+    <li><strong>Filter</strong> (<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block align-text-bottom text-accent-2"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" /></svg>) &mdash; toggle the filter row and type a SQL <code>WHERE</code> expression, then apply or clear it.</li>
+    <li><strong>Resize columns</strong> &mdash; drag a column's right border. Widths are remembered per tab.</li>
+    <li><strong>Select & copy</strong> &mdash; click a cell to select it, navigate with the arrow keys, and press <kbd>&#8984;C</kbd> to copy its value.</li>
+    <li><strong>Row detail</strong> (<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block align-text-bottom text-accent-2"><path d="M8 3H7a2 2 0 0 0-2 2v5a2 2 0 0 1-2 2 2 2 0 0 1 2 2v5c0 1.1.9 2 2 2h1" /><path d="M16 21h1a2 2 0 0 0 2-2v-5c0-1.1.9-2 2-2a2 2 0 0 1-2-2V5a2 2 0 0 0-2-2h-1" /></svg>) &mdash; expand the selected row as formatted JSON.</li>
+    <li><strong>Query text</strong> (<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block align-text-bottom text-accent-2"><polyline points="4 7 4 4 20 4 20 7" /><line x1="9" x2="15" y1="20" y2="20" /><line x1="12" x2="12" y1="4" y2="20" /></svg>) &mdash; view the exact SQL that produced this result.</li>
+    <li><strong>Execution plan</strong> (<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block align-text-bottom text-accent-2"><circle cx="12" cy="18" r="3" /><circle cx="6" cy="6" r="3" /><circle cx="18" cy="6" r="3" /><path d="M18 9v2c0 .6-.4 1-1 1H7c-.6 0-1-.4-1-1V9" /><path d="M12 12v3" /></svg>) &mdash; inspect the plan for a <a href="/querying/cross-source">cross-source query</a>, where it is available.</li>
+  </ul>
+
+  <h2 id="export">Exporting</h2>
+
+  <p>
+    The download button (<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block align-text-bottom text-accent-2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" x2="12" y1="15" y2="3" /></svg>) in the results toolbar exports the result set to a file:
+  </p>
+
+  <ul>
+    <li><strong>CSV</strong> &mdash; RFC 4180 quoting, with <code>NULL</code> written as an empty field.</li>
+    <li><strong>JSON</strong> &mdash; one object per row, with <code>NULL</code> fields written as <code>null</code>.</li>
+  </ul>
+
+  <h2 id="charts">Charts</h2>
+
+  <p>
+    Switching a result to the <strong>Chart</strong> view turns it into a visualization, rendered
+    with <code>Recharts</code>. The chart and the table share the same underlying result, so there
+    is no separate dashboard or export step: pick the chart view, map columns to axes, and the
+    chart renders live.
+  </p>
+
+  <p>
+    When you first open the chart view, Arris seeds a default chart from the result's columns. You
+    refine it from the chart editor in the right sidebar, choosing the chart type, the X / Y
+    columns, an optional series-split column, an aggregation, and styling.
+  </p>
+
+  <Screenshot
+    src="/screenshots/results-chart.png"
+    alt="The Arris results pane in Chart mode rendering a bar chart of amount by order date"
+    caption="Switch to Chart mode to plot the same result, configured from the chart editor in the right sidebar."
+  />
+
+  <h2 id="chart-types">Chart types</h2>
+
+  <DocTable>
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td class="font-medium text-fg">Bar</td><td>Vertical or horizontal bars, with grouping or stacking.</td></tr>
+      <tr><td class="font-medium text-fg">Line</td><td>Connected points with selectable curve interpolation.</td></tr>
+      <tr><td class="font-medium text-fg">Area</td><td>Filled line with adjustable fill opacity and stacking.</td></tr>
+      <tr><td class="font-medium text-fg">Combo</td><td>Bars and lines overlaid on the same axes.</td></tr>
+      <tr><td class="font-medium text-fg">Histogram</td><td>Binned frequency of a continuous column.</td></tr>
+      <tr><td class="font-medium text-fg">Pie</td><td>Proportional slices of a whole.</td></tr>
+      <tr><td class="font-medium text-fg">Donut</td><td>Pie with a configurable inner radius.</td></tr>
+      <tr><td class="font-medium text-fg">Scatter</td><td>X / Y points for correlation.</td></tr>
+      <tr><td class="font-medium text-fg">Bubble</td><td>Scatter with a Z column controlling point size.</td></tr>
+      <tr><td class="font-medium text-fg">Radar</td><td>Multi-axis polygon across several dimensions.</td></tr>
+      <tr><td class="font-medium text-fg">Treemap</td><td>Nested rectangles sized by value.</td></tr>
+      <tr><td class="font-medium text-fg">Funnel</td><td>Progressively narrowing stages.</td></tr>
+      <tr><td class="font-medium text-fg">KPI</td><td>A single-value indicator card.</td></tr>
+    </tbody>
+  </DocTable>
+
+  <p>
+    Multi-series rendering by a series-split column applies to the bar, line, and area types; the
+    other types plot one measure per series.
+  </p>
+
+  <h2 id="chart-config">Chart configuration</h2>
+
+  <p>
+    The chart editor maps result columns to the chart and controls its appearance:
+  </p>
+
+  <DocTable>
+    <thead>
+      <tr>
+        <th>Setting</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td class="font-medium text-fg">X / Y / Z columns</td><td>The horizontal axis, one or more measure columns, and an optional size column for bubble charts.</td></tr>
+      <tr><td class="font-medium text-fg">Series column</td><td>Splits a measure into one series per distinct value (bar, line, area).</td></tr>
+      <tr><td class="font-medium text-fg">Aggregation</td><td>None, sum, average, min, max, or count, applied per X value.</td></tr>
+      <tr><td class="font-medium text-fg">Title</td><td>Chart heading text.</td></tr>
+      <tr><td class="font-medium text-fg">Colors</td><td>Per-series palette, defaulting to a built-in six-color set.</td></tr>
+      <tr><td class="font-medium text-fg">Line style</td><td>Solid, dashed, or dotted, with adjustable stroke width and curve type.</td></tr>
+      <tr><td class="font-medium text-fg">Stacking</td><td>None, stacked, or 100% stacked (bar, area).</td></tr>
+      <tr><td class="font-medium text-fg">Bar orientation</td><td>Vertical or horizontal.</td></tr>
+      <tr><td class="font-medium text-fg">Axes</td><td>Axis titles, manual min / max bounds, X label angle, and a linear or log Y scale.</td></tr>
+      <tr><td class="font-medium text-fg">Reference line</td><td>A horizontal line at a chosen Y value.</td></tr>
+      <tr><td class="font-medium text-fg">Legend & grid</td><td>Toggle the legend (and its position), grid lines, and data labels.</td></tr>
+      <tr><td class="font-medium text-fg">Donut radius</td><td>Inner radius for the donut type.</td></tr>
+    </tbody>
+  </DocTable>
+</DocsLayout>

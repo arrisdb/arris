@@ -1,0 +1,128 @@
+---
+import "../../styles/global.css";
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import DocTable from "../../components/docs/DocTable/DocTable.astro";
+---
+
+<DocsLayout
+  title="Mixpanel — Arris Docs"
+  breadcrumbs={[{ label: "Docs", href: "/" }, { label: "Connections", href: "/connections/overview" }, { label: "Mixpanel" }]}
+  heading="Mixpanel"
+  tocItems={[
+    { label: "Overview", href: "#overview" },
+    { label: "Driver", href: "#driver" },
+    { label: "Connection fields", href: "#fields" },
+    { label: "Schema browser", href: "#schema" },
+    { label: "Supported SQL commands", href: "#features" },
+    { label: "Unsupported SQL commands", href: "#unsupported" },
+  ]}
+  currentPath="/supported-data-sources/mixpanel"
+  prev={{ label: "MariaDB", href: "/supported-data-sources/mariadb", section: "Connections" }}
+  next={{ label: "MongoDB", href: "/supported-data-sources/mongodb", section: "Connections" }}
+>
+  <h2 id="overview">
+    <img src="/db-logos/mixpanel.png" alt="Mixpanel logo" width="32" height="32" class="docLogo" />
+    Overview
+  </h2>
+
+  <p>
+    Mixpanel is a product analytics platform that tracks user interactions with web and mobile
+    applications. It provides event-based analytics, funnels, retention, and cohort analysis.
+    Arris connects to Mixpanel via the Query API to browse event schemas and properties.
+  </p>
+
+  <h2 id="driver">Driver</h2>
+
+  <ul>
+    <li><strong>Crate:</strong> <a href="https://crates.io/crates/reqwest"><code>reqwest</code></a></li>
+    <li><strong>Version:</strong> <code>0.13</code></li>
+  </ul>
+
+  <h2 id="fields">Connection fields</h2>
+
+  <DocTable>
+    <thead>
+      <tr>
+        <th>Field</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="font-medium text-fg">Project ID</td>
+        <td>Your Mixpanel project ID.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">SA Username</td>
+        <td>Service account username for authentication.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">SA Secret</td>
+        <td>Service account secret. Stored in the macOS Keychain.</td>
+      </tr>
+    </tbody>
+  </DocTable>
+
+  <h2 id="schema">Schema browser</h2>
+
+  <p>
+    Once connected, Arris fetches the project metadata and organizes it into groups.
+  </p>
+
+  <p>
+    The schema tree displays the following object types, grouped by category:
+  </p>
+
+  <ul>
+    <li><strong>Events</strong> &mdash; tracked event types</li>
+    <li><strong>Event Properties</strong> &mdash; properties attached to events</li>
+  </ul>
+
+
+
+  <h2 id="features">Supported SQL commands</h2>
+
+  <DocTable>
+    <thead>
+      <tr>
+        <th>Command</th>
+        <th>Notes</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="font-medium text-fg"><code>SELECT</code></td>
+        <td>Query event data through the REST API, with aggregations.</td>
+      </tr>
+    </tbody>
+  </DocTable>
+
+  <h2 id="unsupported">Unsupported SQL commands</h2>
+
+  <DocTable>
+    <thead>
+      <tr>
+        <th>Command</th>
+        <th>Notes</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="font-medium text-fg"><code>INSERT</code></td>
+        <td>Mixpanel is a read-only analytics source.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><code>UPDATE</code></td>
+        <td>Mixpanel is a read-only analytics source.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><code>DELETE</code></td>
+        <td>Mixpanel is a read-only analytics source.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><code>CREATE</code> / <code>DROP</code></td>
+        <td>Mixpanel is a read-only analytics source.</td>
+      </tr>
+    </tbody>
+  </DocTable>
+</DocsLayout>

@@ -1,0 +1,66 @@
+/* Query plan view — JSON dump and flame-graph rows */
+.mdbc-plan-empty {
+  padding: 24px;
+  color: var(--m-fg-3, #a0a0aa);
+  font-size: var(--m-fs-sm);
+}
+.mdbc-plan-json {
+  padding: 12px 14px;
+  margin: 0;
+  font-family: var(--m-font-editor, var(--m-font-mono));
+  font-size: var(--m-fs-sm);
+  white-space: pre-wrap;
+  color: var(--m-fg, #f5f5f7);
+}
+.mdbc-plan-flame-list {
+  overflow: auto;
+  height: 100%;
+  padding: 10px 0;
+}
+.mdbc-plan-flame-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px;
+  border-bottom: 0.5px solid var(--m-sep, rgb(var(--m-overlay-rgb) / 0.07));
+  font-size: var(--m-fs-sm);
+}
+.mdbc-plan-flame-track {
+  width: 220px;
+  flex: none;
+}
+.mdbc-plan-flame-bar {
+  height: 8px;
+  border-radius: 4px;
+}
+.mdbc-plan-flame-details {
+  flex: 1;
+  min-width: 0;
+}
+.mdbc-plan-flame-title-row {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+}
+.mdbc-plan-flame-label {
+  font-weight: 600;
+}
+.mdbc-plan-flame-meta {
+  color: var(--m-fg-3, #a0a0aa);
+  font-family: var(--m-font-editor, var(--m-font-mono));
+}
+.mdbc-plan-flame-stats {
+  display: flex;
+  gap: 12px;
+  font-size: var(--m-fs-xxs);
+  color: var(--m-fg-3, #a0a0aa);
+  font-family: var(--m-font-editor, var(--m-font-mono));
+}
+.mdbc-plan-flame-row-indent {
+  padding-left: var(--mdbc-plan-flame-indent);
+}
+.mdbc-plan-flame-bar-style {
+  width: var(--mdbc-plan-flame-width);
+  background: var(--mdbc-plan-flame-color);
+  box-shadow: var(--mdbc-plan-flame-shadow);
+}

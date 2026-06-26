@@ -1,0 +1,36 @@
+---
+import styles from './ArticleFooter.module.css';
+
+interface Props {
+  prev?: { label: string; href: string; section: string };
+  next?: { label: string; href: string; section: string };
+}
+
+const { prev, next } = Astro.props;
+---
+
+<footer class:list={[styles.footer]}>
+  <div class:list={[styles.helpful]} data-mp-helpful-row>
+    <span class:list={[styles.helpfulLabel]}>Was this helpful?</span>
+    <button class:list={[styles.helpfulBtn]} data-mp-helpful="yes">Yes</button>
+    <button class:list={[styles.helpfulBtn]} data-mp-helpful="no">Could be better</button>
+    <span class:list={[styles.helpfulThanks]}>Thanks for the feedback!</span>
+  </div>
+
+  <div class:list={[styles.pagination, !prev && styles.paginationEnd, !next && styles.paginationStart]}>
+    {prev && (
+      <a href={prev.href} class:list={[styles.pageLink, !next && styles.pageLinkSolo]}>
+        <span class:list={[styles.pageLinkLabel]}>Previous</span>
+        <span class:list={[styles.pageLinkTitle]}>{prev.label}</span>
+        <span class:list={[styles.pageLinkSection]}>{prev.section}</span>
+      </a>
+    )}
+    {next && (
+      <a href={next.href} class:list={[styles.pageLink, styles.pageLinkNext, !prev && styles.pageLinkSolo]}>
+        <span class:list={[styles.pageLinkLabel]}>Next</span>
+        <span class:list={[styles.pageLinkTitle]}>{next.label}</span>
+        <span class:list={[styles.pageLinkSection]}>{next.section}</span>
+      </a>
+    )}
+  </div>
+</footer>

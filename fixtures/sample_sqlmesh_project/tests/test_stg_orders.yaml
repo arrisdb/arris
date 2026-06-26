@@ -1,0 +1,26 @@
+test_stg_orders_passthrough:
+  model: analytics_shop.stg_orders
+  vars:
+    start: 2025-01-01
+    end: 2025-12-31
+  inputs:
+    analytics_shop.raw_orders:
+      rows:
+        - order_id: 100
+          customer_id: 1
+          order_date: 2025-01-03
+          status: completed
+          amount: 129.00
+        - order_id: 101
+          customer_id: 2
+          order_date: 2025-01-04
+          status: returned
+          amount: 42.50
+  outputs:
+    query:
+      partial: true
+      rows:
+        - order_id: 100
+          amount: 129.00
+        - order_id: 101
+          amount: 42.50

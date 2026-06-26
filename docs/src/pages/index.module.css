@@ -1,0 +1,55 @@
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 28px;
+}
+
+.card {
+  display: block;
+  padding: 22px 24px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 0.5px solid rgba(255, 255, 255, 0.08);
+  transition: background 0.15s ease, border-color 0.15s ease;
+  text-decoration: none;
+}
+
+.card:hover {
+  background: rgba(124, 140, 255, 0.06);
+  border-color: rgba(124, 140, 255, 0.25);
+}
+
+.cardTitle {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-fg);
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cardIcon {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  font-size: 12px;
+}
+
+.cardDesc {
+  font-size: 13.5px;
+  color: var(--color-fg-3);
+  line-height: 1.5;
+}
+
+.cardCount {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-fg-4);
+  margin-top: 8px;
+}

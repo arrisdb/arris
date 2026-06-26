@@ -1,0 +1,71 @@
+/* Tab bar — pill tabs */
+.mdbc-tabbar {
+  height: 44px;
+  padding: 8px 12px;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  border-top: 0.5px solid var(--m-sep);
+  border-bottom: 0.5px solid var(--m-sep);
+  background: var(--m-bg-window);
+  overflow: hidden;
+}
+/* The `.mdbc` prefix raises specificity above the global
+   `.mdbc * { scrollbar-width: thin }` / `.mdbc *::-webkit-scrollbar` rules in
+   app.css, which otherwise tie on specificity and win on source order — that
+   tie is why the scrollbar stayed visible despite the hide rule below. */
+.mdbc .mdbc-tabbar-tabs {
+  display: flex;
+  gap: 3px;
+  align-items: center;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  flex: 1;
+  min-width: 0;
+}
+.mdbc .mdbc-tabbar-tabs::-webkit-scrollbar { display: none; width: 0; height: 0; }
+.mdbc-tabbar-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-shrink: 0;
+}
+.mdbc-tab {
+  flex-shrink: 0;
+  height: 30px;
+  padding: 0 12px 0 10px;
+  border-radius: var(--m-r-control);
+  background: rgb(var(--m-overlay-rgb) / 0.04);
+  border: 0.5px solid transparent;
+  display: inline-flex; align-items: center; gap: 7px;
+  font-size: var(--m-fs-md);
+  color: var(--m-fg-2);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.mdbc-tab .x {
+  width: 14px; height: 14px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  color: var(--m-fg-3); margin-left: 2px;
+}
+.mdbc-tab .x:hover { background: rgb(var(--m-overlay-rgb) / 0.1); color: var(--m-fg); }
+.mdbc-tab.active {
+  background: var(--m-accent-tint);
+  color: var(--m-accent);
+  border-color: rgb(var(--m-accent-rgb) / 0.35);
+  box-shadow: none;
+}
+/* Floating chip rendered in the DragOverlay while a tab is dragged. */
+.mdbc-tab.dragging {
+  cursor: grabbing;
+  box-shadow: 0 6px 16px rgb(0 0 0 / 0.35);
+}
+.mdbc-tab-add {
+  flex-shrink: 0;
+  width: 28px; height: 28px; border-radius: 50%;
+  background: rgb(var(--m-overlay-rgb) / 0.04);
+  display: inline-flex; align-items: center; justify-content: center;
+  color: var(--m-fg-3);
+  cursor: pointer;
+}

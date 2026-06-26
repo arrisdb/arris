@@ -1,0 +1,16 @@
+---
+import styles from './Screenshot.module.css';
+
+interface Props {
+  src: string;
+  alt: string;
+  caption?: string;
+}
+
+const { src, alt, caption } = Astro.props;
+---
+
+<figure class={styles.figure}>
+  <img class={styles.img} src={src} alt={alt} loading="lazy" />
+  {caption && <figcaption class={styles.caption}>{caption}</figcaption>}
+</figure>

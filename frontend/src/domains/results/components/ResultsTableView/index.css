@@ -1,0 +1,873 @@
+/* Centered "no result" placeholder used by ResultsTableView etc. */
+.mdbc-placeholder {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--m-fg-3);
+  font-size: var(--m-fs-sm);
+}
+.mdbc-placeholder.flex { flex: 1; }
+.mdbc-placeholder.quiet {
+  color: var(--m-fg-4);
+  font-size: var(--m-fs-body);
+}
+.mdbc-placeholder.italic { font-style: italic; }
+.mdbc-pane-empty {
+  padding: 24px;
+  color: var(--m-fg-3);
+  font-size: var(--m-fs-sm);
+}
+.mdbc-flex-spacer { flex: 1; }
+.mdbc-fill { width: 100%; height: 100%; }
+.mdbc-full-pane-stack {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.mdbc-editor-root {
+  display: flex;
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+.mdbc-editor-empty {
+  flex: 1;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--m-fg-3);
+  gap: 8px;
+}
+.mdbc-editor-empty-label {
+  font-size: var(--m-fs-sm);
+}
+.mdbc-split {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+.mdbc-split.row {
+  flex-direction: row;
+}
+.mdbc-split.column {
+  flex-direction: column;
+}
+/* A child of a split, sized by the `--mdbc-split-cell-grow` fraction set
+   inline while dragging a separator (defaults to equal sizing). */
+.mdbc-split-cell {
+  display: flex;
+  flex-grow: var(--mdbc-split-cell-grow, 1);
+  flex-basis: 0;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.mdbc-pane-sep {
+  background: var(--m-sep);
+  flex: none;
+  position: relative;
+  z-index: 1;
+}
+.mdbc-pane-sep:hover {
+  background: var(--m-accent, #4a9eff);
+}
+/* Vertical hairline between side-by-side panes (row split). */
+.mdbc-pane-sep.row {
+  width: 1px;
+  cursor: col-resize;
+}
+/* Horizontal hairline between stacked panes (column split). */
+.mdbc-pane-sep.column {
+  height: 1px;
+  cursor: row-resize;
+}
+/* Widen the pointer grab zone past the 1px line without shifting layout. */
+.mdbc-pane-sep::after {
+  content: "";
+  position: absolute;
+}
+.mdbc-pane-sep.row::after {
+  top: 0;
+  bottom: 0;
+  left: -3px;
+  right: -3px;
+}
+.mdbc-pane-sep.column::after {
+  left: 0;
+  right: 0;
+  top: -3px;
+  bottom: -3px;
+}
+.mdbc-pane-group {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border-left: none;
+}
+/* Table tabs have no editor: the runbar sits on top and the results grid
+   fills the rest of the pane (single or split). */
+.mdbc-table-results {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+/* Highlight a pane while a dragged tab hovers over it as a drop target. */
+.mdbc-pane-group.drop-target {
+  box-shadow: inset 0 0 0 2px var(--m-accent, #4a9eff);
+}
+.mdbc-tab-content {
+  flex: 1;
+  overflow: hidden;
+}
+.mdbc-tab-content.hidden {
+  display: none;
+}
+.mdbc-runbar-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--m-fg-2);
+  font-size: var(--m-fs-sm);
+}
+.mdbc-centered-hint {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 32px 16px;
+  color: var(--m-fg-4);
+  font-size: var(--m-fs-sm);
+}
+.mdbc-centered-hint.large {
+  flex: 1;
+  gap: 10px;
+  font-size: var(--m-fs-md);
+}
+.mdbc-editor-layout {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+.mdbc-editor-host {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}
+/* Markdown "rendered" view mode hides the editor and shows the preview full-width.
+   The host stays mounted (just hidden) so CodeMirror isn't torn down. */
+.mdbc-editor-host.hidden {
+  display: none;
+}
+/* Static hairline between the editor and an auxiliary pane (Compiled SQL /
+   Docs / Lineage). These dividers are not draggable, so the .row/.column
+   resize modifiers that normally supply the 1px width are never applied —
+   give them an explicit width here or the border renders invisible. */
+.mdbc-editor-layout > .mdbc-pane-sep {
+  width: 1px;
+}
+.mdbc-connection-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 220px;
+  overflow: hidden;
+  margin-left: 2px;
+  padding-left: 10px;
+  border-left: 1px solid var(--m-sep-strong);
+  color: var(--m-fg);
+  font-size: var(--m-fs-sm);
+}
+.mdbc-connection-indicator.federation { color: var(--m-db-federation); }
+.mdbc-connection-indicator.muted { color: var(--m-fg-3); }
+.mdbc-fed-bar {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.mdbc-fed-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-size: var(--m-fs-sm);
+  color: var(--m-fg);
+  white-space: nowrap;
+}
+.mdbc-fed-toggle.disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+.mdbc-fed-info {
+  display: inline-flex;
+  align-items: center;
+  color: var(--m-fg-3);
+  cursor: help;
+}
+.mdbc-fed-info:hover { color: var(--m-fg); }
+.mdbc-truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mdbc-state-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: var(--m-fs-xxs);
+  font-weight: 500;
+}
+.mdbc-state-chip.warning {
+  background: color-mix(in srgb, var(--m-yellow) 16%, transparent);
+  color: var(--m-yellow);
+}
+.mdbc-state-chip.accent {
+  background: var(--m-accent-tint);
+  color: var(--m-accent);
+}
+.mdbc-inline-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.mdbc-inline-row.with-margin { margin-bottom: 12px; }
+.mdbc-range-row {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.mdbc-pane-input.compact { margin-bottom: 0; }
+.mdbc-grid-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
+  gap: 4px;
+  margin-bottom: 12px;
+}
+.mdbc-grid-options .mdbc-toggle-btn {
+  font-size: var(--m-fs-xxs);
+  padding-left: 4px;
+  padding-right: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mdbc-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-height: 28px;
+  margin-bottom: 12px;
+}
+.mdbc-muted-inline {
+  color: var(--m-fg-3);
+  font-size: var(--m-fs-sm);
+}
+.mdbc-control-block { margin-bottom: 12px; }
+.mdbc-color-series-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.mdbc-color-series-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.mdbc-color-input {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.mdbc-field-label-inline {
+  font-size: var(--m-fs-sm);
+  color: var(--m-fg-2);
+}
+.mdbc-check-row-group {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+.mdbc-check-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-size: var(--m-fs-sm);
+  color: var(--m-fg-2);
+}
+.mdbc-toggle-btn {
+  flex: 1;
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--m-sep);
+  background: transparent;
+  color: var(--m-fg);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--m-fs-sm);
+}
+.mdbc-toggle-btn.active {
+  border-color: var(--m-accent);
+  background: var(--m-accent-tint);
+}
+/* Native HTML <table> styled to match the mdbc-grid look. Used for results. */
+.mdbc-table {
+  border-collapse: collapse;
+  /* Size to content (each column capped at 480px below) so a wide table exceeds
+     the scroll container and `overflow: auto` engages. Cells use overflow:hidden
+     for ellipsis, which would otherwise let auto-layout collapse columns to fit
+     the viewport — width:max-content forces the table to its real width instead.
+     min-width keeps it filling the pane when the content is narrow. */
+  width: max-content;
+  min-width: 100%;
+  font-family: var(--m-font-editor, var(--m-font-mono));
+  font-size: var(--m-fs-md);
+  font-variant-numeric: tabular-nums;
+  color: var(--m-fg);
+  background: var(--m-bg-editor);
+}
+.mdbc-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--m-bg-window);
+}
+.mdbc-table th {
+  padding: 0 12px;
+  height: 32px;
+  position: relative;
+  text-align: left;
+  font-family: var(--m-font);
+  font-weight: 600;
+  font-size: var(--m-fs-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: var(--m-fg-3);
+  border-bottom: 0.5px solid var(--m-sep);
+  border-right: 0.5px solid var(--m-sep);
+  /* Match the body cell background so the 0.5px column divider renders the same
+     color in the header as in the data rows (a lighter header tint made the
+     sub-pixel border read brighter). The sticky header stays distinguished by
+     its bold uppercase text and bottom border. */
+  background: var(--m-bg-editor);
+}
+/* Drag handle straddling a header's right border to resize the column. The
+   header is sticky, so anchoring to its right edge and extending the handle far
+   down (clipped by the scroll container) makes the whole column boundary —
+   header and every data row — draggable. Sits above the sort button (z-index)
+   so the drag never triggers a sort. */
+.mdbc-col-resizer {
+  position: absolute;
+  top: 0;
+  right: -3px;
+  width: 7px;
+  height: 100vh;
+  cursor: col-resize;
+  user-select: none;
+  touch-action: none;
+  z-index: 3;
+}
+.mdbc-col-resizer::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 3px;
+  width: 1px;
+  height: 100%;
+  background: var(--m-accent);
+  opacity: 0;
+  transition: opacity 0.1s ease;
+}
+.mdbc-col-resizer:hover::after {
+  opacity: 0.7;
+}
+.mdbc-table th.rownum-head {
+  width: 44px;
+  text-align: right;
+}
+.mdbc-col-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+/* The header is a button so the whole column title toggles its sort. Strip the
+   native button chrome and inherit the th's typography. */
+.mdbc-col-sort {
+  width: 100%;
+  border: 0;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.mdbc-col-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Sort indicator sits after the type chip. Inactive columns only reveal it on
+   hover; the active sort column keeps it visible with the accent color. */
+.mdbc-col-sort-icon {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+  color: var(--m-fg-3);
+  opacity: 0;
+  transition: opacity 0.1s ease;
+}
+.mdbc-col-sort:hover .mdbc-col-sort-icon,
+.mdbc-col-sort:focus-visible .mdbc-col-sort-icon {
+  opacity: 0.6;
+}
+.mdbc-col-sort-icon[data-active="true"] {
+  opacity: 1;
+  color: var(--m-accent);
+}
+.mdbc-col-sort-order {
+  font-family: var(--m-font-editor, var(--m-font-mono));
+  font-size: var(--m-fs-xxs);
+  font-weight: 600;
+  line-height: 1;
+}
+/* Per-column SQL data-type chip rendered beside the header name. Color is
+   driven by the type family (see typeChipMeta); --chip-color falls back to a
+   neutral gray for unknown types. */
+.mdbc-type-chip {
+  flex: none;
+  font-family: var(--m-font-editor, var(--m-font-mono));
+  font-size: var(--m-fs-xxs);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  padding: 2px 5px;
+  border-radius: var(--m-r-xs);
+  text-transform: uppercase;
+  color: var(--chip-color, var(--m-fg-3));
+  background: color-mix(in srgb, var(--chip-color, var(--m-fg-3)) 14%, transparent);
+  border: 0.5px solid color-mix(in srgb, var(--chip-color, var(--m-fg-3)) 32%, transparent);
+}
+.mdbc-type-chip.int { --chip-color: var(--m-accent); }
+.mdbc-type-chip.string { --chip-color: var(--m-green); }
+.mdbc-type-chip.numeric { --chip-color: var(--m-accent-2); }
+.mdbc-type-chip.bool { --chip-color: var(--m-red); }
+.mdbc-type-chip.json { --chip-color: var(--m-pink); }
+.mdbc-type-chip.temporal { --chip-color: var(--m-orange); }
+.mdbc-type-chip.binary { --chip-color: var(--m-teal); }
+.mdbc-type-chip.uuid { --chip-color: var(--m-yellow); }
+.mdbc-type-chip.other { --chip-color: var(--m-fg-3); }
+.mdbc-table td {
+  padding: 0 12px;
+  height: 28px;
+  border-bottom: 0.5px solid var(--m-sep);
+  border-right: 0.5px solid var(--m-sep);
+  white-space: nowrap;
+  /* Cap column width so a long value (e.g. a multi-KB JSON cell) is truncated
+     with an ellipsis instead of stretching the whole column off-screen. The
+     full value stays available in the row detail pane. */
+  max-width: 480px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mdbc-table th {
+  max-width: 480px;
+}
+.mdbc-table td.virtual-pad {
+  height: var(--mdbc-virtual-pad-height);
+  padding: 0;
+  border: none;
+}
+.mdbc-table td.null { color: var(--m-fg-4); font-style: italic; }
+.mdbc-table td.numeric { text-align: right; }
+.mdbc-table td.rownum {
+  color: var(--m-fg-4);
+  text-align: right;
+  font-family: var(--m-font-editor, var(--m-font-mono));
+  background: rgb(var(--m-overlay-rgb) / 0.02);
+  user-select: none;
+}
+.mdbc-table td.selected-cell {
+  background: rgb(var(--m-accent-rgb) / 0.16);
+  outline: 1px solid rgb(var(--m-accent-rgb) / 0.6);
+  outline-offset: -1px;
+}
+.mdbc-table td.staged {
+  background: rgba(255,158,100,0.18);
+}
+.mdbc-table td.selected-cell.staged {
+  background: rgba(255,158,100,0.28);
+}
+.mdbc-table tr.deleted td {
+  text-decoration: line-through;
+  opacity: 0.45;
+  background: rgba(255,100,100,0.08);
+}
+
+/* Column wrapper: the run chips occupy the first row, the tools the second. */
+.mdbc-results-toolbar {
+  display: flex;
+  flex-direction: column;
+  background: var(--m-bg-toolbar);
+  border-bottom: 0.5px solid var(--m-sep);
+  flex-shrink: 0;
+}
+/* Tools row — left group up to the page-size selector, then a spacer pushes
+   the pagination + close group to the right. */
+.mdbc-results-tools {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  min-height: 28px;
+}
+.mdbc-results-surface {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+.mdbc-results-close {
+  position: absolute;
+  top: 4px;
+  right: 8px;
+  z-index: 2;
+}
+.mdbc-results-body {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+.mdbc-results-table-scroll {
+  height: 100%;
+  min-width: 0;
+  overflow: auto;
+  background: var(--m-bg-editor);
+}
+.mdbc-results-table-scroll:focus,
+.mdbc-results-table-scroll:focus-visible {
+  outline: none;
+}
+.mdbc-results-main {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+  /* Clip + allow shrink below content so the inner .mdbc-results-table-scroll
+     becomes the scroller. Console results get this from their react-resizable
+     Panel (overflow:hidden); the table-tab wrapper has no such ancestor, so a
+     wide (width:max-content) table would expand this row and push the scroll
+     boundary off-screen instead of scrolling. */
+  min-width: 0;
+  overflow: hidden;
+  position: relative;
+}
+.mdbc-results-split {
+  flex: 1;
+}
+.mdbc-resize-handle-v {
+  width: 1px;
+  background: var(--m-sep);
+  cursor: col-resize;
+}
+.mdbc-popover-anchor {
+  position: relative;
+}
+
+/* Run-history chips embedded inside the results toolbar. Inherits the
+   toolbar's vertical padding so it doesn't grow the bar. */
+/* Taller than a bare chip so the strip has breathing room. */
+.mdbc-runs-strip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 0 12px;
+  height: 34px;
+}
+.mdbc-runs-label {
+  display: flex;
+  align-items: center;
+  font-size: var(--m-fs-xxs);
+  color: var(--m-fg-3);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+/* The "Runs" label stays pinned on the far left while only the chip track
+   scrolls. The scrollbar is hidden (scroll via wheel/trackpad + programmatic
+   scroll-to-latest) so it never steals vertical space — no scrollbar gutter,
+   no ugly scrollbar track, and the chips stay vertically centered against
+   the label. overflow-y is pinned hidden so overflow-x:auto can't spawn a
+   stray vertical scrollbar. */
+/* The `.mdbc` prefix raises specificity above the global
+   `.mdbc * { scrollbar-width: thin }` / `.mdbc *::-webkit-scrollbar` rules in
+   app.css, which otherwise tie on specificity and win on source order — that
+   tie is exactly why the scrollbar kept showing. */
+.mdbc .mdbc-runs-track {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  min-width: 0;
+  flex: 1;
+  height: 100%;
+  scrollbar-width: none;
+}
+.mdbc .mdbc-runs-track::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+/* Run chips keep their natural width and overflow horizontally instead of
+   squeezing/wrapping when many runs accumulate. The track scrolls to the
+   rightmost (latest) run. */
+.mdbc-runs-track .mdbc-chip {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+/* Filter/sort builder row that drops below the results toolbar when the
+   user toggles "Filter". Renders a compact inline expression input + sort
+   chips. Mirrors DataGrip's filter strip. */
+.mdbc-filter-builder {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: var(--m-bg-toolbar);
+  border-bottom: 0.5px solid var(--m-sep);
+  flex-shrink: 0;
+}
+.mdbc-filter-chip-list {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-width: 0;
+}
+.mdbc-filter-builder .mdbc-filter-input {
+  flex: 1;
+  min-width: 200px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: rgb(var(--m-overlay-rgb) / 0.04);
+  border: 0.5px solid var(--m-sep-strong);
+  border-radius: 999px;
+  font-family: var(--m-font-editor, var(--m-font-mono));
+  font-size: var(--m-fs-sm);
+  color: var(--m-fg);
+}
+.mdbc-filter-builder .mdbc-filter-input input {
+  flex: 1;
+  background: transparent;
+  border: 0;
+  outline: 0;
+  color: inherit;
+  font: inherit;
+}
+.mdbc-filter-builder .mdbc-filter-input .glyph {
+  color: var(--m-fg-3);
+  display: inline-flex;
+  align-items: center;
+}
+
+.mdbc-query-popover {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 50;
+  margin-top: 4px;
+  min-width: 280px;
+  max-width: 520px;
+  max-height: 260px;
+  overflow: auto;
+  background: var(--m-bg-surface);
+  border: 0.5px solid var(--m-sep);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+.mdbc-query-popover.compact {
+  min-width: 120px;
+}
+.mdbc-btn.menu-item {
+  width: 100%;
+  justify-content: flex-start;
+}
+.mdbc-pagination {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.mdbc-pagination-label {
+  font-size: var(--m-fs-xxs);
+  opacity: 0.7;
+  white-space: nowrap;
+}
+.mdbc-chip-icon {
+  display: inline-flex;
+  margin-left: 4px;
+}
+/* Bottom Results pane wrapper — fills the resizable panel and marks the region
+   so a pointer-down here makes Cmd+W close the run chip (not the editor tab). */
+.mdbc-bottom-results {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+/* In-view search: every match gets a soft tint; the focused match (next/prev
+   target) gets a stronger accent outline so the user can track the jump. */
+.mdbc-table td.search-match {
+  background: rgb(var(--m-accent-rgb) / 0.14);
+}
+.mdbc-table td.search-current {
+  background: rgb(var(--m-accent-rgb) / 0.28);
+  outline: 1px solid rgb(var(--m-accent-rgb) / 0.7);
+  outline-offset: -1px;
+}
+.mdbc-error-strip {
+  padding: 6px 10px;
+  color: var(--m-red);
+  font-family: var(--m-font-editor, var(--m-font-mono));
+  font-size: var(--m-fs-xxs);
+}
+.mdbc-row-detail {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--m-bg-surface);
+  border-left: 0.5px solid var(--m-sep);
+}
+.mdbc-row-detail.empty {
+  padding: 16px;
+  color: var(--m-fg-3);
+  font-size: var(--m-fs-sm);
+}
+.mdbc-row-detail-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  font-size: var(--m-fs-sm);
+  font-weight: 600;
+  border-bottom: 0.5px solid var(--m-sep);
+}
+.mdbc-row-detail-body {
+  flex: 1;
+  overflow: auto;
+  min-height: 0;
+}
+
+.mdbc-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--m-fg-3, #a0a0aa);
+  font-size: var(--m-fs-sm);
+  background: var(--m-bg-window);
+}
+
+.mdbc-results-loading-placeholder {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--m-accent);
+  background: var(--m-bg-window);
+}
+
+.mdbc-results-loading-logo {
+  opacity: 0.9;
+  filter: drop-shadow(0 0 8px color-mix(in srgb, var(--m-accent) 36%, transparent));
+  transform-origin: center;
+}
+
+.mdbc-results-loading-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--m-bg-window) 70%, transparent);
+  color: var(--m-accent);
+  pointer-events: none;
+}
+
+/* Results footer — tiny tab bar at bottom of results pane */
+.mdbc-results-footer {
+  display: flex;
+  align-items: center;
+  height: 28px;
+  border-top: 0.5px solid var(--m-sep);
+  background: var(--m-bg-toolbar);
+  padding: 0 8px;
+  gap: 2px;
+  flex-shrink: 0;
+}
+.mdbc-results-footer-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+  padding: 0 8px;
+  font-size: var(--m-fs-xxs);
+  color: var(--m-fg-3);
+  border-radius: var(--m-r-control);
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  font-family: var(--m-font);
+}
+.mdbc-results-footer-tab:hover {
+  background: rgb(var(--m-overlay-rgb) / 0.05);
+  color: var(--m-fg);
+}
+.mdbc-results-footer-tab.active {
+  background: var(--m-accent-tint);
+  color: var(--m-accent);
+}
+.mdbc-results-footer-sep {
+  width: 1px;
+  height: 14px;
+  background: var(--m-sep);
+  margin: 0 4px;
+  flex-shrink: 0;
+}
+.mdbc-results-footer-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--m-fg-3);
+  font-size: var(--m-fs-xxs);
+  font-family: var(--m-font);
+  margin-left: 2px;
+}
+
+.mdbc-row-detail-json-host {
+  height: 100%;
+}

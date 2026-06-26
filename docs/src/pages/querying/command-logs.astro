@@ -1,0 +1,101 @@
+---
+import "../../styles/global.css";
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import Callout from "../../components/docs/Callout/Callout.astro";
+import Screenshot from "../../components/docs/Screenshot/Screenshot.astro";
+---
+
+<DocsLayout
+  title="Command logs — Arris Docs"
+  breadcrumbs={[{ label: "Docs", href: "/" }, { label: "Querying" }, { label: "Command logs" }]}
+  heading="Command logs"
+  lede="A live, session-scoped log of every command you run — queries, dbt and SQLMesh runs, and Python — with output, status, and timing."
+  tocItems={[
+    { label: "Overview", href: "#overview" },
+    { label: "Opening the panel", href: "#opening" },
+    { label: "What a log entry shows", href: "#entry" },
+    { label: "Filtering & clearing", href: "#filtering" },
+    { label: "Session-only, never persisted", href: "#persistence" },
+  ]}
+  currentPath="/querying/command-logs"
+  prev={{ label: "Results viewer", href: "/querying/results", section: "Querying" }}
+  next={{ label: "Cross-source queries", href: "/querying/cross-source", section: "Querying" }}
+>
+  <h2 id="overview">Overview</h2>
+
+  <p>
+    Command logs is a running record of the commands you execute during a session. Every run
+    appends an entry with its output, status, and timing, so you can see at a glance what ran, how
+    long it took, and whether it succeeded. It covers four kinds of command:
+  </p>
+
+  <ul>
+    <li><strong>SQL</strong> &mdash; queries run from console tabs and SQL files.</li>
+    <li><strong>dbt</strong> &mdash; <code>run</code>, <code>test</code>, <code>build</code>, <code>compile</code>, and other dbt commands.</li>
+    <li><strong>SQLMesh</strong> &mdash; <code>plan</code>, <code>test</code>, <code>render</code>, and related commands.</li>
+    <li><strong>Python</strong>: cells run in a Jupyter notebook.</li>
+  </ul>
+
+  <p>
+    Schema browsing, opening files, and UI navigation are not commands and are not logged.
+  </p>
+
+  <Screenshot
+    src="/screenshots/command-logs.png"
+    alt="The Arris Command Logs panel listing recent SQL runs newest-first, with a failed query expanded to show its raw output error and raw query, plus a filter box and status dropdown"
+    caption="The Command Logs panel lists each run newest-first; expand an entry to see its raw output and query."
+  />
+
+  <h2 id="opening">Opening the panel</h2>
+
+  <p>
+    Command logs live in the bottom pane, alongside the results. Click the <strong>Command Logs</strong>
+    tab in the results footer to show it. The pane surfaces automatically whenever a command runs,
+    so a long dbt build or query streams its output into view as it happens.
+  </p>
+
+  <h2 id="entry">What a log entry shows</h2>
+
+  <p>
+    Each entry has a header that is always visible:
+  </p>
+
+  <ul>
+    <li><strong>Status</strong> &mdash; a spinner while running, then a check on success or a cross on error.</li>
+    <li><strong>Command</strong> &mdash; a one-line label: the SQL text, the dbt or SQLMesh command, or the first line of Python.</li>
+    <li><strong>Source tab</strong> &mdash; a badge naming the tab the command came from.</li>
+    <li><strong>Duration</strong> &mdash; how long the command took, once it finishes.</li>
+    <li><strong>Timestamp</strong> &mdash; the wall-clock time it started.</li>
+  </ul>
+
+  <p>
+    Click an entry to expand its body. The newest entry is expanded by default. The body shows:
+  </p>
+
+  <ul>
+    <li><strong>Per-node breakdown</strong> &mdash; for dbt and SQLMesh runs, a table of each node with its type, status, and duration.</li>
+    <li><strong>Raw output</strong> &mdash; the verbatim console output, with ANSI colors preserved.</li>
+    <li><strong>Full query</strong> &mdash; for SQL entries, the executed statement, with a toggle to expand long queries.</li>
+  </ul>
+
+  <h2 id="filtering">Filtering & clearing</h2>
+
+  <p>
+    A search box filters entries by command text or output, and a status dropdown narrows to
+    running, succeeded, or failed commands. <strong>Clear logs</strong> empties the panel. Entries
+    are listed newest first.
+  </p>
+
+  <Callout type="note" title="Read-only entries">
+    Command logs is a record, not a launcher. Entries cannot be re-run, loaded back into the
+    editor, or exported from the panel. To re-run something, run it again from its tab.
+  </Callout>
+
+  <h2 id="persistence">Session-only, never persisted</h2>
+
+  <p>
+    The log lives in memory for the current session only. It is never written to disk, never sent
+    anywhere, and has no retention setting. Quitting and reopening Arris starts with an empty log,
+    and clearing the panel discards every entry immediately.
+  </p>
+</DocsLayout>

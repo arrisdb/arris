@@ -1,0 +1,18 @@
+project: analytics_shop
+
+gateways:
+  postgres:
+    connection:
+      type: postgres
+      host: localhost
+      port: 5432
+      user: postgres
+      password: test
+      database: postgres
+
+default_gateway: postgres
+
+model_defaults:
+  dialect: postgres
+  start: '2025-01-01'
+  cron: '@daily'

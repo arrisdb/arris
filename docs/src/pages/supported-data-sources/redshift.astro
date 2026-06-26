@@ -1,0 +1,203 @@
+---
+import "../../styles/global.css";
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import DocTable from "../../components/docs/DocTable/DocTable.astro";
+
+import CodeBlock from "../../components/docs/CodeBlock/CodeBlock.astro";
+---
+
+<DocsLayout
+  title="Amazon Redshift — Arris Docs"
+  breadcrumbs={[{ label: "Docs", href: "/" }, { label: "Connections", href: "/connections/overview" }, { label: "Amazon Redshift" }]}
+  heading="Amazon Redshift"
+  tocItems={[
+    { label: "Overview", href: "#overview" },
+    { label: "Driver", href: "#driver" },
+    { label: "Connection fields", href: "#fields" },
+    { label: "URI format", href: "#uri" },
+    { label: "SSL & TLS", href: "#ssl" },
+    { label: "Schema browser", href: "#schema" },
+    { label: "Supported SQL commands", href: "#features" },
+  ]}
+  currentPath="/supported-data-sources/redshift"
+  prev={{ label: "Redis", href: "/supported-data-sources/redis", section: "Connections" }}
+  next={{ label: "SQLite", href: "/supported-data-sources/sqlite", section: "Connections" }}
+>
+  <h2 id="overview">
+    <img src="/db-logos/redshift.png" alt="Amazon Redshift logo" width="32" height="32" class="docLogo" />
+    Overview
+  </h2>
+
+  <p>
+    Amazon Redshift is a fully managed, petabyte-scale cloud data warehouse from AWS. It uses
+    columnar storage and a massively parallel processing (MPP) architecture to run analytical
+    queries across large datasets, and integrates with the broader AWS ecosystem such as S3,
+    Glue, and Redshift Spectrum. Redshift was originally derived from PostgreSQL and remains
+    compatible with the PostgreSQL wire protocol, so standard Postgres clients can talk to it.
+  </p>
+
+  <h2 id="driver">Driver</h2>
+
+  <ul>
+    <li><strong>Crate:</strong> <a href="https://crates.io/crates/tokio-postgres"><code>tokio-postgres</code></a></li>
+    <li><strong>Version:</strong> <code>0.7</code></li>
+  </ul>
+
+  <h2 id="fields">Connection fields</h2>
+
+  <DocTable>
+    <thead>
+      <tr>
+        <th>Field</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="font-medium text-fg">Host</td>
+        <td>Redshift cluster endpoint, e.g. <code>mycluster.abc123.us-east-1.redshift.amazonaws.com</code>.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">Port</td>
+        <td>TCP port the cluster listens on. Redshift defaults to <code>5439</code>.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">Database</td>
+        <td>Name of the database to connect to. New clusters default to <code>dev</code>.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">User</td>
+        <td>Authentication username.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">Password</td>
+        <td>Authentication password. Stored in the macOS Keychain.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">SSL Mode</td>
+        <td>One of <code>disable</code>, <code>prefer</code>, <code>require</code>, <code>verify-ca</code>, or <code>verify-full</code>. Redshift clusters typically require SSL.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">Options</td>
+        <td>Additional connection parameters as <code>key1=val1&amp;key2=val2</code>.</td>
+      </tr>
+    </tbody>
+  </DocTable>
+
+  <p>
+    All connections also support an optional <strong>SSH tunnel</strong>. Configure the bastion
+    host, port, user, and private key file under the SSH section of the connection form. See
+    <a href="/connections/ssh-tunnels">SSH tunnels</a> for details.
+  </p>
+
+  <h2 id="uri">URI format</h2>
+
+  <p>
+    Instead of filling in each field individually, you can paste a connection URI into the
+    <strong>Paste URI</strong> field. Arris parses the URI and populates all fields automatically.
+    Paste the cluster endpoint AWS shows in the Redshift console.
+  </p>
+
+  <CodeBlock lang="text" filename="Connection URI">
+    redshift://user:password@mycluster.abc123.us-east-1.redshift.amazonaws.com:5439/dev?sslmode=require
+  </CodeBlock>
+
+  <h2 id="ssl">SSL &amp; TLS</h2>
+
+  <p>
+    Redshift uses the same five SSL modes as PostgreSQL. Because Redshift clusters generally
+    enforce encryption, Arris defaults Redshift connections to <code>require</code>.
+  </p>
+
+  <DocTable>
+    <thead>
+      <tr>
+        <th>SSL Mode</th>
+        <th>Behavior</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="font-medium text-fg"><code>disable</code></td>
+        <td>Never use SSL. Not recommended for production.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><code>prefer</code></td>
+        <td>Use SSL if available, fall back to unencrypted.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><code>require</code></td>
+        <td>Always use SSL. Fail if the server does not support it.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><code>verify-ca</code></td>
+        <td>Require SSL and verify the server certificate against a CA.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><code>verify-full</code></td>
+        <td>Require SSL, verify the CA, and verify the server hostname matches the certificate.</td>
+      </tr>
+    </tbody>
+  </DocTable>
+
+  <h2 id="schema">Schema browser</h2>
+
+  <p>
+    Once connected, Arris fetches the full schema tree and organizes it into groups. The
+    default schema filter is set to <code>public</code>, but you can add or remove schemas from
+    the filter dropdown in the sidebar.
+  </p>
+
+  <p>
+    The schema tree displays the following object types, grouped by category:
+  </p>
+
+  <ul>
+    <li><strong>Tables</strong> &mdash; regular tables and external (Spectrum) tables</li>
+    <li><strong>Views</strong> &mdash; views and materialized views, including late-binding views</li>
+    <li><strong>Routines</strong> &mdash; functions and stored procedures</li>
+    <li><strong>Sequences</strong> &mdash; identity sequences</li>
+    <li><strong>Triggers</strong> &mdash; table-level triggers</li>
+    <li><strong>Indexes</strong> &mdash; index metadata exposed by the catalog</li>
+  </ul>
+
+  <p>
+    Double-click any table, view, materialized view, or external table to open it in a new tab
+    with browse mode.
+  </p>
+
+
+
+  <h2 id="features">Supported SQL commands</h2>
+
+  <DocTable>
+    <thead>
+      <tr>
+        <th>Command</th>
+        <th>Notes</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="font-medium text-fg"><code>SELECT</code></td>
+        <td>Query data with <code>WHERE</code> filters, <code>JOIN</code>s, aggregates, and window functions.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><code>INSERT</code></td>
+        <td>Insert single or multiple rows.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><code>UPDATE</code></td>
+        <td>Update existing rows.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><code>DELETE</code></td>
+        <td>Delete rows.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><code>CREATE</code> / <code>DROP</code></td>
+        <td>Create and drop tables, views, and other schema objects.</td>
+      </tr>
+    </tbody>
+  </DocTable>
+</DocsLayout>

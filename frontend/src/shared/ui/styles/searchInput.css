@@ -1,0 +1,41 @@
+/* Canonical search/filter input — rounded pill with leading search icon.
+   Used app-wide via the SearchInput primitive (styles/searchInput.tsx). */
+.mdbc-search {
+  margin: 4px 10px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  background: rgb(var(--m-overlay-rgb) / 0.04);
+  border: 0.5px solid var(--m-sep);
+  border-radius: var(--m-r-control);
+}
+.mdbc-search.sm {
+  height: 24px;
+  margin: 6px 6px 4px;
+  border-radius: var(--m-r-control);
+  background: rgba(0, 0, 0, 0.18);
+}
+.mdbc-search:focus-within {
+  border-color: rgb(var(--m-accent-rgb) / 0.45);
+  box-shadow: 0 0 0 3px rgb(var(--m-accent-rgb) / 0.12);
+}
+.mdbc-search-icon {
+  color: var(--m-fg-4);
+  display: inline-flex;
+  flex: none;
+}
+.mdbc-search-input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: 0;
+  outline: 0;
+  color: var(--m-fg);
+  font-size: var(--m-fs-sm);
+  font-family: var(--m-font);
+}
+.mdbc-search-input::placeholder {
+  color: var(--m-placeholder);
+}

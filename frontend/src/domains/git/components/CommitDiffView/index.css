@@ -1,0 +1,74 @@
+.mdbc-commit-diff-root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.mdbc-commit-diff-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--mdbc-border, #2a2a2a);
+  background: var(--mdbc-bg-elevated, #1e1e1e);
+}
+
+.mdbc-commit-diff-meta {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.mdbc-commit-diff-author-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.mdbc-commit-diff-author {
+  font-weight: 600;
+  color: var(--mdbc-fg, #e0e0e0);
+}
+
+.mdbc-commit-diff-muted {
+  font-size: 0.85em;
+  color: var(--mdbc-fg-muted, #888);
+}
+
+.mdbc-commit-diff-summary {
+  margin-top: 4px;
+  color: var(--mdbc-fg, #e0e0e0);
+}
+
+.mdbc-commit-diff-body {
+  margin: 6px 0 0;
+  font-family: inherit;
+  font-size: 0.85em;
+  white-space: pre-wrap;
+  color: var(--mdbc-fg-muted, #aaa);
+}
+
+.mdbc-commit-diff-side {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.85em;
+}
+
+.mdbc-commit-diff-stat-add {
+  color: var(--mdbc-git-add, #5cb85c);
+}
+
+.mdbc-commit-diff-stat-del {
+  color: var(--mdbc-git-del, #e8643c);
+}
+
+.mdbc-commit-diff-sha {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--mdbc-font-mono, monospace);
+  color: var(--mdbc-fg-muted, #888);
+}

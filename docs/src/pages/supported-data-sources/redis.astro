@@ -1,0 +1,225 @@
+---
+import "../../styles/global.css";
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import DocTable from "../../components/docs/DocTable/DocTable.astro";
+import CodeBlock from "../../components/docs/CodeBlock/CodeBlock.astro";
+---
+
+<DocsLayout
+  title="Redis — Arris Docs"
+  breadcrumbs={[{ label: "Docs", href: "/" }, { label: "Connections", href: "/connections/overview" }, { label: "Redis" }]}
+  heading="Redis"
+  tocItems={[
+    { label: "Overview", href: "#overview" },
+    { label: "Driver", href: "#driver" },
+    { label: "Connection fields", href: "#fields" },
+    { label: "URI format", href: "#uri" },
+    { label: "SSL & TLS", href: "#ssl" },
+    { label: "Schema browser", href: "#schema" },
+    { label: "Query modes", href: "#modes" },
+    { label: "Supported SQL commands", href: "#features" },
+    { label: "Unsupported SQL commands", href: "#unsupported" },
+  ]}
+  currentPath="/supported-data-sources/redis"
+  prev={{ label: "PostgreSQL", href: "/supported-data-sources/postgres", section: "Connections" }}
+  next={{ label: "Redshift", href: "/supported-data-sources/redshift", section: "Connections" }}
+>
+  <h2 id="overview">
+    <img src="/db-logos/redis.png" alt="Redis logo" width="32" height="32" class="docLogo" />
+    Overview
+  </h2>
+
+  <p>
+    Redis is an open-source, in-memory data store used as a database, cache, and message broker.
+    It supports data structures like strings, lists, sets, hashes, sorted sets, and streams.
+    Redis is available as a managed service on Redis Cloud, Amazon ElastiCache, Azure Cache
+    for Redis, and Google Memorystore.
+  </p>
+
+  <h2 id="driver">Driver</h2>
+
+  <ul>
+    <li><strong>Crate:</strong> <a href="https://crates.io/crates/redis"><code>redis</code></a></li>
+    <li><strong>Version:</strong> <code>1.2</code></li>
+  </ul>
+
+  <h2 id="fields">Connection fields</h2>
+
+  <DocTable>
+    <thead>
+      <tr>
+        <th>Field</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="font-medium text-fg">Host</td>
+        <td>Hostname or IP address of the Redis server.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">Port</td>
+        <td>TCP port the server listens on.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">Database</td>
+        <td>Redis database number (0&ndash;15).</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">User</td>
+        <td>ACL username (Redis 6.0+).</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">Password</td>
+        <td>Authentication password. Stored in the macOS Keychain.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">SSL Mode</td>
+        <td>One of <code>disable</code>, <code>prefer</code>, <code>require</code>, <code>verify-ca</code>, or <code>verify-full</code>.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">Options</td>
+        <td>Additional connection parameters as <code>key1=val1&amp;key2=val2</code>.</td>
+      </tr>
+    </tbody>
+  </DocTable>
+
+  <p>
+    All connections also support an optional <strong>SSH tunnel</strong>. Configure the bastion
+    host, port, user, and private key file under the SSH section of the connection form. See
+    <a href="/connections/ssh-tunnels">SSH tunnels</a> for details.
+  </p>
+
+  <h2 id="uri">URI format</h2>
+
+  <p>
+    Instead of filling in each field individually, you can paste a connection URI into the
+    <strong>Paste URI</strong> field. Arris parses the URI and populates all fields automatically.
+  </p>
+
+  <CodeBlock lang="text" filename="Connection URI">
+    redis://user:password@host:6379/0
+  </CodeBlock>
+
+  <h2 id="ssl">SSL &amp; TLS</h2>
+
+  <p>
+    Redis supports five SSL modes. Arris defaults to <code>prefer</code>, which uses
+    SSL if the server supports it but falls back to unencrypted if not.
+  </p>
+
+  <DocTable>
+    <thead>
+      <tr>
+        <th>SSL Mode</th>
+        <th>Behavior</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="font-medium text-fg"><code>disable</code></td>
+        <td>Never use SSL. Not recommended for production.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><code>prefer</code></td>
+        <td>Use SSL if available, fall back to unencrypted.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><code>require</code></td>
+        <td>Always use SSL. Fail if the server does not support it.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><code>verify-ca</code></td>
+        <td>Require SSL and verify the server certificate against a CA.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><code>verify-full</code></td>
+        <td>Require SSL, verify the CA, and verify the server hostname matches the certificate.</td>
+      </tr>
+    </tbody>
+  </DocTable>
+
+  <h2 id="schema">Schema browser</h2>
+
+  <p>
+    Once connected, Arris scans the keyspace and organizes keys by their data type. Databases
+    act as top-level containers in the tree.
+  </p>
+
+  <p>
+    The schema tree displays the following key types, grouped by category:
+  </p>
+
+  <ul>
+    <li><strong>Strings</strong> &mdash; string keys</li>
+    <li><strong>Lists</strong> &mdash; list keys</li>
+    <li><strong>Sets</strong> &mdash; set keys</li>
+    <li><strong>Hashes</strong> &mdash; hash keys</li>
+    <li><strong>Sorted Sets</strong> &mdash; sorted set (zset) keys</li>
+    <li><strong>Streams</strong> &mdash; stream keys</li>
+    <li><strong>Keys</strong> &mdash; other key types</li>
+  </ul>
+
+  <p>
+    Double-click any key to open it in a new tab with browse mode.
+  </p>
+
+
+
+  <h2 id="modes">Query modes</h2>
+
+  <p>
+    Arris queries Redis in two modes, switched per editor tab.
+  </p>
+
+  <ul>
+    <li><strong>SQL mode</strong> &mdash; read-only <code>SELECT</code> statements browse keys and values, optionally scoped to a logical database with a <code>dbN.</code> prefix on the source.</li>
+    <li><strong>Native mode</strong> &mdash; run raw Redis commands such as <code>GET key</code>, <code>HGETALL hash</code>, or <code>SET key value</code>, including writes.</li>
+  </ul>
+
+  <h2 id="features">Supported SQL commands</h2>
+
+  <DocTable>
+    <thead>
+      <tr>
+        <th>Command</th>
+        <th>Notes</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="font-medium text-fg"><code>SELECT</code></td>
+        <td>Read keys and values across logical databases (<code>db0</code>, <code>db1</code>, …).</td>
+      </tr>
+    </tbody>
+  </DocTable>
+
+  <h2 id="unsupported">Unsupported SQL commands</h2>
+
+  <DocTable>
+    <thead>
+      <tr>
+        <th>Command</th>
+        <th>Notes</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="font-medium text-fg"><code>INSERT</code></td>
+        <td>Write with native commands (<code>SET</code>, <code>HSET</code>, …).</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><code>UPDATE</code></td>
+        <td>Write with native commands (<code>SET</code>, <code>HSET</code>, …).</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><code>DELETE</code></td>
+        <td>Remove keys with the native <code>DEL</code> command.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><code>CREATE</code> / <code>DROP</code></td>
+        <td>Not applicable to Redis key-value data.</td>
+      </tr>
+    </tbody>
+  </DocTable>
+</DocsLayout>

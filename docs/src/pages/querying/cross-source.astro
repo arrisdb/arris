@@ -1,0 +1,117 @@
+---
+import "../../styles/global.css";
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import CodeBlock from "../../components/docs/CodeBlock/CodeBlock.astro";
+import Callout from "../../components/docs/Callout/Callout.astro";
+import Screenshot from "../../components/docs/Screenshot/Screenshot.astro";
+---
+
+<DocsLayout
+  title="Cross-source Queries — Arris Docs"
+  breadcrumbs={[{ label: "Docs", href: "/" }, { label: "Querying" }, { label: "Cross-source" }]}
+  heading="Cross-source queries"
+  lede="Join data across Postgres, Snowflake, MongoDB, and more in a single SQL statement, no ETL pipelines required."
+  tocItems={[
+    { label: "What is DataFusion?", href: "#datafusion" },
+    { label: "How federation works", href: "#how" },
+    { label: "Writing a cross-source query", href: "#writing" },
+    { label: "Table references", href: "#references", level: 3 },
+    { label: "Execution plan", href: "#plan" },
+    { label: "Limitations", href: "#limitations" },
+  ]}
+  currentPath="/querying/cross-source"
+  prev={{ label: "Command logs", href: "/querying/command-logs", section: "Querying" }}
+  next={{ label: "Version control", href: "/git/version-control", section: "Git" }}
+>
+  <h2 id="datafusion">What is DataFusion?</h2>
+
+  <p>
+    <a href="https://datafusion.apache.org/" class="text-accent-2 hover:text-fg transition-colors">Apache DataFusion</a>
+    is a fast, extensible query engine written in Rust. It executes SQL against in-memory
+    <a href="https://arrow.apache.org/" class="text-accent-2 hover:text-fg transition-colors">Apache Arrow</a>
+    columnar data, with a vectorized, streaming execution model and a pluggable table-provider
+    interface that lets a host application feed it rows from any source. It is a top-level Apache
+    project, used as the engine behind many analytical databases and data tools.
+  </p>
+
+  <p>
+    Arris embeds DataFusion to run <strong>cross-source</strong> queries:
+    a single SQL statement that reads from several of your database connections at once and joins
+    the results locally. DataFusion runs entirely in-process, so there is no cluster to deploy and
+    no external service to call.
+  </p>
+
+  <h2 id="how">How it works</h2>
+
+  <p>
+    When you run a cross-source query, Arris hands it to the embedded DataFusion engine, which:
+  </p>
+
+  <ul>
+    <li><strong>Parses</strong> &mdash; the SQL is scanned for dotted table references to work out which connection each table belongs to.</li>
+    <li><strong>Registers</strong> &mdash; each referenced table is registered with a DataFusion session as a custom table provider backed by that connection's native driver.</li>
+    <li><strong>Pushes down</strong> &mdash; column projections, <code>WHERE</code> filters, and row limits are translated back into SQL and pushed to each source, so only the needed rows and columns are pulled.</li>
+    <li><strong>Executes</strong> &mdash; DataFusion streams the source rows as Arrow batches and runs the full query, performing the joins, aggregations, and sorting locally with its vectorized operators.</li>
+    <li><strong>Returns</strong> &mdash; the result is shown in the same results grid as any other query.</li>
+  </ul>
+
+  <h2 id="writing">Writing a cross-source query</h2>
+
+  <p>
+    In an editor tab, flip the <strong>DataFusion</strong> toggle in the run bar. The toggle needs
+    at least two connections configured; once it is on, the connection selector switches to
+    <strong>All Connections</strong> and the tab can reference tables from any of them. Reference a
+    table with its connection name in front: <code>connection.schema.table</code>.
+  </p>
+
+  <h3 id="references">Table references</h3>
+
+  <p>
+    A reference is <code>&lt;connection&gt;.&lt;schema&gt;.&lt;table&gt;</code>, or
+    <code>&lt;connection&gt;.&lt;table&gt;</code> for sources without schemas (e.g., for MongoDB, the
+    database name takes the schema slot). The connection name is the name you gave the connection in
+    Arris, and the editor tints each connection's segment in its own color. Autocomplete spans every
+    connection, so typing a connection name and a dot suggests that connection's schemas, then its
+    tables and columns.
+  </p>
+
+  <Screenshot
+    src="/screenshots/cross-source-query.png"
+    alt="The Arris editor with the DataFusion toggle on and All Connections selected, running a cross-source query that joins a Postgres customers table with a MongoDB orders collection, results shown below"
+    caption="With the DataFusion toggle on, one query joins a Postgres table with a MongoDB collection across connections."
+  />
+
+  <h2 id="plan">Execution plan</h2>
+
+  <p>
+    A cross-source query runs through DataFusion's physical plan, which Arris surfaces as a live
+    execution graph. Use the <strong>Show execution plan</strong> toggle (<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block align-text-bottom text-accent-2"><circle cx="12" cy="18" r="3" /><circle cx="6" cy="6" r="3" /><circle cx="18" cy="6" r="3" /><path d="M18 9v2c0 .6-.4 1-1 1H7c-.6 0-1-.4-1-1V9" /><path d="M12 12v3" /></svg>)
+    in the results toolbar to swap the grid for a node graph of the plan: each scan, join,
+    aggregate, sort, and the final result, with each node's status updating as the query runs.
+  </p>
+
+  <Screenshot
+    src="/screenshots/cross-source-plan.png"
+    alt="The Arris execution plan graph for a cross-source query: two Scan nodes (Postgres customers and MongoDB orders) feeding Sort, Inner Join, and Projection nodes, each showing row count and elapsed time"
+    caption="The execution plan graph shows each scan, sort, join, and projection with its row count and timing."
+  />
+
+  <h2 id="limitations">Limitations</h2>
+
+  <p>
+    Federation is designed for analytical and exploratory workloads. Keep these limits in mind:
+  </p>
+
+  <ul>
+    <li><strong>Read-only sources</strong> &mdash; a cross-source query only reads from its sources; it never writes back to them.</li>
+    <li><strong>Data volume</strong> &mdash; source rows are streamed into memory (DataFusion can spill to disk under pressure). Queries that scan very large tables may be slow or memory-heavy, so filter at the source with <code>WHERE</code> clauses.</li>
+    <li><strong>Transactions</strong> &mdash; a cross-source query does not run in a distributed transaction. Each source is read at a point in time and may not be perfectly consistent with the others.</li>
+    <li><strong>Engine-specific features</strong> &mdash; DataFusion executes the final SQL, so engine-specific functions (for example Postgres <code>array_agg</code>) only work if DataFusion has an equivalent.</li>
+  </ul>
+
+  <Callout type="note" title="DataFusion SQL dialect">
+    Cross-source queries use DataFusion SQL syntax. Most standard SQL works as expected. Check
+    the <a href="https://datafusion.apache.org/user-guide/sql/index.html" class="text-accent-2 hover:text-fg transition-colors">DataFusion SQL reference</a>
+    for dialect-specific details on functions, types, and syntax.
+  </Callout>
+</DocsLayout>

@@ -1,0 +1,44 @@
+.mdbc-connection-picker .mdbc-search {
+  margin-left: 0;
+  margin-right: 0;
+}
+.mdbc-connection-picker-group {
+  margin-top: 12px;
+}
+.mdbc-connection-picker-group-title {
+  font-size: var(--m-fs-xxs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--m-fg-3, #8a8a99);
+  margin-bottom: 6px;
+}
+.mdbc-connection-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+}
+.mdbc-connection-picker-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--m-bg-surface-2, #1e1e26);
+  border: 0.5px solid var(--m-sep, rgb(var(--m-overlay-rgb) / 0.07));
+  border-radius: 8px;
+  color: var(--m-fg-1, #e4e4ed);
+  font-size: var(--m-fs-sm);
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.1s ease, border-color 0.1s ease;
+}
+.mdbc-connection-picker-option:hover {
+  background: rgb(var(--m-overlay-rgb) / 0.06);
+  border-color: var(--m-accent, #6aa1ff);
+}
+.mdbc-connection-picker-option-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

@@ -1,0 +1,161 @@
+---
+import "../../styles/global.css";
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import DocTable from "../../components/docs/DocTable/DocTable.astro";
+---
+
+<DocsLayout
+  title="Elasticsearch — Arris Docs"
+  breadcrumbs={[{ label: "Docs", href: "/" }, { label: "Connections", href: "/connections/overview" }, { label: "Elasticsearch" }]}
+  heading="Elasticsearch"
+  tocItems={[
+    { label: "Overview", href: "#overview" },
+    { label: "Driver", href: "#driver" },
+    { label: "Connection fields", href: "#fields" },
+    { label: "Schema browser", href: "#schema" },
+    { label: "Query modes", href: "#modes" },
+    { label: "Supported SQL commands", href: "#features" },
+    { label: "Unsupported SQL commands", href: "#unsupported" },
+  ]}
+  currentPath="/supported-data-sources/elasticsearch"
+  prev={{ label: "DynamoDB", href: "/supported-data-sources/dynamodb", section: "Connections" }}
+  next={{ label: "Kafka", href: "/supported-data-sources/kafka", section: "Connections" }}
+>
+  <h2 id="overview">
+    <img src="/db-logos/elasticsearch.svg" alt="Elasticsearch logo" width="32" height="32" class="docLogo" />
+    Overview
+  </h2>
+
+  <p>
+    Elasticsearch is a distributed search and analytics engine built on Apache Lucene. It provides
+    full-text search, structured queries, analytics, and logging at scale. Elasticsearch is the
+    core of the Elastic Stack (ELK) and is available as a managed service on Elastic Cloud,
+    Amazon OpenSearch, and Azure Cognitive Search.
+  </p>
+
+  <h2 id="driver">Driver</h2>
+
+  <ul>
+    <li><strong>Crate:</strong> <a href="https://crates.io/crates/reqwest"><code>reqwest</code></a></li>
+    <li><strong>Version:</strong> <code>0.13</code></li>
+  </ul>
+
+  <h2 id="fields">Connection fields</h2>
+
+  <DocTable>
+    <thead>
+      <tr>
+        <th>Field</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="font-medium text-fg">Host</td>
+        <td>Hostname or IP address of the Elasticsearch node.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">Port</td>
+        <td>HTTP port the REST API listens on.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">User</td>
+        <td>Authentication username (for Elastic security).</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">Password</td>
+        <td>Authentication password. Stored in the macOS Keychain.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">Options</td>
+        <td>Additional connection parameters as <code>key1=val1&amp;key2=val2</code>.</td>
+      </tr>
+    </tbody>
+  </DocTable>
+
+  <p>
+    All connections also support an optional <strong>SSH tunnel</strong>. Configure the bastion
+    host, port, user, and private key file under the SSH section of the connection form. See
+    <a href="/connections/ssh-tunnels">SSH tunnels</a> for details.
+  </p>
+
+  <h2 id="schema">Schema browser</h2>
+
+  <p>
+    Once connected, Arris fetches the cluster metadata and organizes it into groups.
+  </p>
+
+  <p>
+    The schema tree displays the following object types, grouped by category:
+  </p>
+
+  <ul>
+    <li><strong>Indices</strong> &mdash; Elasticsearch indices</li>
+    <li><strong>Aliases</strong> &mdash; index aliases</li>
+    <li><strong>Index Templates</strong> &mdash; index templates</li>
+    <li><strong>Data Streams</strong> &mdash; time-series data streams</li>
+  </ul>
+
+  <p>
+    Double-click any index, alias, or data stream to open it in a new tab with browse mode.
+  </p>
+
+
+
+  <h2 id="modes">Query modes</h2>
+
+  <p>
+    Arris talks to Elasticsearch in two modes, switched per editor tab.
+  </p>
+
+  <ul>
+    <li><strong>SQL mode</strong> &mdash; write read-only <code>SELECT</code> queries that Arris sends to the <code>_sql</code> endpoint. <code>SHOW</code>, <code>DESCRIBE</code>, and the Elasticsearch SQL <code>EXPLAIN</code> keyword are also accepted. Writes and CTEs (<code>WITH</code>) are not supported.</li>
+    <li><strong>REST mode</strong> &mdash; start a line with an HTTP verb and path, for example <code>GET /my-index/_search</code>, followed by an optional JSON body. This exposes the full Elasticsearch REST API, including writes.</li>
+  </ul>
+
+  <h2 id="features">Supported SQL commands</h2>
+
+  <DocTable>
+    <thead>
+      <tr>
+        <th>Command</th>
+        <th>Notes</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="font-medium text-fg"><code>SELECT</code></td>
+        <td>Read-only queries sent to the <code>_sql</code> endpoint.</td>
+      </tr>
+    </tbody>
+  </DocTable>
+
+  <h2 id="unsupported">Unsupported SQL commands</h2>
+
+  <DocTable>
+    <thead>
+      <tr>
+        <th>Command</th>
+        <th>Notes</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="font-medium text-fg"><code>INSERT</code></td>
+        <td>Write through REST mode using the Query DSL.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><code>UPDATE</code></td>
+        <td>Write through REST mode using the Query DSL.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><code>DELETE</code></td>
+        <td>Write through REST mode using the Query DSL.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><code>CREATE</code> / <code>DROP</code></td>
+        <td>Manage indices through REST mode.</td>
+      </tr>
+    </tbody>
+  </DocTable>
+</DocsLayout>

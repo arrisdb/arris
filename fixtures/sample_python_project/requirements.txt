@@ -1,0 +1,13 @@
+# The sample notebook and scripts use only the Python standard library, so no
+# third-party packages are required to run them.
+#
+# ipykernel is the one thing a kernel needs. Arris installs it automatically
+# when you create a virtual environment from the notebook toolbar, but if you
+# point at an existing interpreter you can install it yourself:
+#
+#     pip install ipykernel
+#
+# Uncomment below to try the "Create venv" flow with a couple of common extras:
+# pandas
+# matplotlib
+ipykernel

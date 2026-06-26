@@ -1,0 +1,190 @@
+/* Custom select trigger + dropdown menu. */
+.mdbc-select {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 10px;
+  background-color: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--m-sep-strong);
+  border-radius: var(--m-r-control);
+  color: var(--m-fg);
+  font-family: var(--m-font);
+  font-size: var(--m-fs-md);
+  line-height: 1;
+  cursor: pointer;
+  outline: none;
+  transition: background-color 120ms ease, box-shadow 120ms ease;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mdbc-select:hover:not(:disabled) {
+  background-color: rgba(255, 255, 255, 0.08);
+}
+.mdbc-select:focus-visible,
+.mdbc-select.open {
+  outline: none;
+}
+.mdbc-select:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.mdbc-select-label {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.mdbc-select-caret {
+  flex-shrink: 0;
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 4px solid var(--m-fg-3);
+}
+.mdbc-select-menu {
+  position: fixed;
+  top: var(--mdbc-select-top);
+  left: var(--mdbc-select-left);
+  min-width: var(--mdbc-select-min-width);
+  z-index: 9999;
+  padding: 4px;
+  background: var(--m-bg-surface, #1c1b24);
+  border: 0.5px solid var(--m-sep-strong);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  max-height: 240px;
+  overflow-y: auto;
+}
+.mdbc-select-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 6px;
+  color: var(--m-fg);
+  font-family: var(--m-font);
+  font-size: var(--m-fs-md);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 80ms ease;
+}
+.mdbc-select-option:hover {
+  background-color: rgba(255, 255, 255, 0.08);
+}
+.mdbc-select-option.selected {
+  color: var(--m-accent);
+}
+.mdbc-select-option.disabled {
+  color: var(--m-fg-3);
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+.mdbc-select-option.disabled:hover {
+  background-color: transparent;
+}
+.mdbc-select-action {
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid var(--m-sep-strong);
+  color: var(--m-fg-3);
+}
+
+/* Non-selectable divider between the "All" row and the individual options in a
+   MultiSelect that opts into `showSelectAll`. */
+.mdbc-select-separator {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--m-sep-strong);
+  pointer-events: none;
+}
+
+/* Sectioned select: titled groups with checkmark items. Rows and headers run
+   taller than the plain Select so the multi-section menu reads comfortably. */
+.mdbc-select-group + .mdbc-select-group {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--m-sep-strong);
+}
+.mdbc-select-menu:has(.mdbc-select-group) {
+  max-height: 420px;
+}
+.mdbc-select-group .mdbc-select-option {
+  height: 34px;
+}
+.mdbc-select-section {
+  padding: 8px 10px 4px;
+  color: var(--m-fg-3);
+  font-size: var(--m-fs-sm);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.mdbc-select-check {
+  width: 12px;
+  flex: none;
+  color: var(--m-accent);
+  text-align: center;
+}
+.mdbc-select-checkbox {
+  width: 15px;
+  height: 15px;
+  flex: none;
+  border-radius: 4px;
+  border: 1px solid var(--m-fg-4);
+  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 80ms ease, border-color 80ms ease;
+}
+.mdbc-select-option.selected .mdbc-select-checkbox {
+  background: var(--m-accent);
+  border-color: var(--m-accent);
+}
+.mdbc-select-option.selected .mdbc-select-checkbox::after {
+  content: "";
+  width: 3px;
+  height: 7px;
+  margin-top: -1px;
+  border: solid #fff;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+/* Unified app checkbox. Apply `mdbc-checkbox` to any real
+   <input type="checkbox"> so every checkbox matches the schema picker's
+   `.mdbc-select-checkbox` look. (Pseudo-elements don't render on <input>, so
+   the checkmark is drawn with an SVG background-image when :checked.) */
+.mdbc-checkbox {
+  appearance: none;
+  -webkit-appearance: none;
+  margin: 0;
+  width: 15px;
+  height: 15px;
+  flex: none;
+  border-radius: 4px;
+  border: 1px solid var(--m-fg-4);
+  background: transparent;
+  cursor: pointer;
+  transition: background-color 80ms ease, border-color 80ms ease;
+}
+.mdbc-checkbox:checked {
+  background-color: var(--m-accent);
+  border-color: var(--m-accent);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath fill='none' stroke='%23fff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' d='M2.5 6.3l2.4 2.4 4.6-5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 10px 10px;
+}
+.mdbc-checkbox:focus-visible {
+  outline: none;
+  box-shadow: var(--m-accent-glow);
+}

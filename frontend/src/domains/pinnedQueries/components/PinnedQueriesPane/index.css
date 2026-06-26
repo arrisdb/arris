@@ -1,0 +1,101 @@
+/* Pinned Queries pane — list of saved query snippets in the right sidebar.
+   Rows share the sidebar-pane standard 10px horizontal inset. */
+.mdbc-pinned-queries-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 6px 0;
+}
+
+.mdbc-pinned-queries-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.mdbc-pinned-queries-empty {
+  padding: 12px 10px;
+  color: var(--m-fg-3);
+  font-size: var(--m-fs-sm);
+  line-height: 1.5;
+}
+.mdbc-pinned-queries-empty svg {
+  vertical-align: -0.15em;
+}
+
+.mdbc-pinned-query-row {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+/* Hairline divider between rows, matching the connection cards. */
+.mdbc-pinned-query-row + .mdbc-pinned-query-row {
+  border-top: 0.5px solid var(--m-sep);
+}
+.mdbc-pinned-query-row:hover {
+  background: rgb(var(--m-overlay-rgb) / 0.05);
+}
+
+/* Title row: pin icon, title, then the hover action buttons. The preview below
+   spans the full row width. */
+.mdbc-pinned-query-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mdbc-pinned-query-icon {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  color: var(--m-accent-2);
+}
+
+.mdbc-pinned-query-title {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--m-fs-xxs);
+  font-weight: 600;
+  color: var(--m-fg);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mdbc-pinned-query-preview {
+  margin: 0;
+  width: 100%;
+  font-family: var(--m-font-editor, var(--m-font-mono));
+  font-size: var(--m-fs-xxs);
+  color: var(--m-fg-3);
+  white-space: pre-wrap;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 5;
+  -webkit-box-orient: vertical;
+}
+
+.mdbc-pinned-query-rename-input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: 1px solid var(--m-accent, #7c8cff);
+  border-radius: 4px;
+  color: var(--m-fg);
+  padding: 1px 4px;
+  font-size: var(--m-fs-xxs);
+  font-weight: 600;
+  font-family: inherit;
+  outline: none;
+}
+
+/* Rename/copy/remove buttons stay hidden until the row is hovered so the list
+   reads cleanly, matching the run-history chip affordances. */
+.mdbc-pinned-query-icon-button {
+  flex: none;
+  opacity: 0;
+}
+.mdbc-pinned-query-row:hover .mdbc-pinned-query-icon-button {
+  opacity: 1;
+}

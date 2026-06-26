@@ -1,0 +1,68 @@
+/* Modern app scope */
+.mdbc, .mdbc * { box-sizing: border-box; }
+.mdbc {
+  font-family: var(--m-font);
+  color: var(--m-fg);
+  -webkit-font-smoothing: antialiased;
+  font-size: var(--m-fs-body);
+  line-height: 1.4;
+  letter-spacing: -0.01em;
+}
+.mdbc .mono { font-family: var(--m-font-editor, var(--m-font-mono)); letter-spacing: 0; }
+.mdbc * { scrollbar-width: thin; scrollbar-color: var(--m-sep) transparent; }
+.mdbc *::-webkit-scrollbar { width: 6px; height: 6px; }
+.mdbc *::-webkit-scrollbar-track { background: transparent; }
+.mdbc *::-webkit-scrollbar-thumb { background: var(--m-sep); border-radius: 3px; }
+.mdbc *::-webkit-scrollbar-thumb:hover { background: var(--m-sep-strong); }
+.mdbc *::-webkit-scrollbar-corner { background: transparent; }
+
+/* Window with mesh-gradient backdrop */
+.mdbc-window {
+  position: relative;
+  background: var(--m-bg-window);
+  border-radius: 0 0 18px 18px;
+  overflow: hidden;
+  color: var(--m-fg);
+  box-shadow: var(--m-shadow-window);
+  isolation: isolate;
+}
+.mdbc-window > * { position: relative; z-index: 1; }
+
+.mdbc-app-error-state {
+  padding: 24px;
+}
+.mdbc-content-root {
+  height: 100vh;
+  width: 100vw;
+  background: var(--m-bg-app, #0c0c0e);
+  padding: 0;
+  overflow: hidden;
+}
+.mdbc-content-window {
+  height: 100%;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+}
+.mdbc-content-main {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+.mdbc-content-main-panels {
+  flex: 1;
+}
+.mdbc-content-center-stack {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+.mdbc-content-editor-results {
+  flex: 1;
+  min-height: 0;
+}
+.mdbc-content-results-resizer {
+  height: 1px;
+  background: var(--m-sep, rgb(var(--m-overlay-rgb) / 0.07));
+}

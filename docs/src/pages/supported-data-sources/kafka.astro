@@ -1,0 +1,155 @@
+---
+import "../../styles/global.css";
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import DocTable from "../../components/docs/DocTable/DocTable.astro";
+---
+
+<DocsLayout
+  title="Kafka — Arris Docs"
+  breadcrumbs={[{ label: "Docs", href: "/" }, { label: "Connections", href: "/connections/overview" }, { label: "Kafka" }]}
+  heading="Apache Kafka"
+  tocItems={[
+    { label: "Overview", href: "#overview" },
+    { label: "Driver", href: "#driver" },
+    { label: "Connection fields", href: "#fields" },
+    { label: "Schema browser", href: "#schema" },
+    { label: "Supported SQL commands", href: "#features" },
+    { label: "Unsupported SQL commands", href: "#unsupported" },
+  ]}
+  currentPath="/supported-data-sources/kafka"
+  prev={{ label: "Elasticsearch", href: "/supported-data-sources/elasticsearch", section: "Connections" }}
+  next={{ label: "MariaDB", href: "/supported-data-sources/mariadb", section: "Connections" }}
+>
+  <h2 id="overview">
+    <img src="/db-logos/kafka.png" alt="Apache Kafka logo" width="32" height="32" class="docLogo" />
+    Overview
+  </h2>
+
+  <p>
+    Apache Kafka is a distributed event streaming platform for high-throughput, fault-tolerant
+    real-time data pipelines. It organizes data into topics with partitioned, replicated logs.
+    Kafka is used for event sourcing, log aggregation, and stream processing, and is available
+    as a managed service on Confluent Cloud, Amazon MSK, Aiven, and Redpanda.
+  </p>
+
+  <h2 id="driver">Driver</h2>
+
+  <ul>
+    <li><strong>Crate:</strong> <a href="https://crates.io/crates/rdkafka"><code>rdkafka</code></a></li>
+    <li><strong>Version:</strong> <code>0.39</code></li>
+  </ul>
+
+  <h2 id="fields">Connection fields</h2>
+
+  <DocTable>
+    <thead>
+      <tr>
+        <th>Field</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="font-medium text-fg">Host</td>
+        <td>Hostname or IP address of a Kafka broker.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">Port</td>
+        <td>Broker port for the Kafka protocol.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">User</td>
+        <td>SASL authentication username.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">Password</td>
+        <td>SASL authentication password. Stored in the macOS Keychain.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">Schema Reg</td>
+        <td>URL of the Confluent Schema Registry (e.g. <code>http://localhost:8081</code>).</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">SASL</td>
+        <td>SASL mechanism: <code>None</code>, <code>PLAIN</code>, <code>SCRAM-SHA-256</code>, or <code>SCRAM-SHA-512</code>.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">Options</td>
+        <td>Additional connection parameters as <code>key1=val1&amp;key2=val2</code>.</td>
+      </tr>
+    </tbody>
+  </DocTable>
+
+  <p>
+    All connections also support an optional <strong>SSH tunnel</strong>. Configure the bastion
+    host, port, user, and private key file under the SSH section of the connection form. See
+    <a href="/connections/ssh-tunnels">SSH tunnels</a> for details.
+  </p>
+
+  <h2 id="schema">Schema browser</h2>
+
+  <p>
+    Once connected, Arris fetches the cluster metadata and organizes it into groups.
+  </p>
+
+  <p>
+    The schema tree displays the following object types, grouped by category:
+  </p>
+
+  <ul>
+    <li><strong>Topics</strong> &mdash; Kafka topics</li>
+    <li><strong>Consumer Groups</strong> &mdash; consumer groups and their offsets</li>
+  </ul>
+
+  <p>
+    Double-click any topic to open it in a new tab with browse mode.
+  </p>
+
+
+
+  <h2 id="features">Supported SQL commands</h2>
+
+  <DocTable>
+    <thead>
+      <tr>
+        <th>Command</th>
+        <th>Notes</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="font-medium text-fg"><code>SELECT</code></td>
+        <td>Read messages from a topic, with <code>WHERE</code> filters and aggregates.</td>
+      </tr>
+    </tbody>
+  </DocTable>
+
+  <h2 id="unsupported">Unsupported SQL commands</h2>
+
+  <DocTable>
+    <thead>
+      <tr>
+        <th>Command</th>
+        <th>Notes</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="font-medium text-fg"><code>INSERT</code></td>
+        <td>Topics are append-only streams; Arris reads but does not produce.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><code>UPDATE</code></td>
+        <td>Topics are append-only streams; Arris reads but does not produce.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><code>DELETE</code></td>
+        <td>Topics are append-only streams; Arris reads but does not produce.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><code>CREATE</code> / <code>DROP</code></td>
+        <td>Topic management is not available through Arris.</td>
+      </tr>
+    </tbody>
+  </DocTable>
+</DocsLayout>

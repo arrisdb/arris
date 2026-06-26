@@ -1,0 +1,23 @@
+/* ProjectLoadingScreen — neutral full-viewport screen shown while a project loads,
+   so the previously open project's workspace is replaced immediately on Cmd+O. */
+
+.project-loading-screen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  width: 100%;
+  background: var(--m-bg-window);
+}
+
+.project-loading-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.project-loading-label {
+  font-size: var(--m-fs-md);
+  color: var(--m-fg-3);
+}

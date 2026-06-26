@@ -1,0 +1,164 @@
+---
+import "../../styles/global.css";
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import DocTable from "../../components/docs/DocTable/DocTable.astro";
+import CodeBlock from "../../components/docs/CodeBlock/CodeBlock.astro";
+---
+
+<DocsLayout
+  title="Snowflake — Arris Docs"
+  breadcrumbs={[{ label: "Docs", href: "/" }, { label: "Connections", href: "/connections/overview" }, { label: "Snowflake" }]}
+  heading="Snowflake"
+  tocItems={[
+    { label: "Overview", href: "#overview" },
+    { label: "Driver", href: "#driver" },
+    { label: "Connection fields", href: "#fields" },
+    { label: "URI format", href: "#uri" },
+    { label: "Schema browser", href: "#schema" },
+    { label: "Supported SQL commands", href: "#features" },
+  ]}
+  currentPath="/supported-data-sources/snowflake"
+  prev={{ label: "SQLite", href: "/supported-data-sources/sqlite", section: "Connections" }}
+  next={{ label: "StarRocks", href: "/supported-data-sources/starrocks", section: "Connections" }}
+>
+  <h2 id="overview">
+    <img src="/db-logos/snowflake.png" alt="Snowflake logo" width="32" height="32" class="docLogo" />
+    Overview
+  </h2>
+
+  <p>
+    Snowflake is a cloud-native data platform that provides a fully managed data warehouse,
+    data lake, and data sharing service. It runs on AWS, Azure, and Google Cloud with automatic
+    scaling, near-zero maintenance, and support for semi-structured data formats like JSON,
+    Avro, and Parquet. Snowflake separates compute (virtual warehouses) from storage, allowing
+    independent scaling of each.
+  </p>
+
+  <h2 id="driver">Driver</h2>
+
+  <ul>
+    <li><strong>Crate:</strong> <a href="https://crates.io/crates/reqwest"><code>reqwest</code></a></li>
+    <li><strong>Version:</strong> <code>0.13</code></li>
+  </ul>
+
+  <h2 id="fields">Connection fields</h2>
+
+  <DocTable>
+    <thead>
+      <tr>
+        <th>Field</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="font-medium text-fg">Account</td>
+        <td>Snowflake account identifier, e.g. <code>xy12345.us-east-1</code> or <code>myorg-myaccount</code>.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">Warehouse</td>
+        <td>Virtual warehouse to use for queries. Stored in the <code>options</code> field as <code>warehouse=NAME</code>.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">Database</td>
+        <td>Name of the database to connect to.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">Schema</td>
+        <td>Default schema. Stored in <code>options</code> as <code>schema=NAME</code>.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">Role</td>
+        <td>Snowflake role to assume. Stored in <code>options</code> as <code>role=NAME</code>.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">User</td>
+        <td>Snowflake username.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">Password</td>
+        <td>Authentication password. Stored in the macOS Keychain.</td>
+      </tr>
+    </tbody>
+  </DocTable>
+
+  <p>
+    All connections also support an optional <strong>SSH tunnel</strong>. Configure the bastion
+    host, port, user, and private key file under the SSH section of the connection form. See
+    <a href="/connections/ssh-tunnels">SSH tunnels</a> for details.
+  </p>
+
+  <h2 id="uri">URI format</h2>
+
+  <p>
+    Instead of filling in each field individually, you can paste a connection URI into the
+    <strong>Paste URI</strong> field. Arris parses the URI and populates all fields automatically.
+  </p>
+
+  <CodeBlock lang="text" filename="Connection URI">
+    snowflake://user:password@account/database?warehouse=COMPUTE_WH&role=SYSADMIN&schema=PUBLIC
+  </CodeBlock>
+
+  <p>
+    Cloud provider connection strings from the Snowflake web UI can be pasted directly &mdash;
+    Arris extracts the account identifier, database, and other parameters automatically.
+  </p>
+
+  <h2 id="schema">Schema browser</h2>
+
+  <p>
+    Once connected, Arris queries <code>INFORMATION_SCHEMA</code> in the connected database
+    and organizes the schema tree into groups.
+  </p>
+
+  <p>
+    The schema tree displays the following object types, grouped by category:
+  </p>
+
+  <ul>
+    <li><strong>Tables</strong> &mdash; regular tables and external tables</li>
+    <li><strong>Views</strong> &mdash; views and materialized views</li>
+    <li><strong>Routines</strong> &mdash; functions and stored procedures</li>
+    <li><strong>Sequences</strong> &mdash; sequences</li>
+    <li><strong>Indexes</strong> &mdash; indexes</li>
+  </ul>
+
+  <p>
+    Double-click any table or view to open it in a new tab with browse mode.
+  </p>
+
+
+
+  <h2 id="features">Supported SQL commands</h2>
+
+  <DocTable>
+    <thead>
+      <tr>
+        <th>Command</th>
+        <th>Notes</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="font-medium text-fg"><code>SELECT</code></td>
+        <td>Query data with <code>WHERE</code> filters, <code>JOIN</code>s, aggregates, and window functions.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><code>INSERT</code></td>
+        <td>Insert single or multiple rows.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><code>UPDATE</code></td>
+        <td>Update existing rows.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><code>DELETE</code></td>
+        <td>Delete rows.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><code>CREATE</code> / <code>DROP</code></td>
+        <td>Create and drop tables, views, and other schema objects.</td>
+      </tr>
+    </tbody>
+  </DocTable>
+</DocsLayout>

@@ -1,0 +1,44 @@
+---
+import styles from './Callout.module.css';
+
+interface Props {
+  type: 'note' | 'tip' | 'warn';
+  title: string;
+}
+
+const { type, title } = Astro.props;
+
+const iconStyleKey = `icon${type.charAt(0).toUpperCase()}${type.slice(1)}` as keyof typeof styles;
+---
+
+<div class:list={[styles.callout, styles[type]]}>
+  {type === 'note' && (
+    <span class:list={[styles.icon, styles[iconStyleKey]]}>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10" />
+        <line x1="12" y1="16" x2="12" y2="12" />
+        <line x1="12" y1="8" x2="12.01" y2="8" />
+      </svg>
+    </span>
+  )}
+  {type === 'tip' && (
+    <span class:list={[styles.icon, styles[iconStyleKey]]}>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M12 .587l3.668 7.431 8.2 1.192-5.934 5.787 1.4 8.168L12 19.347l-7.334 3.818 1.4-8.168L.132 9.21l8.2-1.192z" />
+      </svg>
+    </span>
+  )}
+  {type === 'warn' && (
+    <span class:list={[styles.icon, styles[iconStyleKey]]}>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+        <line x1="12" y1="9" x2="12" y2="13" />
+        <line x1="12" y1="17" x2="12.01" y2="17" />
+      </svg>
+    </span>
+  )}
+  <div>
+    <div class={styles.title}>{title}</div>
+    <slot />
+  </div>
+</div>

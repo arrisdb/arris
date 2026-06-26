@@ -1,0 +1,158 @@
+---
+import "../../styles/global.css";
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import DocTable from "../../components/docs/DocTable/DocTable.astro";
+---
+
+<DocsLayout
+  title="Debug logs — Arris Docs"
+  breadcrumbs={[{ label: "Docs", href: "/" }, { label: "Reference" }, { label: "Debug logs" }]}
+  heading="Debug logs"
+  lede="An optional, off-by-default diagnostic log that records what Arris did, never your data. Turn it on to help reproduce an issue, then reveal the file from the Help menu."
+  tocItems={[
+    { label: "Overview", href: "#overview" },
+    { label: "Turning it on", href: "#turning-on" },
+    { label: "Opening the logs", href: "#opening" },
+    { label: "What is recorded", href: "#recorded" },
+    { label: "What is never recorded", href: "#never-recorded" },
+    { label: "Storage and rotation", href: "#storage" },
+  ]}
+  currentPath="/reference/debug-logs"
+  prev={{ label: "Keyboard shortcuts", href: "/reference/shortcuts", section: "Reference" }}
+>
+  <h2 id="overview">Overview</h2>
+
+  <p>
+    Debug logs are a troubleshooting aid. When something misbehaves, turning on debug mode records
+    a small, curated stream of diagnostic events to a local file you can share or inspect. It is
+    designed so the log is safe to send to support: it captures what happened, not the contents of
+    your work.
+  </p>
+
+  <p>
+    Debug mode is <strong>off by default</strong>. While it is off, nothing is collected and no log
+    file is created at all. While it is on, only the curated events listed below are written. You
+    can toggle it at any time without restarting Arris.
+  </p>
+
+  <h2 id="turning-on">Turning it on</h2>
+
+  <p>
+    Open <strong>Settings</strong>, go to the <strong>General</strong> pane, and toggle
+    <strong>Debug mode</strong>. Turning it off stops collection immediately. Flipping the toggle
+    takes effect right away, so you can enable it, reproduce the problem, then disable it again.
+  </p>
+
+  <h2 id="opening">Opening the logs</h2>
+
+  <p>
+    Choose <strong>Help</strong> then <strong>Show Debug Logs in Finder</strong> from the menu bar.
+    This opens the <code>debug_logs</code> folder inside the Arris application data directory, where
+    the log file lives. The menu item creates the folder if it does not exist yet, so it always
+    opens to the right place.
+  </p>
+
+  <h2 id="recorded">What is recorded</h2>
+
+  <p>
+    Each event is a single line of metadata describing an operation Arris performed. Events are
+    emitted on a dedicated channel so that logging from the underlying database driver libraries
+    (which can include raw SQL and parameters) is filtered out and never reaches the file.
+  </p>
+
+  <p>
+    Every event carries the connection name you assigned (the <code>conn</code> field) and the
+    source kind, so you can tell apart two connections of the same kind when debugging.
+  </p>
+
+  <DocTable>
+    <thead>
+      <tr>
+        <th>Event</th>
+        <th>Fields recorded</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>query.started</code></td>
+        <td>Connection name and source kind (for example <code>Postgres</code>).</td>
+      </tr>
+      <tr>
+        <td><code>query.finished</code></td>
+        <td>Connection name, source kind, duration in milliseconds, number of rows returned.</td>
+      </tr>
+      <tr>
+        <td><code>query.failed</code></td>
+        <td>Connection name, source kind, a coarse error code, and a credential-scrubbed error message.</td>
+      </tr>
+      <tr>
+        <td><code>connection.opened</code></td>
+        <td>Connection name and source kind.</td>
+      </tr>
+      <tr>
+        <td><code>connection.failed</code></td>
+        <td>Connection name, source kind, a coarse error code, and a credential-scrubbed error message.</td>
+      </tr>
+      <tr>
+        <td><code>schema.load.started</code></td>
+        <td>Connection name, source kind, and scope (the whole connection, or the schema or dataset being expanded).</td>
+      </tr>
+      <tr>
+        <td><code>schema.load.finished</code></td>
+        <td>Connection name, source kind, scope, duration in milliseconds, and the number of schema nodes returned.</td>
+      </tr>
+      <tr>
+        <td><code>schema.load.failed</code></td>
+        <td>Connection name, source kind, scope, a coarse error code, and a credential-scrubbed error message.</td>
+      </tr>
+    </tbody>
+  </DocTable>
+
+  <p>
+    The <code>schema.load.*</code> events cover browsing the schema tree: listing schemas, datasets,
+    tables, and their columns. The scope is the schema or dataset identifier being expanded, which
+    is structural metadata and is what makes it possible to see exactly which load failed when, for
+    example, a connection lists some datasets but not others.
+  </p>
+
+  <p>
+    The error message on a failure is the database driver's own description (for example
+    <code>relation "foo" does not exist</code> or <code>Connection refused (os error 61)</code>),
+    which is what makes a failure useful to debug. Before it is written, the message is passed
+    through a redactor that strips any embedded credentials: userinfo in a connection URI such as
+    <code>postgres://user:secret@host</code> becomes <code>postgres://&lt;redacted&gt;@host</code>,
+    and <code>password</code>, <code>token</code>, <code>api_key</code>, and similar assignments are
+    replaced with <code>&lt;redacted&gt;</code>.
+  </p>
+
+  <h2 id="never-recorded">What is never recorded</h2>
+
+  <p>
+    The log is strictly limited to the metadata above. The following are never written to disk,
+    by design:
+  </p>
+
+  <ul>
+    <li><strong>Credentials and secrets</strong>: passwords, tokens, API keys, and connection strings.</li>
+    <li><strong>Query text</strong>: the SQL or statements you run are not logged.</li>
+    <li><strong>Query parameters</strong>: bound values and literals are not logged.</li>
+    <li><strong>Query results</strong>: no row data, cell values, or result sets. Only counts and timings.</li>
+  </ul>
+
+  <p>
+    This guarantee does not depend on scrubbing text after the fact. The file is filtered to a
+    single dedicated event channel, so the verbose output of the database driver libraries, which is
+    where raw SQL and result data would otherwise appear, is dropped before it can be written. The
+    redactor on error messages is a second layer on top of that.
+  </p>
+
+  <h2 id="storage">Storage and rotation</h2>
+
+  <p>
+    Events are appended to <code>debug.log</code> in the <code>debug_logs</code> folder. The file is
+    size capped: once it reaches 10 MB it rotates to <code>debug.log.1</code> and a fresh
+    <code>debug.log</code> is started, so a single previous generation is kept and the logs never
+    grow without bound. Deleting the files is safe; they are recreated the next time an event is
+    recorded with debug mode on.
+  </p>
+</DocsLayout>

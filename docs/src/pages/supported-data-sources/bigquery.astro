@@ -1,0 +1,143 @@
+---
+import "../../styles/global.css";
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import DocTable from "../../components/docs/DocTable/DocTable.astro";
+---
+
+<DocsLayout
+  title="BigQuery — Arris Docs"
+  breadcrumbs={[{ label: "Docs", href: "/" }, { label: "Connections", href: "/connections/overview" }, { label: "BigQuery" }]}
+  heading="BigQuery"
+  tocItems={[
+    { label: "Overview", href: "#overview" },
+    { label: "Driver", href: "#driver" },
+    { label: "Connection fields", href: "#fields" },
+    { label: "Authentication", href: "#auth" },
+    { label: "Schema browser", href: "#schema" },
+    { label: "Supported SQL commands", href: "#features" },
+  ]}
+  currentPath="/supported-data-sources/bigquery"
+  prev={{ label: "SSL", href: "/connections/ssl", section: "Connections" }}
+  next={{ label: "ClickHouse", href: "/supported-data-sources/clickhouse", section: "Connections" }}
+>
+  <h2 id="overview">
+    <img src="/db-logos/bigquery.png" alt="BigQuery logo" width="32" height="32" class="docLogo" />
+    Overview
+  </h2>
+
+  <p>
+    Google BigQuery is a fully managed, serverless data warehouse designed for large-scale
+    analytics. It supports standard SQL, nested and repeated fields, partitioned tables,
+    materialized views, and integrates with the broader Google Cloud ecosystem. BigQuery
+    separates storage from compute, scaling automatically to petabyte-scale workloads.
+  </p>
+
+  <h2 id="driver">Driver</h2>
+
+  <ul>
+    <li><strong>Crate:</strong> <a href="https://crates.io/crates/gcp-bigquery-client"><code>gcp-bigquery-client</code></a></li>
+    <li><strong>Version:</strong> <code>0.27</code></li>
+  </ul>
+
+  <h2 id="fields">Connection fields</h2>
+
+  <DocTable>
+    <thead>
+      <tr>
+        <th>Field</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="font-medium text-fg">Project ID</td>
+        <td>The GCP project ID that owns the BigQuery datasets (e.g. <code>my-gcp-project</code>).</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">Credentials File</td>
+        <td>Path to a service account JSON key file. Leave empty to use Application Default Credentials.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">Options</td>
+        <td>Additional parameters as <code>key1=val1&amp;key2=val2</code>.</td>
+      </tr>
+    </tbody>
+  </DocTable>
+
+  <h2 id="auth">Authentication</h2>
+
+  <p>
+    BigQuery supports two authentication methods. Arris tries them in order:
+  </p>
+
+  <p>
+    <strong>Service account key file</strong> &mdash; provide the path to a JSON key file
+    downloaded from the GCP Console. The service account must have the
+    <code>BigQuery Data Viewer</code> and <code>BigQuery Job User</code> roles at minimum.
+    For write operations (staged edits), add <code>BigQuery Data Editor</code>.
+  </p>
+
+  <p>
+    <strong>Application Default Credentials (ADC)</strong> &mdash; if no credentials file is
+    provided, Arris uses the <code>GOOGLE_APPLICATION_CREDENTIALS</code> environment
+    variable or the default credentials configured via <code>gcloud auth application-default login</code>.
+  </p>
+
+  <p>
+    All traffic to BigQuery goes over HTTPS. There is no option to disable TLS, and no SSH tunnel
+    is needed since BigQuery is a cloud-only service.
+  </p>
+
+  <h2 id="schema">Schema browser</h2>
+
+  <p>
+    Once connected, Arris lists all datasets in the project and fetches table metadata from
+    <code>INFORMATION_SCHEMA</code>. The schema tree is organized as Project &rarr; Dataset &rarr;
+    objects.
+  </p>
+
+  <ul>
+    <li><strong>Tables</strong> &mdash; regular tables and external tables</li>
+    <li><strong>Views</strong> &mdash; views and materialized views</li>
+    <li><strong>Routines</strong> &mdash; functions and stored procedures</li>
+  </ul>
+
+  <p>
+    Double-click any table or view to open it in browse mode.
+  </p>
+
+
+
+  <h2 id="features">Supported SQL commands</h2>
+
+  <DocTable>
+    <thead>
+      <tr>
+        <th>Command</th>
+        <th>Notes</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="font-medium text-fg"><code>SELECT</code></td>
+        <td>Query data with <code>WHERE</code> filters, <code>JOIN</code>s, aggregates, and window functions.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><code>INSERT</code></td>
+        <td>Insert rows via DML statements.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><code>UPDATE</code></td>
+        <td>Update rows via DML statements.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><code>DELETE</code></td>
+        <td>Delete rows via DML statements.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><code>CREATE</code> / <code>DROP</code></td>
+        <td>Create and drop tables, views, and other schema objects.</td>
+      </tr>
+    </tbody>
+  </DocTable>
+</DocsLayout>

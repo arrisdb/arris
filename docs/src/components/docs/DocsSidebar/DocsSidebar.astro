@@ -1,0 +1,44 @@
+---
+import { docsNav } from '../../../data/docs-nav';
+import styles from './DocsSidebar.module.css';
+
+interface Props {
+  currentPath: string;
+}
+
+const { currentPath } = Astro.props;
+---
+
+<aside class:list={[styles.side]} data-docs-sidebar>
+  {docsNav.map((group) => (
+    <div class:list={[styles.group]}>
+      <h5 class:list={[styles.groupTitle]}>{group.title}</h5>
+      <div class="flex flex-col gap-0.5 mt-1.5">
+        {group.items.map((item) => (
+          <a
+            href={item.href}
+            class:list={[
+              styles.link,
+              currentPath === item.href && styles.linkActive,
+            ]}
+          >
+            <span>{item.label}</span>
+            {item.badge && (
+              <span class:list={[styles.badge]}>{item.badge}</span>
+            )}
+          </a>
+        ))}
+      </div>
+    </div>
+  ))}
+</aside>
+
+<script>
+  document.addEventListener("astro:page-load", () => {
+    const sidebar = document.querySelector("aside");
+    const active = sidebar?.querySelector("[class*='linkActive']") as HTMLElement | null;
+    if (active && sidebar) {
+      active.scrollIntoView({ block: "center" });
+    }
+  });
+</script>

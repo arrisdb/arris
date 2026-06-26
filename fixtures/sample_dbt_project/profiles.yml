@@ -1,0 +1,21 @@
+jaffle_shop:
+  target: mysql
+  outputs:
+    postgres:
+      type: postgres
+      host: localhost
+      port: 5432
+      user: postgres
+      password: test
+      dbname: postgres
+      schema: public
+      threads: 4
+    mysql:
+      type: mysql
+      server: localhost
+      port: 3306
+      username: root
+      password: test
+      schema: appdb
+      threads: 4
+      

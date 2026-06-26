@@ -1,0 +1,197 @@
+---
+import "../../styles/global.css";
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import DocTable from "../../components/docs/DocTable/DocTable.astro";
+import CodeBlock from "../../components/docs/CodeBlock/CodeBlock.astro";
+---
+
+<DocsLayout
+  title="DynamoDB — Arris Docs"
+  breadcrumbs={[{ label: "Docs", href: "/" }, { label: "Connections", href: "/connections/overview" }, { label: "DynamoDB" }]}
+  heading="DynamoDB"
+  tocItems={[
+    { label: "Overview", href: "#overview" },
+    { label: "Driver", href: "#driver" },
+    { label: "Connection fields", href: "#fields" },
+    { label: "Authentication", href: "#auth" },
+    { label: "Schema browser", href: "#schema" },
+    { label: "Query language", href: "#modes" },
+    { label: "Supported PartiQL commands", href: "#features" },
+    { label: "Unsupported commands", href: "#unsupported" },
+  ]}
+  currentPath="/supported-data-sources/dynamodb"
+  prev={{ label: "DuckDB", href: "/supported-data-sources/duckdb", section: "Connections" }}
+  next={{ label: "Elasticsearch", href: "/supported-data-sources/elasticsearch", section: "Connections" }}
+>
+  <h2 id="overview">
+    <img src="/db-logos/dynamodb.png" alt="DynamoDB logo" width="32" height="32" class="docLogo" />
+    Overview
+  </h2>
+
+  <p>
+    Amazon DynamoDB is a fully managed, serverless NoSQL key-value and document database. It stores
+    schemaless items in tables keyed by a partition key (and an optional sort key), scales
+    automatically, and delivers single-digit millisecond latency. DynamoDB runs only on AWS, with a
+    local emulator (DynamoDB Local) available for development.
+  </p>
+
+  <h2 id="driver">Driver</h2>
+
+  <p>
+    Arris connects with the official <a href="https://crates.io/crates/aws-sdk-dynamodb"><code>aws-sdk-dynamodb</code></a>
+    crate over the DynamoDB JSON API. Queries are issued as <strong>PartiQL</strong>, DynamoDB's
+    SQL-compatible dialect, through the <code>ExecuteStatement</code> operation.
+  </p>
+
+  <ul>
+    <li><strong>Crate:</strong> <a href="https://crates.io/crates/aws-sdk-dynamodb"><code>aws-sdk-dynamodb</code></a></li>
+    <li><strong>Version:</strong> <code>1.116</code></li>
+  </ul>
+
+  <h2 id="fields">Connection fields</h2>
+
+  <DocTable>
+    <thead>
+      <tr>
+        <th>Field</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="font-medium text-fg">Region</td>
+        <td>AWS region the table lives in, such as <code>us-east-1</code>. Required unless supplied by the environment.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">Access Key ID</td>
+        <td>AWS access key id. Leave blank to use the default credential chain (environment, shared profile, or IAM role).</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">Secret Access Key</td>
+        <td>AWS secret access key paired with the access key id. Stored in the macOS Keychain.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">Session Token</td>
+        <td>Optional temporary session token for STS or assumed-role credentials.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">Endpoint URL</td>
+        <td>Optional endpoint override, for example <code>http://localhost:8000</code> to target DynamoDB Local or a VPC endpoint.</td>
+      </tr>
+    </tbody>
+  </DocTable>
+
+  <p>
+    DynamoDB has no host, port, or database fields, and no connection URI. Configure the fields above
+    directly. All connections also support an optional <strong>SSH tunnel</strong>; see
+    <a href="/connections/ssh-tunnels">SSH tunnels</a> for details.
+  </p>
+
+  <h2 id="auth">Authentication</h2>
+
+  <p>
+    When you enter an access key id and secret access key, Arris uses them as static credentials
+    (with the session token if provided). When those fields are blank, the AWS default credential
+    chain is used, resolving credentials from environment variables, the shared
+    <code>~/.aws/credentials</code> profile, or an attached IAM role. Connections always use TLS, so
+    there are no SSL mode options.
+  </p>
+
+  <CodeBlock lang="text" filename="DynamoDB Local endpoint">
+    http://localhost:8000
+  </CodeBlock>
+
+  <h2 id="schema">Schema browser</h2>
+
+  <p>
+    Once connected, Arris lists every table in the region. DynamoDB only declares its key attributes,
+    so Arris samples a page of items per table to surface the rest. Each table node shows the following
+    children:
+  </p>
+
+  <ul>
+    <li><strong>Columns</strong>: the partition key and optional sort key with their scalar types, plus the non-key attributes discovered from the sampled items, each with the type inferred from its values.</li>
+    <li><strong>Indexes</strong>: global secondary indexes (GSIs) and the attributes they key on.</li>
+  </ul>
+
+  <p>
+    Double-click any table to open it in a new tab with browse mode.
+  </p>
+
+  <h2 id="modes">Query language</h2>
+
+  <p>
+    DynamoDB has no SQL surface, so Arris uses PartiQL for every statement. Write PartiQL directly in
+    the editor; statements run through <code>ExecuteStatement</code> and read results page through
+    DynamoDB's <code>NextToken</code> automatically. Result columns follow your <code>SELECT</code>
+    projection order, and <code>ORDER BY</code> (which PartiQL itself lacks) is applied by Arris over
+    the full result set. Arris also accepts the familiar ANSI-style
+    <code>INSERT INTO t (cols) VALUES (...)</code> and translates it to PartiQL for you, and applies
+    <code>UPDATE</code> / <code>DELETE</code> with any <code>WHERE</code> (not only a full primary key).
+  </p>
+
+  <CodeBlock lang="sql" filename="PartiQL examples">
+    {`SELECT * FROM "orders" WHERE "customer_id" = 1
+INSERT INTO "orders" VALUE {'order_id': 200, 'customer_id': 1, 'status': 'pending', 'amount': 42.00}
+UPDATE "orders" SET "status" = 'shipped' WHERE "order_id" = 200
+DELETE FROM "orders" WHERE "order_id" = 200`}
+  </CodeBlock>
+
+  <h2 id="features">Supported PartiQL commands</h2>
+
+  <DocTable>
+    <thead>
+      <tr>
+        <th>Command</th>
+        <th>Notes</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="font-medium text-fg"><code>SELECT</code></td>
+        <td>Reads items from a table or index. Result columns follow the projection order and page automatically via <code>NextToken</code>.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><code>INSERT</code></td>
+        <td>Adds items. Both the native PartiQL <code>VALUE</code> document form and the standard <code>INSERT INTO t (cols) VALUES (...)</code> form (including multiple rows) are accepted.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><code>UPDATE</code></td>
+        <td>Updates matching items. A full primary-key match runs directly; any other <code>WHERE</code> (a non-key or range condition) is applied by selecting the matching rows first, then updating each.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><code>DELETE</code></td>
+        <td>Deletes matching items, using the same full-key-or-match behavior as <code>UPDATE</code>.</td>
+      </tr>
+    </tbody>
+  </DocTable>
+
+  <h2 id="unsupported">Unsupported commands</h2>
+
+  <DocTable>
+    <thead>
+      <tr>
+        <th>Command</th>
+        <th>Notes</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="font-medium text-fg"><code>EXPLAIN</code></td>
+        <td>DynamoDB has no query planner, so plan output is not available.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><code>JOIN</code></td>
+        <td>PartiQL on DynamoDB does not support joins across tables. Use federation mode to join a DynamoDB table with another source.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><code>GROUP BY</code> and aggregates</td>
+        <td>PartiQL has no <code>GROUP BY</code> or aggregate functions (<code>COUNT</code>, <code>SUM</code>, ...). Run these through federation mode, which aggregates in the query engine.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">DDL (<code>CREATE</code> / <code>DROP</code>)</td>
+        <td>Manage tables through the AWS console, CLI, or infrastructure tooling.</td>
+      </tr>
+    </tbody>
+  </DocTable>
+</DocsLayout>

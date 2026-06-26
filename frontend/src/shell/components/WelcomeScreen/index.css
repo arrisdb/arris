@@ -1,0 +1,367 @@
+/* WelcomeScreen — full-viewport centered layout shown when no project is open. */
+
+.welcome-screen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  width: 100%;
+  background: var(--m-bg-window);
+  overflow: auto;
+}
+
+.welcome-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  max-width: 700px;
+  width: 100%;
+  padding: 48px 32px 64px;
+  gap: 0;
+}
+
+.welcome-icon {
+  width: 112px;
+  height: 112px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 20px;
+  flex-shrink: 0;
+}
+
+.welcome-logo {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.welcome-heading {
+  font-family: var(--m-font);
+  font-size: calc(var(--m-fs-base) + 18px);
+  font-weight: 700;
+  color: var(--m-fg);
+  letter-spacing: -0.025em;
+  line-height: 1.15;
+  margin: 0 0 14px;
+}
+
+.welcome-subtitle {
+  font-size: var(--m-fs-base);
+  color: var(--m-fg-3);
+  line-height: 1.55;
+  max-width: 440px;
+  margin: 0 0 36px;
+}
+
+/* ── Sections ──────────────────────────────────────────────────────────────── */
+
+.welcome-section {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 32px;
+}
+
+.welcome-section-head {
+  font-size: var(--m-fs-xxs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--m-fg-3);
+  text-align: left;
+  padding-left: 2px;
+}
+
+/* ── New Project cards ─────────────────────────────────────────────────────── */
+
+.welcome-project-types {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 12px;
+  width: 100%;
+}
+
+.welcome-project-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 20px 12px;
+  border-radius: var(--m-r-sm);
+  background: var(--m-bg-card);
+  border: 0.5px solid var(--m-sep);
+  cursor: pointer;
+  text-align: center;
+  color: inherit;
+  transition: background 100ms ease, border-color 100ms ease;
+}
+
+.welcome-project-card:hover {
+  background: var(--m-bg-card-hover);
+  border-color: var(--m-sep-strong);
+}
+
+.welcome-project-card-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--m-r-xs);
+  background: var(--m-accent-tint);
+  color: var(--m-accent);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.welcome-project-card-logo {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+}
+
+.welcome-project-card-label {
+  font-size: var(--m-fs-md);
+  font-weight: 500;
+  color: var(--m-fg);
+}
+
+.welcome-project-card-desc {
+  font-size: var(--m-fs-xxs);
+  color: var(--m-fg-4);
+  line-height: 1.4;
+}
+
+/* ── Open Existing actions ─────────────────────────────────────────────────── */
+
+.welcome-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.welcome-action-btn {
+  height: 36px;
+  padding: 0 16px;
+  font-size: var(--m-fs-md);
+  gap: 7px;
+  border-radius: var(--m-r-sm);
+}
+
+.welcome-kbd {
+  font-family: var(--m-font-editor, var(--m-font-mono));
+  font-size: var(--m-fs-xxs);
+  opacity: 0.65;
+  margin-left: 4px;
+}
+
+.welcome-action-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* ── Recents ───────────────────────────────────────────────────────────────── */
+
+.welcome-recents-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  width: 100%;
+}
+
+.welcome-recent-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: var(--m-r-sm);
+  background: var(--m-bg-card);
+  border: 0.5px solid var(--m-sep);
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  color: inherit;
+  transition: background 100ms ease;
+}
+
+.welcome-recent-card:hover {
+  background: var(--m-bg-card-hover);
+  border-color: var(--m-sep-strong);
+}
+
+.welcome-recent-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--m-r-xs);
+  background: var(--m-accent-tint);
+  color: var(--m-accent);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.welcome-recent-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 3px;
+}
+
+.welcome-recent-name {
+  font-size: var(--m-fs-md);
+  font-weight: 500;
+  color: var(--m-fg);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.welcome-recent-meta {
+  font-size: var(--m-fs-xxs);
+  color: var(--m-fg-4);
+  font-family: var(--m-font);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Confirm dialog ────────────────────────────────────────────────────────── */
+
+.welcome-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 9999;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+.welcome-dialog {
+  background: var(--m-bg-surface);
+  border: 1px solid var(--m-sep);
+  border-radius: 10px;
+  padding: 20px 24px 16px;
+  min-width: 280px;
+  max-width: 360px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.7);
+}
+
+.welcome-dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.welcome-dialog-title {
+  font-size: var(--m-fs-base);
+  font-weight: 600;
+  color: var(--m-fg);
+}
+
+.welcome-dialog-message {
+  font-size: var(--m-fs-md);
+  color: var(--m-fg-3);
+  line-height: 1.45;
+}
+
+.welcome-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.welcome-dialog-btn {
+  font-size: var(--m-fs-sm);
+  padding: 4px 16px;
+  border-radius: 6px;
+}
+
+/* ── Clone dialog ─────────────────────────────────────────────────────────── */
+
+.welcome-clone-dialog {
+  min-width: 400px;
+  max-width: 480px;
+}
+
+.welcome-clone-label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: var(--m-fs-sm);
+  color: var(--m-fg-3);
+  text-align: left;
+}
+
+.welcome-clone-input {
+  width: 100%;
+  height: 32px;
+  padding: 0 10px;
+  font-size: var(--m-fs-md);
+  font-family: var(--m-font);
+  background: var(--m-bg-input);
+  border: 1px solid var(--m-sep);
+  border-radius: 6px;
+  color: var(--m-fg);
+  outline: none;
+  box-sizing: border-box;
+}
+
+.welcome-clone-input:focus {
+  border-color: var(--m-accent);
+}
+
+.welcome-clone-input::placeholder {
+  color: var(--m-placeholder);
+}
+
+.welcome-clone-dest-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.welcome-clone-dest-row .welcome-clone-input {
+  flex: 1;
+}
+
+.welcome-clone-browse {
+  flex-shrink: 0;
+  height: 32px;
+  padding: 0 12px;
+  font-size: var(--m-fs-sm);
+  border-radius: 6px;
+}
+
+.welcome-clone-error {
+  font-size: var(--m-fs-sm);
+  color: var(--m-fg-error, #f87171);
+  line-height: 1.4;
+  text-align: left;
+  word-break: break-word;
+}
+
+@keyframes welcome-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.welcome-clone-spinner {
+  animation: welcome-spin 1s linear infinite;
+}

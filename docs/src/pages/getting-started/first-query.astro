@@ -1,0 +1,130 @@
+---
+import "../../styles/global.css";
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import Callout from "../../components/docs/Callout/Callout.astro";
+import Screenshot from "../../components/docs/Screenshot/Screenshot.astro";
+---
+
+<DocsLayout
+  title="Your First Query | Arris Docs"
+  breadcrumbs={[{ label: "Docs", href: "/" }, { label: "Getting started" }, { label: "First query" }]}
+  heading="Your first query"
+  lede="Connect to a database and run your first SQL query."
+  tocItems={[
+    { label: "Create an empty project", href: "#create-project" },
+    { label: "Write a query", href: "#write-query" },
+    { label: "Run it", href: "#run" },
+    { label: "Browse results", href: "#results" },
+    { label: "Next steps", href: "#next-steps" },
+  ]}
+  currentPath="/getting-started/first-query"
+  prev={{ label: "Install Arris", href: "/getting-started/install", section: "Getting started" }}
+  next={{ label: "Overview", href: "/connections/overview", section: "Connections" }}
+>
+  <h2 id="create-project">Create an empty project</h2>
+
+  <p>
+    On the Welcome screen, click <strong>Empty project</strong> under <strong>New project</strong>.
+    Arris scaffolds a fresh workspace and drops a <code>sample.duckdb</code> database with sample
+    data inside, so you can start querying right away without configuring a connection.
+  </p>
+
+  <Screenshot
+    src="/screenshots/welcome-empty-project.png"
+    alt="The Arris Welcome screen with Empty project, dbt, and SQLMesh options under New project"
+    caption="Click Empty project to scaffold a workspace preloaded with a sample DuckDB database."
+  />
+
+  <h2 id="write-query">Write a query</h2>
+
+  <p>
+    The empty project opens with a <strong>Sample query</strong> tab already wired to the bundled
+    <strong>Sample data</strong> DuckDB connection. Expand it in the right sidebar to browse the
+    sample <code>orders</code> table and its columns (<code>id</code>, <code>product</code>,
+    <code>amount</code>, <code>order_date</code>).
+  </p>
+
+  <Screenshot
+    src="/screenshots/sample-duckdb-editor.png"
+    alt="The Arris SQL editor with the Sample data DuckDB connection expanded, showing the orders table columns id, product, amount, and order_date"
+    caption="The empty project ships with a Sample data DuckDB connection and an orders table to query."
+  />
+
+  <h2 id="run">Run it</h2>
+
+  <p>
+    Click the <strong>Run</strong> button (the <span class="text-accent-2">&#9658;</span> icon
+    in the top-left of the editor) or press <kbd>&#8984;&#8617;</kbd> to execute the query. To
+    run only part of the script, select the lines you want first. Results appear in the panel
+    below, with each column's name and type in the header.
+  </p>
+
+  <Screenshot
+    src="/screenshots/run-query.png"
+    alt="The Arris SQL editor running a query against the sample orders table, with the Run button highlighted and results shown in a grid below"
+    caption="Hit Run or press Cmd+Enter. Results land in the grid below with typed column headers."
+  />
+
+  <h2 id="results">Browse results</h2>
+
+  <p>
+    Query results appear in a grid below the editor. The grid supports:
+  </p>
+
+  <ul class="list-none pl-0 space-y-2.5">
+    <li class="flex items-start gap-2.5">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-accent-2 shrink-0 mt-1"><path d="m21 16-4 4-4-4" /><path d="M17 20V4" /><path d="m3 8 4-4 4 4" /><path d="M7 4v16" /></svg>
+      <span><strong>Sort</strong>: click any column header to sort ascending or descending.</span>
+    </li>
+    <li class="flex items-start gap-2.5">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-accent-2 shrink-0 mt-1"><path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z" /></svg>
+      <span><strong>Filter</strong>: use the filter bar above the grid to narrow results by column values.</span>
+    </li>
+    <li class="flex items-start gap-2.5">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-accent-2 shrink-0 mt-1"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></svg>
+      <span><strong>Copy</strong>: select cells or rows and press <kbd>&#8984;C</kbd> to copy as tab-separated text.</span>
+    </li>
+    <li class="flex items-start gap-2.5">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-accent-2 shrink-0 mt-1"><path d="M8 3H7a2 2 0 0 0-2 2v5a2 2 0 0 1-2 2 2 2 0 0 1 2 2v5c0 1.1.9 2 2 2h1" /><path d="M16 21h1a2 2 0 0 0 2-2v-5c0-1.1.9-2 2-2a2 2 0 0 1-2-2V5a2 2 0 0 0-2-2h-1" /></svg>
+      <span><strong>Row detail</strong>: click the <strong>&#123; &#125;</strong> button in the results toolbar to open the selected row as formatted JSON.</span>
+    </li>
+    <li class="flex items-start gap-2.5">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-accent-2 shrink-0 mt-1"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" x2="12" y1="15" y2="3" /></svg>
+      <span><strong>Export</strong>: right-click the grid to export results as CSV or JSON.</span>
+    </li>
+    <li class="flex items-start gap-2.5">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-accent-2 shrink-0 mt-1"><path d="m18 8 4 4-4 4" /><path d="M2 12h20" /><path d="m6 8-4 4 4 4" /></svg>
+      <span><strong>Resize columns</strong>: drag column borders to resize, or double-click to auto-fit.</span>
+    </li>
+  </ul>
+
+  <Screenshot
+    src="/screenshots/row-detail-json.png"
+    alt="The Arris results grid with a row selected and the Row detail panel showing that row as formatted JSON"
+    caption="Select a row and open the Row detail panel to inspect it as formatted JSON."
+  />
+
+  <p>
+    Prefer a visual? Switch the results panel from <strong>Table</strong> to <strong>Chart</strong>
+    to plot the same query output without leaving the editor. Pick a chart type (bar, line, area,
+    pie, scatter, and more), map the X and Y axes, and Arris renders it live.
+  </p>
+
+  <Screenshot
+    src="/screenshots/chart-view.png"
+    alt="The Arris results panel in Chart mode rendering a bar chart of amount by product, with chart type and axis controls in the right sidebar"
+    caption="Flip to Chart mode to visualize results as a bar, line, pie, and more, configured from the side panel."
+  />
+  <h2 id="next-steps">Next steps</h2>
+
+  <p>
+    You have connected to a database and run your first query. Here are some things to try next:
+  </p>
+
+  <ul>
+    <li>Explore the <a href="/querying/editor" class="text-accent-2 hover:text-fg transition-colors">editor features</a> including schema autocomplete and statement-at-cursor execution.</li>
+    <li>Try a <a href="/querying/cross-source" class="text-accent-2 hover:text-fg transition-colors">cross-source federated query</a> to join data from multiple databases.</li>
+    <li>Open a <a href="/analytics-engineering/dbt" class="text-accent-2 hover:text-fg transition-colors">dbt project</a> to explore models and lineage.</li>
+    <li>Learn the <a href="/reference/shortcuts" class="text-accent-2 hover:text-fg transition-colors">keyboard shortcuts</a> to navigate faster.</li>
+  </ul>
+</DocsLayout>

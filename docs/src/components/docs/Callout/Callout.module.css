@@ -1,0 +1,58 @@
+.callout {
+  display: grid;
+  grid-template-columns: 32px 1fr;
+  gap: 14px;
+  align-items: start;
+  padding: 14px 18px 14px 16px;
+  border-radius: 12px;
+  margin: 22px 0;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+}
+
+.title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-fg);
+  margin-bottom: 4px;
+}
+
+.note {
+  background: rgba(124, 140, 255, 0.08);
+  border: 0.5px solid rgba(124, 140, 255, 0.25);
+}
+
+.iconNote {
+  background: rgba(124, 140, 255, 0.2);
+  color: var(--color-accent-2);
+}
+
+.tip {
+  background: rgba(91, 227, 154, 0.06);
+  border: 0.5px solid rgba(91, 227, 154, 0.22);
+}
+
+.iconTip {
+  background: rgba(91, 227, 154, 0.15);
+  color: var(--color-green);
+}
+
+.warn {
+  background: rgba(255, 161, 74, 0.06);
+  border: 0.5px solid rgba(255, 161, 74, 0.22);
+}
+
+.iconWarn {
+  background: rgba(255, 161, 74, 0.15);
+  color: var(--color-orange);
+}

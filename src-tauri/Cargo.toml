@@ -1,0 +1,46 @@
+[package]
+name = "arris-tauri"
+version = "0.6.0"
+edition = "2024"
+license = "MIT"
+description = "Tauri 2 shell wrapping `arris-engines` command handlers."
+
+[[bin]]
+name = "arris"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+arris-engines = { path = "../crates/arris-engines" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["full"] }
+uuid = { version = "1", features = ["v4", "serde"] }
+tracing = "0.1"
+tauri = { version = "2", features = [] }
+tauri-plugin-shell = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-fs = "2"
+tauri-plugin-pty = "0.2.1"
+tauri-plugin-updater = "2"
+tauri-plugin-process = "2"
+tauri-plugin-opener = "2"
+notify-debouncer-full = "0.7"
+
+# macOS clipboard file-list access (NSPasteboard file URLs). Versions match the
+# objc2 crates Tauri already pulls in on macOS.
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2-app-kit = { version = "0.3", features = ["NSPasteboard", "NSPasteboardItem"] }
+objc2-foundation = { version = "0.3", features = ["NSString", "NSURL", "NSArray"] }
+
+# src-tauri is excluded from the root workspace (see ../Cargo.toml `exclude`),
+# so the app binary does NOT inherit the workspace [profile.release]. Mirror it
+# here so release builds are stripped + LTO'd (otherwise the binary ships
+# unstripped with ~490k symbols).
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+strip = "symbols"

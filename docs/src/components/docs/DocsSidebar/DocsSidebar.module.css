@@ -1,0 +1,82 @@
+.side {
+  position: sticky;
+  top: 76px;
+  max-height: calc(100vh - 96px);
+  overflow-y: auto;
+  padding-bottom: 40px;
+}
+
+.side::-webkit-scrollbar {
+  width: 6px;
+}
+
+.side::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.side::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 3px;
+}
+
+.group {
+  margin-bottom: 22px;
+}
+
+.groupTitle {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-fg-4);
+  font-weight: 600;
+  padding: 0 12px;
+  margin-bottom: 4px;
+  line-height: 1;
+}
+
+.link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px;
+  border-radius: 7px;
+  font-size: 13px;
+  color: var(--color-fg-3);
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.link:hover {
+  color: var(--color-fg);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.linkActive {
+  color: var(--color-fg);
+  background: rgba(124, 140, 255, 0.15);
+  border: 0.5px solid rgba(124, 140, 255, 0.3);
+}
+
+.badge {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 9999px;
+  background: rgba(91, 227, 154, 0.15);
+  color: var(--color-green);
+  line-height: 1.5;
+}
+
+/* Inside the mobile drawer the sidebar fills the panel, so drop the sticky
+   desktop offset and let the drawer own the scroll. */
+@media (max-width: 768px) {
+  .side {
+    position: static;
+    top: auto;
+    max-height: none;
+    overflow-y: visible;
+    padding-bottom: 0;
+  }
+}

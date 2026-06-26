@@ -1,0 +1,173 @@
+---
+import "../../styles/global.css";
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import Screenshot from "../../components/docs/Screenshot/Screenshot.astro";
+---
+
+<DocsLayout
+  title="Editor — Arris Docs"
+  breadcrumbs={[{ label: "Docs", href: "/" }, { label: "Querying" }, { label: "Editor" }]}
+  heading="Editor"
+  lede="A dialect-aware SQL editor with schema autocomplete, linting, and statement-at-cursor execution."
+  tocItems={[
+    { label: "Overview", href: "#overview" },
+    { label: "Dialect awareness", href: "#dialect" },
+    { label: "Autocomplete", href: "#autocomplete" },
+    { label: "Running queries", href: "#running" },
+    { label: "Transactions", href: "#transactions" },
+    { label: "Linting & highlighting", href: "#linting" },
+  ]}
+  currentPath="/querying/editor"
+  prev={{ label: "Trino", href: "/supported-data-sources/trino", section: "Supported data sources" }}
+  next={{ label: "Results viewer", href: "/querying/results", section: "Querying" }}
+>
+  <h2 id="overview">Overview</h2>
+
+  <p>
+    Every console tab and SQL file opens in the same editor, bound to a single connection. The
+    editor handles syntax highlighting, schema-aware autocomplete, inline linting, find and
+    replace, bracket matching, auto-closing brackets, and indentation guides.
+  </p>
+
+  <p>
+    Beyond plain SQL, the same editor drives the Redis CLI, Elasticsearch REST, MongoDB shell,
+    Jupyter notebook cells, and dbt / SQLMesh model files. Each gets its own completion provider, so the
+    suggestions match the surface you are typing into.
+  </p>
+
+  <Screenshot
+    src="/screenshots/editor-overview.png"
+    alt="The Arris SQL Console tab with a multi-line Postgres query using CTEs, date_trunc, SUM, and a LAG window function, syntax-highlighted by identifier role, bound to the prod_postgres connection in Auto transaction mode"
+    caption="A SQL console tab: a multi-CTE query syntax-highlighted by role, bound to a connection."
+  />
+
+  <h2 id="dialect">Dialect awareness</h2>
+
+  <p>
+    The editor detects the SQL dialect from the connection kind, so keywords, functions, and
+    string-quoting rules are highlighted correctly for your engine:
+  </p>
+
+  <ul>
+    <li><strong>PostgreSQL</strong> &mdash; Postgres and Redshift.</li>
+    <li><strong>MySQL</strong> &mdash; MySQL and MariaDB.</li>
+    <li><strong>SQLite</strong> &mdash; SQLite and DuckDB.</li>
+    <li><strong>MSSQL</strong> &mdash; SQL Server.</li>
+    <li><strong>PL/SQL</strong> &mdash; Oracle.</li>
+    <li><strong>BigQuery</strong> &mdash; backtick identifiers and double-quoted strings.</li>
+    <li><strong>Generic SQL</strong> &mdash; every other engine, with a broad keyword set.</li>
+  </ul>
+
+  <h2 id="autocomplete">Autocomplete</h2>
+
+  <p>
+    Autocomplete is schema-aware and draws from the cached schema of the tab's connection. As you
+    type, it suggests:
+  </p>
+
+  <ul>
+    <li><strong>Tables and views</strong> from the connection schema, with schema prefixes.</li>
+    <li><strong>Columns</strong>, narrowed to the tables referenced in the current <code>FROM</code> and <code>JOIN</code> clauses.</li>
+    <li><strong>CTEs and subquery aliases</strong> defined earlier in the same statement.</li>
+    <li><strong>Column aliases</strong> from the statement's <code>SELECT</code> list, so an <code>AS</code> name is suggested in <code>HAVING</code> and <code>ORDER BY</code>.</li>
+    <li><strong>SQL keywords</strong> for the active dialect.</li>
+    <li><strong>Functions</strong>, including dialect-specific built-ins such as <code>array_agg</code> on Postgres or <code>GROUP_CONCAT</code> on MySQL.</li>
+  </ul>
+
+  <p>
+    The menu opens as you type and also pops automatically at clause boundaries (after
+    <code>FROM</code>, <code>GROUP BY</code>, and <code>ORDER BY</code>). In dbt and SQLMesh model
+    files it additionally completes <code>ref()</code>, <code>source()</code>, and model names.
+  </p>
+
+  <Screenshot
+    src="/screenshots/editor-autocomplete.png"
+    alt="The Arris editor showing a schema-aware autocomplete popup: a column suggestion country_code typed as character(2) NOT NULL from postgres.public.customers, followed by the COUNT, CONCAT, and COALESCE function suggestions"
+    caption="Autocomplete suggests schema columns with their types and source table, alongside dialect functions."
+  />
+
+  <h2 id="running">Running queries</h2>
+
+  <p>
+    Press <kbd>&#8984;&#8617;</kbd> to run. Arris picks what to execute based on context, in this
+    order:
+  </p>
+
+  <ol>
+    <li><strong>Selection</strong> &mdash; if text is highlighted, only that text runs.</li>
+    <li><strong>Statement under the cursor</strong> &mdash; otherwise the single statement around the cursor runs. Statements are split on unquoted semicolons, ignoring semicolons inside strings and comments.</li>
+    <li><strong>Whole buffer</strong> &mdash; if the cursor is not inside any statement, the entire editor runs.</li>
+  </ol>
+
+  <p>
+    A gutter indicator next to the running statement shows a live spinner and elapsed timer, then a
+    check on success or a cross on error. The run shortcut is the only run-related action bound by
+    default; <strong>Stop query</strong> ships unbound and can be assigned in
+    <strong>Settings &rarr; Keymap</strong>.
+  </p>
+
+  <h2 id="transactions">Transactions</h2>
+
+  <p>
+    The <strong>Tx</strong> control in the editor toolbar sets how runs are committed. It has two
+    modes and an isolation level, both per connection. Transactions apply to the relational engines
+    that support them: Postgres, Redshift, MySQL, MariaDB, SQLite, DuckDB, SQL Server, Oracle, and
+    Snowflake. On engines without transactions, the control is hidden.
+  </p>
+
+  <ul>
+    <li><strong>Auto</strong> &mdash; the default. Each run commits immediately on its own.</li>
+    <li><strong>Manual</strong> &mdash; the first statement opens a transaction and holds it open. Every later run joins the same transaction until you commit or roll back.</li>
+  </ul>
+
+  <p>
+    The isolation level is chosen in the same dropdown and takes effect when the transaction opens:
+  </p>
+
+  <ul>
+    <li><strong>Database Default</strong> &mdash; no isolation clause is sent; the server's configured default applies.</li>
+    <li><strong>Read Committed</strong></li>
+    <li><strong>Repeatable Read</strong></li>
+    <li><strong>Serializable</strong></li>
+  </ul>
+
+  <Screenshot
+    src="/screenshots/editor-transaction-modes.png"
+    alt="The Arris editor toolbar Tx dropdown open, showing a Transaction Mode group with Auto selected and Manual, and a Transaction Isolation group with Database Default selected and Read Committed, Repeatable Read, and Serializable"
+    caption="The Tx dropdown sets the transaction mode and isolation level for the connection."
+  />
+
+  <p>
+    In manual mode the toolbar adds three controls: <strong>commit</strong>, <strong>roll back</strong>,
+    and a toggle for the transaction panel. Commit and roll back are enabled once the transaction has
+    uncommitted work; while that work is pending you cannot switch back to Auto without first
+    committing or rolling back.
+  </p>
+
+  <p>
+    The transaction panel lists the statements run in the open transaction, numbered in order, each
+    with a success or error marker, its SQL, any error message, and the rows it affected. The
+    transaction stays open on its connection even if you switch tabs, and is held in memory only,
+    never persisted.
+  </p>
+
+  <Screenshot
+    src="/screenshots/editor-transaction-panel.png"
+    alt="The Arris Transaction panel listing two numbered statements in the open transaction, a SELECT and an INSERT, each with a green success checkmark and the INSERT reporting one row"
+    caption="In manual mode the Transaction panel tracks each statement in the open transaction until you commit or roll back."
+  />
+
+  <h2 id="linting">Linting & highlighting</h2>
+
+  <p>
+    The editor highlights identifiers by role: tables, columns, aliases, and functions each get a
+    distinct color, so the shape of a query is readable at a glance. In federated queries, the
+    leading connection segment of a dotted table reference is tinted with that source's color.
+  </p>
+
+  <p>
+    A built-in linter underlines incomplete or misspelled keywords and references that do not match
+    the cached schema, with a warning marker in the gutter. Indentation guides and an optional
+    border around the active statement help you keep long scripts oriented.
+  </p>
+</DocsLayout>

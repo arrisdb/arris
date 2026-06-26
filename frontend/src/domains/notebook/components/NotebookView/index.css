@@ -1,0 +1,475 @@
+/* The notebook owns the shared `mdbc-pyconsole-*` header/status/output styles
+   (formerly defined by the now-removed Python console). The multi-cell document
+   layout is added further below. */
+
+.mdbc-pyconsole {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: var(--m-bg-editor);
+  color: var(--m-fg);
+}
+
+/* === Header === */
+
+.mdbc-pyconsole-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--m-sep);
+}
+
+.mdbc-pyconsole-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--m-fg-4);
+}
+
+.mdbc-pyconsole-dot.idle {
+  background: var(--m-green);
+}
+
+.mdbc-pyconsole-dot.busy,
+.mdbc-pyconsole-dot.starting {
+  background: var(--m-yellow);
+}
+
+/* No interpreter (none) and a dead kernel are both error states — red. */
+.mdbc-pyconsole-dot.none,
+.mdbc-pyconsole-dot.dead {
+  background: var(--m-red);
+}
+
+.mdbc-pyconsole-status {
+  font-size: var(--m-fs-xs);
+  color: var(--m-fg-3);
+  min-width: 64px;
+}
+
+.mdbc-pyconsole-status.busy,
+.mdbc-pyconsole-status.starting {
+  color: var(--m-yellow);
+}
+
+/* No interpreter (none) and a dead kernel are both error states — red. */
+.mdbc-pyconsole-status.none,
+.mdbc-pyconsole-status.dead {
+  color: var(--m-red);
+}
+
+.mdbc-pyconsole-status.idle {
+  color: var(--m-green);
+}
+
+.mdbc-pyconsole-spacer {
+  flex: 1;
+}
+
+.mdbc-pyconsole-ctl {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  border: 1px solid var(--m-sep);
+  border-radius: var(--m-r-sm);
+  background: transparent;
+  color: var(--m-fg-3);
+  font-size: var(--m-fs-xs);
+  cursor: pointer;
+}
+
+.mdbc-pyconsole-ctl:hover:not(:disabled) {
+  background: var(--m-bg-card-hover);
+  color: var(--m-fg);
+}
+
+.mdbc-pyconsole-ctl:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.mdbc-pyconsole-banner {
+  padding: 6px 10px;
+  font-size: var(--m-fs-xs);
+  color: var(--m-red);
+  border-bottom: 1px solid var(--m-sep);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.mdbc-pyconsole-venv-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.mdbc-pyconsole-venv-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mdbc-pyconsole-venv-label {
+  color: var(--m-fg-3);
+  font-size: var(--m-fs-xs);
+}
+
+.mdbc-pyconsole-venv-path {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mdbc-pyconsole-venv-input {
+  flex: 1;
+  box-sizing: border-box;
+  padding: 6px 8px;
+  background: var(--m-bg-card);
+  border: 1px solid var(--m-sep);
+  border-radius: var(--m-r-sm);
+  outline: none;
+  color: var(--m-fg);
+  font-size: var(--m-fs-sm);
+}
+
+.mdbc-pyconsole-venv-input:focus {
+  border-color: var(--m-accent);
+}
+
+.mdbc-pyconsole-venv-preview {
+  color: var(--m-fg-4);
+  font-family: var(--m-font-editor, var(--m-font-mono));
+  font-size: var(--m-fs-xs);
+  word-break: break-all;
+}
+
+/* === Cells === */
+
+.mdbc-pyconsole-cells {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 12px;
+  font-family: var(--m-font-editor, var(--m-font-mono));
+  font-size: var(--m-fs-sm);
+}
+
+.mdbc-pyconsole-prompt {
+  flex-shrink: 0;
+  width: 72px;
+  text-align: right;
+  padding-top: 7px;
+  font-size: var(--m-fs-xs);
+  white-space: nowrap;
+  user-select: none;
+}
+
+.mdbc-pyconsole-prompt.in {
+  color: var(--m-accent);
+}
+
+.mdbc-pyconsole-text,
+.mdbc-pyconsole-stream {
+  margin: 0;
+  color: var(--m-fg-2);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.mdbc-pyconsole-stream.stderr {
+  color: var(--m-red);
+}
+
+.mdbc-pyconsole-html {
+  overflow-x: auto;
+}
+
+/* Pandas DataFrames render as `<table border="1" class="dataframe">`; restyle
+   into a readable, theme-aware table. */
+.mdbc-pyconsole-html table {
+  border-collapse: collapse;
+  margin: 2px 0;
+  color: var(--m-fg-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.mdbc-pyconsole-html th,
+.mdbc-pyconsole-html td {
+  border: 1px solid var(--m-sep);
+  padding: 4px 10px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.mdbc-pyconsole-html thead th {
+  background: var(--m-bg-surface-2);
+  color: var(--m-fg);
+  font-weight: 600;
+}
+
+.mdbc-pyconsole-html tbody th {
+  background: var(--m-bg-surface-2);
+  color: var(--m-fg-3);
+  font-weight: 500;
+  text-align: right;
+}
+
+.mdbc-pyconsole-img {
+  max-width: 100%;
+}
+
+.mdbc-pyconsole-error {
+  background: var(--m-accent-tint);
+  border: 1px solid var(--m-red);
+  border-radius: var(--m-r-md);
+  padding: 10px;
+}
+
+.mdbc-pyconsole-error-body {
+  margin: 0;
+  color: var(--m-red);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* === Running spinner (cell gutter) === */
+
+.mdbc-notebook-spinner {
+  display: inline-block;
+  width: 11px;
+  height: 11px;
+  border: 2px solid var(--m-sep);
+  border-top-color: var(--m-accent);
+  border-radius: 50%;
+  animation: mdbc-notebook-spin 0.7s linear infinite;
+}
+
+@keyframes mdbc-notebook-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.mdbc-notebook .mdbc-pyconsole-cells {
+  font-family: inherit;
+  /* Breathing room below the last cell / add-cell row so the document never
+     sits flush against the bottom of the pane. */
+  padding-bottom: 64px;
+}
+
+.mdbc-notebook-cell {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.mdbc-notebook-gutter {
+  flex-shrink: 0;
+  width: 72px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+/* Vertical separator between the cell-action group and the kernel-control group
+   in the toolbar. */
+.mdbc-notebook-toolbar-divider {
+  align-self: stretch;
+  width: 1px;
+  margin: 2px 0;
+  background: var(--m-sep);
+}
+
+/* Icon-only toolbar buttons: borderless, with a larger glyph than the inline
+   text-button icons since the icon is the only content. The hover background
+   alone supplies the affordance. */
+.mdbc-notebook .mdbc-pyconsole-ctl.icon {
+  padding: 5px;
+  border-color: transparent;
+}
+
+.mdbc-notebook .mdbc-pyconsole-ctl.icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.mdbc-notebook-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.mdbc-notebook-editor {
+  box-sizing: border-box;
+  padding: 8px 10px;
+  background: var(--m-bg-card);
+  border: 1px solid var(--m-sep);
+  border-radius: var(--m-r-md);
+}
+
+.mdbc-notebook-editor:focus-within {
+  border-color: var(--m-accent);
+}
+
+/* Empty and typed states MUST be the same height — no layout shift when the
+   first character replaces the placeholder. Pin the editor, the content, and the
+   placeholder all to exactly one line (font-size x line-height), so an empty cell
+   showing the placeholder is the same height as a cell with one line of code. */
+.mdbc-notebook-editor .cm-editor,
+.mdbc-notebook-editor .cm-content {
+  min-height: calc(var(--m-fs-sm) * 1.5);
+}
+
+.mdbc-notebook-editor .cm-placeholder {
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.mdbc-notebook-sql-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 6px;
+}
+
+.mdbc-notebook-sql-label {
+  color: var(--m-fg-muted);
+  font-size: var(--m-fs-xs);
+  white-space: nowrap;
+}
+
+.mdbc-notebook-sql-logo {
+  width: 14px;
+  height: 14px;
+  margin-right: 6px;
+  object-fit: contain;
+  border-radius: 3px;
+  vertical-align: middle;
+}
+
+.mdbc-notebook-sql-var {
+  box-sizing: border-box;
+  width: 140px;
+  padding: 3px 8px;
+  background: var(--m-bg-card);
+  border: 1px solid var(--m-sep);
+  border-radius: var(--m-r-md);
+  color: var(--m-fg);
+  font-family: var(--m-font-editor, var(--m-font-mono));
+  font-size: var(--m-fs-sm);
+}
+
+.mdbc-notebook-sql-var:focus {
+  outline: none;
+  border-color: var(--m-accent);
+}
+
+.mdbc-notebook-outputs {
+  padding-top: 8px;
+}
+
+.mdbc-notebook-rendered {
+  padding: 4px 2px;
+  cursor: text;
+  color: var(--m-fg);
+  font-family: var(--m-font-editor, var(--m-font-mono));
+}
+
+.mdbc-notebook-markdown h1,
+.mdbc-notebook-markdown h2,
+.mdbc-notebook-markdown h3,
+.mdbc-notebook-markdown h4,
+.mdbc-notebook-markdown h5,
+.mdbc-notebook-markdown h6 {
+  margin: 0.4em 0 0.3em;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.mdbc-notebook-markdown h1 {
+  font-size: 1.7em;
+}
+
+.mdbc-notebook-markdown h2 {
+  font-size: 1.4em;
+}
+
+.mdbc-notebook-markdown h3 {
+  font-size: 1.2em;
+}
+
+.mdbc-notebook-markdown h4 {
+  font-size: 1.05em;
+}
+
+.mdbc-notebook-markdown p {
+  margin: 0.4em 0;
+  line-height: 1.55;
+}
+
+.mdbc-notebook-markdown ul,
+.mdbc-notebook-markdown ol {
+  margin: 0.4em 0;
+  padding-left: 1.4em;
+}
+
+.mdbc-notebook-markdown code {
+  font-family: var(--m-font-editor, var(--m-font-mono));
+  font-size: 0.92em;
+  background: var(--m-bg-card);
+  padding: 1px 4px;
+  border-radius: var(--m-r-sm);
+}
+
+.mdbc-notebook-markdown pre {
+  background: var(--m-bg-card);
+  border: 1px solid var(--m-sep);
+  border-radius: var(--m-r-md);
+  padding: 8px 10px;
+  overflow-x: auto;
+}
+
+.mdbc-notebook-markdown pre code {
+  background: transparent;
+  padding: 0;
+}
+
+.mdbc-notebook-markdown blockquote {
+  margin: 0.4em 0;
+  padding-left: 12px;
+  border-left: 3px solid var(--m-sep);
+  color: var(--m-fg-3);
+}
+
+.mdbc-notebook-markdown a {
+  color: var(--m-accent);
+}
+
+.mdbc-notebook-add-row {
+  display: flex;
+  gap: 6px;
+  margin: 4px 0 0 82px;
+}
+
+.mdbc-notebook-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border: 1px dashed var(--m-sep);
+  border-radius: var(--m-r-sm);
+  background: transparent;
+  color: var(--m-fg-3);
+  font-size: var(--m-fs-xs);
+  cursor: pointer;
+}
+
+.mdbc-notebook-add:hover {
+  background: var(--m-bg-card-hover);
+  color: var(--m-fg);
+}

@@ -1,0 +1,17 @@
+test_stg_products_passthrough:
+  model: analytics_shop.stg_products
+  inputs:
+    analytics_shop.raw_products:
+      rows:
+        - product_id: 1
+          product_name: Mechanical Keyboard
+          category: Peripherals
+          price: 129.00
+  outputs:
+    query:
+      partial: true
+      rows:
+        - product_id: 1
+          product_name: Mechanical Keyboard
+          category: Peripherals
+          price: 129.00

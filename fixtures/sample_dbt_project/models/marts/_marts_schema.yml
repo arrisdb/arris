@@ -1,0 +1,51 @@
+version: 2
+
+models:
+  - name: dim_customers
+    description: Customer dimension table with order summary
+    columns:
+      - name: customer_id
+        description: Primary key
+        tests:
+          - unique
+          - not_null
+      - name: first_name
+        description: Customer first name
+      - name: last_name
+        description: Customer last name
+      - name: email
+        description: Email address
+      - name: order_count
+        description: Total number of orders
+      - name: total_amount
+        description: Lifetime spend in cents
+
+  - name: fct_orders
+    description: Incremental order fact table, appended as new orders arrive
+    columns:
+      - name: order_id
+        description: Primary key
+        tests:
+          - unique
+          - not_null
+      - name: customer_id
+        description: Foreign key to dim_customers
+      - name: order_date
+        description: Date the order was placed
+      - name: status
+        description: Order status
+      - name: amount
+        description: Order total in cents
+
+  - name: fct_daily_order_metrics
+    description: Incremental daily order rollup, recomputed for new days only
+    columns:
+      - name: order_date
+        description: Day of the orders
+        tests:
+          - unique
+          - not_null
+      - name: order_count
+        description: Number of orders that day
+      - name: total_amount
+        description: Total order amount that day in cents
