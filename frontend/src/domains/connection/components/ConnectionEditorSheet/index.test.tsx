@@ -472,3 +472,19 @@ describe("ConnectionEditorSheet save scope", () => {
     }
   });
 });
+
+describe("ConnectionEditorSheet bigquery location field", () => {
+  it("persists the BigQuery Location into the saved config", async () => {
+    saveConnectionMock.mockClear();
+    render(<ConnectionEditorSheet open={true} onClose={() => {}} initial={null} kind="bigquery" />);
+
+    fireEvent.change(screen.getByPlaceholderText("US, EU, asia-northeast1"), {
+      target: { value: "EU" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(saveConnectionMock).toHaveBeenCalledTimes(1));
+    const savedConfig = saveConnectionMock.mock.calls[0][0] as Record<string, unknown>;
+    expect(savedConfig.location).toBe("EU");
+  });
+});

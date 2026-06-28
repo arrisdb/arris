@@ -20,6 +20,26 @@ use crate::{
 struct ConnState {
     client: Arc<Client>,
     project_id: String,
+    /// Optional BigQuery processing location (region/multi-region, e.g. `US`,
+    /// `EU`, `asia-northeast1`). When set it is threaded into every
+    /// `QueryRequest` so jobs run in the region that holds the datasets;
+    /// otherwise BigQuery infers the location and may reject cross-region jobs.
+    location: Option<String>,
+}
+
+impl ConnState {
+    /// Builds a `QueryRequest` for `sql` with this connection's location applied.
+    fn query_request(&self, sql: &str) -> QueryRequest {
+        build_query_request(sql, self.location.as_deref())
+    }
+}
+
+/// Builds a `QueryRequest` for `sql`, threading the optional BigQuery
+/// processing `location` so the job runs in the region that holds the data.
+pub(super) fn build_query_request(sql: &str, location: Option<&str>) -> QueryRequest {
+    let mut req = QueryRequest::new(sql);
+    req.location = location.map(str::to_owned);
+    req
 }
 
 pub struct BigqueryDriver {
@@ -40,6 +60,7 @@ impl BigqueryDriver {
         client: &Client,
         project: &str,
         dataset_id: &str,
+        location: Option<&str>,
     ) -> Result<Vec<(TableMeta, Vec<ColumnMeta>)>> {
         let tables_sql = format!(
             "SELECT table_name, table_type FROM `{project}.{dataset_id}`.INFORMATION_SCHEMA.TABLES"
@@ -50,7 +71,7 @@ impl BigqueryDriver {
         // list so the dataset still renders (with no tables) and every
         // accessible dataset keeps showing.
         let tables_info: Vec<(String, String)> =
-            match client.job().query(project, QueryRequest::new(&tables_sql)).await {
+            match client.job().query(project, build_query_request(&tables_sql, location)).await {
                 Ok(tables_resp) => tables_resp
                     .rows
                     .as_deref()
@@ -73,7 +94,7 @@ impl BigqueryDriver {
         );
         let mut columns_map: std::collections::HashMap<String, Vec<ColumnMeta>> =
             std::collections::HashMap::new();
-        if let Ok(resp) = client.job().query(project, QueryRequest::new(&col_sql)).await {
+        if let Ok(resp) = client.job().query(project, build_query_request(&col_sql, location)).await {
             for row in resp.rows.as_deref().unwrap_or_default() {
                 if let Some(cells) = row.columns.as_ref() {
                     if let (Some(tname), Some(cname), Some(dtype)) = (
@@ -138,9 +159,18 @@ impl DatabaseDriver for BigqueryDriver {
                 })?,
         };
 
+        let location = config
+            .location
+            .as_ref()
+            .map(|s| s.trim().to_owned())
+            .filter(|s| !s.is_empty());
+
         client
             .job()
-            .query(&config.database, QueryRequest::new("SELECT 1"))
+            .query(
+                &config.database,
+                build_query_request("SELECT 1", location.as_deref()),
+            )
             .await
             .map_err(|e| {
                 DriverError::ConnectionFailed(format!("BigQuery connection test failed: {e}"))
@@ -149,6 +179,7 @@ impl DatabaseDriver for BigqueryDriver {
         *self.inner.lock().await = Some(ConnState {
             client: Arc::new(client),
             project_id: config.database.clone(),
+            location,
         });
 
         Ok(())
@@ -173,7 +204,7 @@ impl DatabaseDriver for BigqueryDriver {
         );
         let ds_resp = client
             .job()
-            .query(project, QueryRequest::new(&ds_sql))
+            .query(project, state.query_request(&ds_sql))
             .await
             .map_err(|e| DriverError::QueryFailed(format!("Failed to list datasets: {e}")))?;
 
@@ -204,7 +235,9 @@ impl DatabaseDriver for BigqueryDriver {
         let state = guard.as_ref().ok_or(DriverError::NotConnected)?;
         let project = &state.project_id;
 
-        let tables = Self::fetch_dataset_tables(&state.client, project, schema).await?;
+        let tables =
+            Self::fetch_dataset_tables(&state.client, project, schema, state.location.as_deref())
+                .await?;
         let dataset = DatasetMeta {
             id: schema.to_owned(),
         };
@@ -226,7 +259,7 @@ impl DatabaseDriver for BigqueryDriver {
         let resp = state
             .client
             .job()
-            .query(&state.project_id, QueryRequest::new(text))
+            .query(&state.project_id, state.query_request(text))
             .await
             .map_err(|e| DriverError::QueryFailed(format!("{e}")))?;
 
@@ -255,7 +288,13 @@ impl DatabaseDriver for BigqueryDriver {
     async fn object_definition(&self, object: &crate::ObjectRef) -> Result<String> {
         let guard = self.inner.lock().await;
         let state = guard.as_ref().ok_or(DriverError::NotConnected)?;
-        super::definition::object_definition(&state.client, &state.project_id, object).await
+        super::definition::object_definition(
+            &state.client,
+            &state.project_id,
+            object,
+            state.location.as_deref(),
+        )
+        .await
     }
 
     async fn supports_explain(&self, mode: ExplainMode) -> bool {
@@ -276,7 +315,7 @@ impl DatabaseDriver for BigqueryDriver {
         let guard = self.inner.lock().await;
         let state = guard.as_ref().ok_or(DriverError::NotConnected)?;
 
-        let mut req = QueryRequest::new(text);
+        let mut req = state.query_request(text);
         req.dry_run = Some(true);
 
         let resp = state
@@ -312,7 +351,7 @@ impl DatabaseDriver for BigqueryDriver {
             table.name
         );
 
-        match state.client.job().query(&state.project_id, QueryRequest::new(&sql)).await {
+        match state.client.job().query(&state.project_id, state.query_request(&sql)).await {
             Ok(resp) => {
                 let keys: Vec<String> = resp
                     .rows
@@ -356,7 +395,7 @@ impl DatabaseDriver for BigqueryDriver {
         state
             .client
             .job()
-            .query(&state.project_id, QueryRequest::new(&inlined))
+            .query(&state.project_id, state.query_request(&inlined))
             .await
             .map_err(|e| DriverError::QueryFailed(format!("{e}")))?;
 
@@ -387,7 +426,7 @@ impl DatabaseDriver for BigqueryDriver {
             state
                 .client
                 .job()
-                .query(&state.project_id, QueryRequest::new(&inlined))
+                .query(&state.project_id, state.query_request(&inlined))
                 .await
                 .map_err(|e| DriverError::QueryFailed(format!("{e}")))?;
             result.rows_affected += 1;
@@ -417,7 +456,7 @@ impl DatabaseDriver for BigqueryDriver {
             state
                 .client
                 .job()
-                .query(&state.project_id, QueryRequest::new(&inlined))
+                .query(&state.project_id, state.query_request(&inlined))
                 .await
                 .map_err(|e| DriverError::QueryFailed(format!("{e}")))?;
             result.rows_affected += 1;
@@ -510,5 +549,18 @@ mod tests {
     fn inline_params_no_placeholders() {
         let result = inline_params("SELECT 1", vec![]);
         assert_eq!(result, "SELECT 1");
+    }
+
+    #[test]
+    fn build_query_request_applies_location() {
+        let req = build_query_request("SELECT 1", Some("EU"));
+        assert_eq!(req.location.as_deref(), Some("EU"));
+        assert_eq!(req.query, "SELECT 1");
+    }
+
+    #[test]
+    fn build_query_request_omits_location_when_none() {
+        let req = build_query_request("SELECT 1", None);
+        assert!(req.location.is_none());
     }
 }

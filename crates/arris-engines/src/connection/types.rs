@@ -158,6 +158,10 @@ pub struct ConnectionConfig {
     pub sasl_mechanism: Option<SaslMechanism>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub credentials_file: Option<String>,
+    /// BigQuery processing location (region/multi-region, e.g. `US`, `EU`,
+    /// `asia-northeast1`). Optional; when unset BigQuery infers it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub location: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ssh_host: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -191,6 +195,7 @@ impl ConnectionConfig {
             schema_registry_url: None,
             sasl_mechanism: None,
             credentials_file: None,
+            location: None,
             ssh_host: None,
             ssh_port: None,
             ssh_user: None,

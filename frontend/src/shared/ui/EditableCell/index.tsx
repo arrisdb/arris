@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { QueryValue, QueryValueKind } from "@shared";
 import { coerceQueryValue } from "@shared";
+import { MAX_PREVIEW_CHARS } from "./constants";
 
 interface Props {
   value: QueryValue | null;
@@ -25,6 +26,7 @@ function EditableCell({
   const inputRef = useRef<HTMLInputElement>(null);
 
   const display = displayString(value);
+  const preview = previewString(display);
   const isNull = value?.kind === "null";
 
   useEffect(() => {
@@ -48,7 +50,7 @@ function EditableCell({
       <span className="mdbc-editable-cell-readonly-value"
         style={{ "--mdbc-editable-cell-readonly-color": isNull ? "var(--m-fg-4)" : "var(--m-fg, #f5f5f7)", "--mdbc-editable-cell-readonly-font-style": isNull ? "italic" : "normal" } as any}
       >
-        {display}
+        {preview}
       </span>
     );
   }
@@ -82,7 +84,7 @@ function EditableCell({
       className={[[staged ? "staged" : "", "mdbc-editable-cell-display"].filter(Boolean).join(" "), "mdbc-editable-cell-editable-value"].filter(Boolean).join(" ")}
       style={{ "--mdbc-editable-cell-editable-color": isNull ? "var(--m-fg-4)" : "var(--m-fg, #f5f5f7)", "--mdbc-editable-cell-editable-font-style": isNull ? "italic" : "normal" } as any}
     >
-      {isPendingInsert && !value ? "default" : display}
+      {isPendingInsert && !value ? "default" : preview}
     </span>
   );
 }
@@ -91,6 +93,15 @@ function displayString(v: QueryValue | null): string {
   if (!v) return "";
   if (v.kind === "null") return "NULL";
   return String(v.value ?? "");
+}
+
+function previewString(s: string): string {
+  // Fast path: short, single-line value needs no transformation.
+  if (s.length <= MAX_PREVIEW_CHARS && !/[\n\r\t]/.test(s)) return s;
+  const collapsed = s.replace(/\s+/g, " ").trim();
+  return collapsed.length > MAX_PREVIEW_CHARS
+    ? collapsed.slice(0, MAX_PREVIEW_CHARS) + "…"
+    : collapsed;
 }
 
 export {
