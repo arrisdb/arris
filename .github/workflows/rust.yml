@@ -79,8 +79,11 @@ jobs:
 
       # Unit + doc tests only. Integration tests (tests/*_integration.rs) spin up
       # real database containers and are run separately, not on every PR.
-      - name: Test (unit + doc)
-        run: cargo test --workspace --lib --bins --doc
+      # --doc cannot be combined with --lib/--bins, so run it as its own step.
+      - name: Test (unit)
+        run: cargo test --workspace --lib --bins
+      - name: Test (doc)
+        run: cargo test --workspace --doc
 
       - name: Supply-chain audit
         run: cargo deny check
