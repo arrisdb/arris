@@ -2,7 +2,7 @@
 name = "arris-tauri"
 version = "0.6.0"
 edition = "2024"
-license = "MIT"
+license = "AGPL-3.0-only"
 description = "Tauri 2 shell wrapping `arris-engines` command handlers."
 
 [[bin]]
