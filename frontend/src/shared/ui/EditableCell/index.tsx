@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { QueryValue, QueryValueKind } from "@shared";
 import { coerceQueryValue } from "@shared";
+import { MAX_PREVIEW_CHARS } from "./constants";
 
 interface Props {
   value: QueryValue | null;
@@ -93,12 +94,6 @@ function displayString(v: QueryValue | null): string {
   if (v.kind === "null") return "NULL";
   return String(v.value ?? "");
 }
-
-// Cap on the single-line preview rendered in a table cell. The full value stays
-// in `display` (used for editing) and in the row detail pane; this only bounds
-// what the grid shows so a multi-KB JSON / long text cell renders a readable
-// truncated string ("{"id":1,"name":...…") instead of a bare ellipsis.
-const MAX_PREVIEW_CHARS = 500;
 
 function previewString(s: string): string {
   // Fast path: short, single-line value needs no transformation.
