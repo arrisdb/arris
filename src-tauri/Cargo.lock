@@ -185,7 +185,7 @@ checksum = "7c02d123df017efcdfbd739ef81735b36c5ba83ec3c59c80a9d7ecc718f92e50"
 
 [[package]]
 name = "arris-engines"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -245,7 +245,7 @@ dependencies = [
 
 [[package]]
 name = "arris-tauri"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "arris-engines",
  "notify-debouncer-full",
