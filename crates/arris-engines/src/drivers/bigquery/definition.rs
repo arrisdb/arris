@@ -6,7 +6,6 @@
 //! no reconstruction. (Routines would use `INFORMATION_SCHEMA.ROUTINES`, but the
 //! schema browser never surfaces them.)
 
-use gcp_bigquery_client::model::query_request::QueryRequest;
 use gcp_bigquery_client::Client;
 
 use crate::drivers::errors::Result;
@@ -82,6 +81,7 @@ pub(super) async fn object_definition(
     client: &Client,
     project: &str,
     object: &ObjectRef,
+    location: Option<&str>,
 ) -> Result<String> {
     let sql = match object.kind {
         SchemaNodeKind::Schema => schema_ddl_sql(project, object),
@@ -89,7 +89,7 @@ pub(super) async fn object_definition(
     };
     let resp = client
         .job()
-        .query(project, QueryRequest::new(&sql))
+        .query(project, super::driver::build_query_request(&sql, location))
         .await
         .map_err(|e| DriverError::QueryFailed(format!("{e}")))?;
 

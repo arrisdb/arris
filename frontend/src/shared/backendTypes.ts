@@ -52,6 +52,7 @@ interface ConnectionConfig {
   schemaRegistryURL?: string;
   saslMechanism?: SaslMechanism;
   credentialsFile?: string;
+  location?: string;
   sshHost?: string;
   sshPort?: number;
   sshUser?: string;
