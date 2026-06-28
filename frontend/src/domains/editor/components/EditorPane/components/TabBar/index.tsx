@@ -28,11 +28,12 @@ interface Props {
   onAdd: () => void;
   onAddTerminal?: () => void;
   onAddNotebook?: () => void;
+  onAddCanvas?: () => void;
   onSplit?: (id: string, direction: SplitDirection) => void;
   onRename?: (id: string, newTitle: string) => void;
 }
 
-const RENAMEABLE_TAB_TYPES: TabType[] = ["console", "pinned", "terminal", "notebook"];
+const RENAMEABLE_TAB_TYPES: TabType[] = ["console", "pinned", "terminal", "notebook", "canvas"];
 
 function isRenameable(tabType?: TabType): boolean {
   return !!tabType && RENAMEABLE_TAB_TYPES.includes(tabType);
@@ -47,6 +48,7 @@ function TabBar({
   onAdd,
   onAddTerminal,
   onAddNotebook,
+  onAddCanvas,
   onSplit,
   onRename,
 }: Props) {
@@ -186,6 +188,13 @@ function TabBar({
               onClick={onAddNotebook}
             >
               <Icon name="notebook" size={12} />
+            </button>
+          </Tooltip>
+        )}
+        {onAddCanvas && (
+          <Tooltip label="New Canvas">
+            <button className="mdbc-tab-add" data-testid="tab-add-canvas" onClick={onAddCanvas}>
+              <Icon name="sparkles" size={12} />
             </button>
           </Tooltip>
         )}

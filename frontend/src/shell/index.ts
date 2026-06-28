@@ -1,4 +1,5 @@
 import { registerAgentPane } from "@domains/agent";
+import { registerCanvasTabView } from "@domains/canvas";
 import { registerConnectionsPane, registerDefinitionTabView } from "@domains/connection";
 import { registerChartPane } from "@domains/chart";
 import { registerPinnedQueriesPane } from "@domains/pinnedQueries";
@@ -32,6 +33,7 @@ function registerPanes(): void {
   registerGitPane();
   // Editor tab views contributed by domains.
   registerNotebookTabView();
+  registerCanvasTabView();
   registerGitTabViews();
   registerMediaTabView();
   registerDefinitionTabView();

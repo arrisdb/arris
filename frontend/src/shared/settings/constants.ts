@@ -31,6 +31,7 @@ export const ACTIONS = {
   splitBottom: { label: "Split Editor Bottom", category: "tabs", defaultShortcut: null },
   newTerminalTab: { label: "New Terminal Tab", category: "tabs", defaultShortcut: null },
   newNotebookTab: { label: "New Jupyter Notebook", category: "tabs", defaultShortcut: null },
+  newCanvasTab: { label: "New Canvas", category: "tabs", defaultShortcut: null },
   runCellAndInsertBelow: { label: "Run Cell and Insert Below", category: "tabs", defaultShortcut: { key: "Shift-Enter" } },
 
   openSettings: { label: "Open Settings", category: "navigation", defaultShortcut: { key: "Mod-," } },
