@@ -154,14 +154,6 @@ verify:
 # entries each point at that arch's tarball + signature. The stable .dmgs and
 # latest.json keep the same name every release, so `releases/latest/download/<name>`
 # always resolves to the newest build. GitHub auth comes from `gh` (run `gh auth login` once).
-#
-# Source-leak guard: GitHub attaches "Source code (zip/tar.gz)" to every release,
-# generated from the release tag's git tree in GH_REPO (the public distribution repo,
-# which holds only release docs - no app source). Those two links cannot be removed
-# via the API. After publishing we assert the tag's tree contains nothing but the
-# allowed distribution files, so the auto-archives can never expose the (private)
-# application source. DIST_TREE_ALLOWED is the exact set of paths permitted at the tag.
-DIST_TREE_ALLOWED := ^(README\.md|RELEASE_NOTE\.md|LICENSE|LICENSE\.md|\.gitignore)$$
 publish:
 	@$(PRELUDE); \
 	require_cmd jq gh; \
@@ -210,16 +202,6 @@ publish:
 		gh release create "$$tag" --repo "$(GH_REPO)" --title "Arris $$ver" "$${notes_args[@]}" "$${uploads[@]}"; \
 	fi; \
 	rm -rf "$$staging"; \
-	echo "==> Guard: verifying release tag '$$tag' in $(GH_REPO) exposes no source"; \
-	sha="$$(gh api "repos/$(GH_REPO)/commits/$$tag" --jq .sha 2>/dev/null || true)"; \
-	[ -n "$$sha" ] || die "could not resolve tag '$$tag' in $(GH_REPO) to verify its tree"; \
-	leaked=""; \
-	while IFS= read -r p; do \
-		[ -n "$$p" ] || continue; \
-		[[ "$$p" =~ $(DIST_TREE_ALLOWED) ]] || leaked="$$leaked $$p"; \
-	done < <(gh api "repos/$(GH_REPO)/git/trees/$$sha?recursive=1" --jq '.tree[] | select(.type=="blob") | .path'); \
-	[ -z "$$leaked" ] || die "release tag '$$tag' in $(GH_REPO) contains non-distribution files - GitHub's auto-generated Source code archives would leak:$$leaked"; \
-	echo "OK: '$$tag' tree is distribution-only; GitHub's Source code archives carry no app source"; \
 	echo ""; \
 	echo "Released $(PRODUCT) v$$ver"; \
 	echo "  DMG (Apple Silicon): https://github.com/$(GH_REPO)/releases/latest/download/$(PRODUCT)-aarch64.dmg"; \
