@@ -1,0 +1,114 @@
+name: Rust CI
+
+# Runs on every pull request and on pushes to main. The rust job runs only
+# when Rust files change; the final `rust-ci` job is always produced so it
+# can be a required status check for branch protection (it passes when the
+# rust job succeeded or was path-skipped).
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: rust-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  changes:
+    name: Detect Rust changes
+    runs-on: ubuntu-latest
+    outputs:
+      rust: ${{ steps.filter.outputs.rust }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            rust:
+              - 'crates/**'
+              - 'src-tauri/**'
+              - 'Cargo.toml'
+              - 'Cargo.lock'
+              - 'deny.toml'
+
+  rust:
+    name: Rust
+    needs: changes
+    if: needs.changes.outputs.rust == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # System libraries required to compile the Tauri shell on Linux.
+      - name: Install Tauri system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libssl-dev \
+            libxdo-dev \
+            build-essential \
+            file \
+            wget
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo build
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install cargo-deny
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-deny
+
+      - name: Check workspace
+        run: cargo check --workspace --all-targets
+
+      # Unit + doc tests only. Integration tests (tests/*_integration.rs) spin up
+      # real database containers and are run separately, not on every PR.
+      - name: Test (unit + doc)
+        run: cargo test --workspace --lib --bins --doc
+
+      - name: Supply-chain audit
+        run: cargo deny check
+
+      # The Tauri build script validates that frontendDist (frontend/dist)
+      # exists, so build the frontend bundle before compiling the shell.
+      - name: Set up Node for frontend bundle
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Build frontend bundle
+        run: npm ci && npm run build
+        working-directory: frontend
+      - name: Build Tauri shell
+        run: cargo build --manifest-path src-tauri/Cargo.toml
+
+  # Required status check for branch protection: "Rust CI / rust-ci".
+  rust-ci:
+    name: rust-ci
+    needs: rust
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify Rust checks
+        run: |
+          result='${{ needs.rust.result }}'
+          echo "rust=$result"
+          if [ "$result" = "failure" ] || [ "$result" = "cancelled" ]; then
+            echo "Rust checks did not pass."
+            exit 1
+          fi
+          echo "Rust checks passed (or skipped)."
