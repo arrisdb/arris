@@ -45,8 +45,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # System libraries required to compile the Tauri shell on Linux.
-      - name: Install Tauri system dependencies
+      # System libraries required to compile the Tauri shell and native driver
+      # deps on Linux. libcurl is needed by librdkafka (rdkafka-sys) for its
+      # SASL OAUTHBEARER OIDC support, which includes <curl/curl.h>.
+      - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -55,6 +57,7 @@ jobs:
             libayatana-appindicator3-dev \
             librsvg2-dev \
             libssl-dev \
+            libcurl4-openssl-dev \
             libxdo-dev \
             build-essential \
             file \
