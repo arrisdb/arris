@@ -10,6 +10,14 @@
   <a href="https://github.com/arrisdb/arris/releases/latest/download/Arris-x64.dmg"><b>Download for Intel</b></a>
 </p>
 
+<p align="center">
+  <a href="https://github.com/arrisdb/arris/releases/latest"><img alt="Latest version" src="https://img.shields.io/github/v/release/arrisdb/arris?label=version&color=blue"></a>
+  &nbsp;
+  <a href="https://github.com/arrisdb/arris/actions/workflows/rust.yml"><img alt="Rust tests" src="https://img.shields.io/github/actions/workflow/status/arrisdb/arris/rust.yml?branch=main&label=Rust%20tests"></a>
+  &nbsp;
+  <a href="https://github.com/arrisdb/arris/actions/workflows/frontend.yml"><img alt="Frontend tests" src="https://img.shields.io/github/actions/workflow/status/arrisdb/arris/frontend.yml?branch=main&label=Frontend%20tests"></a>
+</p>
+
 ---
 
 Arris is a desktop data workbench for working with all the most popular database engines. Unlike many database clients that lean heavily on the JVM and consume large amounts of memory, Arris is built on a Rust backend with Rust-based drivers, keeping the app lightweight and fast.
