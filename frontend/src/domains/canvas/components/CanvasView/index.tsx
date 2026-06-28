@@ -2,6 +2,7 @@ import ReactFlow, { Background, Controls } from "reactflow";
 import "reactflow/dist/style.css";
 import "./index.css";
 
+import { CanvasAgentChat } from "../CanvasAgentChat";
 import { CanvasToolbar } from "./components/CanvasToolbar";
 import { useCanvas } from "./hooks";
 import type { CanvasViewProps } from "./types";
@@ -14,6 +15,7 @@ function CanvasView({ activeTab }: CanvasViewProps) {
   const canvas = useCanvas(activeTab);
   return (
     <div className="mdbc-canvas-view">
+      <CanvasAgentChat tab={activeTab} />
       <div className="mdbc-canvas-board">
         <CanvasToolbar onAddText={canvas.addText} onAddShape={canvas.addShape} />
         <ReactFlow
