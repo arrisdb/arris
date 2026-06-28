@@ -32,6 +32,10 @@
 .mdbc-editable-cell-display {
   display: block;
   cursor: text;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .mdbc-text-muted-sm {
   font-size: var(--m-fs-sm);
@@ -48,6 +52,11 @@
   font-size: var(--mdbc-db-kind-symbol-size);
 }
 .mdbc-editable-cell-readonly-value {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: var(--mdbc-editable-cell-readonly-color);
   font-style: var(--mdbc-editable-cell-readonly-font-style);
 }
