@@ -17,7 +17,7 @@ function BigqueryFields({ config, patch }: FieldsProps) {
           testId="bigquery-credentials-browse"
         />
       </FormRow>
-      <FormRow label="Location">
+      <FormRow label="Data Location">
         <Field
           value={config.location ?? ""}
           onChange={(v) => patch("location", v)}
