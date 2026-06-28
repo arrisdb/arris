@@ -17,6 +17,14 @@ function BigqueryFields({ config, patch }: FieldsProps) {
           testId="bigquery-credentials-browse"
         />
       </FormRow>
+      <FormRow label="Location">
+        <Field
+          value={config.location ?? ""}
+          onChange={(v) => patch("location", v)}
+          monospace
+          placeholder="US, EU, asia-northeast1"
+        />
+      </FormRow>
       <FormRow label="Options">
         <Field value={config.options} onChange={(v) => patch("options", v)} monospace placeholder="key=val&key=val" />
       </FormRow>
