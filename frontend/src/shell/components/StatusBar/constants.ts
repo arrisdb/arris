@@ -21,6 +21,8 @@ const STATUS_BAR_ICONS = {
   pinnedQueries: "pin",
   connections: "database",
   activity: "loader",
+  canvasAgent: "sparkles",
+  canvasProps: "settings",
 } as const satisfies Record<string, IconName>;
 
 export {

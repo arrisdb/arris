@@ -12,7 +12,7 @@ function CanvasPropertiesPane({ tabId, component, onChange }: CanvasPropertiesPa
   const KindSection = SECTION_FOR[component.kind];
 
   return (
-    <div className="mdbc-pane right mdbc-canvas-props" data-testid="canvas-properties-pane">
+    <div className="mdbc-canvas-props" data-testid="canvas-properties-pane">
       <div className="mdbc-pane-header">
         <span className="mdbc-pane-title">{KIND_LABEL[component.kind]}</span>
       </div>

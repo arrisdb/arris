@@ -73,8 +73,18 @@
   color: var(--m-fg-2);
 }
 
-/* The "+ Add results" picker in the header keeps a compact, natural width beside
-   the provider select. */
+/* Top toolbar of the chat (the pane title is supplied by the shell left-rail
+   header). Holds the provider picker and the "+ Add results" picker. */
+.mdbc-canvas-chat-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-bottom: 0.5px solid var(--m-sep);
+}
+
+/* The "+ Add results" picker keeps a compact, natural width beside the provider
+   select, pushed to the end of the toolbar. */
 .mdbc-canvas-chat-addresults {
   margin-left: auto;
 }
