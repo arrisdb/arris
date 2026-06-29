@@ -394,18 +394,18 @@ impl AgentEngine {
             match node.kind {
                 SchemaNodeKind::Schema => {
                     if node.children.is_empty() {
-                        if let Some(children) = loaded.get(&node.name) {
-                            node.children = children.clone();
+                        if let Some(children) = Self::loaded_relations(&node.name, loaded) {
+                            node.children = children;
                         }
                     }
                 }
                 SchemaNodeKind::Database => {
                     // Mirror the hydrate-name walk: an empty `Database` is a
-                    // database-as-schema container (MySQL) keyed by its own name;
-                    // a populated one nests `Schema` children to fill instead.
+                    // database-as-schema container (MySQL, MongoDB) keyed by its own
+                    // name; a populated one nests `Schema` children to fill instead.
                     if node.children.is_empty() {
-                        if let Some(children) = loaded.get(&node.name) {
-                            node.children = children.clone();
+                        if let Some(children) = Self::loaded_relations(&node.name, loaded) {
+                            node.children = children;
                         }
                     } else {
                         Self::attach_schema_children(&mut node.children, loaded);
@@ -414,6 +414,27 @@ impl AgentEngine {
                 _ => {}
             }
         }
+    }
+
+    /// The deep `list_schema(name)` of several drivers (MySQL, MongoDB) returns
+    /// its relations re-wrapped in a single container node carrying the same name
+    /// as the schema being filled. Splicing that wrapper in verbatim would nest a
+    /// duplicate `-- Database:`/`-- Schema:` header above the real relations, so
+    /// unwrap one level when the sole loaded node is that same-named container;
+    /// drivers that already return bare relations (Postgres) pass through as-is.
+    fn loaded_relations(
+        name: &str,
+        loaded: &HashMap<String, Vec<SchemaNode>>,
+    ) -> Option<Vec<SchemaNode>> {
+        let nodes = loaded.get(name)?;
+        if let [only] = nodes.as_slice() {
+            if only.name == name
+                && matches!(only.kind, SchemaNodeKind::Database | SchemaNodeKind::Schema)
+            {
+                return Some(only.children.clone());
+            }
+        }
+        Some(nodes.clone())
     }
 
     fn write_ddl_node(out: &mut String, node: &SchemaNode, parent_names: &[&str]) {
@@ -466,7 +487,23 @@ impl AgentEngine {
                 let _ = writeln!(out);
             }
             SchemaNodeKind::Collection => {
-                let _ = writeln!(out, "-- Collection: {}\n", node.name);
+                // A schemaless store (MongoDB) has no declared columns; the driver
+                // samples documents and attaches the inferred fields as `Column`
+                // children. Render them like a table so the agent sees the real
+                // field names and types, not just the collection name.
+                let qualified = Self::qualified_name(parent_names, &node.name);
+                let columns = Self::collect_columns(&node.children);
+                if columns.is_empty() {
+                    let _ = writeln!(out, "-- Collection: {} (no sampled fields)\n", qualified);
+                } else {
+                    let _ = writeln!(out, "-- Collection (sampled fields): {}", qualified);
+                    let _ = writeln!(out, "CREATE TABLE {} (", qualified);
+                    for (i, (name, typ)) in columns.iter().enumerate() {
+                        let comma = if i + 1 < columns.len() { "," } else { "" };
+                        let _ = writeln!(out, "    {} {}{}", name, typ, comma);
+                    }
+                    let _ = writeln!(out, ");\n");
+                }
             }
             _ => {}
         }
@@ -676,21 +713,62 @@ mod tests {
 
     #[test]
     fn attach_schema_children_fills_a_database_as_schema_so_ddl_has_real_tables() {
+        // MySQL's `list_schema(db)` re-wraps its tables in a single same-named
+        // `Database` node (see drivers/mysql/mod.rs). Feed that realistic shape.
         let mut tree = vec![database("shop", vec![])];
         let mut loaded = HashMap::new();
         loaded.insert(
             "shop".to_string(),
-            vec![SchemaNode::new("orders", SchemaNodeKind::Table, "shop.orders")
-                .with_children(vec![SchemaNode::new(
-                    "id",
-                    SchemaNodeKind::Column,
-                    "shop.orders.id",
-                )])],
+            vec![database(
+                "shop",
+                vec![SchemaNode::new("orders", SchemaNodeKind::Table, "shop.orders")
+                    .with_children(vec![SchemaNode::new(
+                        "id",
+                        SchemaNodeKind::Column,
+                        "shop.orders.id",
+                    )])],
+            )],
         );
         AgentEngine::attach_schema_children(&mut tree, &loaded);
         let ddl = AgentEngine::new().schema_ddl(&tree);
         // The MySQL database's deep-loaded table reaches the agent prompt.
         assert!(ddl.contains("CREATE TABLE shop.orders"));
         assert!(ddl.contains("id"));
+        // The same-named wrapper is unwrapped: the database header appears once,
+        // not nested as `-- Database: shop` twice.
+        assert_eq!(ddl.matches("-- Database: shop").count(), 1);
+    }
+
+    #[test]
+    fn attach_schema_children_renders_mongo_collection_fields_without_a_duplicate_database() {
+        // MongoDB's `list_schema(db)` returns the collections (with sampled field
+        // columns) re-wrapped in a same-named `Database` node.
+        let mut tree = vec![database("appdb", vec![])];
+        let mut loaded = HashMap::new();
+        loaded.insert(
+            "appdb".to_string(),
+            vec![database(
+                "appdb",
+                vec![
+                    SchemaNode::new("customers", SchemaNodeKind::Collection, "appdb.customers")
+                        .with_children(vec![
+                            SchemaNode::new("_id", SchemaNodeKind::Column, "appdb.customers._id")
+                                .with_detail("objectId"),
+                            SchemaNode::new("name", SchemaNodeKind::Column, "appdb.customers.name")
+                                .with_detail("string"),
+                        ]),
+                ],
+            )],
+        );
+        AgentEngine::attach_schema_children(&mut tree, &loaded);
+        let ddl = AgentEngine::new().schema_ddl(&tree);
+        // The sampled fields reach the agent (previously the Collection arm dropped
+        // all children and emitted only the collection name).
+        assert!(ddl.contains("CREATE TABLE appdb.customers"));
+        assert!(ddl.contains("_id objectId"));
+        assert!(ddl.contains("name string"));
+        assert!(ddl.contains("-- Collection (sampled fields): appdb.customers"));
+        // No nested duplicate database header.
+        assert_eq!(ddl.matches("-- Database: appdb").count(), 1);
     }
 }
