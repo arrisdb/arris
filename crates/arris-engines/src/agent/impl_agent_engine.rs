@@ -248,7 +248,7 @@ impl AgentEngine {
              \x20 \"components\": [\n\
              \x20   {{ \"kind\": \"query\", \"id\": \"q1\", \"title\": \"<label>\", \"sql\": \"<one {name} statement>\" }},\n\
              \x20   {{ \"kind\": \"chart\", \"id\": \"c1\", \"sourceQueryId\": \"q1\",\n\
-             \x20     \"spec\": {{ \"kind\": \"bar\", \"xColumn\": \"<col>\", \"yColumns\": [\"<col>\"], \"seriesColumn\": \"<col?>\", \"aggregation\": \"sum\", \"title\": \"<title>\", \"style\": {{ \"stackMode\": \"stacked\" }} }} }},\n\
+             \x20     \"spec\": {{ \"kind\": \"bar\", \"xColumn\": \"<col>\", \"yColumns\": [\"<col>\"], \"seriesColumn\": \"<col?>\", \"aggregation\": \"sum\", \"title\": \"<title>\", \"style\": {{ \"stackMode\": \"stacked\", \"showLegend\": true, \"yMin\": 0, \"yMax\": 100 }} }} }},\n\
              \x20   {{ \"kind\": \"text\", \"id\": \"t1\", \"text\": \"## Heading\\nMarkdown commentary.\" }},\n\
              \x20   {{ \"kind\": \"sticky\", \"id\": \"s1\", \"text\": \"<short note>\", \"color\": \"yellow\" }},\n\
              \x20   {{ \"kind\": \"shape\", \"id\": \"sh1\", \"shape\": \"rect\", \"text\": \"<optional label>\" }}\n\
@@ -272,6 +272,19 @@ impl AgentEngine {
              bar, line, area, pie, scatter, combo, donut, radar, treemap, funnel, \
              kpi. Omit `seriesColumn` and `style` when not needed; `aggregation` is \
              one of none, sum, avg, min, max, count.\n\
+             - `spec.style` (every field optional) controls appearance, axes, and \
+             legend. Supported keys: `colors` (array of hex strings), `lineStyle` \
+             (solid|dashed|dotted), `strokeWidth` (number), `showLegend` (bool), \
+             `legendPosition` (top|bottom|left|right), `showGrid` (bool), \
+             `showDataLabels` (bool), `xMin`/`xMax`/`yMin`/`yMax` (axis bounds, \
+             numbers), `xAxisTitle`/`yAxisTitle` (strings), `xLabelAngle`/\
+             `yLabelAngle` (numbers), `yScale` (linear|log), `stackMode` \
+             (none|stacked|percent), `barOrientation` (vertical|horizontal), \
+             `sortOrder` (none|asc|desc), `curveType` (linear|monotone|step|natural), \
+             `fillOpacity` (0..1), `donutInnerRadius` (number), `referenceLineY` \
+             (number), `xTickInterval` (number). Set only the keys the request asks \
+             for. To change one of these on an existing chart, re-`spec` it by id with \
+             just the `style` keys you are changing.\n\
              - `sticky.color` is one of yellow, green, blue, pink, purple. \
              `shape.shape` is one of rect, ellipse, line; rect/ellipse may carry \
              optional `text`.\n\
@@ -521,6 +534,13 @@ mod tests {
         assert!(prompt.contains("\"kind\": \"sticky\""));
         assert!(prompt.contains("\"kind\": \"shape\""));
         assert!(prompt.contains("\"remove\""));
+        // The full chart-style contract is advertised so the agent knows it can set
+        // axis bounds and toggle the legend instead of refusing for lack of a field.
+        assert!(prompt.contains("yMin"));
+        assert!(prompt.contains("yMax"));
+        assert!(prompt.contains("showLegend"));
+        assert!(prompt.contains("legendPosition"));
+        assert!(prompt.contains("yScale"));
         assert!(!prompt.contains("return exactly one ```sql fenced block"));
     }
 
