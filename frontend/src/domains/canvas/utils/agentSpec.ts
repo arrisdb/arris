@@ -10,7 +10,7 @@ import { autoLayout } from "./layout";
 import { makeComponent, makeEdge } from "./factory";
 import type { ComponentInput } from "./factory";
 
-const KNOWN_KINDS: ComponentKind[] = ["text", "query", "chart", "shape"];
+const KNOWN_KINDS: ComponentKind[] = ["text", "sticky", "query", "chart", "shape"];
 
 /// Pull the JSON body out of the agent's ```arris-canvas fenced block. Returns
 /// null when no such block is present (the agent replied with prose only).

@@ -3,9 +3,11 @@ import type { NodeProps } from "reactflow";
 
 import { useCanvasStore } from "../../../../hooks";
 import type { CanvasNodeData } from "../../types";
+import { CanvasResizer } from "../CanvasResizer";
 
 /// A decorative shape (rectangle, ellipse, or horizontal line). Fills its node
-/// box; the radius/line treatment is chosen by the shape kind.
+/// box; the radius/line treatment is chosen by the shape kind. Drag any border to
+/// resize it.
 function ShapeNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
   const { tabId } = data;
   const component = useCanvasStore((s) =>
@@ -26,10 +28,13 @@ function ShapeNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
     borderRadius: component.shape === "ellipse" ? "50%" : "var(--m-r-md)",
   };
   return (
-    <div
-      className={`mdbc-canvas-node mdbc-canvas-shape${selected ? " selected" : ""}`}
-      style={css}
-    />
+    <>
+      <CanvasResizer tabId={tabId} id={id} visible={selected} />
+      <div
+        className={`mdbc-canvas-node mdbc-canvas-shape${selected ? " selected" : ""}`}
+        style={css}
+      />
+    </>
   );
 }
 

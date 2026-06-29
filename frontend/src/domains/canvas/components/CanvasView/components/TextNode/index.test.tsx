@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
+import { ReactFlowProvider } from "reactflow";
 import type { NodeProps } from "reactflow";
 
 import { useCanvasStore } from "../../../../hooks";
@@ -24,7 +25,11 @@ describe("TextNode", () => {
 
   it("renders the object's text and writes edits back to the store", () => {
     seed(makeComponent({ kind: "text", id: "t", text: "hello" }));
-    render(<TextNode {...nodeProps("t")} />);
+    render(
+      <ReactFlowProvider>
+        <TextNode {...nodeProps("t")} />
+      </ReactFlowProvider>,
+    );
     const input = screen.getByPlaceholderText("Type text…") as HTMLTextAreaElement;
     expect(input.value).toBe("hello");
     fireEvent.change(input, { target: { value: "world" } });

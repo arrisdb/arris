@@ -5,23 +5,26 @@ import { useCanvasStore } from "../../../../hooks";
 import type { CanvasNodeData } from "../../types";
 import { CanvasResizer } from "../CanvasResizer";
 
-/// A free-text object. Always editable (a transparent textarea styled to read as
-/// prose); `nodrag`/`nowheel` keep ReactFlow from hijacking pointer + scroll.
-function TextNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
+/// A sticky note: free text on a coloured, shadowed card. Reads as an annotation
+/// pinned to the board. `nodrag`/`nowheel` keep ReactFlow from hijacking the
+/// textarea's pointer + scroll while editing.
+function StickyNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
   const { tabId } = data;
   const component = useCanvasStore((s) =>
     s.boards[tabId]?.doc.components.find((c) => c.id === id),
   );
   const updateComponent = useCanvasStore((s) => s.updateComponent);
-  if (!component || component.kind !== "text") return null;
+  if (!component || component.kind !== "sticky") return null;
   return (
     <>
       <CanvasResizer tabId={tabId} id={id} visible={selected} />
-      <div className={`mdbc-canvas-node mdbc-canvas-text${selected ? " selected" : ""}`}>
+      <div
+        className={`mdbc-canvas-node mdbc-canvas-sticky color-${component.color ?? "yellow"}${selected ? " selected" : ""}`}
+      >
         <textarea
-          className="nodrag nowheel mdbc-canvas-text-input"
+          className="nodrag nowheel mdbc-canvas-sticky-input"
           value={component.text}
-          placeholder="Type text…"
+          placeholder="Note…"
           onChange={(e) => updateComponent(tabId, id, { text: e.target.value })}
         />
       </div>
@@ -29,6 +32,6 @@ function TextNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
   );
 }
 
-const TextNode = memo(TextNodeImpl);
+const StickyNode = memo(StickyNodeImpl);
 
-export { TextNode };
+export { StickyNode };

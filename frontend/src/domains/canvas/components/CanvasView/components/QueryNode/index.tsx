@@ -4,6 +4,7 @@ import type { QueryValue } from "@shared";
 
 import { useCanvasStore } from "../../../../hooks";
 import type { CanvasNodeData } from "../../types";
+import { CanvasResizer } from "../CanvasResizer";
 
 const PREVIEW_ROWS = 50;
 
@@ -25,7 +26,9 @@ function QueryNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
   const run = board?.runs[id];
 
   return (
-    <div className={`mdbc-canvas-node mdbc-canvas-query${selected ? " selected" : ""}`}>
+    <>
+      <CanvasResizer tabId={tabId} id={id} visible={selected} />
+      <div className={`mdbc-canvas-node mdbc-canvas-query${selected ? " selected" : ""}`}>
       <div className="mdbc-canvas-node-head">
         <span className="mdbc-canvas-node-title">{component.title ?? "Query"}</span>
         <button
@@ -70,7 +73,8 @@ function QueryNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
           <div className="mdbc-canvas-result-empty">Run to see results</div>
         )}
       </div>
-    </div>
+      </div>
+    </>
   );
 }
 

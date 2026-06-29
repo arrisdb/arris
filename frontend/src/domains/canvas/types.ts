@@ -5,9 +5,12 @@ import type { ChartSpec, QueryResult } from "@shared";
 /// overlap. This discriminated union is the extension seam: a future object kind
 /// (e.g. a Python cell or a static-file table import) is added here, gains one
 /// renderer-registry entry, and one agent-spec arm. Nothing nests.
-type ComponentKind = "text" | "query" | "chart" | "shape"; // future: "python" | "tableImport"
+type ComponentKind = "text" | "sticky" | "query" | "chart" | "shape"; // future: "python" | "tableImport"
 
 type ShapeKind = "rect" | "ellipse" | "line";
+
+/// Preset sticky-note tints. The note picks one; the renderer maps it to a colour.
+type StickyColor = "yellow" | "green" | "blue" | "pink" | "purple";
 type TextAlign = "left" | "center" | "right";
 
 interface TextStyle {
@@ -40,6 +43,14 @@ interface TextComponent extends BaseComponent {
   style?: TextStyle;
 }
 
+/// A sticky note: free text on a coloured card. Like text, but with a filled,
+/// shadowed background so it reads as an annotation pinned to the board.
+interface StickyComponent extends BaseComponent {
+  kind: "sticky";
+  text: string;
+  color?: StickyColor;
+}
+
 /// A SQL object: runs `sql` against `connectionId` and shows the result grid.
 /// Results are runtime-only (kept in the store's `runs`, never serialized).
 interface QueryComponent extends BaseComponent {
@@ -66,6 +77,7 @@ interface ShapeComponent extends BaseComponent {
 
 type CanvasComponent =
   | TextComponent
+  | StickyComponent
   | QueryComponent
   | ChartComponent
   | ShapeComponent;
@@ -144,6 +156,8 @@ export type {
   ShapeComponent,
   ShapeKind,
   ShapeStyle,
+  StickyColor,
+  StickyComponent,
   TextAlign,
   TextComponent,
   TextStyle,

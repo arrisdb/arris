@@ -7,9 +7,9 @@ import type { EditorTab } from "@shell/types";
 
 import { CANVAS_SAVE_DEBOUNCE_MS, LAYOUT_ORIGIN } from "../../constants";
 import { useCanvasStore } from "../../hooks";
-import type { CanvasComponent, CanvasEdge } from "../../types";
+import type { CanvasComponent, CanvasEdge, ShapeKind } from "../../types";
 import { makeComponent, serializeDoc } from "../../utils";
-import type { CanvasNodeData } from "./types";
+import type { CanvasMode, CanvasNodeData } from "./types";
 import { toFlowEdges, toFlowNodes } from "./utils";
 
 const EMPTY_COMPONENTS: CanvasComponent[] = [];
@@ -87,6 +87,9 @@ function useCanvas(tab: EditorTab) {
     [tabId, setViewport],
   );
 
+  // The active pointer tool. `move` drags objects; `hand` pans the board.
+  const [mode, setMode] = useState<CanvasMode>("move");
+
   // Cascade manually-added objects so they don't stack exactly on top.
   const placementFor = useCallback(() => {
     const n = (board?.doc.components.length ?? 0) % 8;
@@ -97,8 +100,33 @@ function useCanvas(tab: EditorTab) {
     addComponent(tabId, makeComponent({ kind: "text", ...placementFor(), text: "" }));
   }, [addComponent, placementFor, tabId]);
 
-  const addShape = useCallback(() => {
-    addComponent(tabId, makeComponent({ kind: "shape", shape: "rect", ...placementFor() }));
+  const addSticky = useCallback(() => {
+    addComponent(tabId, makeComponent({ kind: "sticky", ...placementFor(), text: "" }));
+  }, [addComponent, placementFor, tabId]);
+
+  const addShape = useCallback(
+    (shape: ShapeKind) => {
+      addComponent(tabId, makeComponent({ kind: "shape", shape, ...placementFor() }));
+    },
+    [addComponent, placementFor, tabId],
+  );
+
+  // Manual query objects bind to the canvas's own connection (same one the agent
+  // reads), so Run works without any extra wiring.
+  const addQuery = useCallback(() => {
+    addComponent(
+      tabId,
+      makeComponent({
+        kind: "query",
+        ...placementFor(),
+        connectionId: tab.connectionId ?? null,
+        sql: "",
+      }),
+    );
+  }, [addComponent, placementFor, tab.connectionId, tabId]);
+
+  const addChart = useCallback(() => {
+    addComponent(tabId, makeComponent({ kind: "chart", ...placementFor() }));
   }, [addComponent, placementFor, tabId]);
 
   // Debounced serialize of the live board into the tab's text (persistence).
@@ -123,8 +151,13 @@ function useCanvas(tab: EditorTab) {
     onNodesDelete,
     onMoveEnd,
     defaultViewport: board?.doc.viewport ?? DEFAULT_VIEWPORT,
+    mode,
+    setMode,
     addText,
+    addSticky,
     addShape,
+    addQuery,
+    addChart,
   };
 }
 

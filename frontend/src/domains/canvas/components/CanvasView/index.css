@@ -15,16 +15,137 @@
 .mdbc-canvas-board .react-flow {
   width: 100%;
   height: 100%;
-  background: var(--m-bg-app);
+  background: var(--m-bg-editor);
 }
+
+/* Hand tool: pan cursor over the whole board. */
+.mdbc-canvas-board.hand .react-flow__pane,
+.mdbc-canvas-board.hand .react-flow__node {
+  cursor: grab;
+}
+.mdbc-canvas-board.hand .react-flow__pane:active,
+.mdbc-canvas-board.hand .react-flow__node:active {
+  cursor: grabbing;
+}
+
+/* ── bottom toolbar (Figma/Canva pill) ────────────────────────────────────── */
 
 .mdbc-canvas-toolbar {
   position: absolute;
-  top: 12px;
-  left: 12px;
-  z-index: 5;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 6;
   display: flex;
-  gap: 6px;
+  align-items: center;
+  gap: 2px;
+  padding: 6px;
+  background: var(--m-bg-surface);
+  border: 1px solid var(--m-sep-strong);
+  border-radius: var(--m-r-lg);
+  box-shadow: var(--m-shadow-pop);
+}
+
+.mdbc-canvas-tool-group {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.mdbc-canvas-tool-divider {
+  width: 1px;
+  height: 22px;
+  margin: 0 6px;
+  background: var(--m-sep-strong);
+}
+
+.mdbc-canvas-tool.mdbc-btn.icon-only {
+  width: 34px;
+  height: 34px;
+  border-radius: var(--m-r-sm);
+}
+
+/* Small caret over the tool's lower-right corner, opening its options menu. */
+.mdbc-canvas-tool-caret {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--m-fg-3);
+  cursor: pointer;
+}
+
+.mdbc-canvas-tool-caret:hover,
+.mdbc-canvas-tool-caret.open {
+  color: var(--m-fg);
+}
+
+.mdbc-canvas-tool-menu {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 50%;
+  transform: translateX(-50%);
+  min-width: 184px;
+  padding: 4px;
+}
+
+.mdbc-canvas-tool-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: var(--m-r-xs);
+  font-size: var(--m-fs-sm);
+  color: var(--m-fg);
+  cursor: pointer;
+}
+
+.mdbc-canvas-tool-item:hover {
+  background: rgb(var(--m-overlay-rgb) / 0.08);
+}
+
+.mdbc-canvas-tool-item-label {
+  flex: 1 1 auto;
+}
+
+.mdbc-canvas-tool-item-check {
+  color: var(--m-accent);
+}
+
+.mdbc-canvas-tool-item-shortcut {
+  color: var(--m-fg-3);
+  font-size: var(--m-fs-xs);
+}
+
+.mdbc-canvas-tool-item.disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.mdbc-canvas-tool-item.disabled:hover {
+  background: transparent;
+}
+
+/* ── resize handles ───────────────────────────────────────────────────────── */
+
+.mdbc-canvas-resize-line {
+  border-color: var(--m-accent);
+}
+
+.mdbc-canvas-resize-handle {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: var(--m-bg-surface);
+  border: 1px solid var(--m-accent);
 }
 
 /* ── object node base ─────────────────────────────────────────────────────── */
@@ -170,6 +291,39 @@
   min-height: 0;
   position: relative;
 }
+
+/* ── sticky note ──────────────────────────────────────────────────────────── */
+
+.mdbc-canvas-sticky {
+  border: none;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+  color: #20212b;
+}
+
+.mdbc-canvas-sticky-input {
+  flex: 1 1 auto;
+  width: 100%;
+  height: 100%;
+  resize: none;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: inherit;
+  font-family: var(--m-font);
+  font-size: var(--m-fs-md);
+  line-height: 1.4;
+  padding: 12px;
+}
+
+.mdbc-canvas-sticky-input::placeholder {
+  color: rgba(32, 33, 43, 0.45);
+}
+
+.mdbc-canvas-sticky.color-yellow { background: #ffe9a8; }
+.mdbc-canvas-sticky.color-green { background: #c8f0c8; }
+.mdbc-canvas-sticky.color-blue { background: #bfe0ff; }
+.mdbc-canvas-sticky.color-pink { background: #ffc9de; }
+.mdbc-canvas-sticky.color-purple { background: #d9c9ff; }
 
 /* ── shape object ─────────────────────────────────────────────────────────── */
 

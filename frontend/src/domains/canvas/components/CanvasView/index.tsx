@@ -13,11 +13,11 @@ import { nodeTypes } from "./utils";
 /// rendered alongside the board.
 function CanvasView({ activeTab }: CanvasViewProps) {
   const canvas = useCanvas(activeTab);
+  const handMode = canvas.mode === "hand";
   return (
     <div className="mdbc-canvas-view">
       <CanvasAgentChat tab={activeTab} />
-      <div className="mdbc-canvas-board">
-        <CanvasToolbar onAddText={canvas.addText} onAddShape={canvas.addShape} />
+      <div className={`mdbc-canvas-board${handMode ? " hand" : ""}`}>
         <ReactFlow
           nodes={canvas.rfNodes}
           edges={canvas.rfEdges}
@@ -29,6 +29,7 @@ function CanvasView({ activeTab }: CanvasViewProps) {
           defaultViewport={canvas.defaultViewport}
           minZoom={0.2}
           maxZoom={2}
+          nodesDraggable={!handMode}
           nodesConnectable={false}
           deleteKeyCode={["Backspace", "Delete"]}
           proOptions={{ hideAttribution: true }}
@@ -36,6 +37,15 @@ function CanvasView({ activeTab }: CanvasViewProps) {
           <Background gap={24} size={1} color="rgb(var(--m-overlay-rgb) / 0.06)" />
           <Controls position="bottom-right" showInteractive={false} />
         </ReactFlow>
+        <CanvasToolbar
+          mode={canvas.mode}
+          onModeChange={canvas.setMode}
+          onAddQuery={canvas.addQuery}
+          onAddChart={canvas.addChart}
+          onAddSticky={canvas.addSticky}
+          onAddText={canvas.addText}
+          onAddShape={canvas.addShape}
+        />
       </div>
     </div>
   );

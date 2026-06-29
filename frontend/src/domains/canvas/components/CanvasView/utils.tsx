@@ -8,18 +8,20 @@ import type {
 import { ChartNode } from "./components/ChartNode";
 import { QueryNode } from "./components/QueryNode";
 import { ShapeNode } from "./components/ShapeNode";
+import { StickyNode } from "./components/StickyNode";
 import { TextNode } from "./components/TextNode";
 import type { CanvasNodeData } from "./types";
 
 /// Every object kind, in render order. The single list the registry-completeness
 /// guard checks against; adding a kind means adding it here and to `nodeTypes`.
-const COMPONENT_KINDS: ComponentKind[] = ["text", "query", "chart", "shape"];
+const COMPONENT_KINDS: ComponentKind[] = ["text", "sticky", "query", "chart", "shape"];
 
 /// The ReactFlow node-renderer registry: one custom node component per object
 /// kind. This is the extension seam (mirrors the chart RendererRegistry): a new
 /// kind is wired by adding one entry here.
 const nodeTypes: NodeTypes = {
   text: TextNode,
+  sticky: StickyNode,
   query: QueryNode,
   chart: ChartNode,
   shape: ShapeNode,
