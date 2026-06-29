@@ -70,3 +70,52 @@
   word-break: break-word;
   color: var(--m-fg-2);
 }
+
+/* The "+ Add results" picker in the header keeps a compact, natural width beside
+   the provider select. */
+.mdbc-canvas-chat-addresults {
+  margin-left: auto;
+}
+
+.mdbc-canvas-chat-addresults .mdbc-select {
+  min-width: 0;
+}
+
+/* Attached-result chips, shown above the input. Each names a query object's
+   shared result with a remove button, matching the agent context-chip look. */
+.mdbc-canvas-chat-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 6px 10px 0;
+}
+
+.mdbc-canvas-chat-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  padding: 2px 6px;
+  border: 0.5px solid var(--m-sep);
+  border-radius: 5px;
+  background: var(--m-bg-card);
+  color: var(--m-fg-2);
+  font-size: var(--m-fs-2xs);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mdbc-canvas-chat-chip-remove {
+  border: 0;
+  background: transparent;
+  color: var(--m-fg-3);
+  cursor: pointer;
+  padding: 0;
+  font-size: var(--m-fs-2xs);
+  line-height: 1;
+}
+
+.mdbc-canvas-chat-chip-remove:hover {
+  color: var(--m-fg);
+}

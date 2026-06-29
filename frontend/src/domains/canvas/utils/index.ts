@@ -4,4 +4,5 @@ export { describeBoard } from "./boardContext";
 export { genId, makeComponent, makeEdge } from "./factory";
 export type { ComponentInput } from "./factory";
 export { autoLayout, contentBottom } from "./layout";
+export { serializeResultTable } from "./resultTable";
 export { emptyDoc, parseDoc, serializeDoc } from "./serialize";

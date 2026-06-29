@@ -15,4 +15,14 @@ interface CanvasAgentChatProps {
   tab: EditorTab;
 }
 
-export type { CanvasAgentChatProps, ChatEntry, ChatRole };
+/// A query object's result the user attached to the next message. `table` is the
+/// serialized markdown sent to the agent; `label` is the removable chip shown
+/// above the input.
+interface ResultAttachment {
+  id: string;
+  queryId: string;
+  label: string;
+  table: string;
+}
+
+export type { CanvasAgentChatProps, ChatEntry, ChatRole, ResultAttachment };

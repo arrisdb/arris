@@ -281,21 +281,25 @@
 
 /* ── query object ─────────────────────────────────────────────────────────── */
 
+/* Host for the query object's CodeMirror SQL editor (schema-aware completion +
+   highlighting, same as the main editor). The editor fills the fixed-height box
+   and scrolls internally; its own theme supplies padding/colours. */
 .mdbc-canvas-sql {
   flex: 0 0 auto;
   height: 96px;
   width: 100%;
   box-sizing: border-box;
-  resize: none;
-  border: none;
-  outline: none;
+  overflow: hidden;
   border-bottom: 1px solid var(--m-sep);
   background: var(--m-bg-editor);
-  color: var(--m-fg);
-  font-family: var(--m-font-mono);
-  font-size: var(--m-fs-xs);
-  line-height: 1.5;
-  padding: 8px 10px;
+}
+
+.mdbc-canvas-sql .cm-editor {
+  height: 100%;
+}
+
+.mdbc-canvas-sql .cm-scroller {
+  overflow: auto;
 }
 
 .mdbc-canvas-result {

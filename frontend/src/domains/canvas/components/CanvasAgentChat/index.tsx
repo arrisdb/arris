@@ -11,12 +11,16 @@ import "./index.css";
 /// Renders the shared agent-chat chrome so it matches the SQL agent pane.
 function CanvasAgentChat({ tab }: CanvasAgentChatProps) {
   const {
+    attachResult,
+    attachments,
     buildContext,
     cancel,
     connectionId,
     connectionOptions,
     entries,
     pickConnection,
+    removeAttachment,
+    resultOptions,
     schemaLoading,
     send,
     streaming,
@@ -29,6 +33,17 @@ function CanvasAgentChat({ tab }: CanvasAgentChatProps) {
       <div className="mdbc-pane-header">
         <span className="mdbc-pane-title">AGENT</span>
         <AgentProviderSelect />
+        {resultOptions.length > 0 ? (
+          <div className="mdbc-canvas-chat-addresults">
+            <Select
+              value=""
+              options={resultOptions}
+              onChange={attachResult}
+              placeholder="+ Add results"
+              data-testid="canvas-add-results"
+            />
+          </div>
+        ) : null}
       </div>
       <div className="mdbc-canvas-chat-conn">
         <span className="mdbc-canvas-chat-conn-label">Connection</span>
@@ -89,6 +104,23 @@ function CanvasAgentChat({ tab }: CanvasAgentChatProps) {
           {streaming ? <ChatTyping onStop={cancel} /> : null}
         </div>
       )}
+      {attachments.length > 0 ? (
+        <div className="mdbc-canvas-chat-chips">
+          {attachments.map((att) => (
+            <span key={att.id} className="mdbc-canvas-chat-chip" title={att.label}>
+              {att.label}
+              <button
+                type="button"
+                className="mdbc-canvas-chat-chip-remove"
+                aria-label={`Remove ${att.label}`}
+                onClick={() => removeAttachment(att.id)}
+              >
+                ✕
+              </button>
+            </span>
+          ))}
+        </div>
+      ) : null}
       <ChatInput
         placeholder={
           connectionId ? "Ask the agent… (⌘↵ to send)" : "Connect a database to use the agent"

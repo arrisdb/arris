@@ -1,4 +1,5 @@
 import { IconButton } from "@shared/ui/IconButton";
+import { Select } from "@shared/ui";
 import { Tooltip } from "@shared/ui/Tooltip";
 import { AgentProviderSelect } from "../AgentProviderSelect";
 import { AGENT_PANE_TITLE } from "./constants";
@@ -17,6 +18,17 @@ function AgentPane() {
       <div className="mdbc-pane-header">
         <span className="mdbc-pane-title">{AGENT_PANE_TITLE}</span>
         <AgentProviderSelect />
+        {pane.resultOptions.length > 0 ? (
+          <div className="mdbc-agent-addresults">
+            <Select
+              value=""
+              options={pane.resultOptions}
+              onChange={pane.onAttachResult}
+              placeholder="+ Add results"
+              data-testid="agent-add-results"
+            />
+          </div>
+        ) : null}
         {pane.hasMessages ? (
           <Tooltip label="Clear conversation">
             <IconButton

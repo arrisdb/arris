@@ -5,9 +5,11 @@ import { useConnectionsStore } from "@domains/connection/hooks";
 import { useTabsStore } from "@shell/hooks/tabsStore";
 import type { EditorTab } from "@shell/types";
 
+import type { SelectOption } from "@shared/ui";
+
 import { CANVAS_SPEC_FENCE } from "../../constants";
 import { useCanvasStore } from "../../hooks";
-import { describeBoard, genId, parseAgentCanvas } from "../../utils";
+import { describeBoard, genId, parseAgentCanvas, serializeResultTable } from "../../utils";
 import {
   cancelCanvasAgentIPC,
   fetchCanvasSchemaContextIPC,
@@ -15,7 +17,14 @@ import {
   sendCanvasAgentIPC,
 } from "./ipc";
 import type { CanvasAgentEventEnvelope } from "./ipc";
-import type { ChatEntry } from "./types";
+import type { ChatEntry, ResultAttachment } from "./types";
+
+/// Serialize the attached query results into the prompt preamble the agent sees,
+/// one titled markdown table per attachment.
+function serializeAttachments(attachments: ResultAttachment[]): string {
+  if (attachments.length === 0) return "";
+  return `${attachments.map((a) => `# Results: ${a.label}\n${a.table}`).join("\n\n")}\n\n`;
+}
 
 /// Strip the arris-canvas fenced block from the agent's reply so the chat shows
 /// only the prose. Used for the streaming bubble and the final fallback text.
@@ -58,6 +67,48 @@ function useCanvasAgentChat(tab: EditorTab) {
 
   const [entries, setEntries] = useState<ChatEntry[]>([]);
   const [streaming, setStreaming] = useState(false);
+
+  // Query objects the user attached to the next message (not automatic). The
+  // picker lists every query object that currently has a result; attaching one
+  // serializes its rows and shows a removable chip above the input.
+  const [attachments, setAttachments] = useState<ResultAttachment[]>([]);
+  const board = useCanvasStore((s) => s.boards[tabId]);
+  const resultOptions = useMemo<SelectOption[]>(() => {
+    if (!board) return [];
+    const opts: SelectOption[] = [];
+    for (const c of board.doc.components) {
+      if (c.kind !== "query") continue;
+      const result = board.runs[c.id]?.result;
+      if (!result) continue;
+      opts.push({
+        value: c.id,
+        label: `${c.title ?? "Query"} · ${result.rows.length}×${result.columns.length}`,
+      });
+    }
+    return opts;
+  }, [board]);
+
+  const attachResult = useCallback(
+    (queryId: string) => {
+      const cur = useCanvasStore.getState().boards[tabId];
+      const comp = cur?.doc.components.find((c) => c.id === queryId);
+      const result = cur?.runs[queryId]?.result;
+      if (!comp || comp.kind !== "query" || !result) return;
+      const { table, rowCount, colCount } = serializeResultTable(result);
+      const label = `${comp.title ?? "Query"} · ${rowCount}×${colCount}`;
+      // Replace any prior attachment of the same query so re-running and
+      // re-attaching refreshes rather than duplicating.
+      setAttachments((prev) => [
+        ...prev.filter((a) => a.queryId !== queryId),
+        { id: genId("att"), queryId, label, table },
+      ]);
+    },
+    [tabId],
+  );
+
+  const removeAttachment = useCallback((id: string) => {
+    setAttachments((prev) => prev.filter((a) => a.id !== id));
+  }, []);
 
   // The schema DDL the agent will receive for this connection. Fetched (with a
   // spinner) whenever the connection changes, so the panel can be explicit about
@@ -222,7 +273,9 @@ function useCanvasAgentChat(tab: EditorTab) {
       sendCanvasAgentIPC({
         provider,
         connectionId,
-        prompt: text,
+        // Attached query results ride in front of the user's prompt; the chat
+        // bubble still shows only `text`.
+        prompt: `${serializeAttachments(attachments)}${text}`,
         boardContext,
         turnId,
         resumeSession,
@@ -230,8 +283,9 @@ function useCanvasAgentChat(tab: EditorTab) {
         setAgentText(`Error: ${errToString(e)}`, false);
         endTurn();
       });
+      setAttachments([]);
     },
-    [connectionId, endTurn, setAgentText, streaming, tabId],
+    [attachments, connectionId, endTurn, setAgentText, streaming, tabId],
   );
 
   const cancel = useCallback(() => {
@@ -243,12 +297,16 @@ function useCanvasAgentChat(tab: EditorTab) {
   }, [endTurn, setAgentText]);
 
   return {
+    attachResult,
+    attachments,
     buildContext,
     cancel,
     connectionId,
     connectionOptions,
     entries,
     pickConnection,
+    removeAttachment,
+    resultOptions,
     schemaLoading,
     send,
     streaming,

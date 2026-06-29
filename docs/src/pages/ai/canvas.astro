@@ -69,8 +69,10 @@ import DocTable from "../../components/docs/DocTable/DocTable.astro";
       <tr>
         <td class="font-medium text-fg">Query</td>
         <td>
-          Holds one SQL statement with a <strong>Run</strong> button and a compact result grid. It
-          runs against the canvas's connection, the same engine the editor uses.
+          Holds one SQL statement with a <strong>Run</strong> button and a compact result grid. Its
+          editor is the same CodeMirror as the main SQL editor, so you get the connection's dialect
+          highlighting and schema-aware table and column autocomplete. It runs against the canvas's
+          connection, the same engine the editor uses.
         </td>
       </tr>
       <tr>
@@ -134,6 +136,15 @@ import DocTable from "../../components/docs/DocTable/DocTable.astro";
     as a line chart, rewrite a query, retitle an object), or <strong>remove</strong> objects you no
     longer want. A query the agent adds or changes runs automatically, and any chart bound to it
     updates.
+  </p>
+
+  <p>
+    The agent sees your schema and the board, but not the rows a query returned, unless you share
+    them. When a query object on the board has results, an <strong>Add results</strong> picker
+    appears in the chat header listing those queries; pick one and Arris attaches its result as a
+    removable chip above the input. Your next message sends those rows along, so the agent can write
+    commentary or follow-up queries grounded in the real data. Sharing is never automatic: nothing
+    leaves until you attach it and send.
   </p>
 
   <h2 id="board">Working on the board</h2>

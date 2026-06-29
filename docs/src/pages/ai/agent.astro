@@ -192,6 +192,13 @@ import Screenshot from "../../components/docs/Screenshot/Screenshot.astro";
     <li><strong>Run &amp; share full results</strong>, which sends the entire result set. Arris warns that <em>&ldquo;all rows can be slow on large tables and consumes far more agent tokens.&rdquo;</em></li>
   </ul>
 
+  <p>
+    You can also share a result you already have. After you run a query in the editor, an
+    <strong>Add results</strong> picker appears in the agent header listing the active tab's recent
+    runs; pick one to attach its rows as a context chip on your next message. Like the editor and
+    file chips, it is removable and sends only when you do, so nothing is shared automatically.
+  </p>
+
   <Screenshot
     src="/screenshots/agent-share.png"
     alt="An AI Agent turn with a SQL block, the Run & share 100 rows and Run & share full results buttons with the token warning, a collapsed 'Shared 3 rows × 2 cols' card, and the agent's final answer naming the top categories"

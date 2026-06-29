@@ -39,7 +39,7 @@ type ChatItem = ChatMessage | ToolCallItem | SqlBlockItem | ResultShareItem;
 interface ContextChip {
   id: string;
   label: string;
-  kind: "selection" | "file";
+  kind: "selection" | "file" | "result";
   text: string;
 }
 

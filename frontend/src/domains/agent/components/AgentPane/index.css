@@ -167,6 +167,16 @@
   border-top: 0.5px solid var(--m-sep);
 }
 
+/* "+ Add results" picker: attaches a recent run's result as a context chip. Sits
+   to the right of the model label, before the Clear button. */
+.mdbc-agent-addresults {
+  margin-left: auto;
+}
+
+.mdbc-agent-addresults .mdbc-select {
+  min-width: 0;
+}
+
 /* Clear sits at the far right of the header, after the model label. */
 .mdbc-agent-clear {
   margin-left: 8px;

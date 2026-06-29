@@ -24,8 +24,14 @@ import { useConnectionsStore } from "@domains/connection/hooks";
 import { useTabsStore } from "@shell/hooks/tabsStore";
 import { runCanvasQueryIPC } from "../../ipc";
 import { useCanvasStore } from "../../hooks";
+import { makeComponent } from "../../utils";
 import { sendCanvasAgentIPC } from "./ipc";
 import { useCanvasAgentChat } from "./hooks";
+
+const queryResult = {
+  columns: [{ name: "category", type_hint: "text" }],
+  rows: [[{ kind: "text", value: "Books" }]],
+} as never;
 
 const TAB = "tab-1";
 const withConn = { id: TAB, text: "", connectionId: "conn-1" } as unknown as EditorTab;
@@ -54,6 +60,42 @@ describe("useCanvasAgentChat", () => {
     expect(ctx).toContain("CREATE TABLE public.orders");
     expect(ctx).toContain("# Database schema");
     expect(ctx).toContain("# Current board");
+  });
+
+  it("attaches a query object's result and sends it ahead of the prompt", () => {
+    useCanvasStore
+      .getState()
+      .addComponent(TAB, makeComponent({ kind: "query", id: "q1", sql: "select 1", connectionId: "conn-1", title: "Monthly sales" }));
+    useCanvasStore.getState().setRun(TAB, "q1", { running: false, result: queryResult });
+
+    const { result } = renderHook(() => useCanvasAgentChat(withConn));
+    expect(result.current.resultOptions).toEqual([
+      { value: "q1", label: "Monthly sales · 1×1" },
+    ]);
+
+    act(() => result.current.attachResult("q1"));
+    expect(result.current.attachments).toHaveLength(1);
+    expect(result.current.attachments[0].label).toBe("Monthly sales · 1×1");
+
+    act(() => result.current.send("describe the trend"));
+    const prompt = vi.mocked(sendCanvasAgentIPC).mock.calls[0][0].prompt;
+    expect(prompt).toContain("# Results: Monthly sales");
+    expect(prompt).toContain("category (text)");
+    expect(prompt).toContain("describe the trend");
+    // The chips clear after the message is dispatched.
+    expect(result.current.attachments).toHaveLength(0);
+  });
+
+  it("removes an attached result", () => {
+    useCanvasStore
+      .getState()
+      .addComponent(TAB, makeComponent({ kind: "query", id: "q1", sql: "select 1", connectionId: "conn-1" }));
+    useCanvasStore.getState().setRun(TAB, "q1", { running: false, result: queryResult });
+    const { result } = renderHook(() => useCanvasAgentChat(withConn));
+    act(() => result.current.attachResult("q1"));
+    const id = result.current.attachments[0].id;
+    act(() => result.current.removeAttachment(id));
+    expect(result.current.attachments).toHaveLength(0);
   });
 
   it("exposes the connections as options and binds the picked one to the tab", () => {
