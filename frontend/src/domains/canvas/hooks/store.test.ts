@@ -136,6 +136,12 @@ describe("useCanvasStore", () => {
     expect(get().boards[TAB].doc.components).toHaveLength(1);
   });
 
+  it("setConnectionIds persists the board's connection set", () => {
+    get().ensureBoard(TAB, "");
+    get().setConnectionIds(TAB, ["conn-a", "conn-b"]);
+    expect(get().boards[TAB].doc.connectionIds).toEqual(["conn-a", "conn-b"]);
+  });
+
   it("reorderComponent restacks objects by z", () => {
     get().ensureBoard(TAB, "");
     get().addComponent(TAB, makeComponent({ kind: "shape", id: "a", shape: "rect", z: 0 }));

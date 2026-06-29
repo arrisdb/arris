@@ -70,6 +70,36 @@ describe("planAgentChanges", () => {
     expect(edges).toEqual([{ id: expect.any(String), source: "q1", target: "c1" }]);
   });
 
+  it("targets a query at the connection the agent named, over the board default", () => {
+    const multi: AgentCanvasSpec = {
+      components: [
+        { kind: "query", id: "qa", sql: "select 1", connectionId: "conn-a" },
+        { kind: "query", id: "qb", sql: "select 2", connectionId: "conn-b" },
+        { kind: "query", id: "qc", sql: "select 3" },
+      ],
+      edges: [],
+    };
+    const { created } = planAgentChanges(multi, [], "conn-default");
+    expect(created.find((c) => c.id === "qa")).toMatchObject({ connectionId: "conn-a" });
+    expect(created.find((c) => c.id === "qb")).toMatchObject({ connectionId: "conn-b" });
+    // No connectionId named falls back to the board's primary connection.
+    expect(created.find((c) => c.id === "qc")).toMatchObject({ connectionId: "conn-default" });
+  });
+
+  it("re-targets an existing query to a new connection by id", () => {
+    const existing = planAgentChanges(
+      { components: [{ kind: "query", id: "q1", sql: "select 1", connectionId: "conn-a" }], edges: [] },
+      [],
+      "conn-a",
+    ).created;
+    const plan = planAgentChanges(
+      { components: [{ kind: "query", id: "q1", connectionId: "conn-b" }], edges: [] },
+      existing,
+      "conn-a",
+    );
+    expect(plan.updates[0]).toMatchObject({ id: "q1", patch: { connectionId: "conn-b" } });
+  });
+
   it("does not duplicate an explicit edge", () => {
     const withEdge: AgentCanvasSpec = {
       components: spec.components,
