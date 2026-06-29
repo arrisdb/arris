@@ -105,6 +105,28 @@ describe("useCanvasStore", () => {
     expect(ids).toEqual(["q1"]);
   });
 
+  it("runAllQueries dispatches only sink cells, letting the backend run upstreams", async () => {
+    vi.mocked(runCanvasCellIPC).mockResolvedValue([]);
+    get().ensureBoard(TAB, "");
+    get().addComponent(
+      TAB,
+      makeComponent({ kind: "query", id: "abc", title: "abc", sql: "select 1", connectionId: "c" }),
+    );
+    get().addComponent(
+      TAB,
+      makeComponent({ kind: "query", id: "q2", title: "q2", sql: "select * from abc", connectionId: "c" }),
+    );
+    get().addComponent(
+      TAB,
+      makeComponent({ kind: "query", id: "q3", title: "q3", sql: "select 9", connectionId: "c" }),
+    );
+    await get().runAllQueries(TAB);
+    // abc feeds q2, so only the sinks q2 and q3 are dispatched; abc runs as q2's
+    // upstream inside the backend, not as a separate top-level run.
+    const targets = vi.mocked(runCanvasCellIPC).mock.calls.map((c) => c[1]).sort();
+    expect(targets).toEqual(["q2", "q3"]);
+  });
+
   it("applyAgentSpec removes the ids in the remove list, with their edges and runs", () => {
     get().ensureBoard(TAB, "");
     get().applyAgentSpec(

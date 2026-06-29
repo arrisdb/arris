@@ -19,6 +19,7 @@ function CanvasToolbar({
   onAddSticky,
   onAddText,
   onAddShape,
+  onRunAll,
 }: CanvasToolbarProps) {
   const [openId, setOpenId] = useState<string | null>(null);
   // Remembers the last option chosen per expandable tool so its main button
@@ -156,6 +157,20 @@ function CanvasToolbar({
         </div>
         );
       })}
+      <div className="mdbc-canvas-tool-group">
+        <span className="mdbc-canvas-tool-divider" />
+        <IconButton
+          icon="play"
+          label="Run all queries"
+          size={18}
+          className="mdbc-canvas-tool"
+          onClick={() => {
+            setOpenId(null);
+            onRunAll();
+          }}
+          data-testid="canvas-tool-run-all"
+        />
+      </div>
     </div>
   );
 }

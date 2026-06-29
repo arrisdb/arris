@@ -14,6 +14,7 @@ function setup(overrides: Partial<CanvasToolbarProps> = {}) {
     onAddSticky: vi.fn(),
     onAddText: vi.fn(),
     onAddShape: vi.fn(),
+    onRunAll: vi.fn(),
     ...overrides,
   };
   render(<CanvasToolbar {...props} />);
@@ -33,6 +34,12 @@ describe("CanvasToolbar", () => {
     expect(props.onAddChart).toHaveBeenCalledTimes(1);
     expect(props.onAddTable).toHaveBeenCalledTimes(1);
     expect(props.onAddQuery).toHaveBeenCalledTimes(1);
+  });
+
+  it("runs all queries from the Run all button", () => {
+    const props = setup();
+    fireEvent.click(screen.getByTestId("canvas-tool-run-all"));
+    expect(props.onRunAll).toHaveBeenCalledTimes(1);
   });
 
   it("picks a shape kind from the shape menu", () => {

@@ -72,6 +72,10 @@ interface CanvasStore {
   setRun: (tabId: string, id: string, run: QueryRunState) => void;
   /// Execute a query object and store its result/error in `runs`.
   runQueryComponent: (tabId: string, id: string) => Promise<void>;
+  /// Run every query object on the board. Only the sink cells (those no other
+  /// cell reads) are dispatched; the backend auto-runs each sink's upstream
+  /// dependencies, so a shared upstream runs once rather than once per dependent.
+  runAllQueries: (tabId: string) => Promise<void>;
   removeBoard: (tabId: string) => void;
 }
 
@@ -379,6 +383,27 @@ const useCanvasStore = create<CanvasStore>((set, get) => ({
     } catch (e) {
       get().setRun(tabId, id, { running: false, error: errToString(e) });
     }
+  },
+
+  runAllQueries: async (tabId) => {
+    const board = get().boards[tabId];
+    if (!board) return;
+    const queries = board.doc.components.filter(
+      (c): c is QueryComponent => c.kind === "query",
+    );
+    if (queries.length === 0) return;
+    // Dispatch only sinks: query cells that are not read by another query cell.
+    // Every cell is either a sink or an ancestor of one, so the backend's
+    // upstream auto-run covers the whole board without re-running shared
+    // upstreams once per dependent.
+    const queryIds = new Set(queries.map((c) => c.id));
+    const upstream = new Set(
+      deriveDataEdges(board.doc.components, board.doc.edges)
+        .filter((e) => queryIds.has(e.source) && queryIds.has(e.target))
+        .map((e) => e.source),
+    );
+    const sinks = queries.filter((c) => !upstream.has(c.id));
+    await Promise.all(sinks.map((c) => get().runQueryComponent(tabId, c.id)));
   },
 
   removeBoard: (tabId) =>
