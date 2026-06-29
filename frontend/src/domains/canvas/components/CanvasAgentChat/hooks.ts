@@ -63,7 +63,7 @@ function useCanvasAgentChat(tab: EditorTab) {
         case "message":
           if (evt.text) {
             accumRef.current += evt.text;
-            setAgentText(displayText(accumRef.current) || "Working…", true);
+            setAgentText(displayText(accumRef.current), true);
           }
           return;
         case "error":
@@ -133,7 +133,7 @@ function useCanvasAgentChat(tab: EditorTab) {
       setEntries((prev) => [
         ...prev,
         { id: genId("msg"), role: "user", text },
-        { id: agentId, role: "agent", text: "Working…", pending: true },
+        { id: agentId, role: "agent", text: "", pending: true },
       ]);
       setStreaming(true);
       sendCanvasAgentIPC({

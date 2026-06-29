@@ -1,69 +1,41 @@
-import { useState } from "react";
-import type { KeyboardEvent } from "react";
+import { ChatBubble, ChatEmpty, ChatInput, ChatTyping } from "@shared/ui";
 
 import { useCanvasAgentChat } from "./hooks";
 import type { CanvasAgentChatProps } from "./types";
-import "./index.css";
 
-/// The board's agent chat: type a request, the agent designs objects and adds
-/// them to this canvas. Mirrors the reference's left "Agents" panel.
+/// The board's agent chat: type a request, the agent reads the schema and the
+/// current board, then adds or revises canvas objects. Renders the shared
+/// agent-chat chrome so it is visually identical to the SQL agent pane.
 function CanvasAgentChat({ tab }: CanvasAgentChatProps) {
   const { cancel, connectionId, entries, send, streaming } = useCanvasAgentChat(tab);
-  const [draft, setDraft] = useState("");
-
-  const submit = () => {
-    if (!draft.trim() || streaming) return;
-    send(draft);
-    setDraft("");
-  };
-
-  const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      submit();
-    }
-  };
+  const isEmpty = entries.length === 0 && !streaming;
 
   return (
-    <div className="mdbc-canvas-chat">
-      <div className="mdbc-canvas-chat-head">
-        <span className="mdbc-canvas-chat-title">Agent</span>
+    <div className="mdbc-agent-pane">
+      <div className="mdbc-pane-header">
+        <span className="mdbc-pane-title">AGENT</span>
       </div>
-      <div className="mdbc-canvas-chat-log">
-        {entries.length === 0 ? (
-          <div className="mdbc-canvas-chat-empty">
-            Ask the agent to build something, like "monthly sales by category".
-          </div>
+      <div className="mdbc-agent-stream">
+        {isEmpty ? (
+          <ChatEmpty
+            title="Ask the agent to build your board"
+            text='Describe an analysis, like "monthly sales by category". The agent reads your schema and the current board, then adds or revises objects.'
+          />
         ) : (
-          entries.map((entry) => (
-            <div
-              key={entry.id}
-              className={`mdbc-canvas-chat-msg ${entry.role}${entry.pending ? " pending" : ""}`}
-            >
-              {entry.text}
-            </div>
-          ))
+          entries
+            .filter((entry) => entry.text.length > 0)
+            .map((entry) => (
+              <ChatBubble key={entry.id} role={entry.role} text={entry.text} />
+            ))
         )}
+        {streaming ? <ChatTyping onStop={cancel} /> : null}
       </div>
-      <div className="mdbc-canvas-chat-input">
-        <textarea
-          className="mdbc-canvas-chat-textarea"
-          value={draft}
-          rows={2}
-          placeholder={connectionId ? "Ask the agent…" : "Connect a database to use the agent"}
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={onKeyDown}
-        />
-        {streaming ? (
-          <button type="button" className="mdbc-btn danger" onClick={cancel}>
-            Stop
-          </button>
-        ) : (
-          <button type="button" className="mdbc-btn primary" disabled={!draft.trim()} onClick={submit}>
-            Send
-          </button>
-        )}
-      </div>
+      <ChatInput
+        placeholder={
+          connectionId ? "Ask the agent… (⌘↵ to send)" : "Connect a database to use the agent"
+        }
+        onSend={send}
+      />
     </div>
   );
 }

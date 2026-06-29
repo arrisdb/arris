@@ -1,3 +1,5 @@
+export { ChatBubble, ChatEmpty, ChatInput, ChatTyping } from "./AgentChat";
+export type { ChatRole } from "./AgentChat";
 export { Btn } from "./Btn";
 export { Card } from "./Card";
 export { Chip } from "./Chip";

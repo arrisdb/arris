@@ -7,6 +7,7 @@ import { useAgentPane } from "./hooks";
 import { ContextChips } from "./components/ContextChips";
 import { InputBar } from "./components/InputBar";
 import { MessageStream } from "./components/MessageStream";
+import "@shared/ui/AgentChat/index.css";
 import "./index.css";
 
 function AgentPane() {

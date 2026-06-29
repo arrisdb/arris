@@ -1,0 +1,147 @@
+/* Shared agent-chat chrome: the column shell, message bubbles, empty state, the
+   working indicator, and the input pill. This is the single source for these
+   classes — the SQL AgentPane and the canvas agent chat both render them, so the
+   two panels look identical. SQL-only cards (sql/share/result/tool/chips/model)
+   stay in the agent domain's own stylesheet. */
+
+.mdbc-agent-pane {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+/* Message stream */
+.mdbc-agent-stream {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 12px 10px;
+}
+
+/* Rows keep their natural height — never let the column flex compress a tall SQL
+   block (which would clip its action buttons). The stream scrolls instead. */
+.mdbc-agent-stream > * {
+  flex-shrink: 0;
+}
+
+.mdbc-agent-msg {
+  font-size: var(--m-fs-sm);
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-width: 85%;
+  padding: 7px 10px;
+  border-radius: var(--m-r-control);
+}
+
+.mdbc-agent-msg.user {
+  align-self: flex-end;
+  background: rgb(var(--m-accent-rgb) / 0.18);
+  color: var(--m-fg);
+}
+
+/* Agent replies get their own bubble too, so the conversation reads as a
+   back-and-forth instead of loose unframed text. Neutral fill keeps the user's
+   accent bubble visually dominant. */
+.mdbc-agent-msg.agent {
+  align-self: flex-start;
+  background: rgb(var(--m-overlay-rgb) / 0.06);
+  color: var(--m-fg);
+}
+
+/* Working indicator: animated dots + an inline Stop button. */
+.mdbc-agent-typing {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--m-fg-4);
+}
+
+.mdbc-agent-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mdbc-agent-dots span {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--m-fg-3);
+  animation: mdbc-agent-bounce 1.2s infinite ease-in-out both;
+}
+
+.mdbc-agent-dots span:nth-child(1) {
+  animation-delay: -0.32s;
+}
+
+.mdbc-agent-dots span:nth-child(2) {
+  animation-delay: -0.16s;
+}
+
+@keyframes mdbc-agent-bounce {
+  0%,
+  80%,
+  100% {
+    transform: scale(0.4);
+    opacity: 0.4;
+  }
+  40% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* Empty conversation: a centered hint so the pane never reads as broken. */
+.mdbc-agent-empty {
+  margin: auto;
+  max-width: 340px;
+  padding: 16px 8px;
+  text-align: center;
+}
+
+.mdbc-agent-empty-title {
+  font-size: var(--m-fs-md, 15px);
+  color: var(--m-fg-2);
+  margin-bottom: 8px;
+}
+
+.mdbc-agent-empty-text {
+  font-size: var(--m-fs-xs, 11px);
+  line-height: 1.5;
+  color: var(--m-fg-4);
+}
+
+/* Input */
+.mdbc-agent-input {
+  border-top: 0.5px solid var(--m-sep);
+  padding: 8px 10px;
+}
+
+.mdbc-agent-unavailable {
+  color: var(--m-red);
+  font-size: var(--m-fs-xs, 11px);
+  margin-bottom: 6px;
+}
+
+/* The agent input is a growable textarea, so the canonical search pill must
+   stretch with it instead of clamping to its rigid single-line height. Drop the
+   pill's own margin — the .mdbc-agent-input padding owns the 10px inset. */
+.mdbc-agent-input .mdbc-search {
+  height: auto;
+  align-items: stretch;
+  margin: 0;
+  padding: 6px 8px;
+}
+
+.mdbc-agent-textarea {
+  resize: none;
+  min-height: 32px;
+  max-height: 120px;
+  padding: 2px 0;
+  line-height: 1.4;
+}
