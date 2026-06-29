@@ -29,9 +29,10 @@ describe("StickyNode", () => {
     useCanvasStore
       .getState()
       .addComponent(TAB, makeComponent({ kind: "sticky", id: "s", text: "todo" }));
-    renderNode("s");
+    const { container } = renderNode("s");
     const input = screen.getByPlaceholderText("Note…") as HTMLTextAreaElement;
     expect(input.value).toBe("todo");
+    fireEvent.doubleClick(container.querySelector(".mdbc-canvas-sticky") as Element);
     fireEvent.change(input, { target: { value: "done" } });
     expect(useCanvasStore.getState().boards[TAB].doc.components[0]).toMatchObject({
       kind: "sticky",

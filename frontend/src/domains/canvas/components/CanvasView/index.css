@@ -225,6 +225,19 @@
   padding: 8px 10px;
 }
 
+/* Idle text/sticky: clicks fall through to the node so a single click selects +
+   drags it; double-click enters editing (read-only is cleared). */
+.mdbc-canvas-text,
+.mdbc-canvas-sticky {
+  cursor: move;
+}
+
+.mdbc-canvas-text-input:read-only,
+.mdbc-canvas-sticky-input:read-only {
+  pointer-events: none;
+  cursor: move;
+}
+
 /* ── query object ─────────────────────────────────────────────────────────── */
 
 .mdbc-canvas-sql {

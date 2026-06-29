@@ -81,7 +81,7 @@ import DocTable from "../../components/docs/DocTable/DocTable.astro";
       </tr>
       <tr>
         <td class="font-medium text-fg">Text</td>
-        <td>Free text for headings and commentary. Click to edit in place.</td>
+        <td>Free text for headings and commentary. Double-click to edit in place.</td>
       </tr>
       <tr>
         <td class="font-medium text-fg">Sticky note</td>
@@ -121,7 +121,8 @@ import DocTable from "../../components/docs/DocTable/DocTable.astro";
 
   <ul>
     <li><strong>Add</strong> objects from the toolbar at the bottom of the board: a query, chart, sticky note, text, or shape. Tools with a caret open a small menu of options (the shape kind, the query language, the pointer mode).</li>
-    <li><strong>Move</strong> an object by dragging it; objects may overlap. Switch the pointer to the <strong>Hand</strong> tool to pan the board from anywhere instead of dragging objects.</li>
+    <li><strong>Select</strong> an object with a single click; its resize anchors stay shown until you click an empty part of the board.</li>
+    <li><strong>Move</strong> an object by dragging it; objects may overlap. Text and sticky notes move on a single drag and open for editing on double-click. Switch the pointer to the <strong>Hand</strong> tool to pan the board from anywhere instead of dragging objects.</li>
     <li><strong>Resize</strong> a selected object by dragging any of its borders or corners.</li>
     <li><strong>Pan</strong> by dragging the empty canvas, and <strong>zoom</strong> with the scroll wheel or the controls in the corner.</li>
     <li><strong>Delete</strong> a selected object with <kbd>Delete</kbd> or <kbd>Backspace</kbd>.</li>
