@@ -42,6 +42,17 @@ describe("CanvasToolbar", () => {
     expect(props.onRunAll).toHaveBeenCalledTimes(1);
   });
 
+  it("wraps every tool in a tooltip carrying its label", () => {
+    setup();
+    const tips = Array.from(document.querySelectorAll(".mdbc-tooltip-label")).map(
+      (el) => el.textContent,
+    );
+    expect(tips).toContain("Select");
+    expect(tips).toContain("Query cell");
+    expect(tips).toContain("Chart");
+    expect(tips).toContain("Run all queries");
+  });
+
   it("picks a shape kind from the shape menu", () => {
     const props = setup();
     expect(screen.queryByTestId("canvas-tool-shape-ellipse")).toBeNull();
