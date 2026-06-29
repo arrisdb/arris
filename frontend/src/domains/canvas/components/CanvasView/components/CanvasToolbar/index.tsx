@@ -15,6 +15,7 @@ function CanvasToolbar({
   onModeChange,
   onAddQuery,
   onAddChart,
+  onAddTable,
   onAddSticky,
   onAddText,
   onAddShape,
@@ -68,6 +69,7 @@ function CanvasToolbar({
       ],
     },
     { id: "chart", icon: "barChart", title: "Chart", onClick: onAddChart },
+    { id: "table", icon: "table", title: "Table", onClick: onAddTable },
     { id: "sticky", icon: "stickyNote", title: "Sticky note", onClick: onAddSticky },
     { id: "text", icon: "type", title: "Text", onClick: onAddText },
     {

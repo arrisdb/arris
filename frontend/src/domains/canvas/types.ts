@@ -5,7 +5,7 @@ import type { ChartSpec, QueryResult } from "@shared";
 /// overlap. This discriminated union is the extension seam: a future object kind
 /// (e.g. a Python cell or a static-file table import) is added here, gains one
 /// renderer-registry entry, and one agent-spec arm. Nothing nests.
-type ComponentKind = "text" | "sticky" | "query" | "chart" | "shape"; // future: "python" | "tableImport"
+type ComponentKind = "text" | "sticky" | "query" | "chart" | "table" | "shape"; // future: "python" | "tableImport"
 
 type ShapeKind = "rect" | "ellipse" | "line";
 
@@ -75,6 +75,16 @@ interface ChartComponent extends BaseComponent {
   title?: string;
 }
 
+/// A data table bound to a query object's data by `sourceQueryId`. Renders the
+/// upstream query's `QueryResult` as a scrollable grid, so it updates whenever
+/// that query re-runs. The query object itself no longer shows its rows inline;
+/// this is the object that previews them.
+interface TableComponent extends BaseComponent {
+  kind: "table";
+  sourceQueryId: string;
+  title?: string;
+}
+
 interface ShapeComponent extends BaseComponent {
   kind: "shape";
   shape: ShapeKind;
@@ -91,6 +101,7 @@ type CanvasComponent =
   | StickyComponent
   | QueryComponent
   | ChartComponent
+  | TableComponent
   | ShapeComponent;
 
 /// A connector between two objects (e.g. a query feeding a chart).
@@ -179,6 +190,7 @@ export type {
   ShapeStyle,
   StickyColor,
   StickyComponent,
+  TableComponent,
   TextAlign,
   TextComponent,
   TextStyle,

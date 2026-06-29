@@ -8,6 +8,7 @@ const KIND_LABEL: Record<ComponentKind, string> = {
   sticky: "Sticky note",
   query: "Query",
   chart: "Chart",
+  table: "Table",
   shape: "Shape",
 };
 

@@ -18,11 +18,13 @@ describe("describeBoard", () => {
         spec: { kind: "line", xColumn: "month", yColumns: ["total"], seriesColumn: "cat" },
         z: 1,
       }),
-      makeComponent({ kind: "sticky", id: "s1", text: "note", color: "green", z: 2 }),
+      makeComponent({ kind: "table", id: "tb1", sourceQueryId: "q1", z: 2 }),
+      makeComponent({ kind: "sticky", id: "s1", text: "note", color: "green", z: 3 }),
     ]);
     expect(out).toContain("query id=q1");
     expect(out).toContain('title="Monthly sales"');
     expect(out).toContain("chart id=c1 source=q1 kind=line x=month y=[total] series=cat");
+    expect(out).toContain("table id=tb1 source=q1");
     expect(out).toContain("sticky id=s1 color=green");
   });
 

@@ -260,6 +260,18 @@ function useCanvas(tab: EditorTab) {
     addComponent(tabId, makeComponent({ kind: "chart", ...placementFor() }));
   }, [addComponent, placementFor, tabId]);
 
+  // A table previews a query object's rows. Default its source to the most
+  // recently added query object so it shows data immediately; the user can
+  // repoint it in the properties pane.
+  const addTable = useCallback(() => {
+    const queries = (board?.doc.components ?? []).filter((c) => c.kind === "query");
+    const sourceQueryId = queries.length ? queries[queries.length - 1].id : "";
+    addComponent(
+      tabId,
+      makeComponent({ kind: "table", ...placementFor(), sourceQueryId }),
+    );
+  }, [addComponent, board, placementFor, tabId]);
+
   // Debounced serialize of the live board into the tab's text (persistence).
   const doc = board?.doc;
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -289,6 +301,7 @@ function useCanvas(tab: EditorTab) {
     addShape,
     addQuery,
     addChart,
+    addTable,
     copy,
     paste,
     remove,
