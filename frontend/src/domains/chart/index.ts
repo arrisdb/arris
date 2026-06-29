@@ -2,6 +2,9 @@ import { registerPane } from "@shared";
 import { useChartEditorStore } from "./hooks/store";
 import { useTabsStore } from "@shell/hooks/tabsStore";
 import { ChartEditorPanel } from "./components/ChartEditorPanel";
+import { ChartEditorSections } from "./components/ChartEditorPanel/components/ChartEditorContent";
+import { buildChartEditorViewModel } from "./components/ChartEditorPanel/utils";
+import type { ChartEditorPanelViewModel } from "./components/ChartEditorPanel/types";
 import { ChartView } from "./components/ChartView";
 import { defaultChartSpec, exportChartPng, reconcileChartSpec } from "./components/ChartView/utils";
 
@@ -30,10 +33,13 @@ function registerChartPane(): void {
 }
 
 export {
+  buildChartEditorViewModel,
   ChartEditorPanel,
+  ChartEditorSections,
   ChartView,
   defaultChartSpec,
   exportChartPng,
   reconcileChartSpec,
   registerChartPane,
 };
+export type { ChartEditorPanelViewModel };
