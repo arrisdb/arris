@@ -20,18 +20,6 @@ interface BoardState {
 
 interface CanvasStore {
   boards: Record<string, BoardState>;
-  /// The id of the selected object per board (or null). Mirrored from the board's
-  /// live ReactFlow selection so the shell-hosted properties pane, which lives in
-  /// a different subtree, can read what is selected.
-  selectedByTab: Record<string, string | null>;
-  setSelected: (tabId: string, id: string | null) => void;
-  /// Whether the canvas agent chat (left rail) and properties pane (right rail)
-  /// are open. Toggled from the status bar; the rails also gate on the active tab
-  /// being a canvas board.
-  agentPaneOpen: boolean;
-  propsPaneOpen: boolean;
-  toggleAgentPane: () => void;
-  togglePropsPane: () => void;
   /// Parse a tab's text into a board the first time it mounts; a no-op afterward
   /// so live edits are never clobbered by a re-mount.
   ensureBoard: (tabId: string, text: string) => void;
@@ -125,15 +113,6 @@ function withDoc(
 const useCanvasStore = create<CanvasStore>((set, get) => ({
   boards: {},
   clipboard: null,
-  selectedByTab: {},
-  agentPaneOpen: true,
-  propsPaneOpen: true,
-
-  setSelected: (tabId, id) =>
-    set((s) => ({ selectedByTab: { ...s.selectedByTab, [tabId]: id } })),
-
-  toggleAgentPane: () => set((s) => ({ agentPaneOpen: !s.agentPaneOpen })),
-  togglePropsPane: () => set((s) => ({ propsPaneOpen: !s.propsPaneOpen })),
 
   ensureBoard: (tabId, text) =>
     set((s) =>
@@ -165,12 +144,7 @@ const useCanvasStore = create<CanvasStore>((set, get) => ({
       const board = s.boards[tabId];
       if (!board) return s;
       const { [id]: _dropped, ...runs } = board.runs;
-      const selectedByTab =
-        s.selectedByTab[tabId] === id
-          ? { ...s.selectedByTab, [tabId]: null }
-          : s.selectedByTab;
       return {
-        selectedByTab,
         boards: {
           ...s.boards,
           [tabId]: {

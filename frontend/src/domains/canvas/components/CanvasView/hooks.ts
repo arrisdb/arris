@@ -33,7 +33,6 @@ function useCanvas(tab: EditorTab) {
   const addEdge = useCanvasStore((s) => s.addEdge);
   const removeEdges = useCanvasStore((s) => s.removeEdges);
   const setViewport = useCanvasStore((s) => s.setViewport);
-  const setSelected = useCanvasStore((s) => s.setSelected);
 
   // While drawing a relationship arrow, the id of the object clicked first (the
   // arrow's source); the next object clicked becomes its target. A ref mirrors it
@@ -185,12 +184,6 @@ function useCanvas(tab: EditorTab) {
     selectedIds.length === 1
       ? components.find((c) => c.id === selectedIds[0])
       : undefined;
-
-  // Mirror the single selection into the store so the shell-hosted properties
-  // pane (a separate React subtree) can read what is selected on this board.
-  useEffect(() => {
-    setSelected(tabId, selectedIds.length === 1 ? selectedIds[0] : null);
-  }, [tabId, selectedIds, setSelected]);
 
   // Copy (⌘/Ctrl+C) the selected object and Paste (⌘/Ctrl+V) a fresh clone.
   // Skipped while typing in an input, textarea, or code editor so ordinary text
