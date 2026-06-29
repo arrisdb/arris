@@ -26,6 +26,24 @@ function serializeAttachments(attachments: ResultAttachment[]): string {
   return `${attachments.map((a) => `# Results: ${a.label}\n${a.table}`).join("\n\n")}\n\n`;
 }
 
+/// Assemble the schema the agent receives for a multi-connection board: one
+/// section per connection, headed with the connection's name, id, and dialect so
+/// the agent can set each query object's `connectionId` to the right database.
+function assembleSchemaContext(
+  ids: string[],
+  nameOf: (id: string) => string,
+  dialectOf: (id: string) => string,
+  schemaByConn: Record<string, string>,
+): string {
+  return ids
+    .map((id) => {
+      const ddl =
+        (schemaByConn[id] ?? "").trim() || "(no schema loaded for this connection)";
+      return `## Connection ${JSON.stringify(nameOf(id))} (id=${id}, ${dialectOf(id)})\n${ddl}`;
+    })
+    .join("\n\n");
+}
+
 /// Strip the arris-canvas fenced block from the agent's reply so the chat shows
 /// only the prose. Used for the streaming bubble and the final fallback text.
 function displayText(raw: string): string {
@@ -45,22 +63,35 @@ function errToString(err: unknown): string {
 /// never picks up the SQL chat's turns.
 function useCanvasAgentChat(tab: EditorTab) {
   const tabId = tab.id;
-  const connectionId = tab.connectionId ?? null;
 
-  // The board's connection is canvas-wide: the agent reads its schema and every
-  // query object runs against it. Picking one binds it to the tab.
+  // A board can target several connections at once: the agent reads every chosen
+  // connection's schema and may run each query object against a different one.
   const connections = useConnectionsStore((s) => s.connections);
   const connectionOptions = useMemo(
     () => connections.map((c) => ({ value: c.id, label: c.name })),
     [connections],
   );
-  const pickConnection = useCallback(
-    (id: string) => {
-      const conn = connections.find((c) => c.id === id);
-      if (!conn) return;
-      if (!conn.isConnected) useConnectionsStore.getState().connectAndLoad(id);
-      useConnectionsStore.getState().selectConnection(id);
-      useTabsStore.getState().updateTab(tabId, { connectionId: id });
+  const connById = useMemo(
+    () => new Map(connections.map((c) => [c.id, c])),
+    [connections],
+  );
+  // Pick the board's connections (multi-select). The first is the primary: the
+  // default for new query objects and the global selection. Each is connected
+  // and loaded so its schema is ready for the agent.
+  const pickConnections = useCallback(
+    (ids: string[]) => {
+      useCanvasStore.getState().setConnectionIds(tabId, ids);
+      for (const id of ids) {
+        const conn = connections.find((c) => c.id === id);
+        if (conn && !conn.isConnected) useConnectionsStore.getState().connectAndLoad(id);
+      }
+      const primary = ids[0];
+      if (primary) {
+        useConnectionsStore.getState().selectConnection(primary);
+        useTabsStore.getState().updateTab(tabId, { connectionId: primary });
+      } else {
+        useTabsStore.getState().updateTab(tabId, { connectionId: undefined });
+      }
     },
     [connections, tabId],
   );
@@ -73,6 +104,18 @@ function useCanvasAgentChat(tab: EditorTab) {
   // serializes its rows and shows a removable chip above the input.
   const [attachments, setAttachments] = useState<ResultAttachment[]>([]);
   const board = useCanvasStore((s) => s.boards[tabId]);
+
+  // The connections the agent may use, from the persisted board doc. An older
+  // board with no set falls back to the tab's primary connection. The first id
+  // is the primary (drives the "no connection" gating and the single-connection
+  // backend path).
+  const connectionIds = useMemo<string[]>(() => {
+    const fromDoc = board?.doc.connectionIds;
+    if (fromDoc && fromDoc.length > 0) return fromDoc;
+    return tab.connectionId ? [tab.connectionId] : [];
+  }, [board?.doc.connectionIds, tab.connectionId]);
+  const connectionId = connectionIds[0] ?? null;
+
   const resultOptions = useMemo<SelectOption[]>(() => {
     if (!board) return [];
     const opts: SelectOption[] = [];
@@ -113,23 +156,26 @@ function useCanvasAgentChat(tab: EditorTab) {
   // The schema DDL the agent will receive for this connection. Fetched (with a
   // spinner) whenever the connection changes, so the panel can be explicit about
   // reading the database's tables and can preview the exact context.
-  const [schemaContext, setSchemaContext] = useState("");
+  const [schemaByConn, setSchemaByConn] = useState<Record<string, string>>({});
   const [schemaLoading, setSchemaLoading] = useState(false);
 
   useEffect(() => {
-    if (!connectionId) {
-      setSchemaContext("");
+    if (connectionIds.length === 0) {
+      setSchemaByConn({});
       setSchemaLoading(false);
       return;
     }
     let active = true;
     setSchemaLoading(true);
-    fetchCanvasSchemaContextIPC(connectionId)
-      .then((ddl) => {
-        if (active) setSchemaContext(ddl);
-      })
-      .catch(() => {
-        if (active) setSchemaContext("");
+    Promise.all(
+      connectionIds.map((id) =>
+        fetchCanvasSchemaContextIPC(id)
+          .then((ddl) => [id, ddl] as const)
+          .catch(() => [id, ""] as const),
+      ),
+    )
+      .then((pairs) => {
+        if (active) setSchemaByConn(Object.fromEntries(pairs));
       })
       .finally(() => {
         if (active) setSchemaLoading(false);
@@ -137,7 +183,17 @@ function useCanvasAgentChat(tab: EditorTab) {
     return () => {
       active = false;
     };
-  }, [connectionId]);
+  }, [connectionIds]);
+
+  const nameOf = useCallback((id: string) => connById.get(id)?.name ?? id, [connById]);
+  const dialectOf = useCallback((id: string) => connById.get(id)?.kind ?? "sql", [connById]);
+  // More than one connection means the backend can't resolve a single schema, so
+  // we assemble one labeled per connection and pass it as the override.
+  const multiConnection = connectionIds.length > 1;
+  const agentSchema = useCallback(
+    () => assembleSchemaContext(connectionIds, nameOf, dialectOf, schemaByConn),
+    [connectionIds, nameOf, dialectOf, schemaByConn],
+  );
 
   // The exact context block the agent receives: the schema DDL plus the current
   // board summary. Read at call time so the board section is always current.
@@ -145,14 +201,18 @@ function useCanvasAgentChat(tab: EditorTab) {
     const components =
       useCanvasStore.getState().boards[tabId]?.doc.components ?? [];
     const board = describeBoard(components);
+    const schema = multiConnection
+      ? agentSchema()
+      : (schemaByConn[connectionId ?? ""] ?? "").trim() ||
+        "(no schema loaded for this connection)";
     return [
       "# Database schema (sent to the agent)",
-      schemaContext.trim() || "(no schema loaded for this connection)",
+      schema,
       "",
       "# Current board",
       board || "The board is empty.",
     ].join("\n");
-  }, [schemaContext, tabId]);
+  }, [agentSchema, connectionId, multiConnection, schemaByConn, tabId]);
 
   const turnIdRef = useRef<string | null>(null);
   const agentEntryIdRef = useRef<string | null>(null);
@@ -272,11 +332,15 @@ function useCanvasAgentChat(tab: EditorTab) {
       );
       sendCanvasAgentIPC({
         provider,
-        connectionId,
+        // A multi-connection board hands the backend a pre-assembled schema and
+        // no single connection; a single-connection board lets the backend
+        // resolve the schema for its one connection.
+        connectionId: multiConnection ? null : connectionId,
         // Attached query results ride in front of the user's prompt; the chat
         // bubble still shows only `text`.
         prompt: `${serializeAttachments(attachments)}${text}`,
         boardContext,
+        schemaOverride: multiConnection ? agentSchema() : null,
         turnId,
         resumeSession,
       }).catch((e) => {
@@ -285,7 +349,16 @@ function useCanvasAgentChat(tab: EditorTab) {
       });
       setAttachments([]);
     },
-    [attachments, connectionId, endTurn, setAgentText, streaming, tabId],
+    [
+      agentSchema,
+      attachments,
+      connectionId,
+      endTurn,
+      multiConnection,
+      setAgentText,
+      streaming,
+      tabId,
+    ],
   );
 
   const cancel = useCallback(() => {
@@ -302,9 +375,10 @@ function useCanvasAgentChat(tab: EditorTab) {
     buildContext,
     cancel,
     connectionId,
+    connectionIds,
     connectionOptions,
     entries,
-    pickConnection,
+    pickConnections,
     removeAttachment,
     resultOptions,
     schemaLoading,

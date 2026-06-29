@@ -24,13 +24,18 @@ interface SendCanvasAgentArgs {
   /// A compact summary of the objects already on the board, so the agent can
   /// reference, modify, or remove them by id. Empty when the board is empty.
   boardContext: string;
+  /// A schema assembled across several connections, used when the board spans
+  /// more than one database: each connection's DDL labeled with its id and
+  /// dialect. Null for a single-connection board (the backend resolves it).
+  schemaOverride: string | null;
   turnId: string;
   resumeSession: string | null;
 }
 
 /// Start one canvas-profile agent turn with the chosen provider. The backend
-/// injects the connection's schema, the current board, and the arris-canvas
-/// contract, then streams `agent-event`s.
+/// injects the connection's schema (or `schemaOverride` for a multi-connection
+/// board), the current board, and the arris-canvas contract, then streams
+/// `agent-event`s.
 function sendCanvasAgentIPC(args: SendCanvasAgentArgs): Promise<void> {
   return invoke("cmd_agent_send", {
     provider: args.provider,
@@ -38,6 +43,7 @@ function sendCanvasAgentIPC(args: SendCanvasAgentArgs): Promise<void> {
     connectionId: args.connectionId,
     prompt: args.prompt,
     boardContext: args.boardContext,
+    schemaOverride: args.schemaOverride,
     turnId: args.turnId,
     resumeSession: args.resumeSession,
   });
