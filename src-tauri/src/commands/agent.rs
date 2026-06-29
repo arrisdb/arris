@@ -60,6 +60,12 @@ pub async fn cmd_agent_send(
     connection_id: Option<Uuid>,
     prompt: String,
     board_context: Option<String>,
+    // A pre-assembled schema block, used by the canvas chat when the board spans
+    // several connections: the frontend fetches each connection's schema, labels
+    // it with the connection's id and dialect, and sends the combined text here.
+    // When present it replaces the single-connection schema the backend would
+    // otherwise resolve.
+    schema_override: Option<String>,
     turn_id: String,
     resume_session: Option<String>,
 ) -> Result<(), IpcError> {
@@ -77,6 +83,7 @@ pub async fn cmd_agent_send(
             connection_id,
             prompt,
             board_context,
+            schema_override,
             turn_id.clone(),
             resume_session,
             cancel_rx,
@@ -127,6 +134,7 @@ async fn run_turn(
     connection_id: Option<Uuid>,
     prompt: String,
     board_context: Option<String>,
+    schema_override: Option<String>,
     turn_id: String,
     resume_session: Option<String>,
     cancel: oneshot::Receiver<()>,
@@ -167,15 +175,19 @@ async fn run_turn(
         None => None,
     };
 
-    let (dialect, schema_ddl) = match &conn {
-        Some(conn) => {
+    // A frontend-assembled schema (the canvas multi-connection case) replaces the
+    // single-connection schema we would otherwise resolve. Its dialects are
+    // labeled inline per connection, so the prompt stays dialect-generic.
+    let (dialect, schema_ddl) = match (&conn, schema_override) {
+        (_, Some(over)) => (conn.as_ref().map(|c| c.kind), over),
+        (Some(conn), None) => {
             let schema = resolve_schema_ddl(env, conn).await.unwrap_or_else(|| {
                 eprintln!("[agent] schema unavailable for connection; continuing without it");
                 String::new()
             });
             (Some(conn.kind), schema)
         }
-        None => (None, String::new()),
+        (None, None) => (None, String::new()),
     };
 
     match env

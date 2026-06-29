@@ -259,6 +259,12 @@ impl AgentEngine {
              ```\n\n\
              # Rules\n\
              - Use dialect-appropriate {name} syntax and only the tables/columns above.\n\
+             - Each `query` runs against ONE database connection. When the schema \
+             section above lists more than one connection (each under a \
+             `## Connection ... id=<id>` header), every `query` MUST include a \
+             `connectionId` set to the matching `id`, so the board can run queries \
+             against different databases in the same answer. With a single \
+             connection, omit `connectionId`.\n\
              - To ADD an object, use a new `id`. To MODIFY an object already on the \
              board, return a component whose `id` matches the existing one and \
              include only the fields you are changing (the client merges them). To \
@@ -541,6 +547,10 @@ mod tests {
         assert!(prompt.contains("showLegend"));
         assert!(prompt.contains("legendPosition"));
         assert!(prompt.contains("yScale"));
+        // The per-query connection rule lets the agent target several databases in
+        // one answer (canvas multi-connection support).
+        assert!(prompt.contains("connectionId"));
+        assert!(prompt.contains("## Connection"));
         assert!(!prompt.contains("return exactly one ```sql fenced block"));
     }
 
