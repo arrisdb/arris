@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -12,6 +13,7 @@ use datafusion::prelude::{SessionConfig, SessionContext};
 use super::constants::QUERY_MEMORY_POOL_SIZE;
 use super::errors::CanvasError;
 use super::impl_cell_result_cache::CellResultCache;
+use super::types::CanvasCellSpec;
 use crate::federation::FederationEngine;
 use crate::QueryResult;
 
@@ -22,8 +24,9 @@ use crate::QueryResult;
 /// canvas cell-chaining feature: cell B can `SELECT ... FROM a` where `a` is the
 /// sanitized title of cell A.
 ///
-/// Scope today (Phase 1): cell-to-cell references only. A cell that also reads a
-/// live database table is a later phase (it reuses the federation scan path).
+/// Cache entries are board-scoped, so two boards may reuse the same cell titles
+/// without colliding. Planning (`plan`) and reference parsing (`table_refs`) are
+/// pure helpers the command layer uses to drive the auto-run-upstream order.
 pub struct CanvasEngine {
     cache: Arc<CellResultCache>,
 }
@@ -64,10 +67,10 @@ impl CanvasEngine {
     }
 
     /// The table names referenced after `FROM`/`JOIN`, lowercased and stripped to
-    /// their leading identifier. Used to decide which cached cells to register.
-    /// A dotted name (`conn.schema.table`) reduces to its first segment, which a
-    /// cell title never matches, so federation refs are simply ignored here.
-    fn referenced_tables(sql: &str) -> Vec<String> {
+    /// their leading identifier. A dotted name (`conn.schema.table`) reduces to
+    /// its first segment, which a cell title never matches, so a federation/live
+    /// reference simply doesn't resolve to a cell here.
+    pub fn table_refs(sql: &str) -> Vec<String> {
         let tokens: Vec<&str> = sql
             .split(|c: char| c.is_whitespace() || c == ',' || c == '(' || c == ')')
             .filter(|t| !t.is_empty())
@@ -89,6 +92,65 @@ impl CanvasEngine {
         out
     }
 
+    /// Board-scoped cache key for a cell title.
+    fn key(board: &str, title: &str) -> String {
+        format!("{board}\u{1}{}", Self::sanitize_title(title))
+    }
+
+    /// Topologically order the target cell and its transitive cell dependencies
+    /// (dependencies first, target last), so the caller runs upstream cells
+    /// before the ones that read them. Returns an error on a dependency cycle or
+    /// an unknown target.
+    pub fn plan(cells: &[CanvasCellSpec], target_id: &str) -> Result<Vec<String>, CanvasError> {
+        let by_id: HashMap<&str, &CanvasCellSpec> =
+            cells.iter().map(|c| (c.id.as_str(), c)).collect();
+        if !by_id.contains_key(target_id) {
+            return Err(CanvasError::Engine(format!("unknown target cell {target_id}")));
+        }
+        // Sanitized title -> cell id. Last cell wins on a title collision.
+        let title_to_id: HashMap<String, String> = cells
+            .iter()
+            .map(|c| (Self::sanitize_title(&c.title), c.id.clone()))
+            .collect();
+
+        let mut order: Vec<String> = Vec::new();
+        // 0 = on the current DFS stack (cycle if re-seen), 1 = finished.
+        let mut state: HashMap<String, u8> = HashMap::new();
+        Self::visit(target_id, &by_id, &title_to_id, &mut state, &mut order)?;
+        Ok(order)
+    }
+
+    fn visit(
+        id: &str,
+        by_id: &HashMap<&str, &CanvasCellSpec>,
+        title_to_id: &HashMap<String, String>,
+        state: &mut HashMap<String, u8>,
+        order: &mut Vec<String>,
+    ) -> Result<(), CanvasError> {
+        match state.get(id) {
+            Some(1) => return Ok(()),
+            Some(_) => {
+                return Err(CanvasError::Engine(format!(
+                    "dependency cycle involving cell {id}"
+                )))
+            }
+            None => {}
+        }
+        state.insert(id.to_string(), 0);
+        if let Some(cell) = by_id.get(id) {
+            for dep_title in Self::table_refs(&cell.sql) {
+                if let Some(dep_id) = title_to_id.get(&dep_title) {
+                    if dep_id != id {
+                        Self::visit(dep_id, by_id, title_to_id, state, order)?;
+                    }
+                }
+            }
+        }
+        state.insert(id.to_string(), 1);
+        order.push(id.to_string());
+        Ok(())
+    }
+
     /// A DataFusion session with a bounded, disk-spilling memory pool. Mirrors the
     /// federation engine's setup so chained-cell queries spill rather than OOM.
     fn session_context() -> Result<SessionContext, CanvasError> {
@@ -102,23 +164,35 @@ impl CanvasEngine {
         Ok(SessionContext::new_with_config_rt(config, runtime))
     }
 
-    /// Store a plain (non-chained) cell's result so downstream cells can read it.
-    /// Call this after running any ordinary query object on the board.
-    pub fn cache_result(&self, title: &str, result: &QueryResult) -> Result<(), CanvasError> {
+    /// Store a plain (non-chained) cell's result so downstream cells on the same
+    /// board can read it. Call this after running any ordinary query object.
+    pub fn cache_result(
+        &self,
+        board: &str,
+        title: &str,
+        result: &QueryResult,
+    ) -> Result<(), CanvasError> {
         let (_schema, batch) =
             FederationEngine::query_result_to_batch(result).map_err(CanvasError::Conversion)?;
-        self.cache.put(&Self::sanitize_title(title), vec![batch])
+        self.cache.put(&Self::key(board, title), vec![batch])
     }
 
-    /// Run one cell's SQL, registering every referenced cell that has a cached
-    /// result as a `MemTable`, then cache this cell's own output under its
-    /// sanitized title (so cells downstream of it can read it in turn).
-    pub async fn run_cell(&self, title: &str, sql: &str) -> Result<QueryResult, CanvasError> {
+    /// Run one cell's SQL, registering every referenced cell on this board that has
+    /// a cached result as a `MemTable`, then cache this cell's own output under its
+    /// sanitized title (so cells downstream of it can read it in turn). A trailing
+    /// semicolon is stripped (DataFusion rejects it).
+    pub async fn run_cell(
+        &self,
+        board: &str,
+        title: &str,
+        sql: &str,
+    ) -> Result<QueryResult, CanvasError> {
+        let sql = sql.trim().trim_end_matches(';').trim();
         let start = Instant::now();
         let ctx = Self::session_context()?;
 
-        for name in Self::referenced_tables(sql) {
-            if let Some(batches) = self.cache.get(&name)? {
+        for name in Self::table_refs(sql) {
+            if let Some(batches) = self.cache.get(&Self::key(board, &name))? {
                 let schema = batches[0].schema();
                 let table = MemTable::try_new(schema, vec![batches])
                     .map_err(|e| CanvasError::Engine(e.to_string()))?;
@@ -140,20 +214,30 @@ impl CanvasEngine {
             batches.push(RecordBatch::new_empty(schema));
         }
 
-        let result = FederationEngine::batches_to_query_result(&batches, start.elapsed().as_secs_f64());
-        self.cache.put(&Self::sanitize_title(title), batches)?;
+        let result =
+            FederationEngine::batches_to_query_result(&batches, start.elapsed().as_secs_f64());
+        self.cache.put(&Self::key(board, title), batches)?;
         Ok(result)
+    }
+
+    /// Drop every cached result for a board (e.g. when its tab closes).
+    pub fn clear_board(&self, board: &str, titles: &[String]) {
+        for title in titles {
+            self.cache.remove(&Self::key(board, title));
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::sync::atomic::{AtomicU64, Ordering};
     use std::path::PathBuf;
+    use std::sync::atomic::{AtomicU64, Ordering};
 
     use crate::{ColumnSpec, QueryValue, StatementType};
 
     use super::*;
+
+    const BOARD: &str = "board-1";
 
     static DIR_SEQ: AtomicU64 = AtomicU64::new(0);
 
@@ -190,6 +274,15 @@ mod tests {
         }
     }
 
+    fn spec(id: &str, title: &str, sql: &str) -> CanvasCellSpec {
+        CanvasCellSpec {
+            id: id.to_string(),
+            title: title.to_string(),
+            sql: sql.to_string(),
+            connection_id: None,
+        }
+    }
+
     fn text_at(result: &QueryResult, row: usize, col: usize) -> String {
         match &result.rows[row][col] {
             QueryValue::Text(s) => s.clone(),
@@ -207,10 +300,11 @@ mod tests {
     #[tokio::test]
     async fn cell_b_aggregates_cell_a_cached_result() {
         let engine = engine();
-        engine.cache_result("a", &sales_result()).unwrap();
+        engine.cache_result(BOARD, "a", &sales_result()).unwrap();
 
         let out = engine
             .run_cell(
+                BOARD,
                 "b",
                 "SELECT category, SUM(total) AS total FROM a GROUP BY category ORDER BY category",
             )
@@ -229,30 +323,84 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn select_star_with_trailing_semicolon_reads_the_cell() {
+        let engine = engine();
+        engine.cache_result(BOARD, "abc", &sales_result()).unwrap();
+        // Mirrors the UI: a `SELECT * fROM abc;` reading another cell's result.
+        let out = engine.run_cell(BOARD, "query", "SELECT * fROM abc;").await.unwrap();
+        assert_eq!(out.rows.len(), 3);
+        assert_eq!(out.columns.len(), 2);
+    }
+
+    #[tokio::test]
     async fn a_chained_cell_is_cached_for_its_own_downstream() {
         let engine = engine();
-        engine.cache_result("a", &sales_result()).unwrap();
-        // b depends on a; c depends on b. Running b then c proves a two-hop chain.
+        engine.cache_result(BOARD, "a", &sales_result()).unwrap();
         engine
-            .run_cell("b", "SELECT category, SUM(total) AS total FROM a GROUP BY category")
+            .run_cell(BOARD, "b", "SELECT category, SUM(total) AS total FROM a GROUP BY category")
             .await
             .unwrap();
-        assert!(engine.cache().contains("b"));
+        assert!(engine.cache().contains(&CanvasEngine::key(BOARD, "b")));
 
         let out = engine
-            .run_cell("c", "SELECT SUM(total) AS grand FROM b")
+            .run_cell(BOARD, "c", "SELECT SUM(total) AS grand FROM b")
             .await
             .unwrap();
         assert_eq!(int_at(&out, 0, 0), 18);
     }
 
     #[tokio::test]
+    async fn board_scoping_keeps_same_titled_cells_apart() {
+        let engine = engine();
+        let mut other = sales_result();
+        other.rows.clear();
+        engine.cache_result("board-A", "a", &sales_result()).unwrap();
+        engine.cache_result("board-B", "a", &other).unwrap();
+        let a = engine.run_cell("board-A", "x", "SELECT * FROM a").await.unwrap();
+        let b = engine.run_cell("board-B", "x", "SELECT * FROM a").await.unwrap();
+        assert_eq!(a.rows.len(), 3);
+        assert_eq!(b.rows.len(), 0);
+    }
+
+    #[tokio::test]
     async fn referencing_an_unknown_cell_errors() {
         let engine = engine();
         let err = engine
-            .run_cell("b", "SELECT * FROM does_not_exist")
+            .run_cell(BOARD, "b", "SELECT * FROM does_not_exist")
             .await
             .unwrap_err();
+        assert!(matches!(err, CanvasError::Engine(_)));
+    }
+
+    #[test]
+    fn plan_orders_dependencies_before_the_target() {
+        let cells = vec![
+            spec("id_q", "Query", "SELECT * FROM abc"),
+            spec("id_abc", "abc", "SELECT * FROM public.sales"),
+        ];
+        let order = CanvasEngine::plan(&cells, "id_q").unwrap();
+        assert_eq!(order, vec!["id_abc".to_string(), "id_q".to_string()]);
+    }
+
+    #[test]
+    fn plan_runs_only_the_targets_ancestors() {
+        let cells = vec![
+            spec("a", "a", "SELECT 1"),
+            spec("b", "b", "SELECT * FROM a"),
+            spec("c", "c", "SELECT 2"),
+        ];
+        // Target b pulls in a, but not the unrelated c.
+        let order = CanvasEngine::plan(&cells, "b").unwrap();
+        assert_eq!(order, vec!["a".to_string(), "b".to_string()]);
+    }
+
+    #[test]
+    fn plan_detects_a_dependency_cycle() {
+        let cells = vec![
+            spec("a", "a", "SELECT * FROM b"),
+            spec("b", "b", "SELECT * FROM a"),
+        ];
+        let err = CanvasEngine::plan(&cells, "a").unwrap_err();
         assert!(matches!(err, CanvasError::Engine(_)));
     }
 
@@ -266,10 +414,9 @@ mod tests {
     }
 
     #[test]
-    fn referenced_tables_picks_out_from_and_join_targets() {
-        let refs = CanvasEngine::referenced_tables(
-            "SELECT * FROM Orders o JOIN customers c ON o.cid = c.id",
-        );
+    fn table_refs_picks_out_from_and_join_targets() {
+        let refs =
+            CanvasEngine::table_refs("SELECT * FROM Orders o JOIN customers c ON o.cid = c.id");
         assert_eq!(refs, vec!["orders", "customers"]);
     }
 }
