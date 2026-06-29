@@ -174,11 +174,37 @@ impl AgentEngine {
     ) -> String {
         let name = dialect.map(Self::dialect_name).unwrap_or("SQL");
         let schema = Self::clamp_schema(schema_ddl);
+        let syntax_note = Self::dialect_syntax_note(dialect);
         match profile {
-            AgentProfile::Sql => Self::build_sql_prompt(name, &schema, user_prompt),
+            AgentProfile::Sql => Self::build_sql_prompt(name, &schema, syntax_note, user_prompt),
             AgentProfile::Canvas => {
-                Self::build_canvas_prompt(name, &schema, board_context, user_prompt)
+                Self::build_canvas_prompt(name, &schema, syntax_note, board_context, user_prompt)
             }
+        }
+    }
+
+    /// Dialect-specific syntax guidance appended to the generic "use {name}
+    /// syntax" rule. Most SQL databases need none. A non-SQL store whose query
+    /// language the model would otherwise get wrong returns a note here. For
+    /// MongoDB the driver parses the statement's argument as STRICT JSON, so the
+    /// model must double-quote every key (the default mongosh/JS style with
+    /// unquoted keys fails with `invalid JSON ... key must be a string`).
+    fn dialect_syntax_note(dialect: Option<DatabaseKind>) -> &'static str {
+        match dialect {
+            Some(DatabaseKind::Mongodb) => {
+                "\n- This is MongoDB, not SQL. Write each statement as \
+                 `db.<collection>.<verb>(...)` (analytics use \
+                 `db.<collection>.aggregate([ ... ])`; also `find`, `insertOne`, \
+                 `updateMany`, `deleteMany`). The argument is parsed as STRICT JSON: \
+                 EVERY key MUST be double-quoted, including `$`-operators (\"$group\", \
+                 \"$match\", \"$sum\", \"$project\", \"$sort\", \"$dateToString\") and \
+                 field names (\"_id\", \"category\", \"total_sales\"); string values are \
+                 double-quoted too. NEVER use mongosh/JavaScript style with unquoted \
+                 keys, and never use shell helpers like ObjectId(...) or ISODate(...). \
+                 Example: db.sales.aggregate([{\"$group\":{\"_id\":\"$category\",\"total\":\
+                 {\"$sum\":\"$amount\"}}},{\"$sort\":{\"total\":-1}}])."
+            }
+            _ => "",
         }
     }
 
@@ -195,15 +221,15 @@ impl AgentEngine {
     }
 
     /// The query-assistant prompt: write or explain one SQL block.
-    fn build_sql_prompt(name: &str, schema: &str, user_prompt: &str) -> String {
+    fn build_sql_prompt(name: &str, schema: &str, syntax_note: &str, user_prompt: &str) -> String {
         format!(
             "You are a SQL assistant embedded in a database client. You ONLY write \
-             or explain SQL queries for the user's {name} database — nothing else. \
+             or explain SQL queries for the user's {name} database, nothing else. \
              Do not run shell commands, read files, or do unrelated work.\n\n\
              # Database schema ({name})\n\
              {schema}\n\n\
              # Rules\n\
-             - Use dialect-appropriate {name} syntax and the tables/columns above.\n\
+             - Use dialect-appropriate {name} syntax and the tables/columns above.{syntax_note}\n\
              - When you write a query, return exactly one ```sql fenced block, then \
              one short sentence describing it. The user reviews and applies it.\n\
              - When asked to explain a query, describe what it does in plain prose; \
@@ -221,6 +247,7 @@ impl AgentEngine {
     fn build_canvas_prompt(
         name: &str,
         schema: &str,
+        syntax_note: &str,
         board_context: &str,
         user_prompt: &str,
     ) -> String {
@@ -259,7 +286,7 @@ impl AgentEngine {
              }}\n\
              ```\n\n\
              # Rules\n\
-             - Use dialect-appropriate {name} syntax and only the tables/columns above.\n\
+             - Use dialect-appropriate {name} syntax and only the tables/columns above.{syntax_note}\n\
              - Each `query` runs against ONE database connection. When the schema \
              section above lists more than one connection (each under a \
              `## Connection ... id=<id>` header), every `query` MUST include a \
@@ -677,6 +704,35 @@ mod tests {
         let huge = "x".repeat(SCHEMA_PROMPT_MAX_BYTES + 1000);
         let prompt = AgentEngine::build_prompt(AgentProfile::Canvas, None, &huge, "go", "");
         assert!(prompt.contains("(schema truncated)"));
+    }
+
+    #[test]
+    fn mongo_prompt_demands_strict_json_keys() {
+        // The MongoDB driver parses each statement's argument as strict JSON, so
+        // both profiles must tell the model to double-quote every key (otherwise it
+        // emits mongosh/JS unquoted keys that the driver rejects).
+        for profile in [AgentProfile::Canvas, AgentProfile::Sql] {
+            let prompt = AgentEngine::build_prompt(
+                profile,
+                Some(DatabaseKind::Mongodb),
+                "sales_transactions: { amount, category, sale_date }",
+                "monthly sales by category",
+                "",
+            );
+            assert!(prompt.contains("MongoDB, not SQL"));
+            assert!(prompt.contains("STRICT JSON"));
+            assert!(prompt.contains("double-quoted"));
+            assert!(prompt.contains("aggregate"));
+        }
+        // A SQL database gets no MongoDB note.
+        let pg = AgentEngine::build_prompt(
+            AgentProfile::Canvas,
+            Some(DatabaseKind::Postgres),
+            "CREATE TABLE t (id INT);",
+            "x",
+            "",
+        );
+        assert!(!pg.contains("STRICT JSON"));
     }
 
     fn schema(name: &str) -> SchemaNode {
