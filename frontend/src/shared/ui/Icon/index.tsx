@@ -4,6 +4,7 @@
 import type { ComponentProps, ComponentType } from "react";
 import {
   ArrowDown,
+  ArrowRight,
   ArrowUp,
   ArrowUpDown,
   BarChart3,
@@ -118,6 +119,7 @@ const PlayInsert: LucideIcon = ({ width, height, strokeWidth, className }) => (
 /// in this one file so library swaps are contained.
 const Icons = {
   arrowDown: ArrowDown,
+  arrowRight: ArrowRight,
   arrowUp: ArrowUp,
   arrowUpDown: ArrowUpDown,
   barChart: BarChart3,

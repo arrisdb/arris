@@ -47,6 +47,13 @@ describe("CanvasToolbar", () => {
     expect(props.onModeChange).toHaveBeenCalledWith("hand");
   });
 
+  it("enters connect mode from the Arrow option", () => {
+    const props = setup();
+    fireEvent.click(screen.getByTestId("canvas-tool-select-caret"));
+    fireEvent.click(screen.getByTestId("canvas-tool-select-connect"));
+    expect(props.onModeChange).toHaveBeenCalledWith("connect");
+  });
+
   it("does not fire for the disabled Python option", () => {
     const props = setup();
     fireEvent.click(screen.getByTestId("canvas-tool-query-caret"));

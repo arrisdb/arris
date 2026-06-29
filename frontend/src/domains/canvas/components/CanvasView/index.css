@@ -55,6 +55,44 @@
   cursor: grabbing;
 }
 
+/* Connect tool: a crosshair everywhere, and objects read as click targets while
+   drawing a relationship arrow. */
+.mdbc-canvas-board.connect .react-flow__pane,
+.mdbc-canvas-board.connect .react-flow__node {
+  cursor: crosshair;
+}
+
+/* The object picked as the arrow's source, highlighted until its target is
+   chosen. */
+.react-flow__node.mdbc-connect-source {
+  outline: 2px solid var(--m-accent);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+/* The two endpoint handles every object carries exist only so an arrow has
+   something to attach to; the floating edge draws the visible line to the
+   object's border, so the handles themselves stay invisible and inert. */
+.mdbc-canvas-node-handle {
+  width: 1px;
+  height: 1px;
+  min-width: 0;
+  min-height: 0;
+  border: 0;
+  opacity: 0;
+  background: transparent;
+  pointer-events: none;
+}
+
+/* Relationship arrows: an accent line; the right-click "Delete arrow" target
+   gets a wider invisible hit area from ReactFlow's interaction path. */
+.mdbc-canvas-board .react-flow__edge-path {
+  stroke: var(--m-accent);
+}
+.mdbc-canvas-board .react-flow__edge:hover .react-flow__edge-path {
+  stroke-width: 2.5;
+}
+
 /* ── bottom toolbar (Figma/Canva pill) ────────────────────────────────────── */
 
 .mdbc-canvas-toolbar {
