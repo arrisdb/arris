@@ -23,6 +23,8 @@ describe("describeBoard", () => {
     ]);
     expect(out).toContain("query id=q1");
     expect(out).toContain('title="Monthly sales"');
+    // The query line carries its current connection so the agent can move it.
+    expect(out).toContain("connectionId=");
     expect(out).toContain("chart id=c1 source=q1 kind=line x=month y=[total] series=cat");
     expect(out).toContain("table id=tb1 source=q1");
     expect(out).toContain("sticky id=s1 color=green");
