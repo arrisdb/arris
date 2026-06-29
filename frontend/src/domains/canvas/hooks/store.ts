@@ -316,13 +316,13 @@ const useCanvasStore = create<CanvasStore>((set, get) => ({
         },
       };
     });
-    // Re-run query objects the turn created or whose SQL it changed; charts read
-    // their source's cached result, so they need no run of their own.
+    // Re-run query objects the turn created or whose SQL or connection it changed;
+    // charts read their source's cached result, so they need no run of their own.
     const createdQueryIds = created
       .filter((c) => c.kind === "query")
       .map((c) => c.id);
     const changedQueryIds = updates
-      .filter((u) => "sql" in u.patch)
+      .filter((u) => "sql" in u.patch || "connectionId" in u.patch)
       .map((u) => u.id)
       .filter((id) =>
         board.doc.components.some((c) => c.id === id && c.kind === "query"),

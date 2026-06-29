@@ -11,7 +11,7 @@ function clip(value: string, max = 100): string {
 function describeComponent(c: CanvasComponent): string {
   switch (c.kind) {
     case "query":
-      return `- query id=${c.id} title=${JSON.stringify(c.title ?? "")} sql=${JSON.stringify(clip(c.sql))}`;
+      return `- query id=${c.id} title=${JSON.stringify(c.title ?? "")} connectionId=${c.connectionId ?? "(unset)"} sql=${JSON.stringify(clip(c.sql))}`;
     case "chart": {
       const s = c.spec;
       const series = s.seriesColumn ? ` series=${s.seriesColumn}` : "";

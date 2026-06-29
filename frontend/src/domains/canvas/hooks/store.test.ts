@@ -87,6 +87,24 @@ describe("useCanvasStore", () => {
     expect(ids).toEqual(["q1"]);
   });
 
+  it("applyAgentSpec re-runs a query whose connection changed even without an sql edit", () => {
+    get().ensureBoard(TAB, "");
+    get().addComponent(
+      TAB,
+      makeComponent({ kind: "query", id: "q1", sql: "select 1", connectionId: "conn-a" }),
+    );
+    const ids = get().applyAgentSpec(
+      TAB,
+      { components: [{ kind: "query", id: "q1", connectionId: "conn-b" }], edges: [] },
+      "conn-a",
+    );
+    expect(get().boards[TAB].doc.components[0]).toMatchObject({
+      id: "q1",
+      connectionId: "conn-b",
+    });
+    expect(ids).toEqual(["q1"]);
+  });
+
   it("applyAgentSpec removes the ids in the remove list, with their edges and runs", () => {
     get().ensureBoard(TAB, "");
     get().applyAgentSpec(

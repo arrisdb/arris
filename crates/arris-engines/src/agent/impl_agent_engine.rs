@@ -266,6 +266,12 @@ impl AgentEngine {
              `connectionId` set to the matching `id`, so the board can run queries \
              against different databases in the same answer. With a single \
              connection, omit `connectionId`.\n\
+             - Each existing `query` line in the board summary shows its current \
+             `connectionId=<id>`. To MOVE an existing query to a different \
+             connection, re-emit it by its `id` with the new `connectionId` (set it \
+             to the target `## Connection ... id=<id>`); also rewrite its `sql` into \
+             that connection's dialect when the dialects differ. The client re-runs \
+             a query whose `connectionId` changed.\n\
              - To ADD an object, use a new `id`. To MODIFY an object already on the \
              board, return a component whose `id` matches the existing one and \
              include only the fields you are changing (the client merges them). To \
@@ -615,6 +621,9 @@ mod tests {
         // one answer (canvas multi-connection support).
         assert!(prompt.contains("connectionId"));
         assert!(prompt.contains("## Connection"));
+        // The agent is explicitly told it may move an existing query to another
+        // connection by re-emitting it by id with a new connectionId.
+        assert!(prompt.contains("MOVE an existing query"));
         assert!(!prompt.contains("return exactly one ```sql fenced block"));
     }
 
