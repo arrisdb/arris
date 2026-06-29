@@ -582,6 +582,39 @@ impl FederationEngine {
         }
     }
 
+    /// Convert a `QueryResult` into a single Arrow `RecordBatch` plus its schema,
+    /// reusing the same type inference the federation scan path uses. Shared with
+    /// the canvas cell cache, which stores a prior cell's result as Arrow so a
+    /// later cell can read it back through a `MemTable`.
+    pub(crate) fn query_result_to_batch(
+        result: &QueryResult,
+    ) -> Result<(datafusion::arrow::datatypes::SchemaRef, RecordBatch), String> {
+        let schema = FederatedExec::infer_schema_from_result(result);
+        let batch = FederatedExec::query_result_to_record_batch(result, &schema)?;
+        Ok((schema, batch))
+    }
+
+    /// Flatten Arrow `RecordBatch`es back into a `QueryResult` (column specs from
+    /// the batch schema, rows from each batch). The inverse of
+    /// `query_result_to_batch`; shared with the canvas engine so a chained cell
+    /// returns the same shape as any other query.
+    pub(crate) fn batches_to_query_result(batches: &[RecordBatch], elapsed: f64) -> QueryResult {
+        let columns = batches
+            .first()
+            .map(Self::schema_to_column_specs)
+            .unwrap_or_default();
+        let mut rows = Vec::new();
+        for batch in batches {
+            Self::append_batch_rows(batch, &mut rows);
+        }
+        QueryResult {
+            columns,
+            rows,
+            elapsed,
+            ..Default::default()
+        }
+    }
+
     fn parse_federated_refs(sql: &str) -> Vec<FederationRef> {
         let chars: Vec<char> = sql.chars().collect();
         let mut out = Vec::new();

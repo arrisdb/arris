@@ -225,7 +225,7 @@ impl FederatedExec {
         DataType::Utf8
     }
 
-    fn query_result_to_record_batch(
+    pub(crate) fn query_result_to_record_batch(
         result: &QueryResult,
         schema: &SchemaRef,
     ) -> Result<RecordBatch, String> {
