@@ -75,20 +75,23 @@ function toFlowEdges(edges: CanvasEdge[]): Edge[] {
 
 /// The object-actions a node context menu invokes, bound to the owning tab.
 interface NodeMenuActions {
-  duplicate: (id: string) => void;
+  copy: (id: string) => void;
+  paste: () => void;
   reorder: (id: string, op: ReorderOp) => void;
   toggleLock: (id: string) => void;
+  remove: (id: string) => void;
 }
 
-/// Build the right-click menu for one object: copy, the four restacking steps,
-/// and a lock toggle (label reflects the object's current state).
+/// Build the right-click menu for one object: copy/paste, the four restacking
+/// steps, a lock toggle (label reflects the object's current state), and delete.
 function buildNodeMenuItems(
   component: CanvasComponent,
   actions: NodeMenuActions,
 ): ContextMenuItem[] {
   const id = component.id;
   return [
-    { id: "copy", label: "Copy", shortcut: "⌘C", testId: "canvas-menu-copy", action: () => actions.duplicate(id) },
+    { id: "copy", label: "Copy", shortcut: "⌘C", testId: "canvas-menu-copy", action: () => actions.copy(id) },
+    { id: "paste", label: "Paste", shortcut: "⌘V", testId: "canvas-menu-paste", action: () => actions.paste() },
     { kind: "separator", id: "sep-stack" },
     { id: "front", label: "Bring to front", shortcut: "]", testId: "canvas-menu-front", action: () => actions.reorder(id, "front") },
     { id: "forward", label: "Bring forward", action: () => actions.reorder(id, "forward") },
@@ -96,6 +99,8 @@ function buildNodeMenuItems(
     { id: "back", label: "Send to back", shortcut: "[", testId: "canvas-menu-back", action: () => actions.reorder(id, "back") },
     { kind: "separator", id: "sep-lock" },
     { id: "lock", label: component.locked ? "Unlock" : "Lock", testId: "canvas-menu-lock", action: () => actions.toggleLock(id) },
+    { kind: "separator", id: "sep-delete" },
+    { id: "delete", label: "Delete", shortcut: "⌫", testId: "canvas-menu-delete", action: () => actions.remove(id) },
   ];
 }
 

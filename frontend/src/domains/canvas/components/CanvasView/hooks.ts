@@ -27,7 +27,8 @@ function useCanvas(tab: EditorTab) {
   const addComponent = useCanvasStore((s) => s.addComponent);
   const updateComponent = useCanvasStore((s) => s.updateComponent);
   const removeComponent = useCanvasStore((s) => s.removeComponent);
-  const duplicateComponent = useCanvasStore((s) => s.duplicateComponent);
+  const copyComponent = useCanvasStore((s) => s.copyComponent);
+  const pasteComponent = useCanvasStore((s) => s.pasteComponent);
   const reorderComponent = useCanvasStore((s) => s.reorderComponent);
   const setViewport = useCanvasStore((s) => s.setViewport);
 
@@ -105,9 +106,14 @@ function useCanvas(tab: EditorTab) {
   );
 
   // Context-menu object actions, bound to this board.
-  const duplicate = useCallback(
-    (id: string) => duplicateComponent(tabId, id),
-    [duplicateComponent, tabId],
+  const copy = useCallback(
+    (id: string) => copyComponent(tabId, id),
+    [copyComponent, tabId],
+  );
+  const paste = useCallback(() => pasteComponent(tabId), [pasteComponent, tabId]);
+  const remove = useCallback(
+    (id: string) => removeComponent(tabId, id),
+    [removeComponent, tabId],
   );
   const reorder = useCallback(
     (id: string, op: ReorderOp) => reorderComponent(tabId, id, op),
@@ -143,6 +149,33 @@ function useCanvas(tab: EditorTab) {
     selectedIds.length === 1
       ? components.find((c) => c.id === selectedIds[0])
       : undefined;
+
+  // Copy (⌘/Ctrl+C) the selected object and Paste (⌘/Ctrl+V) a fresh clone.
+  // Skipped while typing in an input, textarea, or code editor so ordinary text
+  // copy/paste still works inside a query cell or text block.
+  useEffect(() => {
+    function isEditable(t: EventTarget | null): boolean {
+      const el = t as HTMLElement | null;
+      if (!el) return false;
+      if (el.isContentEditable) return true;
+      const tag = el.tagName;
+      return tag === "INPUT" || tag === "TEXTAREA" || !!el.closest(".cm-editor");
+    }
+    function onKey(e: KeyboardEvent) {
+      if (!(e.metaKey || e.ctrlKey) || e.altKey || e.shiftKey) return;
+      if (isEditable(e.target)) return;
+      const key = e.key.toLowerCase();
+      if (key === "c" && selectedComponent) {
+        e.preventDefault();
+        copyComponent(tabId, selectedComponent.id);
+      } else if (key === "v") {
+        e.preventDefault();
+        pasteComponent(tabId);
+      }
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [tabId, selectedComponent, copyComponent, pasteComponent]);
 
   // The active pointer tool. `move` drags objects; `hand` pans the board.
   const [mode, setMode] = useState<CanvasMode>("move");
@@ -215,7 +248,9 @@ function useCanvas(tab: EditorTab) {
     addShape,
     addQuery,
     addChart,
-    duplicate,
+    copy,
+    paste,
+    remove,
     reorder,
     toggleLock,
     componentById,

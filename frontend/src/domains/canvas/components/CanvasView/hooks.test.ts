@@ -72,14 +72,24 @@ describe("useCanvas", () => {
     expect(useCanvasStore.getState().boards["tab-1"].doc.components[0].locked).toBe(false);
   });
 
-  it("duplicate appends a clone and componentById resolves an object", () => {
+  it("copy then paste appends a clone and componentById resolves an object", () => {
     const store = useCanvasStore.getState();
     store.ensureBoard("tab-1", "");
     store.addComponent("tab-1", makeComponent({ kind: "shape", id: "s", shape: "rect" }));
     const { result } = renderHook(() => useCanvas(tab));
     expect(result.current.componentById("s")?.kind).toBe("shape");
-    act(() => result.current.duplicate("s"));
+    act(() => result.current.copy("s"));
+    act(() => result.current.paste());
     expect(useCanvasStore.getState().boards["tab-1"].doc.components).toHaveLength(2);
+  });
+
+  it("remove deletes the object from the board", () => {
+    const store = useCanvasStore.getState();
+    store.ensureBoard("tab-1", "");
+    store.addComponent("tab-1", makeComponent({ kind: "shape", id: "s", shape: "rect" }));
+    const { result } = renderHook(() => useCanvas(tab));
+    act(() => result.current.remove("s"));
+    expect(useCanvasStore.getState().boards["tab-1"].doc.components).toHaveLength(0);
   });
 
   it("exposes the single selected object and nothing when 0 or 2 are selected", () => {
