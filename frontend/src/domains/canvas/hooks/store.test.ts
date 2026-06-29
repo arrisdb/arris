@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("../ipc", () => ({ runCanvasQueryIPC: vi.fn() }));
+vi.mock("../ipc", () => ({ runCanvasCellIPC: vi.fn() }));
 
 import type { AgentCanvasSpec } from "../types";
 import { makeComponent } from "../utils";
-import { runCanvasQueryIPC } from "../ipc";
+import { runCanvasCellIPC } from "../ipc";
 import { useCanvasStore } from "./store";
 
 const TAB = "tab-1";
@@ -191,8 +191,10 @@ describe("useCanvasStore", () => {
     expect(get().boards[TAB].doc.components[0].locked).toBe(true);
   });
 
-  it("runQueryComponent stores the result on success", async () => {
-    vi.mocked(runCanvasQueryIPC).mockResolvedValue({ columns: [], rows: [], elapsed: 1 });
+  it("runQueryComponent applies each executed cell's result", async () => {
+    vi.mocked(runCanvasCellIPC).mockResolvedValue([
+      { id: "q1", result: { columns: [], rows: [], elapsed: 1 } },
+    ]);
     get().ensureBoard(TAB, "");
     get().addComponent(
       TAB,
@@ -200,22 +202,61 @@ describe("useCanvasStore", () => {
     );
     await get().runQueryComponent(TAB, "q1");
     expect(get().boards[TAB].runs.q1.result).toBeDefined();
-    expect(get().boards[TAB].runs.q1.running).toBe(false);
+    expect(get().boards[TAB].runs.q1.running).toBeFalsy();
   });
 
-  it("runQueryComponent errors (without calling IPC) when no connection is set", async () => {
+  it("runQueryComponent auto-runs upstream cells and applies their results too", async () => {
+    // The user runs `query` (reads `abc`); the backend returns abc + query.
+    vi.mocked(runCanvasCellIPC).mockResolvedValue([
+      { id: "abc", result: { columns: [], rows: [], elapsed: 1 } },
+      { id: "query", result: { columns: [], rows: [], elapsed: 1 } },
+    ]);
     get().ensureBoard(TAB, "");
     get().addComponent(
       TAB,
-      makeComponent({ kind: "query", id: "q1", sql: "s", connectionId: null }),
+      makeComponent({ kind: "query", id: "abc", title: "abc", sql: "SELECT 1", connectionId: "conn" }),
+    );
+    get().addComponent(
+      TAB,
+      makeComponent({ kind: "query", id: "query", title: "query", sql: "SELECT * FROM abc" }),
+    );
+    await get().runQueryComponent(TAB, "query");
+    expect(get().boards[TAB].runs.abc.result).toBeDefined();
+    expect(get().boards[TAB].runs.query.result).toBeDefined();
+    // The dependency arrow abc -> query is auto-derived from the SQL.
+    expect(get().boards[TAB].doc.edges).toEqual(
+      expect.arrayContaining([expect.objectContaining({ source: "abc", target: "query" })]),
+    );
+  });
+
+  it("runQueryComponent surfaces a per-cell backend error", async () => {
+    vi.mocked(runCanvasCellIPC).mockResolvedValue([
+      { id: "q1", error: "pick a connection for this query cell" },
+    ]);
+    get().ensureBoard(TAB, "");
+    get().addComponent(
+      TAB,
+      makeComponent({ kind: "query", id: "q1", sql: "select 1", connectionId: null }),
     );
     await get().runQueryComponent(TAB, "q1");
     expect(get().boards[TAB].runs.q1.error).toBeTruthy();
-    expect(runCanvasQueryIPC).not.toHaveBeenCalled();
+  });
+
+  it("runQueryComponent errors (without calling IPC) on an empty query", async () => {
+    get().ensureBoard(TAB, "");
+    get().addComponent(
+      TAB,
+      makeComponent({ kind: "query", id: "q1", sql: "   ", connectionId: "conn" }),
+    );
+    await get().runQueryComponent(TAB, "q1");
+    expect(get().boards[TAB].runs.q1.error).toBeTruthy();
+    expect(runCanvasCellIPC).not.toHaveBeenCalled();
   });
 
   it("runQueryComponent auto-adds a preview table + arrow bound to the query", async () => {
-    vi.mocked(runCanvasQueryIPC).mockResolvedValue({ columns: [], rows: [], elapsed: 1 });
+    vi.mocked(runCanvasCellIPC).mockResolvedValue([
+      { id: "q1", result: { columns: [], rows: [], elapsed: 1 } },
+    ]);
     get().ensureBoard(TAB, "");
     get().addComponent(
       TAB,
@@ -232,7 +273,9 @@ describe("useCanvasStore", () => {
   });
 
   it("a second run does not pile on a duplicate preview table", async () => {
-    vi.mocked(runCanvasQueryIPC).mockResolvedValue({ columns: [], rows: [], elapsed: 1 });
+    vi.mocked(runCanvasCellIPC).mockResolvedValue([
+      { id: "q1", result: { columns: [], rows: [], elapsed: 1 } },
+    ]);
     get().ensureBoard(TAB, "");
     get().addComponent(
       TAB,

@@ -6,12 +6,20 @@ import type {
   CanvasDoc,
   CanvasEdge,
   CanvasViewport,
+  QueryComponent,
   QueryRunState,
   ReorderOp,
 } from "../types";
 import { DEFAULT_SIZE, LAYOUT_GAP } from "../constants";
-import { genId, makeComponent, makeEdge, parseDoc, planAgentChanges } from "../utils";
-import { runCanvasQueryIPC } from "../ipc";
+import {
+  deriveDataEdges,
+  genId,
+  makeComponent,
+  makeEdge,
+  parseDoc,
+  planAgentChanges,
+} from "../utils";
+import { runCanvasCellIPC } from "../ipc";
 
 interface BoardState {
   doc: CanvasDoc;
@@ -337,22 +345,37 @@ const useCanvasStore = create<CanvasStore>((set, get) => ({
   runQueryComponent: async (tabId, id) => {
     const board = get().boards[tabId];
     const comp = board?.doc.components.find((c) => c.id === id);
-    if (!comp || comp.kind !== "query") return;
-    if (!comp.connectionId) {
-      get().setRun(tabId, id, { error: "Pick a connection for this query object." });
-      return;
-    }
+    if (!board || !comp || comp.kind !== "query") return;
     if (!comp.sql.trim()) {
       get().setRun(tabId, id, { error: "This query object is empty." });
       return;
     }
+    // Snapshot every query cell so the backend can resolve title references and
+    // auto-run this cell's upstream dependencies before the target.
+    const cells = board.doc.components
+      .filter((c): c is QueryComponent => c.kind === "query")
+      .map((c) => ({
+        id: c.id,
+        title: c.title ?? "",
+        sql: c.sql,
+        connectionId: c.connectionId,
+      }));
     get().setRun(tabId, id, { running: true });
     try {
-      const result = await runCanvasQueryIPC(comp.connectionId, comp.sql);
-      get().setRun(tabId, id, { running: false, result });
-      // First successful run auto-adds a preview table (with an arrow) bound to
-      // this query, so the rows show without the user creating one by hand.
-      set((s) => ({ boards: withDoc(s.boards, tabId, (doc) => withPreviewTable(doc, id)) }));
+      const runs = await runCanvasCellIPC(tabId, id, cells);
+      // Apply each executed cell's outcome (target + its upstream dependencies).
+      for (const r of runs) {
+        get().setRun(tabId, r.id, r.error ? { error: r.error } : { result: r.result });
+      }
+      const targetOk = runs.some((r) => r.id === id && r.result);
+      // The cell the user ran gets a preview table on first success; the
+      // query-to-query arrows are re-derived from the current SQL references.
+      set((s) => ({
+        boards: withDoc(s.boards, tabId, (doc) => {
+          const next = targetOk ? withPreviewTable(doc, id) : doc;
+          return { ...next, edges: deriveDataEdges(next.components, next.edges) };
+        }),
+      }));
     } catch (e) {
       get().setRun(tabId, id, { running: false, error: errToString(e) });
     }
