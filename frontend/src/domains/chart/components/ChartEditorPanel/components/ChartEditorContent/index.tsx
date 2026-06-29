@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Icon } from "@shared/ui/Icon";
 import { MultiSelect, NumberStepper, Select } from "@shared/ui";
+import "../../index.css";
 import {
   AGGREGATIONS,
   AGGREGATION_KINDS,
@@ -252,9 +253,6 @@ function AxesSection({ pane }: { pane: ChartEditorPanelViewModel }) {
 }
 
 function ChartEditorContent({ pane }: { pane: ChartEditorPanelViewModel }) {
-  const { spec, style, yColumns } = pane;
-  const kind = spec.kind;
-
   return (
     <>
       <div className="mdbc-pane-header">
@@ -262,7 +260,33 @@ function ChartEditorContent({ pane }: { pane: ChartEditorPanelViewModel }) {
       </div>
 
       <div className="mdbc-pane-body">
-        <Section title="Data" defaultOpen>
+        <ChartEditorSections pane={pane} />
+      </div>
+
+      <div className="mdbc-pane-footer">
+        <button
+          onClick={pane.onClickReset}
+          className="mdbc-btn"
+          data-testid="chart-editor-reset"
+        >
+          Reset chart
+        </button>
+        <div className="mdbc-flex-spacer" />
+      </div>
+    </>
+  );
+}
+
+/// The chart-editor control sections (Data, Axes, Appearance, Extras), driven by
+/// a `ChartEditorPanelViewModel`. Reused by the results-pane editor and the canvas
+/// chart properties pane so both expose the identical, full control surface.
+function ChartEditorSections({ pane }: { pane: ChartEditorPanelViewModel }) {
+  const { spec, style, yColumns } = pane;
+  const kind = spec.kind;
+
+  return (
+    <>
+      <Section title="Data" defaultOpen>
           <label className="mdbc-pane-label">Title</label>
           <input
             className="mdbc-pane-input"
@@ -372,21 +396,9 @@ function ChartEditorContent({ pane }: { pane: ChartEditorPanelViewModel }) {
           </div>
         </Section>
 
-        {!!kind && AXES_KINDS.has(kind) && <AxesSection pane={pane} />}
-        <AppearanceSection pane={pane} />
-        <ExtrasSection pane={pane} />
-      </div>
-
-      <div className="mdbc-pane-footer">
-        <button
-          onClick={pane.onClickReset}
-          className="mdbc-btn"
-          data-testid="chart-editor-reset"
-        >
-          Reset chart
-        </button>
-        <div className="mdbc-flex-spacer" />
-      </div>
+      {!!kind && AXES_KINDS.has(kind) && <AxesSection pane={pane} />}
+      <AppearanceSection pane={pane} />
+      <ExtrasSection pane={pane} />
     </>
   );
 }
@@ -510,4 +522,4 @@ function ToggleBtn({
   );
 }
 
-export { ChartEditorContent };
+export { ChartEditorContent, ChartEditorSections };
