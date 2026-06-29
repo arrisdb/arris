@@ -63,10 +63,10 @@ describe("QueryNode", () => {
     expect(view!.state.doc.toString()).toBe("select 42");
   });
 
-  it("Run surfaces an error when the object has no connection", async () => {
-    seed(makeComponent({ kind: "query", id: "q", sql: "select 1", connectionId: null }));
+  it("Run surfaces an error for an empty query (without hitting the backend)", async () => {
+    seed(makeComponent({ kind: "query", id: "q", sql: "   ", connectionId: "c" }));
     renderNode("q");
     fireEvent.click(screen.getByRole("button", { name: "Run" }));
-    expect(await screen.findByText(/Pick a connection/)).toBeTruthy();
+    expect(await screen.findByText(/empty/i)).toBeTruthy();
   });
 });
