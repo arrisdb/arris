@@ -138,14 +138,16 @@
 
 .mdbc-canvas-resize-line {
   border-color: var(--m-accent);
+  border-width: 1.5px;
 }
 
 .mdbc-canvas-resize-handle {
-  width: 8px;
-  height: 8px;
+  width: 11px;
+  height: 11px;
   border-radius: 2px;
-  background: var(--m-bg-surface);
-  border: 1px solid var(--m-accent);
+  background: #fff;
+  border: 1.5px solid var(--m-accent);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
 }
 
 /* ── object node base ─────────────────────────────────────────────────────── */
@@ -157,8 +159,10 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: var(--m-bg-card);
-  border: 1px solid var(--m-sep);
+  /* Solid, opaque card raised above the (purple) board: every surface token is
+     the same colour as the board, so a solid elevated tone is hard-coded here. */
+  background: #262430;
+  border: 1px solid var(--m-sep-strong);
   border-radius: var(--m-r-md);
   box-shadow: var(--m-shadow-card);
   color: var(--m-fg);

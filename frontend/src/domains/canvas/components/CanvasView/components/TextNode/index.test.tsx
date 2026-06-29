@@ -38,4 +38,19 @@ describe("TextNode", () => {
       text: "world",
     });
   });
+
+  it("is draggable when idle and nodrag while editing", () => {
+    seed(makeComponent({ kind: "text", id: "t", text: "" }));
+    render(
+      <ReactFlowProvider>
+        <TextNode {...nodeProps("t")} />
+      </ReactFlowProvider>,
+    );
+    const input = screen.getByPlaceholderText("Type text…");
+    expect(input.classList.contains("nodrag")).toBe(false);
+    fireEvent.focus(input);
+    expect(input.classList.contains("nodrag")).toBe(true);
+    fireEvent.blur(input);
+    expect(input.classList.contains("nodrag")).toBe(false);
+  });
 });

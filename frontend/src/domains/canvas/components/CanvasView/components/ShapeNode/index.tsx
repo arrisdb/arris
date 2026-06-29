@@ -16,11 +16,11 @@ function ShapeNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
   if (!component || component.kind !== "shape") return null;
   const style = component.style ?? {};
   const css = {
-    background: component.shape === "line" ? "transparent" : (style.fill ?? "rgb(var(--m-accent-rgb) / 0.12)"),
+    background: component.shape === "line" ? "transparent" : (style.fill ?? "#3a3950"),
     border:
       component.shape === "line"
         ? "none"
-        : `${style.strokeWidth ?? 1}px solid ${style.stroke ?? "rgb(var(--m-accent-rgb) / 0.5)"}`,
+        : `${style.strokeWidth ?? 1}px solid ${style.stroke ?? "rgb(var(--m-accent-rgb) / 0.6)"}`,
     borderTop:
       component.shape === "line"
         ? `${style.strokeWidth ?? 2}px solid ${style.stroke ?? "rgb(var(--m-accent-rgb) / 0.6)"}`
