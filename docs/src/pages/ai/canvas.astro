@@ -161,12 +161,14 @@ import DocTable from "../../components/docs/DocTable/DocTable.astro";
   </p>
 
   <p>
-    The agent sees your schema and the board, but not the rows a query returned, unless you share
-    them. When a query object on the board has results, an <strong>Add results</strong> picker
-    appears in the chat header listing those queries; pick one and Arris attaches its result as a
-    removable chip above the input. Your next message sends those rows along, so the agent can write
-    commentary or follow-up queries grounded in the real data. Sharing is never automatic: nothing
-    leaves until you attach it and send.
+    The agent sees your schema and the board, but never the rows a query returned. When it needs
+    them, it <strong>asks</strong>: instead of changing the board it posts a <strong>Share
+    results</strong> request naming the query objects it wants and why. A card appears in the chat
+    with <strong>Share results</strong> and <strong>Decline</strong> buttons; click Share results and
+    Arris sends those rows in the next message so the agent can write commentary or follow-up queries
+    grounded in the real data. Sharing is never automatic: nothing leaves until you approve the
+    request. (Asking the user is a general mechanism, so the agent can grow other question types over
+    time; sharing results is the first.)
   </p>
 
   <h2 id="board">Working on the board</h2>

@@ -1,0 +1,61 @@
+.mdbc-canvas-question {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 4px 0;
+  padding: 10px;
+  border: 1px solid var(--m-sep);
+  border-radius: var(--m-radius);
+  background: var(--m-bg-surface);
+}
+
+.mdbc-canvas-question-title {
+  font-size: var(--m-fs-sm);
+  font-weight: 600;
+  color: var(--m-fg);
+}
+
+.mdbc-canvas-question-reason {
+  font-size: var(--m-fs-sm);
+  color: var(--m-fg-2);
+}
+
+.mdbc-canvas-question-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mdbc-canvas-question-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: var(--m-fs-sm);
+}
+
+.mdbc-canvas-question-item-name {
+  color: var(--m-fg);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mdbc-canvas-question-item-meta {
+  flex: 0 0 auto;
+  color: var(--m-fg-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.mdbc-canvas-question-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.mdbc-canvas-question-done {
+  font-size: var(--m-fs-sm);
+  color: var(--m-fg-3);
+}

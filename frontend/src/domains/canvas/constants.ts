@@ -7,6 +7,10 @@ const CANVAS_DOC_VERSION = 1;
 /// The fenced-block language tag the agent emits and `parseAgentCanvas` reads.
 const CANVAS_SPEC_FENCE = "arris-canvas";
 
+/// The fenced-block language tag the agent emits to ASK the user something
+/// (instead of changing the board), read by `parseAgentQuestion`.
+const CANVAS_ASK_FENCE = "arris-ask";
+
 /// Every object kind the agent-spec parser accepts inside an `arris-canvas`
 /// block. Adding a kind to the union means adding it here too.
 const KNOWN_KINDS: ComponentKind[] = [
@@ -39,6 +43,7 @@ const LAYOUT_ORIGIN = { x: 80, y: 80 };
 const CANVAS_SAVE_DEBOUNCE_MS = 400;
 
 export {
+  CANVAS_ASK_FENCE,
   CANVAS_DOC_VERSION,
   CANVAS_SAVE_DEBOUNCE_MS,
   CANVAS_SPEC_FENCE,

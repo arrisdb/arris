@@ -176,9 +176,39 @@ interface AgentCanvasSpec {
   remove?: string[];
 }
 
+// ── agent question (the `arris-ask` JSON the agent emits to ask the user) ─────
+
+/// A question the agent asks the user mid-conversation instead of changing the
+/// board, discriminated on `type`. To add a new question type: add a variant
+/// here and a matching `AgentQuestionAnswer` variant, a parse case in
+/// `parseAgentQuestion`, a follow-up builder case in `buildQuestionAnswer`, and a
+/// render case in the `AgentQuestionCard` component.
+
+/// Request the rows of one or more query objects the agent cannot see, so it can
+/// summarize or build on them. The user approves (rows sent) or declines.
+interface ShareResultsQuestion {
+  type: "share_results";
+  queryIds: string[];
+  reason?: string;
+}
+
+type AgentQuestion = ShareResultsQuestion;
+
+/// The user's answer to a `share_results` question: whether to share the rows.
+interface ShareResultsAnswer {
+  type: "share_results";
+  shared: boolean;
+}
+
+type AgentQuestionAnswer = ShareResultsAnswer;
+
 export type {
   AgentCanvasSpec,
   AgentComponentSpec,
+  AgentQuestion,
+  AgentQuestionAnswer,
+  ShareResultsAnswer,
+  ShareResultsQuestion,
   BaseComponent,
   CanvasComponent,
   CanvasDoc,
