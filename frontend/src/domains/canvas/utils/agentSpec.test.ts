@@ -107,6 +107,26 @@ describe("planAgentChanges", () => {
     ]);
   });
 
+  it("merges a partial chart-spec edit onto the existing spec without wiping columns", () => {
+    const existing = planAgentChanges(spec, [], "conn-1").created;
+    // The agent re-addresses the chart with only an axis-bound tweak (no columns).
+    const plan = planAgentChanges(
+      {
+        components: [{ kind: "chart", id: "c1", spec: { style: { yMax: 9 } } as never }],
+        edges: [],
+      },
+      existing,
+      "conn-1",
+    );
+    expect(plan.updates).toHaveLength(1);
+    const patched = plan.updates[0].patch as {
+      spec: { yColumns: string[]; xColumn: string; style?: Record<string, unknown> };
+    };
+    expect(patched.spec.yColumns).toEqual(["t"]);
+    expect(patched.spec.xColumn).toBe("category");
+    expect(patched.spec.style).toMatchObject({ yMax: 9 });
+  });
+
   it("only removes ids that exist on the board", () => {
     const existing = planAgentChanges(spec, [], null).created;
     const plan = planAgentChanges(

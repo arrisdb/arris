@@ -8,6 +8,7 @@ import type {
   ComponentKind,
 } from "../types";
 import { autoLayout } from "./layout";
+import { sanitizeChartSpec } from "./chartSpec";
 import { makeComponent, makeEdge } from "./factory";
 import type { ComponentInput } from "./factory";
 
@@ -96,7 +97,9 @@ function toInput(spec: AgentComponentSpec, connectionId: string | null): Compone
     connectionId: spec.kind === "query" ? connectionId : undefined,
     sql: spec.sql,
     sourceQueryId: spec.sourceQueryId,
-    spec: spec.spec,
+    // A new chart's spec is normalized so it always has valid arrays, even if the
+    // agent emitted a partial or malformed one.
+    spec: spec.kind === "chart" ? sanitizeChartSpec(spec.spec) : spec.spec,
     shape: spec.shape,
   };
 }
@@ -160,7 +163,18 @@ function planAgentChanges(
     newSpecs.map((s) => makeComponent(toInput(s, connectionId))),
     existing,
   );
-  const updates = updateSpecs.map((s) => ({ id: s.id, patch: toPatch(s) }));
+  const updates = updateSpecs.map((s) => {
+    const patch = toPatch(s);
+    // A chart-spec edit is MERGED onto the object's current spec and normalized, so
+    // a partial edit (e.g. only axis bounds) never wipes the columns and can never
+    // leave `yColumns` undefined for the renderer.
+    if ("spec" in patch) {
+      const existingComp = existing.find((c) => c.id === s.id);
+      const base = existingComp?.kind === "chart" ? existingComp.spec : undefined;
+      patch.spec = sanitizeChartSpec(s.spec, base);
+    }
+    return { id: s.id, patch };
+  });
   const removeIds = (spec.remove ?? []).filter((id) => existingIds.has(id));
 
   const removed = new Set(removeIds);

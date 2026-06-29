@@ -32,6 +32,14 @@ describe("ChartView", () => {
     expect(screen.getByTestId("chart")).toBeTruthy();
   });
 
+  it("does not crash on a malformed spec missing yColumns", () => {
+    // A spec a bad agent edit or stale board could produce; the render guard must
+    // coerce yColumns to an array rather than letting `undefined.map` throw.
+    const bad = { kind: "bar", xColumn: "day" } as unknown as ChartSpec;
+    expect(() => render(<ChartView spec={bad} result={RESULT} onEdit={vi.fn()} />)).not.toThrow();
+    expect(screen.getByTestId("chart-view-empty")).toBeTruthy();
+  });
+
   it("prompts to run a query when there is no result", () => {
     render(<ChartView spec={SPEC} result={undefined} onEdit={vi.fn()} />);
     expect(screen.getByTestId("chart-view-empty").textContent).toContain("Run a query");

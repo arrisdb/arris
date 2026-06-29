@@ -1,5 +1,6 @@
 import { CANVAS_DOC_VERSION } from "../constants";
 import type { CanvasComponent, CanvasDoc, CanvasEdge } from "../types";
+import { sanitizeChartSpec } from "./chartSpec";
 
 /// A fresh, empty board document.
 function emptyDoc(): CanvasDoc {
@@ -49,9 +50,16 @@ function parseDoc(text: string): CanvasDoc {
   if (!raw || typeof raw !== "object") return emptyDoc();
   const doc = raw as Record<string, unknown>;
   if (doc.version !== CANVAS_DOC_VERSION) return emptyDoc();
-  const components = Array.isArray(doc.components)
-    ? (doc.components.filter(isComponent) as CanvasComponent[])
-    : [];
+  const components = (
+    Array.isArray(doc.components)
+      ? (doc.components.filter(isComponent) as CanvasComponent[])
+      : []
+  ).map((c) =>
+    // Heal a persisted-but-stale chart spec (e.g. one a prior agent turn left
+    // without `yColumns`) on load, so reopening a board can never crash the
+    // renderer with a malformed spec.
+    c.kind === "chart" ? { ...c, spec: sanitizeChartSpec(c.spec) } : c,
+  );
   const edges = Array.isArray(doc.edges)
     ? (doc.edges.filter(isEdge) as CanvasEdge[])
     : [];
