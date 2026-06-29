@@ -70,6 +70,49 @@ describe("useCanvasStore", () => {
     expect(get().boards[TAB].doc.edges).toHaveLength(1);
   });
 
+  it("applyAgentSpec patches an existing object by id and re-runs a changed query", () => {
+    get().ensureBoard(TAB, "");
+    get().addComponent(
+      TAB,
+      makeComponent({ kind: "query", id: "q1", sql: "select 1", connectionId: "conn" }),
+    );
+    const ids = get().applyAgentSpec(
+      TAB,
+      { components: [{ kind: "query", id: "q1", sql: "select 2" }], edges: [] },
+      "conn",
+    );
+    // No duplicate object; the existing one is patched; the changed query re-runs.
+    expect(get().boards[TAB].doc.components).toHaveLength(1);
+    expect(get().boards[TAB].doc.components[0]).toMatchObject({ id: "q1", sql: "select 2" });
+    expect(ids).toEqual(["q1"]);
+  });
+
+  it("applyAgentSpec removes the ids in the remove list, with their edges and runs", () => {
+    get().ensureBoard(TAB, "");
+    get().applyAgentSpec(
+      TAB,
+      {
+        components: [
+          { kind: "query", id: "q1", sql: "s" },
+          {
+            kind: "chart",
+            id: "c1",
+            sourceQueryId: "q1",
+            spec: { kind: "bar", xColumn: "a", yColumns: ["b"] },
+          },
+        ],
+        edges: [],
+      },
+      "conn",
+    );
+    get().setRun(TAB, "q1", { result: { columns: [], rows: [], elapsed: 0 } });
+    get().applyAgentSpec(TAB, { components: [], edges: [], remove: ["q1"] }, "conn");
+    const board = get().boards[TAB];
+    expect(board.doc.components.map((c) => c.id)).toEqual(["c1"]);
+    expect(board.doc.edges).toHaveLength(0);
+    expect(board.runs.q1).toBeUndefined();
+  });
+
   it("duplicateComponent clones with a new id, an offset, and raised z", () => {
     get().ensureBoard(TAB, "");
     get().addComponent(

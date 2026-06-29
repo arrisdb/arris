@@ -19,18 +19,23 @@ interface CanvasAgentEventEnvelope {
 interface SendCanvasAgentArgs {
   connectionId: string | null;
   prompt: string;
+  /// A compact summary of the objects already on the board, so the agent can
+  /// reference, modify, or remove them by id. Empty when the board is empty.
+  boardContext: string;
   turnId: string;
   resumeSession: string | null;
 }
 
 /// Start one canvas-profile agent turn (Claude). The backend injects the
-/// connection's schema and the arris-canvas contract, then streams `agent-event`s.
+/// connection's schema, the current board, and the arris-canvas contract, then
+/// streams `agent-event`s.
 function sendCanvasAgentIPC(args: SendCanvasAgentArgs): Promise<void> {
   return invoke("cmd_agent_send", {
     provider: "claude",
     profile: "canvas",
     connectionId: args.connectionId,
     prompt: args.prompt,
+    boardContext: args.boardContext,
     turnId: args.turnId,
     resumeSession: args.resumeSession,
   });

@@ -53,6 +53,7 @@ pub async fn cmd_agent_send(
     profile: Option<AgentProfile>,
     connection_id: Option<Uuid>,
     prompt: String,
+    board_context: Option<String>,
     turn_id: String,
     resume_session: Option<String>,
 ) -> Result<(), IpcError> {
@@ -69,6 +70,7 @@ pub async fn cmd_agent_send(
             profile,
             connection_id,
             prompt,
+            board_context,
             turn_id.clone(),
             resume_session,
             cancel_rx,
@@ -97,6 +99,7 @@ async fn run_turn(
     profile: AgentProfile,
     connection_id: Option<Uuid>,
     prompt: String,
+    board_context: Option<String>,
     turn_id: String,
     resume_session: Option<String>,
     cancel: oneshot::Receiver<()>,
@@ -156,6 +159,7 @@ async fn run_turn(
             dialect,
             schema_ddl,
             prompt,
+            board_context,
             resume_session,
             cancel,
         )
