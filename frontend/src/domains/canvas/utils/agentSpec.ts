@@ -130,7 +130,7 @@ function toPatch(spec: AgentComponentSpec): Partial<CanvasComponent> {
 function buildEdges(
   spec: AgentCanvasSpec,
   idsAfter: Set<string>,
-  createdSourced: { id: string; sourceQueryId: string }[],
+  createdSourced: { id: string; sourceQueryId: string | null }[],
 ): CanvasEdge[] {
   const out: CanvasEdge[] = [];
   const seen = new Set<string>();

@@ -68,9 +68,10 @@ interface QueryComponent extends BaseComponent {
 
 /// A chart bound to a query object's data by `sourceQueryId`. Renders through the
 /// shared `@domains/chart` `ChartView` with the upstream query's `QueryResult`.
+/// `sourceQueryId` is `null` until the user (or the agent) binds a query.
 interface ChartComponent extends BaseComponent {
   kind: "chart";
-  sourceQueryId: string;
+  sourceQueryId: string | null;
   spec: ChartSpec;
   title?: string;
 }
@@ -78,10 +79,13 @@ interface ChartComponent extends BaseComponent {
 /// A data table bound to a query object's data by `sourceQueryId`. Renders the
 /// upstream query's `QueryResult` as a scrollable grid, so it updates whenever
 /// that query re-runs. The query object itself no longer shows its rows inline;
-/// this is the object that previews them.
+/// this is the object that previews them. `sourceQueryId` is `null` until the
+/// user (or the agent) binds a query; `previewRows` caps the visible rows
+/// (absent = the default cap).
 interface TableComponent extends BaseComponent {
   kind: "table";
-  sourceQueryId: string;
+  sourceQueryId: string | null;
+  previewRows?: number;
   title?: string;
 }
 

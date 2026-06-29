@@ -20,8 +20,10 @@ function useCanvasChartEditor(
   component: ChartComponent,
   onChange: (patch: Partial<ChartComponent>) => void,
 ): ChartEditorPanelViewModel {
-  const result = useCanvasStore(
-    (s) => s.boards[tabId]?.runs[component.sourceQueryId]?.result,
+  const result = useCanvasStore((s) =>
+    component.sourceQueryId
+      ? s.boards[tabId]?.runs[component.sourceQueryId]?.result
+      : undefined,
   );
   const columns = useMemo(
     () => result?.columns.map((column) => column.name) ?? [],

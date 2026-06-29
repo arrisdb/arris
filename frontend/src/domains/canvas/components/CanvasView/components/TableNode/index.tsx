@@ -22,7 +22,8 @@ function TableNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
   const board = useCanvasStore((s) => s.boards[tabId]);
   const component = board?.doc.components.find((c) => c.id === id);
   if (!component || component.kind !== "table") return null;
-  const run = board?.runs[component.sourceQueryId];
+  const run = component.sourceQueryId ? board?.runs[component.sourceQueryId] : undefined;
+  const limit = component.previewRows ?? PREVIEW_ROWS;
 
   return (
     <>
@@ -48,7 +49,7 @@ function TableNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
                 </tr>
               </thead>
               <tbody>
-                {run.result.rows.slice(0, PREVIEW_ROWS).map((row, ri) => (
+                {run.result.rows.slice(0, limit).map((row, ri) => (
                   <tr key={ri}>
                     {row.map((value, ci) => (
                       <td key={ci}>{cellText(value)}</td>

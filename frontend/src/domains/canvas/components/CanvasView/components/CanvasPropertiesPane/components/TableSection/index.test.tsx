@@ -27,6 +27,25 @@ describe("TableSection", () => {
     expect(onChange).toHaveBeenCalledWith({ sourceQueryId: "q1" });
   });
 
+  it("sets a numeric preview-row cap", () => {
+    const onChange = vi.fn();
+    const { getByTestId } = render(
+      <TableSection tabId={TAB} component={table} onChange={onChange} />,
+    );
+    fireEvent.change(getByTestId("table-preview-rows"), { target: { value: "25" } });
+    expect(onChange).toHaveBeenCalledWith({ previewRows: 25 });
+  });
+
+  it("clears the cap back to the default when blanked", () => {
+    const onChange = vi.fn();
+    const capped = makeComponent({ kind: "table", id: "tbl", sourceQueryId: "q1", previewRows: 25 });
+    const { getByTestId } = render(
+      <TableSection tabId={TAB} component={capped} onChange={onChange} />,
+    );
+    fireEvent.change(getByTestId("table-preview-rows"), { target: { value: "" } });
+    expect(onChange).toHaveBeenCalledWith({ previewRows: undefined });
+  });
+
   it("renders nothing for a non-table object", () => {
     const other = makeComponent({ kind: "shape", id: "s", shape: "rect" });
     const { container } = render(

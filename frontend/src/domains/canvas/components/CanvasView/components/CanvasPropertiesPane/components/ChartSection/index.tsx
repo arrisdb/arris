@@ -36,7 +36,7 @@ function ChartSectionBody({
       <div className="mdbc-pane-form">
         <span className="mdbc-pane-label">Source query</span>
         <Select
-          value={component.sourceQueryId}
+          value={component.sourceQueryId ?? ""}
           options={sourceOptions}
           placeholder="Pick a query object"
           onChange={(v) => onChange({ sourceQueryId: v })}
