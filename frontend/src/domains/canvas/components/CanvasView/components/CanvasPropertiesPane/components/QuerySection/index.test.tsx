@@ -11,7 +11,7 @@ const comp = makeComponent({ kind: "query", id: "q", connectionId: null });
 describe("QuerySection", () => {
   beforeEach(() => {
     useConnectionsStore.setState({
-      connections: [{ id: "c1", name: "Local" }] as never,
+      connections: [{ id: "c1", name: "Local", kind: "postgres" }] as never,
     });
   });
 
@@ -33,6 +33,17 @@ describe("QuerySection", () => {
     fireEvent.click(getByTestId("query-connection-select"));
     fireEvent.click(getByText("Local"));
     expect(onChange).toHaveBeenCalledWith({ connectionId: "c1" });
+  });
+
+  it("shows the database logo next to each connection option", () => {
+    const { getByTestId, container } = render(
+      <QuerySection tabId="t" component={comp} onChange={vi.fn()} />,
+    );
+    fireEvent.click(getByTestId("query-connection-select"));
+    const logo = document.querySelector("img.mdbc-db-kind-logo") as HTMLImageElement;
+    expect(logo).toBeTruthy();
+    expect(logo.getAttribute("src")).toContain("/db-logos/postgres");
+    expect(container).toBeTruthy();
   });
 
   it("renders nothing for a non-query object", () => {
