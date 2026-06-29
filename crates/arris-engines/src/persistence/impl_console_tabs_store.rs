@@ -75,12 +75,13 @@ impl ConsoleTabIndexEntry {
         }
     }
 
-    /// Notebooks serialize to `.ipynb`; everything else (SQL consoles) to `.sql`.
+    /// Notebooks serialize to `.ipynb`; canvas boards to `.canvas.json`;
+    /// everything else (SQL consoles) to `.sql`.
     fn ext(&self) -> &'static str {
-        if self.tab_type.as_deref() == Some("notebook") {
-            "ipynb"
-        } else {
-            "sql"
+        match self.tab_type.as_deref() {
+            Some("notebook") => "ipynb",
+            Some("canvas") => "canvas.json",
+            _ => "sql",
         }
     }
 
@@ -92,7 +93,7 @@ impl ConsoleTabIndexEntry {
         self.file_path.is_none()
             && matches!(
                 self.tab_type.as_deref(),
-                None | Some("console") | Some("notebook")
+                None | Some("console") | Some("notebook") | Some("canvas")
             )
     }
 
@@ -347,6 +348,29 @@ mod tests {
         store.save(&[tab.clone()]).await.unwrap();
         let sidecar = tmp.path().join(".arris").join("files").join("tab-1.ipynb");
         assert_eq!(std::fs::read_to_string(&sidecar).unwrap(), "{\"cells\":[]}");
+        let loaded = store.load().await.unwrap();
+        assert_eq!(loaded, vec![tab]);
+    }
+
+    #[tokio::test]
+    async fn canvas_body_uses_canvas_json_sidecar() {
+        let tmp = tempfile::tempdir().unwrap();
+        let store = store_in(tmp.path());
+        let mut tab = sample_tab();
+        tab.tab_type = Some("canvas".into());
+        tab.kind = "canvas".into();
+        tab.text = "{\"version\":1,\"components\":[],\"edges\":[]}".into();
+        store.save(&[tab.clone()]).await.unwrap();
+        let sidecar = tmp
+            .path()
+            .join(".arris")
+            .join("files")
+            .join("tab-1.canvas.json");
+        assert_eq!(
+            std::fs::read_to_string(&sidecar).unwrap(),
+            "{\"version\":1,\"components\":[],\"edges\":[]}"
+        );
+        // The board body round-trips: reload returns the same doc, not an empty string.
         let loaded = store.load().await.unwrap();
         assert_eq!(loaded, vec![tab]);
     }

@@ -1,5 +1,5 @@
 import { registerAgentPane } from "@domains/agent";
-import { registerCanvasTabView } from "@domains/canvas";
+import { registerCanvasSection, registerCanvasTabView } from "@domains/canvas";
 import { registerConnectionsPane, registerDefinitionTabView } from "@domains/connection";
 import { registerChartPane } from "@domains/chart";
 import { registerPinnedQueriesPane } from "@domains/pinnedQueries";
@@ -27,6 +27,7 @@ function registerPanes(): void {
   registerPinnedQueriesPane();
   registerConsolesSection();
   registerNotebookSection();
+  registerCanvasSection();
   registerFilesPane();
   registerDbtPane();
   registerSqlMeshPane();
