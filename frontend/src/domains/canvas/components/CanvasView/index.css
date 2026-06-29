@@ -402,6 +402,25 @@
   font-weight: 600;
 }
 
+/* One-line run status under the query editor. The query object no longer shows
+   its rows inline; a bound table object renders the data. */
+.mdbc-canvas-query-status {
+  flex: 0 0 auto;
+  padding: 6px 10px;
+  border-top: 1px solid var(--m-sep);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* ── table object ─────────────────────────────────────────────────────────── */
+
+/* The table object reuses the shared .mdbc-canvas-result* grid; the result area
+   fills the node frame below the optional title. */
+.mdbc-canvas-table .mdbc-canvas-result {
+  height: 100%;
+}
+
 /* ── chart object ─────────────────────────────────────────────────────────── */
 
 .mdbc-canvas-chart-body {

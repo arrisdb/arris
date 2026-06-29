@@ -70,6 +70,22 @@ describe("planAgentChanges", () => {
     expect(edges).toEqual([{ id: expect.any(String), source: "q1", target: "c1" }]);
   });
 
+  it("auto-links a created table to its source query", () => {
+    const withTable: AgentCanvasSpec = {
+      components: [
+        { kind: "query", id: "q1", sql: "select 1" },
+        { kind: "table", id: "tb1", sourceQueryId: "q1" },
+      ],
+      edges: [],
+    };
+    const { created, edges } = planAgentChanges(withTable, [], "conn-1");
+    expect(created.find((c) => c.id === "tb1")).toMatchObject({
+      kind: "table",
+      sourceQueryId: "q1",
+    });
+    expect(edges).toEqual([{ id: expect.any(String), source: "q1", target: "tb1" }]);
+  });
+
   it("targets a query at the connection the agent named, over the board default", () => {
     const multi: AgentCanvasSpec = {
       components: [

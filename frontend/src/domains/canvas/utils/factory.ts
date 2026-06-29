@@ -100,6 +100,14 @@ function makeComponent(input: ComponentInput): CanvasComponent {
         spec: input.spec ?? fallbackChartSpec(),
         title: input.title,
       };
+    case "table":
+      return {
+        id,
+        kind: "table",
+        ...geom,
+        sourceQueryId: input.sourceQueryId ?? "",
+        title: input.title,
+      };
     case "shape":
       return {
         id,

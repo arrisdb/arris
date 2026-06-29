@@ -249,6 +249,7 @@ impl AgentEngine {
              \x20   {{ \"kind\": \"query\", \"id\": \"q1\", \"title\": \"<label>\", \"sql\": \"<one {name} statement>\" }},\n\
              \x20   {{ \"kind\": \"chart\", \"id\": \"c1\", \"sourceQueryId\": \"q1\",\n\
              \x20     \"spec\": {{ \"kind\": \"bar\", \"xColumn\": \"<col>\", \"yColumns\": [\"<col>\"], \"seriesColumn\": \"<col?>\", \"aggregation\": \"sum\", \"title\": \"<title>\", \"style\": {{ \"stackMode\": \"stacked\", \"showLegend\": true, \"yMin\": 0, \"yMax\": 100 }} }} }},\n\
+             \x20   {{ \"kind\": \"table\", \"id\": \"tb1\", \"sourceQueryId\": \"q1\", \"title\": \"<label>\" }},\n\
              \x20   {{ \"kind\": \"text\", \"id\": \"t1\", \"text\": \"## Heading\\nMarkdown commentary.\" }},\n\
              \x20   {{ \"kind\": \"sticky\", \"id\": \"s1\", \"text\": \"<short note>\", \"color\": \"yellow\" }},\n\
              \x20   {{ \"kind\": \"shape\", \"id\": \"sh1\", \"shape\": \"rect\", \"text\": \"<optional label>\" }}\n\
@@ -291,6 +292,11 @@ impl AgentEngine {
              (number), `xTickInterval` (number). Set only the keys the request asks \
              for. To change one of these on an existing chart, re-`spec` it by id with \
              just the `style` keys you are changing.\n\
+             - A `table` previews a query's rows as a grid. It MUST set \
+             `sourceQueryId` to the `id` of a `query` (new in this block or already \
+             on the board). Prefer a table when the user wants to see the rows; a \
+             chart when they want them visualized. A `query` object itself shows no \
+             rows, so add a `table` (or `chart`) bound to it to surface results.\n\
              - `sticky.color` is one of yellow, green, blue, pink, purple. \
              `shape.shape` is one of rect, ellipse, line; rect/ellipse may carry \
              optional `text`.\n\
@@ -556,7 +562,8 @@ mod tests {
         assert!(prompt.contains("sourceQueryId"));
         assert!(prompt.contains("\"kind\": \"query\""));
         assert!(prompt.contains("\"kind\": \"chart\""));
-        // All five object kinds are offered, plus the modify/remove affordances.
+        // All six object kinds are offered, plus the modify/remove affordances.
+        assert!(prompt.contains("\"kind\": \"table\""));
         assert!(prompt.contains("\"kind\": \"sticky\""));
         assert!(prompt.contains("\"kind\": \"shape\""));
         assert!(prompt.contains("\"remove\""));
