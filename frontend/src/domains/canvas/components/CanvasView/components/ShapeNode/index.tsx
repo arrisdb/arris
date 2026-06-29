@@ -79,6 +79,7 @@ function ShapeNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
           (editing ? (
             <textarea
               ref={inputRef}
+              rows={1}
               className="nowheel nodrag mdbc-canvas-shape-text"
               value={text}
               onBlur={() => setEditing(false)}
