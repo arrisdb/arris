@@ -33,6 +33,18 @@ function useQueryEditor(host: RefObject<HTMLDivElement | null>, input: QueryEdit
     connectionId ? s.schemaCache[connectionId] : undefined,
   );
 
+  // Completion needs the connection's columns, not just the schema browser's
+  // selected subset. Ensure the container list is cached, then deep-load EVERY
+  // schema's tables/columns for this connection. Re-runs when the shallow tree
+  // first arrives (schemaNodes flips defined); once all schemas are loaded the
+  // action no-ops, so the later merges don't loop.
+  useEffect(() => {
+    if (!connectionId) return;
+    const cs = useConnectionsStore.getState();
+    cs.ensureSchema(connectionId);
+    void cs.loadAllSchemaTables(connectionId);
+  }, [connectionId, schemaNodes]);
+
   const viewRef = useRef<EditorView | null>(null);
   const supportRef = useRef<Compartment | null>(null);
 

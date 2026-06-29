@@ -1,6 +1,8 @@
 import { memo, useRef } from "react";
 import type { NodeProps } from "reactflow";
 
+import { IconButton } from "@shared/ui/IconButton";
+
 import { useCanvasStore } from "../../../../hooks";
 import type { CanvasNodeData } from "../../types";
 import { CanvasResizer } from "../CanvasResizer";
@@ -42,14 +44,16 @@ function QueryNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
       <div className={`mdbc-canvas-node mdbc-canvas-query${selected ? " selected" : ""}`}>
         <div className="mdbc-canvas-node-head">
           <span className="mdbc-canvas-node-title">{title}</span>
-          <button
-            type="button"
-            className="mdbc-btn primary text-only mdbc-canvas-run"
+          <IconButton
+            icon="play"
+            label="Run"
+            variant="primary"
+            size={14}
+            loading={run?.running}
             disabled={run?.running}
+            className="mdbc-canvas-run"
             onClick={() => void runQueryComponent(tabId, id)}
-          >
-            {run?.running ? "Running…" : "Run"}
-          </button>
+          />
         </div>
         <div ref={hostRef} className="nodrag nowheel mdbc-canvas-sql" />
         <div className="mdbc-canvas-query-status">
@@ -63,9 +67,7 @@ function QueryNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
               {run.result.columns.length} column{run.result.columns.length === 1 ? "" : "s"}
             </span>
           ) : (
-            <span className="mdbc-canvas-result-empty">
-              Run to load data; add a table object to see the rows
-            </span>
+            <span className="mdbc-canvas-result-empty">Run the query to preview data</span>
           )}
         </div>
       </div>

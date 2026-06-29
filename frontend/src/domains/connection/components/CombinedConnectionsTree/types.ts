@@ -125,6 +125,12 @@ interface ConnectionsState {
   // refresh. Returns the in-flight load (resolved for an empty list) so callers
   // can keep the refreshing flag set until the tables have actually arrived.
   loadSchemaNodes: (id: string, schemas: string[]) => Promise<void>;
+  // Deep-loads tables/columns for EVERY schema of a lazy-schema source, not just
+  // the user's selected ones. Used where completion needs the whole catalog up
+  // front (the canvas query editor), independent of the schema-browser selection.
+  // No-op for eager sources (their tables ship in the base list) and for a
+  // connection whose container list has not been cached yet.
+  loadAllSchemaTables: (id: string) => Promise<void>;
   // Persist a new connection order (the full list of connection ids in display
   // order). Reorders each scope's stored list; cross-scope order is not kept.
   reorderConnections: (orderedIds: string[]) => void;
