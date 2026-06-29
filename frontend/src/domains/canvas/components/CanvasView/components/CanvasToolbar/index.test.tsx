@@ -55,6 +55,26 @@ describe("CanvasToolbar", () => {
     expect(props.onAddQuery).not.toHaveBeenCalled();
   });
 
+  it("clicking an expandable tool applies its default option and opens the menu", () => {
+    const props = setup();
+    // No menu open yet.
+    expect(screen.queryByTestId("canvas-tool-shape-ellipse")).toBeNull();
+    fireEvent.click(screen.getByTestId("canvas-tool-shape"));
+    // Default option (rect) fires, and the menu is shown for a quick switch.
+    expect(props.onAddShape).toHaveBeenCalledWith("rect");
+    expect(screen.getByTestId("canvas-tool-shape-ellipse")).toBeTruthy();
+  });
+
+  it("remembers the last option so the main button re-applies it", () => {
+    const props = setup();
+    fireEvent.click(screen.getByTestId("canvas-tool-shape-caret"));
+    fireEvent.click(screen.getByTestId("canvas-tool-shape-ellipse"));
+    expect(props.onAddShape).toHaveBeenLastCalledWith("ellipse");
+    // Clicking the main button now repeats the remembered choice, not rect.
+    fireEvent.click(screen.getByTestId("canvas-tool-shape"));
+    expect(props.onAddShape).toHaveBeenLastCalledWith("ellipse");
+  });
+
   it("closes an open menu when another tool is used", () => {
     setup();
     fireEvent.click(screen.getByTestId("canvas-tool-shape-caret"));

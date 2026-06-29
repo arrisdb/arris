@@ -65,8 +65,8 @@
   z-index: 6;
   display: flex;
   align-items: center;
-  gap: 2px;
-  padding: 6px;
+  gap: 4px;
+  padding: 10px;
   background: var(--m-bg-surface);
   border: 1px solid var(--m-sep-strong);
   border-radius: var(--m-r-lg);
@@ -81,38 +81,41 @@
 
 .mdbc-canvas-tool-divider {
   width: 1px;
-  height: 22px;
-  margin: 0 6px;
+  height: 26px;
+  margin: 0 8px;
   background: var(--m-sep-strong);
 }
 
 .mdbc-canvas-tool.mdbc-btn.icon-only {
-  width: 34px;
-  height: 34px;
+  width: 40px;
+  height: 40px;
   border-radius: var(--m-r-sm);
 }
 
-/* Small caret over the tool's lower-right corner, opening its options menu. */
+/* Caret pill over the tool's lower-right corner, opening its options menu. A
+   filled background and border make the expand affordance obvious at a glance. */
 .mdbc-canvas-tool-caret {
   position: absolute;
-  right: 0;
-  bottom: 0;
+  right: -3px;
+  bottom: -3px;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 14px;
-  height: 14px;
+  width: 18px;
+  height: 18px;
   padding: 0;
-  border: none;
-  border-radius: 4px;
-  background: transparent;
-  color: var(--m-fg-3);
+  border: 1px solid var(--m-sep-strong);
+  border-radius: 6px;
+  background: var(--m-bg-surface-2);
+  color: var(--m-fg-2);
   cursor: pointer;
 }
 
 .mdbc-canvas-tool-caret:hover,
 .mdbc-canvas-tool-caret.open {
   color: var(--m-fg);
+  border-color: var(--m-accent);
+  background: var(--m-bg-card-hover);
 }
 
 .mdbc-canvas-tool-menu {

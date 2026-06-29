@@ -20,6 +20,9 @@ function CanvasToolbar({
   onAddShape,
 }: CanvasToolbarProps) {
   const [openId, setOpenId] = useState<string | null>(null);
+  // Remembers the last option chosen per expandable tool so its main button
+  // both reflects and re-applies that choice on the next click.
+  const [lastSelect, setLastSelect] = useState<Record<string, string>>({});
   const rootRef = useRef<HTMLDivElement>(null);
 
   // Dismiss an open menu on outside click or Escape.
@@ -79,18 +82,33 @@ function CanvasToolbar({
 
   return (
     <div className="mdbc-canvas-toolbar" ref={rootRef} role="toolbar" aria-label="Canvas tools">
-      {tools.map((tool) => (
+      {tools.map((tool) => {
+        // For an expandable tool, the main button mirrors the last chosen option
+        // (icon + action); a fresh tool falls back to its first enabled option.
+        const activeItem = tool.menu
+          ? tool.menu.find((m) => m.id === lastSelect[tool.id] && !m.disabled)
+          : undefined;
+        const displayIcon = activeItem?.icon ?? tool.icon;
+        return (
         <div className="mdbc-canvas-tool-group" key={tool.id}>
           {tool.id === "query" && <span className="mdbc-canvas-tool-divider" />}
           <IconButton
-            icon={tool.icon}
+            icon={displayIcon}
             label={tool.title}
             variant={tool.active ? "primary" : "default"}
-            size={16}
+            size={18}
             className="mdbc-canvas-tool"
             onClick={() => {
-              setOpenId(null);
-              tool.onClick?.();
+              if (tool.menu) {
+                // Apply the remembered (or default) option AND open the menu so a
+                // different option is one click away.
+                const item = activeItem ?? tool.menu.find((m) => !m.disabled);
+                item?.onSelect();
+                setOpenId(tool.id);
+              } else {
+                setOpenId(null);
+                tool.onClick?.();
+              }
             }}
             data-testid={`canvas-tool-${tool.id}`}
           />
@@ -104,7 +122,7 @@ function CanvasToolbar({
               onClick={() => setOpenId(openId === tool.id ? null : tool.id)}
               data-testid={`canvas-tool-${tool.id}-caret`}
             >
-              <Icon name="chevronUp" size={10} />
+              <Icon name="chevronUp" size={12} />
             </button>
           )}
           {tool.menu && openId === tool.id && (
@@ -117,6 +135,7 @@ function CanvasToolbar({
                   onClick={() => {
                     if (item.disabled) return;
                     item.onSelect();
+                    setLastSelect((s) => ({ ...s, [tool.id]: item.id }));
                     setOpenId(null);
                   }}
                   data-testid={`canvas-tool-${tool.id}-${item.id}`}
@@ -130,7 +149,8 @@ function CanvasToolbar({
             </div>
           )}
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
