@@ -266,6 +266,39 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.mdbc-canvas-node-head-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.mdbc-canvas-conn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  font-size: var(--m-fs-sm);
+  color: var(--m-fg-2);
+}
+
+.mdbc-canvas-conn-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 120px;
+}
+
+.mdbc-canvas-head-sep {
+  width: 1px;
+  align-self: stretch;
+  margin: 2px 0;
+  background: var(--m-sep);
 }
 
 .mdbc-canvas-run {

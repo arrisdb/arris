@@ -1,3 +1,4 @@
+import { DatabaseKindIcon } from "@domains/connection";
 import { useConnectionsStore } from "@domains/connection/hooks";
 import { Select } from "@shared/ui";
 
@@ -10,7 +11,11 @@ function QuerySection({ component, onChange }: SectionProps) {
   const connections = useConnectionsStore((s) => s.connections);
   if (component.kind !== "query") return null;
 
-  const options = connections.map((c) => ({ value: c.id, label: c.name || c.id }));
+  const options = connections.map((c) => ({
+    value: c.id,
+    label: c.name || c.id,
+    icon: <DatabaseKindIcon kind={c.kind} size={14} />,
+  }));
 
   return (
     <div className="mdbc-pane-form">

@@ -4,6 +4,8 @@ import { ReactFlowProvider } from "reactflow";
 import type { NodeProps } from "reactflow";
 import { EditorView } from "@codemirror/view";
 
+import { useConnectionsStore } from "@domains/connection/hooks";
+
 import { useCanvasStore } from "../../../../hooks";
 import { makeComponent } from "../../../../utils";
 import type { CanvasComponent } from "../../../../types";
@@ -30,7 +32,10 @@ function renderNode(id: string) {
 }
 
 describe("QueryNode", () => {
-  beforeEach(() => useCanvasStore.setState({ boards: {} }));
+  beforeEach(() => {
+    useCanvasStore.setState({ boards: {} });
+    useConnectionsStore.setState({ connections: [] } as never);
+  });
 
   it("mounts a CodeMirror editor seeded with the object's SQL", () => {
     seed(makeComponent({ kind: "query", id: "q", sql: "select 1", connectionId: "c" }));
@@ -61,6 +66,18 @@ describe("QueryNode", () => {
     useCanvasStore.getState().updateComponent(TAB, "q", { sql: "select 42" });
     const view = EditorView.findFromDOM(container.querySelector(".cm-content") as HTMLElement);
     expect(view!.state.doc.toString()).toBe("select 42");
+  });
+
+  it("shows the connection name and database logo next to Run", () => {
+    useConnectionsStore.setState({
+      connections: [{ id: "c", name: "test_postgres", kind: "postgres" }],
+    } as never);
+    seed(makeComponent({ kind: "query", id: "q", sql: "select 1", connectionId: "c" }));
+    const { container } = renderNode("q");
+    expect(screen.getByText("test_postgres")).toBeTruthy();
+    const logo = container.querySelector("img.mdbc-db-kind-logo") as HTMLImageElement;
+    expect(logo).toBeTruthy();
+    expect(logo.getAttribute("src")).toContain("/db-logos/postgres");
   });
 
   it("Run surfaces an error for an empty query (without hitting the backend)", async () => {
