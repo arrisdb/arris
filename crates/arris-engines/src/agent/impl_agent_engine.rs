@@ -360,7 +360,18 @@ impl AgentEngine {
                     }
                 }
                 SchemaNodeKind::Database => {
-                    Self::collect_hydrate_names(&node.children, max, out);
+                    // A database-as-schema source (e.g. MySQL) returns top-level
+                    // `Database` nodes whose tables load via `list_schema(db)`, with
+                    // no intermediate `Schema` node. Hydrate such an empty database
+                    // by its own name; otherwise recurse to its `Schema` children
+                    // (e.g. Postgres `database > schema > tables`).
+                    if node.children.is_empty() {
+                        if !out.contains(&node.name) {
+                            out.push(node.name.clone());
+                        }
+                    } else {
+                        Self::collect_hydrate_names(&node.children, max, out);
+                    }
                 }
                 _ => {}
             }
@@ -383,7 +394,16 @@ impl AgentEngine {
                     }
                 }
                 SchemaNodeKind::Database => {
-                    Self::attach_schema_children(&mut node.children, loaded);
+                    // Mirror the hydrate-name walk: an empty `Database` is a
+                    // database-as-schema container (MySQL) keyed by its own name;
+                    // a populated one nests `Schema` children to fill instead.
+                    if node.children.is_empty() {
+                        if let Some(children) = loaded.get(&node.name) {
+                            node.children = children.clone();
+                        }
+                    } else {
+                        Self::attach_schema_children(&mut node.children, loaded);
+                    }
                 }
                 _ => {}
             }
@@ -635,5 +655,35 @@ mod tests {
         assert!(ddl.contains("id"));
         // A schema with no loaded entry stays empty (no fabricated tables).
         assert!(!ddl.contains("CREATE TABLE analytics"));
+    }
+
+    #[test]
+    fn schema_names_to_hydrate_collects_empty_databases_as_schema_containers() {
+        // MySQL-style: top-level `Database` nodes with no `Schema` child; their
+        // tables load via `list_schema(db)`. The database name itself is the
+        // hydrate key.
+        let tree = vec![database("shop", vec![]), database("analytics", vec![])];
+        let names = AgentEngine::schema_names_to_hydrate(&tree, 10);
+        assert_eq!(names, vec!["shop".to_string(), "analytics".to_string()]);
+    }
+
+    #[test]
+    fn attach_schema_children_fills_a_database_as_schema_so_ddl_has_real_tables() {
+        let mut tree = vec![database("shop", vec![])];
+        let mut loaded = HashMap::new();
+        loaded.insert(
+            "shop".to_string(),
+            vec![SchemaNode::new("orders", SchemaNodeKind::Table, "shop.orders")
+                .with_children(vec![SchemaNode::new(
+                    "id",
+                    SchemaNodeKind::Column,
+                    "shop.orders.id",
+                )])],
+        );
+        AgentEngine::attach_schema_children(&mut tree, &loaded);
+        let ddl = AgentEngine::new().schema_ddl(&tree);
+        // The MySQL database's deep-loaded table reaches the agent prompt.
+        assert!(ddl.contains("CREATE TABLE shop.orders"));
+        assert!(ddl.contains("id"));
     }
 }
