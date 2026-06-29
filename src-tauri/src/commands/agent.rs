@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 
-use arris_engines::agent::{AgentEvent, AgentProfile, AgentProvider};
+use arris_engines::agent::{AgentEngine, AgentEvent, AgentProfile, AgentProvider};
 use arris_engines::{AppEnvironment, IpcError};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, State};
@@ -13,6 +13,12 @@ use uuid::Uuid;
 /// giving up and running the turn with no schema context. An unreachable DB
 /// must never stall the agent turn — the user can still write/explain SQL.
 const SCHEMA_FETCH_TIMEOUT: Duration = Duration::from_secs(15);
+
+/// Cap on how many schemas the agent deep-loads. `list_schemas` is lazy
+/// (containers only), so each schema costs a `list_schema` round-trip; the cap
+/// keeps a many-schema database from blowing the fetch timeout (and the prompt
+/// is byte-capped downstream anyway).
+const MAX_AGENT_SCHEMAS: usize = 12;
 
 /// Registry of in-flight agent turns, keyed by turn id. Each entry holds a
 /// one-shot sender that, when fired, cancels that turn (killing its codex
@@ -79,6 +85,27 @@ pub async fn cmd_agent_send(
         runs.inner.lock().await.remove(&turn_id);
     });
     Ok(())
+}
+
+/// Resolve the schema DDL the agent would receive for `connection_id` (the same
+/// deep-loaded snapshot a turn inlines). The canvas chat calls this to show a
+/// "fetching schema" indicator and to preview the exact context in its panel.
+/// Returns an empty string when the connection is unknown or unreadable.
+#[tauri::command]
+pub async fn cmd_agent_schema_context(
+    env: State<'_, Arc<AppEnvironment>>,
+    connection_id: Uuid,
+) -> Result<String, IpcError> {
+    let conn = {
+        let project = env.project.read().await;
+        env.connection
+            .find_connection(connection_id, project.as_ref())
+            .await
+    };
+    match conn {
+        Some(conn) => Ok(resolve_schema_ddl(env.inner(), &conn).await.unwrap_or_default()),
+        None => Ok(String::new()),
+    }
 }
 
 /// Stop an in-flight agent turn, killing its codex process.
@@ -187,8 +214,19 @@ async fn resolve_schema_ddl(
 ) -> Option<String> {
     let fetch = async {
         let driver = env.connection.open_connection(conn).await.ok()?;
-        let schema = driver.list_schemas().await.ok()?;
-        Some(env.agent.schema_ddl(&schema))
+        let mut roots = driver.list_schemas().await.ok()?;
+        // `list_schemas` is lazy: it returns schema containers with no relations
+        // or columns (those load on expand). Deep-load each schema's tables and
+        // columns so the prompt carries the real schema, not just its name.
+        let names = AgentEngine::schema_names_to_hydrate(&roots, MAX_AGENT_SCHEMAS);
+        let mut loaded = HashMap::new();
+        for name in names {
+            if let Ok(children) = driver.list_schema(&name).await {
+                loaded.insert(name, children);
+            }
+        }
+        AgentEngine::attach_schema_children(&mut roots, &loaded);
+        Some(env.agent.schema_ddl(&roots))
     };
     tokio::time::timeout(SCHEMA_FETCH_TIMEOUT, fetch)
         .await

@@ -15,8 +15,58 @@
   color: var(--m-fg-3);
 }
 
-/* The Select stretches to fill the row beside its label. */
+/* The Select stretches to fill the row beside its label; the Context button
+   keeps its natural width on the right. */
 .mdbc-canvas-chat-conn .mdbc-select {
   flex: 1 1 auto;
   min-width: 0;
+}
+
+/* "Fetching schema" indicator: a spinner + label shown while the agent's schema
+   context loads for the chosen connection. */
+.mdbc-canvas-chat-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-bottom: 0.5px solid var(--m-sep);
+  font-size: var(--m-fs-xs);
+  color: var(--m-fg-3);
+}
+
+/* The Context view replaces the message stream while open: the exact schema +
+   board text the agent receives, scrollable. */
+.mdbc-canvas-chat-context {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.mdbc-canvas-chat-context-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  border-bottom: 0.5px solid var(--m-sep);
+}
+
+.mdbc-canvas-chat-context-title {
+  font-size: var(--m-fs-sm);
+  font-weight: 600;
+  color: var(--m-fg-2);
+}
+
+.mdbc-canvas-chat-context-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  margin: 0;
+  padding: 10px;
+  font-family: var(--m-font-mono);
+  font-size: var(--m-fs-xs);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--m-fg-2);
 }

@@ -1,4 +1,4 @@
-import { act, renderHook } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { EditorTab } from "@shell/types";
 
@@ -9,6 +9,7 @@ const hoisted = vi.hoisted(() => ({
 vi.mock("./ipc", () => ({
   sendCanvasAgentIPC: vi.fn().mockResolvedValue(undefined),
   cancelCanvasAgentIPC: vi.fn().mockResolvedValue(undefined),
+  fetchCanvasSchemaContextIPC: vi.fn().mockResolvedValue("CREATE TABLE public.orders ();"),
   listenCanvasAgentEventsIPC: vi.fn((h: (e: unknown) => void) => {
     hoisted.handler = h;
     return Promise.resolve(() => {});
@@ -44,6 +45,15 @@ describe("useCanvasAgentChat", () => {
     useConnectionsStore.setState({ connections: [], selectedId: null });
     vi.clearAllMocks();
     hoisted.handler = null;
+  });
+
+  it("fetches the schema context for the connection and previews it with the board", async () => {
+    const { result } = renderHook(() => useCanvasAgentChat(withConn));
+    await waitFor(() => expect(result.current.schemaLoading).toBe(false));
+    const ctx = result.current.buildContext();
+    expect(ctx).toContain("CREATE TABLE public.orders");
+    expect(ctx).toContain("# Database schema");
+    expect(ctx).toContain("# Current board");
   });
 
   it("exposes the connections as options and binds the picked one to the tab", () => {

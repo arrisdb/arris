@@ -121,6 +121,13 @@ import DocTable from "../../components/docs/DocTable/DocTable.astro";
   </p>
 
   <p>
+    When you pick a connection, the panel shows a <strong>fetching schema</strong> indicator while it
+    reads the database's tables and columns (the same deep read the schema browser does, not just the
+    table names). The <strong>Context</strong> button previews the exact text handed to the agent: the
+    schema DDL plus the current board summary, so you can see what it is working from.
+  </p>
+
+  <p>
     Because each turn sees the current board, follow-up messages refine it in place rather than only
     piling on new objects. The agent can <strong>add</strong> any object kind (a query, chart, text
     block, sticky note, or shape), <strong>modify</strong> one that is already there (re-spec a chart

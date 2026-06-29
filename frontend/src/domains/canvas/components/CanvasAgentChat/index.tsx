@@ -1,4 +1,5 @@
-import { ChatBubble, ChatEmpty, ChatInput, ChatTyping, Select } from "@shared/ui";
+import { useState } from "react";
+import { ChatBubble, ChatEmpty, ChatInput, ChatTyping, Select, Spinner } from "@shared/ui";
 import { AgentProviderSelect } from "@domains/agent";
 
 import { useCanvasAgentChat } from "./hooks";
@@ -9,9 +10,19 @@ import "./index.css";
 /// agent reads the schema and the current board, then adds or revises objects.
 /// Renders the shared agent-chat chrome so it matches the SQL agent pane.
 function CanvasAgentChat({ tab }: CanvasAgentChatProps) {
-  const { cancel, connectionId, connectionOptions, entries, pickConnection, send, streaming } =
-    useCanvasAgentChat(tab);
+  const {
+    buildContext,
+    cancel,
+    connectionId,
+    connectionOptions,
+    entries,
+    pickConnection,
+    schemaLoading,
+    send,
+    streaming,
+  } = useCanvasAgentChat(tab);
   const isEmpty = entries.length === 0 && !streaming;
+  const [contextText, setContextText] = useState<string | null>(null);
 
   return (
     <div className="mdbc-agent-pane">
@@ -28,26 +39,56 @@ function CanvasAgentChat({ tab }: CanvasAgentChatProps) {
           placeholder="No connection"
           data-testid="canvas-connection-select"
         />
+        <button
+          type="button"
+          className="mdbc-btn text-only"
+          disabled={!connectionId}
+          onClick={() => setContextText(buildContext())}
+        >
+          Context
+        </button>
       </div>
-      <div className="mdbc-agent-stream">
-        {isEmpty ? (
-          <ChatEmpty
-            title="Ask the agent to build your board"
-            text={
-              connectionId
-                ? 'Describe an analysis, like "monthly sales by category". The agent reads your schema and the current board, then adds or revises objects.'
-                : "Pick a connection above so the agent can read your schema, then describe the analysis you want."
-            }
-          />
-        ) : (
-          entries
-            .filter((entry) => entry.text.length > 0)
-            .map((entry) => (
-              <ChatBubble key={entry.id} role={entry.role} text={entry.text} />
-            ))
-        )}
-        {streaming ? <ChatTyping onStop={cancel} /> : null}
-      </div>
+      {schemaLoading ? (
+        <div className="mdbc-canvas-chat-status">
+          <Spinner size={12} />
+          <span>Fetching schema &amp; table info…</span>
+        </div>
+      ) : null}
+      {contextText !== null ? (
+        <div className="mdbc-canvas-chat-context">
+          <div className="mdbc-canvas-chat-context-head">
+            <span className="mdbc-canvas-chat-context-title">Context sent to the agent</span>
+            <button
+              type="button"
+              className="mdbc-btn text-only"
+              onClick={() => setContextText(null)}
+            >
+              Close
+            </button>
+          </div>
+          <pre className="mdbc-canvas-chat-context-body">{contextText}</pre>
+        </div>
+      ) : (
+        <div className="mdbc-agent-stream">
+          {isEmpty ? (
+            <ChatEmpty
+              title="Ask the agent to build your board"
+              text={
+                connectionId
+                  ? 'Describe an analysis, like "monthly sales by category". The agent reads your schema and the current board, then adds or revises objects.'
+                  : "Pick a connection above so the agent can read your schema, then describe the analysis you want."
+              }
+            />
+          ) : (
+            entries
+              .filter((entry) => entry.text.length > 0)
+              .map((entry) => (
+                <ChatBubble key={entry.id} role={entry.role} text={entry.text} />
+              ))
+          )}
+          {streaming ? <ChatTyping onStop={cancel} /> : null}
+        </div>
+      )}
       <ChatInput
         placeholder={
           connectionId ? "Ask the agent… (⌘↵ to send)" : "Connect a database to use the agent"

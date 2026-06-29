@@ -47,11 +47,23 @@ function cancelCanvasAgentIPC(turnId: string): Promise<void> {
   return invoke("cmd_agent_cancel", { turnId });
 }
 
+/// Fetch the schema DDL the agent would receive for a connection (the same
+/// deep-loaded snapshot a turn inlines), so the chat can show a "fetching
+/// schema" indicator and preview the exact context.
+function fetchCanvasSchemaContextIPC(connectionId: string): Promise<string> {
+  return invoke("cmd_agent_schema_context", { connectionId });
+}
+
 function listenCanvasAgentEventsIPC(
   handler: (event: CanvasAgentEventEnvelope) => void,
 ): Promise<UnlistenFn> {
   return listen<CanvasAgentEventEnvelope>("agent-event", (evt) => handler(evt.payload));
 }
 
-export { cancelCanvasAgentIPC, listenCanvasAgentEventsIPC, sendCanvasAgentIPC };
+export {
+  cancelCanvasAgentIPC,
+  fetchCanvasSchemaContextIPC,
+  listenCanvasAgentEventsIPC,
+  sendCanvasAgentIPC,
+};
 export type { CanvasAgentEventEnvelope };

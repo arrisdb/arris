@@ -10,6 +10,7 @@ import { useCanvasStore } from "../../hooks";
 import { describeBoard, genId, parseAgentCanvas } from "../../utils";
 import {
   cancelCanvasAgentIPC,
+  fetchCanvasSchemaContextIPC,
   listenCanvasAgentEventsIPC,
   sendCanvasAgentIPC,
 } from "./ipc";
@@ -57,6 +58,50 @@ function useCanvasAgentChat(tab: EditorTab) {
 
   const [entries, setEntries] = useState<ChatEntry[]>([]);
   const [streaming, setStreaming] = useState(false);
+
+  // The schema DDL the agent will receive for this connection. Fetched (with a
+  // spinner) whenever the connection changes, so the panel can be explicit about
+  // reading the database's tables and can preview the exact context.
+  const [schemaContext, setSchemaContext] = useState("");
+  const [schemaLoading, setSchemaLoading] = useState(false);
+
+  useEffect(() => {
+    if (!connectionId) {
+      setSchemaContext("");
+      setSchemaLoading(false);
+      return;
+    }
+    let active = true;
+    setSchemaLoading(true);
+    fetchCanvasSchemaContextIPC(connectionId)
+      .then((ddl) => {
+        if (active) setSchemaContext(ddl);
+      })
+      .catch(() => {
+        if (active) setSchemaContext("");
+      })
+      .finally(() => {
+        if (active) setSchemaLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [connectionId]);
+
+  // The exact context block the agent receives: the schema DDL plus the current
+  // board summary. Read at call time so the board section is always current.
+  const buildContext = useCallback(() => {
+    const components =
+      useCanvasStore.getState().boards[tabId]?.doc.components ?? [];
+    const board = describeBoard(components);
+    return [
+      "# Database schema (sent to the agent)",
+      schemaContext.trim() || "(no schema loaded for this connection)",
+      "",
+      "# Current board",
+      board || "The board is empty.",
+    ].join("\n");
+  }, [schemaContext, tabId]);
 
   const turnIdRef = useRef<string | null>(null);
   const agentEntryIdRef = useRef<string | null>(null);
@@ -198,11 +243,13 @@ function useCanvasAgentChat(tab: EditorTab) {
   }, [endTurn, setAgentText]);
 
   return {
+    buildContext,
     cancel,
     connectionId,
     connectionOptions,
     entries,
     pickConnection,
+    schemaLoading,
     send,
     streaming,
   };
