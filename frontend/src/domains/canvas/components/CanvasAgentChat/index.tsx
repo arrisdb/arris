@@ -1,4 +1,5 @@
 import { ChatBubble, ChatEmpty, ChatInput, ChatTyping } from "@shared/ui";
+import { AgentProviderSelect } from "@domains/agent";
 
 import { useCanvasAgentChat } from "./hooks";
 import type { CanvasAgentChatProps } from "./types";
@@ -14,6 +15,7 @@ function CanvasAgentChat({ tab }: CanvasAgentChatProps) {
     <div className="mdbc-agent-pane">
       <div className="mdbc-pane-header">
         <span className="mdbc-pane-title">AGENT</span>
+        <AgentProviderSelect />
       </div>
       <div className="mdbc-agent-stream">
         {isEmpty ? (

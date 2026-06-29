@@ -5,20 +5,17 @@ import { useEditorHandleStore } from "@domains/editor/hooks";
 import { useTabsStore } from "@shell/hooks/tabsStore";
 import type { SelectOption } from "@shared/ui";
 import { listenAgentEventsIPC, runShareQueryIPC } from "./ipc";
-import type { AgentProvider, ChatItem, ContextChip } from "./types";
+import type { ChatItem, ContextChip } from "./types";
 import { serializeQueryResult } from "./utils";
 
 interface AgentPaneModel {
   items: ChatItem[];
   streaming: boolean;
   chips: ContextChip[];
-  provider: AgentProvider;
   available: boolean | null;
-  model: string | null;
   hasMessages: boolean;
   canShare: boolean;
   connectionOptions: SelectOption[];
-  onSetProvider: (provider: AgentProvider) => void;
   onSend: (text: string) => void;
   onStop: () => void;
   onClear: () => void;
@@ -65,9 +62,7 @@ const useAgentPane = (): AgentPaneModel => {
   );
 
   const thread = useAgentStore((state) => state.threads[threadKey]);
-  const provider = useAgentStore((state) => state.provider);
   const available = useAgentStore((state) => state.available);
-  const model = useAgentStore((state) => state.model);
 
   const [removedChips, setRemovedChips] = useState<Set<string>>(new Set());
 
@@ -174,13 +169,10 @@ const useAgentPane = (): AgentPaneModel => {
     items: thread?.items ?? [],
     streaming: thread?.streaming ?? false,
     chips,
-    provider,
     available,
-    model,
     hasMessages: (thread?.items.length ?? 0) > 0,
     canShare: runConnectionId !== null,
     connectionOptions,
-    onSetProvider: (next) => useAgentStore.getState().setProvider(next),
     onSend,
     onStop,
     onClear,

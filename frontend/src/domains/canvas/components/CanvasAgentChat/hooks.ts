@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { useAgentStore } from "@domains/agent/hooks";
 import type { EditorTab } from "@shell/types";
 
 import { CANVAS_SPEC_FENCE } from "../../constants";
@@ -41,6 +42,11 @@ function useCanvasAgentChat(tab: EditorTab) {
   const agentEntryIdRef = useRef<string | null>(null);
   const accumRef = useRef("");
   const sessionRef = useRef<string | null>(null);
+  // The provider this turn runs under, and the one that produced the live
+  // session: a codex session id can't be resumed under claude (and vice versa),
+  // so switching providers in the header starts a fresh session.
+  const turnProviderRef = useRef<string | null>(null);
+  const sessionProviderRef = useRef<string | null>(null);
 
   const setAgentText = useCallback((text: string, pending: boolean) => {
     const id = agentEntryIdRef.current;
@@ -59,6 +65,7 @@ function useCanvasAgentChat(tab: EditorTab) {
       switch (evt.kind) {
         case "session_started":
           if (evt.session_id) sessionRef.current = evt.session_id;
+          sessionProviderRef.current = turnProviderRef.current;
           return;
         case "message":
           if (evt.text) {
@@ -136,21 +143,30 @@ function useCanvasAgentChat(tab: EditorTab) {
         { id: agentId, role: "agent", text: "", pending: true },
       ]);
       setStreaming(true);
+      const provider = useAgentStore.getState().provider;
+      turnProviderRef.current = provider;
+      // Only resume when the live session was produced by the same provider; a
+      // header switch (codex <-> claude) must start fresh.
+      const resumeSession =
+        sessionRef.current && sessionProviderRef.current === provider
+          ? sessionRef.current
+          : null;
       const boardContext = describeBoard(
         useCanvasStore.getState().boards[tabId]?.doc.components ?? [],
       );
       sendCanvasAgentIPC({
+        provider,
         connectionId,
         prompt: text,
         boardContext,
         turnId,
-        resumeSession: sessionRef.current,
+        resumeSession,
       }).catch((e) => {
         setAgentText(`Error: ${errToString(e)}`, false);
         endTurn();
       });
     },
-    [connectionId, endTurn, setAgentText, streaming],
+    [connectionId, endTurn, setAgentText, streaming, tabId],
   );
 
   const cancel = useCallback(() => {
