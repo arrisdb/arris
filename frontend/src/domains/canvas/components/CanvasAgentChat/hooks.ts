@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useAgentStore } from "@domains/agent/hooks";
+import { useConnectionsStore } from "@domains/connection/hooks";
+import { useTabsStore } from "@shell/hooks/tabsStore";
 import type { EditorTab } from "@shell/types";
 
 import { CANVAS_SPEC_FENCE } from "../../constants";
@@ -34,6 +36,24 @@ function errToString(err: unknown): string {
 function useCanvasAgentChat(tab: EditorTab) {
   const tabId = tab.id;
   const connectionId = tab.connectionId ?? null;
+
+  // The board's connection is canvas-wide: the agent reads its schema and every
+  // query object runs against it. Picking one binds it to the tab.
+  const connections = useConnectionsStore((s) => s.connections);
+  const connectionOptions = useMemo(
+    () => connections.map((c) => ({ value: c.id, label: c.name })),
+    [connections],
+  );
+  const pickConnection = useCallback(
+    (id: string) => {
+      const conn = connections.find((c) => c.id === id);
+      if (!conn) return;
+      if (!conn.isConnected) useConnectionsStore.getState().connectAndLoad(id);
+      useConnectionsStore.getState().selectConnection(id);
+      useTabsStore.getState().updateTab(tabId, { connectionId: id });
+    },
+    [connections, tabId],
+  );
 
   const [entries, setEntries] = useState<ChatEntry[]>([]);
   const [streaming, setStreaming] = useState(false);
@@ -177,7 +197,15 @@ function useCanvasAgentChat(tab: EditorTab) {
     endTurn();
   }, [endTurn, setAgentText]);
 
-  return { cancel, connectionId, entries, send, streaming };
+  return {
+    cancel,
+    connectionId,
+    connectionOptions,
+    entries,
+    pickConnection,
+    send,
+    streaming,
+  };
 }
 
 export { useCanvasAgentChat };

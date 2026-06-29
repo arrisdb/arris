@@ -19,6 +19,8 @@ vi.mock("../../ipc", () => ({
   runCanvasQueryIPC: vi.fn().mockResolvedValue({ columns: [], rows: [], elapsed: 0 }),
 }));
 
+import { useConnectionsStore } from "@domains/connection/hooks";
+import { useTabsStore } from "@shell/hooks/tabsStore";
 import { runCanvasQueryIPC } from "../../ipc";
 import { useCanvasStore } from "../../hooks";
 import { sendCanvasAgentIPC } from "./ipc";
@@ -39,8 +41,24 @@ describe("useCanvasAgentChat", () => {
   beforeEach(() => {
     useCanvasStore.setState({ boards: {} });
     useCanvasStore.getState().ensureBoard(TAB, "");
+    useConnectionsStore.setState({ connections: [], selectedId: null });
     vi.clearAllMocks();
     hoisted.handler = null;
+  });
+
+  it("exposes the connections as options and binds the picked one to the tab", () => {
+    useConnectionsStore.setState({
+      connections: [{ id: "conn-1", name: "Sales DB", isConnected: true }],
+    } as never);
+    const updateTab = vi.spyOn(useTabsStore.getState(), "updateTab");
+    const selectConnection = vi.spyOn(useConnectionsStore.getState(), "selectConnection");
+
+    const { result } = renderHook(() => useCanvasAgentChat(noConn));
+    expect(result.current.connectionOptions).toEqual([{ value: "conn-1", label: "Sales DB" }]);
+
+    act(() => result.current.pickConnection("conn-1"));
+    expect(selectConnection).toHaveBeenCalledWith("conn-1");
+    expect(updateTab).toHaveBeenCalledWith(TAB, { connectionId: "conn-1" });
   });
 
   it("dispatches a canvas turn and shows a user + pending agent entry", () => {

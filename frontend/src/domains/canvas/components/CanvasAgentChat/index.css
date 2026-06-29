@@ -1,0 +1,22 @@
+/* The board's connection picker row, under the agent header. The connection is
+   canvas-wide (the agent's schema source and every query object's target), so it
+   sits at the top of the chat where the "connect a database" prompt appears. */
+.mdbc-canvas-chat-conn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-bottom: 0.5px solid var(--m-sep);
+}
+
+.mdbc-canvas-chat-conn-label {
+  flex: 0 0 auto;
+  font-size: var(--m-fs-xs);
+  color: var(--m-fg-3);
+}
+
+/* The Select stretches to fill the row beside its label. */
+.mdbc-canvas-chat-conn .mdbc-select {
+  flex: 1 1 auto;
+  min-width: 0;
+}

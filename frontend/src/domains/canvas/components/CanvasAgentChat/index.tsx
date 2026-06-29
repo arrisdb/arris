@@ -1,14 +1,16 @@
-import { ChatBubble, ChatEmpty, ChatInput, ChatTyping } from "@shared/ui";
+import { ChatBubble, ChatEmpty, ChatInput, ChatTyping, Select } from "@shared/ui";
 import { AgentProviderSelect } from "@domains/agent";
 
 import { useCanvasAgentChat } from "./hooks";
 import type { CanvasAgentChatProps } from "./types";
+import "./index.css";
 
-/// The board's agent chat: type a request, the agent reads the schema and the
-/// current board, then adds or revises canvas objects. Renders the shared
-/// agent-chat chrome so it is visually identical to the SQL agent pane.
+/// The board's agent chat: pick the board's connection, type a request, and the
+/// agent reads the schema and the current board, then adds or revises objects.
+/// Renders the shared agent-chat chrome so it matches the SQL agent pane.
 function CanvasAgentChat({ tab }: CanvasAgentChatProps) {
-  const { cancel, connectionId, entries, send, streaming } = useCanvasAgentChat(tab);
+  const { cancel, connectionId, connectionOptions, entries, pickConnection, send, streaming } =
+    useCanvasAgentChat(tab);
   const isEmpty = entries.length === 0 && !streaming;
 
   return (
@@ -17,11 +19,25 @@ function CanvasAgentChat({ tab }: CanvasAgentChatProps) {
         <span className="mdbc-pane-title">AGENT</span>
         <AgentProviderSelect />
       </div>
+      <div className="mdbc-canvas-chat-conn">
+        <span className="mdbc-canvas-chat-conn-label">Connection</span>
+        <Select
+          value={connectionId ?? ""}
+          options={connectionOptions}
+          onChange={pickConnection}
+          placeholder="No connection"
+          data-testid="canvas-connection-select"
+        />
+      </div>
       <div className="mdbc-agent-stream">
         {isEmpty ? (
           <ChatEmpty
             title="Ask the agent to build your board"
-            text='Describe an analysis, like "monthly sales by category". The agent reads your schema and the current board, then adds or revises objects.'
+            text={
+              connectionId
+                ? 'Describe an analysis, like "monthly sales by category". The agent reads your schema and the current board, then adds or revises objects.'
+                : "Pick a connection above so the agent can read your schema, then describe the analysis you want."
+            }
           />
         ) : (
           entries
