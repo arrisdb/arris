@@ -111,14 +111,19 @@ import DocTable from "../../components/docs/DocTable/DocTable.astro";
   <p>
     The agent uses Anthropic's <strong>Claude CLI</strong> (<code>claude -p</code>) under the same
     guardrails as the SQL agent: it runs locally in a read-only mode, never touches your filesystem,
-    and only receives your prompt plus the connection's <strong>schema as DDL</strong> and dialect
-    (capped in size). Your row data is not sent. Because the agent needs the schema to write correct
-    SQL, the chat asks you to connect a database to the canvas first.
+    and only receives your prompt, the connection's <strong>schema as DDL</strong> and dialect, and a
+    short summary of the objects already on the board (their kinds, ids, titles, and SQL), all capped
+    in size. Your row data is not sent. Because the agent needs the schema to write correct SQL, the
+    chat asks you to connect a database to the canvas first.
   </p>
 
   <p>
-    Follow-up messages refine the same board: ask for a different chart type, another breakdown, or a
-    second query, and the new objects are added alongside the existing ones.
+    Because each turn sees the current board, follow-up messages refine it in place rather than only
+    piling on new objects. The agent can <strong>add</strong> any object kind (a query, chart, text
+    block, sticky note, or shape), <strong>modify</strong> one that is already there (re-spec a chart
+    as a line chart, rewrite a query, retitle an object), or <strong>remove</strong> objects you no
+    longer want. A query the agent adds or changes runs automatically, and any chart bound to it
+    updates.
   </p>
 
   <h2 id="board">Working on the board</h2>
