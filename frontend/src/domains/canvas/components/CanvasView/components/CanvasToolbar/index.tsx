@@ -34,10 +34,12 @@ function CanvasToolbar({
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") setOpenId(null);
     }
-    document.addEventListener("mousedown", onDown);
+    // Capture phase so the menu still dismisses when the click lands on the
+    // ReactFlow pane, which stops pointer events from reaching us by bubbling.
+    document.addEventListener("mousedown", onDown, true);
     document.addEventListener("keydown", onKey);
     return () => {
-      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("mousedown", onDown, true);
       document.removeEventListener("keydown", onKey);
     };
   }, [openId]);

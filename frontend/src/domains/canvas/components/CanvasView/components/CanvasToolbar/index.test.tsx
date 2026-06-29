@@ -75,6 +75,15 @@ describe("CanvasToolbar", () => {
     expect(props.onAddShape).toHaveBeenLastCalledWith("ellipse");
   });
 
+  it("dismisses an open menu when clicking outside the toolbar (e.g. the canvas)", () => {
+    setup();
+    fireEvent.click(screen.getByTestId("canvas-tool-shape-caret"));
+    expect(screen.getByTestId("canvas-tool-shape-ellipse")).toBeTruthy();
+    // A mousedown anywhere outside the toolbar closes the menu.
+    fireEvent.mouseDown(document.body);
+    expect(screen.queryByTestId("canvas-tool-shape-ellipse")).toBeNull();
+  });
+
   it("closes an open menu when another tool is used", () => {
     setup();
     fireEvent.click(screen.getByTestId("canvas-tool-shape-caret"));
