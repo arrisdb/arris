@@ -3,22 +3,21 @@
    sits at the top of the chat where the "connect a database" prompt appears. */
 .mdbc-canvas-chat-conn {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 10px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  padding: 8px 10px;
   border-bottom: 0.5px solid var(--m-sep);
 }
 
 .mdbc-canvas-chat-conn-label {
-  flex: 0 0 auto;
   font-size: var(--m-fs-xs);
   color: var(--m-fg-3);
 }
 
-/* The Select stretches to fill the row beside its label; the Context button
-   keeps its natural width on the right. */
+/* The connection picker sits on its own line below the label and fills the row. */
 .mdbc-canvas-chat-conn .mdbc-select {
-  flex: 1 1 auto;
+  width: 100%;
   min-width: 0;
 }
 
@@ -34,35 +33,38 @@
   color: var(--m-fg-3);
 }
 
-/* The Context view replaces the message stream while open: the exact schema +
-   board text the agent receives, scrollable. */
+/* The Context section: a collapsible, scrollable preview of the exact schema +
+   board text handed to the agent, shown inline above the message stream. It is
+   height-capped so the expanded body never swallows the whole pane. */
 .mdbc-canvas-chat-context {
-  flex: 1;
-  min-height: 0;
   display: flex;
   flex-direction: column;
-}
-
-.mdbc-canvas-chat-context-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 6px 10px;
   border-bottom: 0.5px solid var(--m-sep);
 }
 
-.mdbc-canvas-chat-context-title {
-  font-size: var(--m-fs-sm);
-  font-weight: 600;
+.mdbc-canvas-chat-context-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 0;
+  background: transparent;
   color: var(--m-fg-2);
+  font-size: var(--m-fs-xs);
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+}
+
+.mdbc-canvas-chat-context-toggle:hover {
+  color: var(--m-fg);
 }
 
 .mdbc-canvas-chat-context-body {
-  flex: 1;
-  min-height: 0;
+  max-height: 200px;
   overflow: auto;
   margin: 0;
-  padding: 10px;
+  padding: 0 10px 10px;
   font-family: var(--m-font-mono);
   font-size: var(--m-fs-xs);
   line-height: 1.5;
