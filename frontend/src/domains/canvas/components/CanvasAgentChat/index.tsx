@@ -32,8 +32,7 @@ function CanvasAgentChat({ tab }: CanvasAgentChatProps) {
 
   return (
     <div className="mdbc-agent-pane">
-      <div className="mdbc-pane-header">
-        <span className="mdbc-pane-title">AGENT</span>
+      <div className="mdbc-canvas-chat-toolbar">
         <AgentProviderSelect />
         {resultOptions.length > 0 ? (
           <div className="mdbc-canvas-chat-addresults">

@@ -106,7 +106,9 @@ import DocTable from "../../components/docs/DocTable/DocTable.astro";
   <h2 id="agent">Building with the agent</h2>
 
   <p>
-    The <strong>Agent</strong> panel runs down the left of the board. Type a request, for example
+    The <strong>Agent</strong> panel lives in the app's left sidebar while a board is open; show or
+    hide it with its toggle in the status bar (the canvas pane toggles appear only on a canvas tab).
+    Type a request, for example
     <em>"monthly sales by category"</em>, and the agent reads the connection's schema and replies
     with a set of objects to add. A typical answer is a query object (the SQL that aggregates your
     data), a chart object bound to it, and a short text summary. Arris places the new objects on the
@@ -158,7 +160,7 @@ import DocTable from "../../components/docs/DocTable/DocTable.astro";
   <ul>
     <li><strong>Add</strong> objects from the toolbar at the bottom of the board: a query, chart, sticky note, text, or shape. Tools with a caret have options (the shape kind, the query language, the pointer mode): clicking the tool applies its last-used option and opens the menu at the same time, so switching to another option is one more click. The caret alone just toggles the menu.</li>
     <li><strong>Select</strong> an object with a single click; its resize anchors stay shown until you click an empty part of the board.</li>
-    <li><strong>Adjust properties</strong> in the panel that opens on the right while one object is selected. Every object shows its position, size, and a lock toggle; below that each kind has its own controls (a shape's fill, stroke, and corner radius; a text block's font size, weight, alignment, and colour; a sticky note's tint; a query's title, connection, and Run; a chart's source query plus the full chart
+    <li><strong>Adjust properties</strong> in the <strong>Properties</strong> pane in the right sidebar (toggle it from the status bar); it shows the controls for the selected object. Every object shows its position, size, and a lock toggle; below that each kind has its own controls (a shape's fill, stroke, and corner radius; a text block's font size, weight, alignment, and colour; a sticky note's tint; a query's title, connection, and Run; a chart's source query plus the full chart
       editor: type, axes, series, aggregation, colours, legend, and labels, the same
       control surface as the results-view chart editor).</li>
     <li><strong>Move</strong> an object by dragging it; objects may overlap. Text and sticky notes move on a single drag and open for editing on double-click. Switch the pointer to the <strong>Hand</strong> tool to pan the board from anywhere instead of dragging objects.</li>

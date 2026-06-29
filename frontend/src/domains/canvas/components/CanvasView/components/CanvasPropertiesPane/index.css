@@ -1,10 +1,18 @@
-/* The canvas properties pane: a fixed-width right rail shown while one object is
-   selected. Reuses the shared pane chrome (mdbc-pane right + header/body). */
+/* The canvas properties pane content. The shell right rail (RightPane) provides
+   the `.mdbc-pane right` frame, so this is the header + body column inside it. */
 .mdbc-canvas-props {
-  /* Fills its resizable Panel; the divider sets the width. */
+  display: flex;
+  flex-direction: column;
   width: 100%;
   height: 100%;
-  z-index: 5;
+  min-height: 0;
+}
+
+/* Empty state shown in the inspector when no object is selected. */
+.mdbc-canvas-props-empty {
+  padding: 12px 10px;
+  font-size: var(--m-fs-xs);
+  color: var(--m-fg-3);
 }
 
 /* Two-column grid for the X/Y/W/H geometry fields. */

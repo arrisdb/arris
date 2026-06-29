@@ -14,17 +14,23 @@ export function StatusBar() {
     agentPanelOpen,
     bgLabel,
     canChart,
+    canvasActive,
+    canvasAgentOpen,
+    canvasPropsOpen,
     chartEditorOpen,
     connectionsOpen,
     key,
     leftRailItems,
     leftVisible,
     onClickAgentPanel,
+    onClickCanvasAgent,
+    onClickCanvasProps,
     onClickChartEditor,
     onClickConnections,
     onClickLeftRail,
     onClickPinnedQueries,
     pinnedQueriesOpen,
+    rightVisible,
     tab,
   } = useStatusBar();
 
@@ -54,6 +60,21 @@ export function StatusBar() {
             </button>
           </Tooltip>
         ))}
+        {canvasActive && (
+          <Tooltip label="Canvas Agent">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={canvasAgentOpen && leftVisible}
+              aria-label="Canvas Agent"
+              onClick={onClickCanvasAgent}
+              className={`mdbc-status-btn${canvasAgentOpen && leftVisible ? " on" : ""}`}
+              data-testid="status-rail-canvas-agent"
+            >
+              <Icon name={STATUS_BAR_ICONS.canvasAgent} size={14} />
+            </button>
+          </Tooltip>
+        )}
       </span>
       {bgLabel && (
         <span className="mdbc-status-activity" data-testid="status-activity">
@@ -62,6 +83,21 @@ export function StatusBar() {
         </span>
       )}
       <span className="mdbc-status-rail mdbc-status-rail-right">
+        {canvasActive && (
+          <Tooltip label="Canvas Properties">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={canvasPropsOpen && rightVisible}
+              aria-label="Canvas Properties"
+              onClick={onClickCanvasProps}
+              className={`mdbc-status-btn${canvasPropsOpen && rightVisible ? " on" : ""}`}
+              data-testid="status-rail-canvas-props"
+            >
+              <Icon name={STATUS_BAR_ICONS.canvasProps} size={14} />
+            </button>
+          </Tooltip>
+        )}
         <Tooltip label="Chart Editor" shortcut={key(RIGHT_RAIL_ACTIONS.chartEditor)}>
           <button
             type="button"
