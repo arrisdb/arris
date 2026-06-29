@@ -312,6 +312,21 @@ impl AgentEngine {
              - Do not invent ids you have not defined or seen on the board. \
              Positions/sizes are optional (the client lays objects out). Emit \
              nothing after the closing fence.\n\n\
+             # Asking the user\n\
+             You never receive the ROW DATA a query returned, only the schema and \
+             the board summary. If you cannot complete the request without input \
+             only the user can give (most commonly those rows), ASK instead of \
+             guessing. To ask, reply with ONE fenced block tagged `arris-ask` \
+             containing a single JSON object with a `type` field, and emit NO \
+             `arris-canvas` block in that turn (you are waiting for the answer). \
+             Supported question types:\n\
+             ```arris-ask\n\
+             {{ \"type\": \"share_results\", \"queryIds\": [\"q1\"], \"reason\": \"<one short sentence>\" }}\n\
+             ```\n\
+             - `share_results`: request the rows of one or more existing query \
+             objects (by their board ids) so you can summarize or build on them. \
+             The user approves (the rows arrive in the next message) or declines. \
+             Only ask for results you actually need.\n\n\
              # Request\n\
              {user_prompt}\n",
         )
@@ -624,6 +639,10 @@ mod tests {
         // The agent is explicitly told it may move an existing query to another
         // connection by re-emitting it by id with a new connectionId.
         assert!(prompt.contains("MOVE an existing query"));
+        // The agent can ASK the user for data it cannot see (the question
+        // abstraction), with share_results as the first question type.
+        assert!(prompt.contains("arris-ask"));
+        assert!(prompt.contains("share_results"));
         assert!(!prompt.contains("return exactly one ```sql fenced block"));
     }
 
