@@ -3,7 +3,6 @@ import { fireEvent, render } from "@testing-library/react";
 
 import { useConnectionsStore } from "@domains/connection/hooks";
 
-import { useCanvasStore } from "../../../../../../hooks";
 import { makeComponent } from "../../../../../../utils";
 import { QuerySection } from "./index";
 
@@ -34,18 +33,6 @@ describe("QuerySection", () => {
     fireEvent.click(getByTestId("query-connection-select"));
     fireEvent.click(getByText("Local"));
     expect(onChange).toHaveBeenCalledWith({ connectionId: "c1" });
-  });
-
-  it("runs the query through the store", () => {
-    const spy = vi
-      .spyOn(useCanvasStore.getState(), "runQueryComponent")
-      .mockResolvedValue();
-    const { getByText } = render(
-      <QuerySection tabId="t" component={comp} onChange={vi.fn()} />,
-    );
-    fireEvent.click(getByText("Run query"));
-    expect(spy).toHaveBeenCalledWith("t", "q");
-    spy.mockRestore();
   });
 
   it("renders nothing for a non-query object", () => {

@@ -9,7 +9,8 @@ import type {
   QueryRunState,
   ReorderOp,
 } from "../types";
-import { genId, parseDoc, planAgentChanges } from "../utils";
+import { DEFAULT_SIZE, LAYOUT_GAP } from "../constants";
+import { genId, makeComponent, makeEdge, parseDoc, planAgentChanges } from "../utils";
 import { runCanvasQueryIPC } from "../ipc";
 
 interface BoardState {
@@ -97,6 +98,39 @@ function restack(
     [order[i], order[i - 1]] = [order[i - 1], order[i]];
   const zById = new Map(order.map((c, idx) => [c.id, idx]));
   return components.map((c) => ({ ...c, z: zById.get(c.id) ?? c.z }));
+}
+
+/// Place a preview table to the right of a query the first time it runs, bound by
+/// `sourceQueryId` and joined with an arrow, so the user sees the rows without
+/// adding a table object by hand. No-op once any table is already bound to the
+/// query (so a second run never piles on duplicates).
+function withPreviewTable(doc: CanvasDoc, queryId: string): CanvasDoc {
+  const query = doc.components.find((c) => c.id === queryId);
+  if (!query || query.kind !== "query") return doc;
+  // Skip if the query already has a viewer (a table OR a chart) bound to it: the
+  // user added one, or the agent built a chart for it, so don't pile on a table.
+  const hasViewer = doc.components.some(
+    (c) =>
+      (c.kind === "table" || c.kind === "chart") && c.sourceQueryId === queryId,
+  );
+  if (hasViewer) return doc;
+  const maxZ = doc.components.reduce((m, c) => Math.max(m, c.z), 0);
+  const size = DEFAULT_SIZE.table;
+  const table = makeComponent({
+    kind: "table",
+    sourceQueryId: queryId,
+    x: query.x + query.w + LAYOUT_GAP,
+    y: query.y,
+    w: size.w,
+    h: size.h,
+    z: maxZ + 1,
+    title: query.title ? `${query.title} results` : "Results",
+  });
+  return {
+    ...doc,
+    components: [...doc.components, table],
+    edges: [...doc.edges, makeEdge(queryId, table.id)],
+  };
 }
 
 /// Replace the doc of one board, leaving its runtime results in place.
@@ -316,6 +350,9 @@ const useCanvasStore = create<CanvasStore>((set, get) => ({
     try {
       const result = await runCanvasQueryIPC(comp.connectionId, comp.sql);
       get().setRun(tabId, id, { running: false, result });
+      // First successful run auto-adds a preview table (with an arrow) bound to
+      // this query, so the rows show without the user creating one by hand.
+      set((s) => ({ boards: withDoc(s.boards, tabId, (doc) => withPreviewTable(doc, id)) }));
     } catch (e) {
       get().setRun(tabId, id, { running: false, error: errToString(e) });
     }
