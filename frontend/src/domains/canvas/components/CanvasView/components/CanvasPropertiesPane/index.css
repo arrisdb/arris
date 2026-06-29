@@ -1,8 +1,9 @@
 /* The canvas properties pane: a fixed-width right rail shown while one object is
    selected. Reuses the shared pane chrome (mdbc-pane right + header/body). */
 .mdbc-canvas-props {
-  width: 232px;
-  flex: 0 0 232px;
+  /* Fills its resizable Panel; the divider sets the width. */
+  width: 100%;
+  height: 100%;
   z-index: 5;
 }
 
