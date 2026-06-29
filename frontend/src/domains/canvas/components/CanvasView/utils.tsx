@@ -1,5 +1,6 @@
 import type { ComponentType } from "react";
-import type { Edge, Node, NodeProps, NodeTypes } from "reactflow";
+import { Handle, MarkerType, Position } from "reactflow";
+import type { Edge, EdgeTypes, Node, NodeProps, NodeTypes } from "reactflow";
 import type { ContextMenuItem } from "@shared/ui/ContextMenu";
 
 import type {
@@ -9,6 +10,7 @@ import type {
   ReorderOp,
 } from "../../types";
 import { ChartNode } from "./components/ChartNode";
+import { FloatingEdge } from "./components/FloatingEdge";
 import { NodeBoundary } from "./components/NodeBoundary";
 import { QueryNode } from "./components/QueryNode";
 import { ShapeNode } from "./components/ShapeNode";
@@ -16,17 +18,37 @@ import { StickyNode } from "./components/StickyNode";
 import { TextNode } from "./components/TextNode";
 import type { CanvasNodeData } from "./types";
 
+/// The relationship-arrow colour (matches the accent), used for both the line and
+/// its arrowhead marker. A concrete colour so the SVG marker resolves it.
+const ARROW_COLOR = "rgb(124 140 255)";
+
 /// Wrap a node renderer in the per-object error boundary so a render error in one
 /// object (e.g. a chart fed a malformed spec) is contained to that object instead
-/// of crashing the whole board.
+/// of crashing the whole board. Two hidden, non-interactive handles give every
+/// object an endpoint a relationship arrow can attach to; the floating edge then
+/// routes the visible line to the object's border, not to these handles.
 function withNodeBoundary(
   NodeComponent: ComponentType<NodeProps<CanvasNodeData>>,
 ): ComponentType<NodeProps<CanvasNodeData>> {
   function BoundedNode(props: NodeProps<CanvasNodeData>) {
     return (
-      <NodeBoundary>
-        <NodeComponent {...props} />
-      </NodeBoundary>
+      <>
+        <Handle
+          type="target"
+          position={Position.Left}
+          isConnectable={false}
+          className="mdbc-canvas-node-handle"
+        />
+        <Handle
+          type="source"
+          position={Position.Right}
+          isConnectable={false}
+          className="mdbc-canvas-node-handle"
+        />
+        <NodeBoundary>
+          <NodeComponent {...props} />
+        </NodeBoundary>
+      </>
     );
   }
   return BoundedNode;
@@ -53,6 +75,7 @@ const nodeTypes: NodeTypes = {
 function toFlowNodes(
   components: CanvasComponent[],
   tabId: string,
+  connectingId?: string | null,
 ): Node<CanvasNodeData>[] {
   return components.map((c) => ({
     id: c.id,
@@ -61,17 +84,30 @@ function toFlowNodes(
     data: { tabId },
     // A locked object can't be dragged (the resizer self-hides too).
     draggable: !c.locked,
+    // The pending source object is highlighted while choosing an arrow's target.
+    className: c.id === connectingId ? "mdbc-connect-source" : undefined,
     style: { width: c.w, height: c.h, zIndex: c.z },
   }));
 }
 
+/// Map board arrows to ReactFlow edges: a floating edge that anchors to each
+/// object's border, with an arrowhead at the target end.
 function toFlowEdges(edges: CanvasEdge[]): Edge[] {
   return edges.map((e) => ({
     id: e.id,
     source: e.source,
     target: e.target,
+    type: "floating",
+    markerEnd: { type: MarkerType.ArrowClosed, width: 16, height: 16, color: ARROW_COLOR },
+    style: { stroke: ARROW_COLOR, strokeWidth: 1.5 },
   }));
 }
+
+/// The ReactFlow edge-renderer registry: relationship arrows render as floating
+/// edges (border-anchored, orthogonal, arrowheaded).
+const edgeTypes: EdgeTypes = {
+  floating: FloatingEdge,
+};
 
 /// The object-actions a node context menu invokes, bound to the owning tab.
 interface NodeMenuActions {
@@ -104,11 +140,34 @@ function buildNodeMenuItems(
   ];
 }
 
+/// The actions an arrow's right-click menu invokes.
+interface EdgeMenuActions {
+  remove: (id: string) => void;
+}
+
+/// Build the right-click menu for a relationship arrow: a single Delete.
+function buildEdgeMenuItems(
+  edgeId: string,
+  actions: EdgeMenuActions,
+): ContextMenuItem[] {
+  return [
+    {
+      id: "delete",
+      label: "Delete arrow",
+      shortcut: "⌫",
+      testId: "canvas-edge-menu-delete",
+      action: () => actions.remove(edgeId),
+    },
+  ];
+}
+
 export {
+  buildEdgeMenuItems,
   buildNodeMenuItems,
   COMPONENT_KINDS,
+  edgeTypes,
   nodeTypes,
   toFlowEdges,
   toFlowNodes,
 };
-export type { NodeMenuActions };
+export type { EdgeMenuActions, NodeMenuActions };

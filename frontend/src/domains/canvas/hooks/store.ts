@@ -42,6 +42,11 @@ interface CanvasStore {
   /// Restack an object relative to its peers (Bring to front / forward, etc.).
   reorderComponent: (tabId: string, id: string, op: ReorderOp) => void;
   setEdges: (tabId: string, edges: CanvasEdge[]) => void;
+  /// Connect two objects with a directed arrow (the user draws relationships in
+  /// connect mode). No-op for a self-link or a duplicate of an existing arrow.
+  addEdge: (tabId: string, source: string, target: string) => void;
+  /// Remove arrows by id (deleting one from its right-click menu).
+  removeEdges: (tabId: string, ids: string[]) => void;
   setViewport: (tabId: string, viewport: CanvasViewport) => void;
   /// Set the connections the agent may use for this board (persisted in the doc).
   /// The first id is the board's primary connection (the default for new query
@@ -205,6 +210,34 @@ const useCanvasStore = create<CanvasStore>((set, get) => ({
     set((s) => ({
       boards: withDoc(s.boards, tabId, (doc) => ({ ...doc, connectionIds: ids })),
     })),
+
+  addEdge: (tabId, source, target) =>
+    set((s) => {
+      const board = s.boards[tabId];
+      if (!board || source === target) return s;
+      const exists = board.doc.edges.some(
+        (e) => e.source === source && e.target === target,
+      );
+      if (exists) return s;
+      const edge: CanvasEdge = { id: genId("edge"), source, target };
+      return {
+        boards: withDoc(s.boards, tabId, (doc) => ({
+          ...doc,
+          edges: [...doc.edges, edge],
+        })),
+      };
+    }),
+
+  removeEdges: (tabId, ids) =>
+    set((s) => {
+      const drop = new Set(ids);
+      return {
+        boards: withDoc(s.boards, tabId, (doc) => ({
+          ...doc,
+          edges: doc.edges.filter((e) => !drop.has(e.id)),
+        })),
+      };
+    }),
 
   applyAgentSpec: (tabId, spec, connectionId) => {
     const board = get().boards[tabId];

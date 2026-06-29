@@ -47,13 +47,14 @@ function CanvasToolbar({
   const tools: Tool[] = [
     {
       id: "select",
-      icon: mode === "hand" ? "hand" : "mousePointer",
+      icon: mode === "hand" ? "hand" : mode === "connect" ? "arrowRight" : "mousePointer",
       title: "Select",
       active: true,
       onClick: () => onModeChange("move"),
       menu: [
         { id: "move", label: "Move", icon: "mousePointer", shortcut: "V", active: mode === "move", onSelect: () => onModeChange("move") },
         { id: "hand", label: "Hand tool", icon: "hand", shortcut: "H", active: mode === "hand", onSelect: () => onModeChange("hand") },
+        { id: "connect", label: "Arrow / connect", icon: "arrowRight", shortcut: "A", active: mode === "connect", onSelect: () => onModeChange("connect") },
       ],
     },
     {
