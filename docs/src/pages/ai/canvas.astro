@@ -89,7 +89,11 @@ import DocTable from "../../components/docs/DocTable/DocTable.astro";
       </tr>
       <tr>
         <td class="font-medium text-fg">Shape</td>
-        <td>A rectangle, ellipse, or line for grouping and annotation.</td>
+        <td>
+          A rectangle, ellipse, or line for grouping and annotation. Rectangles and
+          ellipses hold optional centered text (double-click to add it), and a rectangle's
+          corners can be rounded by dragging its radius handle.
+        </td>
       </tr>
     </tbody>
   </DocTable>
@@ -123,7 +127,8 @@ import DocTable from "../../components/docs/DocTable/DocTable.astro";
     <li><strong>Add</strong> objects from the toolbar at the bottom of the board: a query, chart, sticky note, text, or shape. Tools with a caret open a small menu of options (the shape kind, the query language, the pointer mode).</li>
     <li><strong>Select</strong> an object with a single click; its resize anchors stay shown until you click an empty part of the board.</li>
     <li><strong>Move</strong> an object by dragging it; objects may overlap. Text and sticky notes move on a single drag and open for editing on double-click. Switch the pointer to the <strong>Hand</strong> tool to pan the board from anywhere instead of dragging objects.</li>
-    <li><strong>Resize</strong> a selected object by dragging any of its borders or corners.</li>
+    <li><strong>Resize</strong> a selected object by dragging any of its borders or corner handles.</li>
+    <li><strong>Reorder, copy, and lock</strong> from an object's right-click menu: Copy duplicates it, the four restacking actions (Bring to front, Bring forward, Send backward, Send to back) change its overlap order, and Lock freezes it (a locked object can't be moved or resized until you unlock it).</li>
     <li><strong>Pan</strong> by dragging the empty canvas, and <strong>zoom</strong> with the scroll wheel or the controls in the corner.</li>
     <li><strong>Delete</strong> a selected object with <kbd>Delete</kbd> or <kbd>Backspace</kbd>.</li>
     <li><strong>Run</strong> a query object at any time with its Run button to refresh the charts bound to it.</li>

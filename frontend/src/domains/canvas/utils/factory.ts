@@ -32,6 +32,7 @@ interface ComponentInput {
   spec?: ChartSpec;
   // shape
   shape?: ShapeKind;
+  radius?: number;
 }
 
 let seq = 0;
@@ -100,7 +101,14 @@ function makeComponent(input: ComponentInput): CanvasComponent {
         title: input.title,
       };
     case "shape":
-      return { id, kind: "shape", ...geom, shape: input.shape ?? "rect" };
+      return {
+        id,
+        kind: "shape",
+        ...geom,
+        shape: input.shape ?? "rect",
+        radius: input.radius ?? 0,
+        text: input.text ?? "",
+      };
   }
 }
 

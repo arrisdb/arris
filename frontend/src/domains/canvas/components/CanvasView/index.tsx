@@ -1,12 +1,16 @@
 import ReactFlow, { Background, Controls } from "reactflow";
+import type { Node } from "reactflow";
+import type { MouseEvent as ReactMouseEvent } from "react";
 import "reactflow/dist/style.css";
 import "./index.css";
+
+import { ContextMenu, useContextMenu } from "@shared/ui/ContextMenu";
 
 import { CanvasAgentChat } from "../CanvasAgentChat";
 import { CanvasToolbar } from "./components/CanvasToolbar";
 import { useCanvas } from "./hooks";
 import type { CanvasViewProps } from "./types";
-import { nodeTypes } from "./utils";
+import { buildNodeMenuItems, nodeTypes } from "./utils";
 
 /// The canvas thinkboard tab view: an infinite ReactFlow board of objects
 /// (text/query/chart/shape) plus a floating add-toolbar. The agent chat panel is
@@ -14,6 +18,13 @@ import { nodeTypes } from "./utils";
 function CanvasView({ activeTab }: CanvasViewProps) {
   const canvas = useCanvas(activeTab);
   const handMode = canvas.mode === "hand";
+  const menu = useContextMenu<string>();
+
+  const onNodeContextMenu = (event: ReactMouseEvent, node: Node) =>
+    menu.open(event, node.id);
+
+  const menuComponent = menu.state ? canvas.componentById(menu.state.context) : undefined;
+
   return (
     <div className="mdbc-canvas-view">
       <CanvasAgentChat tab={activeTab} />
@@ -25,6 +36,7 @@ function CanvasView({ activeTab }: CanvasViewProps) {
           onNodesChange={canvas.onNodesChange}
           onNodeDragStop={canvas.onNodeDragStop}
           onNodesDelete={canvas.onNodesDelete}
+          onNodeContextMenu={onNodeContextMenu}
           onMoveEnd={canvas.onMoveEnd}
           defaultViewport={canvas.defaultViewport}
           minZoom={0.2}
@@ -47,6 +59,19 @@ function CanvasView({ activeTab }: CanvasViewProps) {
           onAddShape={canvas.addShape}
         />
       </div>
+      {menu.state && menuComponent && (
+        <ContextMenu
+          x={menu.state.x}
+          y={menu.state.y}
+          items={buildNodeMenuItems(menuComponent, {
+            duplicate: canvas.duplicate,
+            reorder: canvas.reorder,
+            toggleLock: canvas.toggleLock,
+          })}
+          onClose={menu.close}
+          data-testid="canvas-node-menu"
+        />
+      )}
     </div>
   );
 }

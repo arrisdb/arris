@@ -22,10 +22,15 @@ interface CanvasResizerProps {
 /// every object kind resizes identically.
 function CanvasResizerImpl({ tabId, id, visible }: CanvasResizerProps) {
   const updateComponent = useCanvasStore((s) => s.updateComponent);
+  // A locked object never shows resize handles (and isn't draggable), so it
+  // can't be reshaped until it's unlocked from the context menu.
+  const locked = useCanvasStore(
+    (s) => s.boards[tabId]?.doc.components.find((c) => c.id === id)?.locked ?? false,
+  );
   return (
     <NodeResizer
       nodeId={id}
-      isVisible={visible}
+      isVisible={visible && !locked}
       minWidth={MIN_W}
       minHeight={MIN_H}
       lineClassName="mdbc-canvas-resize-line"

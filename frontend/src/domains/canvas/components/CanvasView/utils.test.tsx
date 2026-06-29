@@ -1,7 +1,13 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { makeComponent } from "../../utils";
-import { COMPONENT_KINDS, nodeTypes, toFlowEdges, toFlowNodes } from "./utils";
+import {
+  buildNodeMenuItems,
+  COMPONENT_KINDS,
+  nodeTypes,
+  toFlowEdges,
+  toFlowNodes,
+} from "./utils";
 
 describe("nodeTypes registry", () => {
   it("has exactly one renderer per component kind (expansion guard)", () => {
@@ -22,8 +28,57 @@ describe("toFlowNodes", () => {
       type: "text",
       position: { x: 10, y: 20 },
       data: { tabId: "tab-1" },
+      draggable: true,
       style: { width: 30, height: 40, zIndex: 2 },
     });
+  });
+
+  it("marks a locked object as not draggable", () => {
+    const c = makeComponent({ kind: "shape", id: "s", shape: "rect" });
+    const [node] = toFlowNodes([{ ...c, locked: true }], "tab-1");
+    expect(node.draggable).toBe(false);
+  });
+});
+
+describe("buildNodeMenuItems", () => {
+  const actions = { duplicate: vi.fn(), reorder: vi.fn(), toggleLock: vi.fn() };
+
+  it("offers copy, the four restacking steps, and a lock toggle", () => {
+    const c = makeComponent({ kind: "shape", id: "s", shape: "rect" });
+    const labels = buildNodeMenuItems(c, actions).flatMap((i) =>
+      i.kind === "separator" ? [] : [i.label],
+    );
+    expect(labels).toEqual([
+      "Copy",
+      "Bring to front",
+      "Bring forward",
+      "Send backward",
+      "Send to back",
+      "Lock",
+    ]);
+  });
+
+  it("labels the lock item 'Unlock' for a locked object", () => {
+    const c = makeComponent({ kind: "shape", id: "s", shape: "rect" });
+    const item = buildNodeMenuItems({ ...c, locked: true }, actions).find(
+      (i) => i.kind !== "separator" && i.id === "lock",
+    );
+    expect(item && item.kind !== "separator" ? item.label : "").toBe("Unlock");
+  });
+
+  it("wires each action to the object id", () => {
+    const c = makeComponent({ kind: "shape", id: "s", shape: "rect" });
+    const items = buildNodeMenuItems(c, actions);
+    const run = (id: string) => {
+      const item = items.find((i) => i.kind !== "separator" && i.id === id);
+      if (item && item.kind !== "separator") item.action();
+    };
+    run("copy");
+    run("front");
+    run("lock");
+    expect(actions.duplicate).toHaveBeenCalledWith("s");
+    expect(actions.reorder).toHaveBeenCalledWith("s", "front");
+    expect(actions.toggleLock).toHaveBeenCalledWith("s");
   });
 });
 

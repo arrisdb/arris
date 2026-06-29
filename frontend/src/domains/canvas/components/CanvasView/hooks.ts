@@ -7,7 +7,7 @@ import type { EditorTab } from "@shell/types";
 
 import { CANVAS_SAVE_DEBOUNCE_MS, LAYOUT_ORIGIN } from "../../constants";
 import { useCanvasStore } from "../../hooks";
-import type { CanvasComponent, CanvasEdge, ShapeKind } from "../../types";
+import type { CanvasComponent, CanvasEdge, ReorderOp, ShapeKind } from "../../types";
 import { makeComponent, serializeDoc } from "../../utils";
 import type { CanvasMode, CanvasNodeData } from "./types";
 import { toFlowEdges, toFlowNodes } from "./utils";
@@ -27,6 +27,8 @@ function useCanvas(tab: EditorTab) {
   const addComponent = useCanvasStore((s) => s.addComponent);
   const updateComponent = useCanvasStore((s) => s.updateComponent);
   const removeComponent = useCanvasStore((s) => s.removeComponent);
+  const duplicateComponent = useCanvasStore((s) => s.duplicateComponent);
+  const reorderComponent = useCanvasStore((s) => s.reorderComponent);
   const setViewport = useCanvasStore((s) => s.setViewport);
 
   // Parse the tab's text into a board exactly once (a re-mount is a no-op).
@@ -93,6 +95,27 @@ function useCanvas(tab: EditorTab) {
   const onMoveEnd = useCallback(
     (_event: unknown, viewport: Viewport) => setViewport(tabId, viewport),
     [tabId, setViewport],
+  );
+
+  // Context-menu object actions, bound to this board.
+  const duplicate = useCallback(
+    (id: string) => duplicateComponent(tabId, id),
+    [duplicateComponent, tabId],
+  );
+  const reorder = useCallback(
+    (id: string, op: ReorderOp) => reorderComponent(tabId, id, op),
+    [reorderComponent, tabId],
+  );
+  const toggleLock = useCallback(
+    (id: string) => {
+      const comp = components.find((c) => c.id === id);
+      if (comp) updateComponent(tabId, id, { locked: !comp.locked });
+    },
+    [components, updateComponent, tabId],
+  );
+  const componentById = useCallback(
+    (id: string) => components.find((c) => c.id === id),
+    [components],
   );
 
   // The active pointer tool. `move` drags objects; `hand` pans the board.
@@ -166,6 +189,10 @@ function useCanvas(tab: EditorTab) {
     addShape,
     addQuery,
     addChart,
+    duplicate,
+    reorder,
+    toggleLock,
+    componentById,
   };
 }
 

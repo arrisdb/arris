@@ -148,11 +148,11 @@
 }
 
 .mdbc-canvas-resize-handle {
-  width: 11px;
-  height: 11px;
-  border-radius: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
   background: #fff;
-  border: 1.5px solid var(--m-accent);
+  border: 2px solid var(--m-accent);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
 }
 
@@ -352,4 +352,66 @@
 
 .mdbc-canvas-shape {
   overflow: visible;
+  position: relative;
+  align-items: center;
+  justify-content: center;
+}
+
+/* The shape's label, vertically + horizontally centered. Idle it is a plain div
+   with no pointer events, so a single click falls through to select + drag the
+   shape; double-click swaps it for the editing textarea below. The "Add text"
+   hint is only rendered while the shape is selected. */
+.mdbc-canvas-shape-label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 8px;
+  color: var(--m-fg);
+  font-family: var(--m-font);
+  font-size: var(--m-fs-md);
+  line-height: 1.4;
+  white-space: pre-wrap;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.mdbc-canvas-shape-label.placeholder {
+  color: var(--m-fg-3);
+}
+
+/* The editing textarea, centered over the shape while the label is being typed. */
+.mdbc-canvas-shape-text {
+  width: 100%;
+  height: 100%;
+  resize: none;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--m-fg);
+  font-family: var(--m-font);
+  font-size: var(--m-fs-md);
+  line-height: 1.4;
+  padding: 8px;
+  text-align: center;
+}
+
+/* The corner-radius handle: a small accent dot that rides a rectangle's top
+   edge; drag it horizontally to round the corners. Sized like the corner
+   resize handles so the controls read as one family. */
+.mdbc-canvas-radius-handle {
+  position: absolute;
+  top: 0;
+  left: var(--radius-handle-x);
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid var(--m-accent);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  transform: translate(-50%, -50%);
+  cursor: ew-resize;
+  z-index: 11;
 }

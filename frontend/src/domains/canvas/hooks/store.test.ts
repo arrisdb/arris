@@ -70,6 +70,48 @@ describe("useCanvasStore", () => {
     expect(get().boards[TAB].doc.edges).toHaveLength(1);
   });
 
+  it("duplicateComponent clones with a new id, an offset, and raised z", () => {
+    get().ensureBoard(TAB, "");
+    get().addComponent(
+      TAB,
+      makeComponent({ kind: "shape", id: "s", shape: "rect", x: 10, y: 20, z: 0 }),
+    );
+    get().duplicateComponent(TAB, "s");
+    const comps = get().boards[TAB].doc.components;
+    expect(comps).toHaveLength(2);
+    const clone = comps[1];
+    expect(clone.id).not.toBe("s");
+    expect(clone).toMatchObject({ kind: "shape", x: 34, y: 44 });
+    expect(clone.z).toBeGreaterThan(comps[0].z);
+  });
+
+  it("reorderComponent restacks objects by z", () => {
+    get().ensureBoard(TAB, "");
+    get().addComponent(TAB, makeComponent({ kind: "shape", id: "a", shape: "rect", z: 0 }));
+    get().addComponent(TAB, makeComponent({ kind: "shape", id: "b", shape: "rect", z: 1 }));
+    get().addComponent(TAB, makeComponent({ kind: "shape", id: "c", shape: "rect", z: 2 }));
+    const zOf = (id: string) =>
+      get().boards[TAB].doc.components.find((x) => x.id === id)!.z;
+
+    get().reorderComponent(TAB, "a", "front");
+    expect(zOf("a")).toBeGreaterThan(zOf("b"));
+    expect(zOf("a")).toBeGreaterThan(zOf("c"));
+
+    get().reorderComponent(TAB, "a", "back");
+    expect(zOf("a")).toBeLessThan(zOf("b"));
+
+    // Forward swaps with the immediate neighbour above.
+    get().reorderComponent(TAB, "a", "forward");
+    expect(zOf("a")).toBe(1);
+  });
+
+  it("updateComponent toggles the locked flag", () => {
+    get().ensureBoard(TAB, "");
+    get().addComponent(TAB, makeComponent({ kind: "shape", id: "s", shape: "rect" }));
+    get().updateComponent(TAB, "s", { locked: true });
+    expect(get().boards[TAB].doc.components[0].locked).toBe(true);
+  });
+
   it("runQueryComponent stores the result on success", async () => {
     vi.mocked(runCanvasQueryIPC).mockResolvedValue({ columns: [], rows: [], elapsed: 1 });
     get().ensureBoard(TAB, "");

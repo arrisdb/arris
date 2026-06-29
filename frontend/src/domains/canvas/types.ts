@@ -27,6 +27,8 @@ interface ShapeStyle {
 }
 
 /// Geometry shared by every object: canvas-space position, size, and z-order.
+/// `locked` freezes the object: it can't be dragged or resized (still selectable
+/// so it can be unlocked from the context menu).
 interface BaseComponent {
   id: string;
   kind: ComponentKind;
@@ -35,7 +37,11 @@ interface BaseComponent {
   w: number;
   h: number;
   z: number;
+  locked?: boolean;
 }
+
+/// One step of restacking an object relative to its peers.
+type ReorderOp = "front" | "forward" | "backward" | "back";
 
 interface TextComponent extends BaseComponent {
   kind: "text";
@@ -72,6 +78,11 @@ interface ChartComponent extends BaseComponent {
 interface ShapeComponent extends BaseComponent {
   kind: "shape";
   shape: ShapeKind;
+  /// Corner radius in px (rectangles only; 0 = square corners). Adjusted by the
+  /// radius handle shown when the shape is selected.
+  radius?: number;
+  /// Optional centered label (Figma puts editable text inside a shape).
+  text?: string;
   style?: ShapeStyle;
 }
 
@@ -153,6 +164,7 @@ export type {
   ComponentKind,
   QueryComponent,
   QueryRunState,
+  ReorderOp,
   ShapeComponent,
   ShapeKind,
   ShapeStyle,
