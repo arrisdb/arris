@@ -63,4 +63,28 @@ describe("TableNode", () => {
     renderNode("tbl");
     expect(screen.getByText("boom")).toBeTruthy();
   });
+
+  it("caps the rendered rows at the table's previewRows", () => {
+    const manyRows: QueryResult = {
+      columns: [{ name: "n", type: "number" }],
+      rows: Array.from({ length: 5 }, (_, i) => [{ kind: "int", value: i }]),
+    } as unknown as QueryResult;
+    useCanvasStore.setState({ boards: {} });
+    useCanvasStore.getState().ensureBoard(TAB, "");
+    useCanvasStore
+      .getState()
+      .addComponent(TAB, makeComponent({ kind: "table", id: "tbl", sourceQueryId: "q", previewRows: 2 }));
+    useCanvasStore.getState().setRun(TAB, "q", { result: manyRows });
+    renderNode("tbl");
+    // Header row + 2 capped body rows = 3 <tr>.
+    expect(document.querySelectorAll(".mdbc-canvas-result-table tr").length).toBe(3);
+  });
+
+  it("prompts to pick a source when the table is unbound", () => {
+    useCanvasStore.setState({ boards: {} });
+    useCanvasStore.getState().ensureBoard(TAB, "");
+    useCanvasStore.getState().addComponent(TAB, makeComponent({ kind: "table", id: "tbl" }));
+    renderNode("tbl");
+    expect(screen.getByText(/Pick a source query/)).toBeTruthy();
+  });
 });
