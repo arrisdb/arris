@@ -87,6 +87,7 @@ function CanvasView({ activeTab }: CanvasViewProps) {
               onAddSticky={canvas.addSticky}
               onAddText={canvas.addText}
               onAddShape={canvas.addShape}
+              onRunAll={canvas.runAll}
             />
           </div>
         </Panel>
