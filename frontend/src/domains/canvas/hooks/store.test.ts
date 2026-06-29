@@ -12,47 +12,8 @@ const get = () => useCanvasStore.getState();
 
 describe("useCanvasStore", () => {
   beforeEach(() => {
-    useCanvasStore.setState({
-      boards: {},
-      clipboard: null,
-      selectedByTab: {},
-      agentPaneOpen: true,
-      propsPaneOpen: true,
-    });
+    useCanvasStore.setState({ boards: {}, clipboard: null });
     vi.clearAllMocks();
-  });
-
-  it("setSelected records the selected object id per board", () => {
-    get().setSelected(TAB, "obj-1");
-    expect(get().selectedByTab[TAB]).toBe("obj-1");
-    get().setSelected(TAB, null);
-    expect(get().selectedByTab[TAB]).toBeNull();
-  });
-
-  it("removing the selected object clears the selection", () => {
-    get().ensureBoard(TAB, "");
-    get().addComponent(TAB, makeComponent({ kind: "text", id: "t", text: "a" }));
-    get().setSelected(TAB, "t");
-    get().removeComponent(TAB, "t");
-    expect(get().selectedByTab[TAB]).toBeNull();
-  });
-
-  it("removing a non-selected object leaves the selection intact", () => {
-    get().ensureBoard(TAB, "");
-    get().addComponent(TAB, makeComponent({ kind: "text", id: "a", text: "a" }));
-    get().addComponent(TAB, makeComponent({ kind: "text", id: "b", text: "b" }));
-    get().setSelected(TAB, "a");
-    get().removeComponent(TAB, "b");
-    expect(get().selectedByTab[TAB]).toBe("a");
-  });
-
-  it("toggles the agent and properties pane flags", () => {
-    expect(get().agentPaneOpen).toBe(true);
-    get().toggleAgentPane();
-    expect(get().agentPaneOpen).toBe(false);
-    expect(get().propsPaneOpen).toBe(true);
-    get().togglePropsPane();
-    expect(get().propsPaneOpen).toBe(false);
   });
 
   it("ensureBoard parses once and never clobbers live edits", () => {

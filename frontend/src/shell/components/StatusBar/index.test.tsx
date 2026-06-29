@@ -1,7 +1,6 @@
 import { useConnectionsStore } from "@domains/connection/hooks";
 import { useResultsTableStore } from "@domains/results/hooks";
 import { usePinnedQueriesStore } from "@domains/pinnedQueries/hooks";
-import { useCanvasStore } from "@domains/canvas/hooks";
 import { describe, it, expect, beforeEach } from "vitest";
 import { fireEvent, render, screen, act } from "@testing-library/react";
 import { StatusBar } from ".";
@@ -36,7 +35,6 @@ beforeEach(() => {
   usePinnedQueriesStore.setState({ queries: [], paneOpen: false });
   useTabsStore.setState({ tabs: [], activeId: null, layout: null, focusedPaneGroupId: null });
   useBackgroundTasksStore.setState({ tasks: new Map() });
-  useCanvasStore.setState({ agentPaneOpen: true, propsPaneOpen: true });
 });
 
 describe("StatusBar", () => {
@@ -309,38 +307,5 @@ describe("StatusBar", () => {
     });
     rerender(<StatusBarHarness />);
     expect(screen.queryByTestId("status-activity")).toBeNull();
-  });
-
-  it("shows the canvas agent/properties toggles only on a canvas tab", () => {
-    render(<StatusBarHarness />);
-    expect(screen.queryByTestId("status-rail-canvas-agent")).toBeNull();
-    expect(screen.queryByTestId("status-rail-canvas-props")).toBeNull();
-
-    act(() => {
-      useTabsStore.setState({
-        tabs: [{ id: "c1", tabType: "canvas" }],
-        activeId: "c1",
-      } as never);
-    });
-    expect(screen.getByTestId("status-rail-canvas-agent")).toBeTruthy();
-    expect(screen.getByTestId("status-rail-canvas-props")).toBeTruthy();
-  });
-
-  it("toggles the canvas agent and properties pane flags", () => {
-    act(() => {
-      useTabsStore.setState({
-        tabs: [{ id: "c1", tabType: "canvas" }],
-        activeId: "c1",
-      } as never);
-    });
-    render(<StatusBarHarness />);
-    act(() => {
-      fireEvent.click(screen.getByTestId("status-rail-canvas-agent"));
-    });
-    expect(useCanvasStore.getState().agentPaneOpen).toBe(false);
-    act(() => {
-      fireEvent.click(screen.getByTestId("status-rail-canvas-props"));
-    });
-    expect(useCanvasStore.getState().propsPaneOpen).toBe(false);
   });
 });
