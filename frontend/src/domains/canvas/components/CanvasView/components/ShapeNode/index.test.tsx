@@ -43,23 +43,27 @@ describe("ShapeNode", () => {
     expect(container.querySelector(".mdbc-canvas-shape")).toBeNull();
   });
 
-  it("shows the 'Add text' hint only while selected", () => {
+  it("offers the 'Add text' placeholder only while selected", () => {
     seed(makeComponent({ kind: "shape", id: "s", shape: "rect" }));
     const idle = renderNode("s", false);
-    expect(idle.queryByText("Add text")).toBeNull();
+    expect(
+      (idle.container.querySelector("textarea") as HTMLTextAreaElement).placeholder,
+    ).toBe("");
     idle.unmount();
     const selected = renderNode("s", true);
-    expect(selected.queryByText("Add text")).toBeTruthy();
+    expect(
+      (selected.container.querySelector("textarea") as HTMLTextAreaElement).placeholder,
+    ).toBe("Add text");
   });
 
-  it("swaps the label for an editable textarea on double-click", () => {
+  it("makes the label editable on double-click and writes typed text back", () => {
     seed(makeComponent({ kind: "shape", id: "s", shape: "rect" }));
     const { container } = renderNode("s", true);
-    // Idle: a label, no textarea (a single click falls through to select/drag).
-    expect(container.querySelector("textarea")).toBeNull();
-    fireEvent.doubleClick(container.querySelector(".mdbc-canvas-shape") as Element);
     const input = container.querySelector("textarea") as HTMLTextAreaElement;
-    expect(input).toBeTruthy();
+    // Idle: read-only so a single click falls through to select/drag.
+    expect(input.readOnly).toBe(true);
+    fireEvent.doubleClick(container.querySelector(".mdbc-canvas-shape") as Element);
+    expect(input.readOnly).toBe(false);
     fireEvent.change(input, { target: { value: "Label" } });
     expect(useCanvasStore.getState().boards[TAB].doc.components[0]).toMatchObject({
       kind: "shape",
@@ -67,11 +71,9 @@ describe("ShapeNode", () => {
     });
   });
 
-  it("never shows a label or editor for a line", () => {
+  it("never shows a label for a line", () => {
     seed(makeComponent({ kind: "shape", id: "s", shape: "line" }));
     const { container } = renderNode("s", true);
-    expect(container.querySelector(".mdbc-canvas-shape-label")).toBeNull();
-    fireEvent.doubleClick(container.querySelector(".mdbc-canvas-shape") as Element);
     expect(container.querySelector("textarea")).toBeNull();
   });
 

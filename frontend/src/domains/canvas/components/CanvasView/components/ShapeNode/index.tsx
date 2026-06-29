@@ -1,4 +1,4 @@
-import { memo, useEffect, useRef, useState } from "react";
+import { memo, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { CSSProperties, PointerEvent as ReactPointerEvent } from "react";
 import type { NodeProps } from "reactflow";
 
@@ -18,16 +18,29 @@ function ShapeNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
     s.boards[tabId]?.doc.components.find((c) => c.id === id),
   );
   const updateComponent = useCanvasStore((s) => s.updateComponent);
+  const shape = component && component.kind === "shape" ? component : null;
+  const text = shape?.text ?? "";
+  const width = shape?.w ?? 0;
 
   useEffect(() => {
     if (editing) inputRef.current?.focus();
   }, [editing]);
 
-  if (!component || component.kind !== "shape") return null;
-  const style = component.style ?? {};
-  const isLine = component.shape === "line";
-  const radius = component.radius ?? 0;
-  const text = component.text ?? "";
+  // Auto-grow the label to its content height so the text stays vertically
+  // centered (the shape centers its children) and never needs a scrollbar.
+  // Re-measure when the text, the edit state, or the shape width (wrapping)
+  // changes.
+  useLayoutEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [text, editing, width]);
+
+  if (!shape) return null;
+  const style = shape.style ?? {};
+  const isLine = shape.shape === "line";
+  const radius = shape.radius ?? 0;
   const css = {
     background: isLine ? "transparent" : (style.fill ?? "#3a3950"),
     border: isLine
@@ -37,7 +50,7 @@ function ShapeNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
       ? `${style.strokeWidth ?? 2}px solid ${style.stroke ?? "rgb(var(--m-accent-rgb) / 0.6)"}`
       : undefined,
     borderRadius:
-      component.shape === "ellipse" ? "50%" : isLine ? undefined : `${radius}px`,
+      shape.shape === "ellipse" ? "50%" : isLine ? undefined : `${radius}px`,
   };
 
   // Drag the radius handle right to round the corners, left to square them.
@@ -48,7 +61,7 @@ function ShapeNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
     event.preventDefault();
     const startX = event.clientX;
     const startR = radius;
-    const maxR = Math.min(component.w, component.h) / 2;
+    const maxR = Math.min(shape.w, shape.h) / 2;
     const onMove = (ev: PointerEvent) => {
       const next = Math.max(0, Math.min(maxR, startR + (ev.clientX - startX)));
       updateComponent(tabId, id, { radius: next });
@@ -63,7 +76,7 @@ function ShapeNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
 
   // The handle rides the top edge, offset from the left corner by the radius
   // (clamped so it never leaves the edge).
-  const handleX = Math.min(Math.max(radius, 14), component.w - 14);
+  const handleX = Math.min(Math.max(radius, 14), shape.w - 14);
 
   return (
     <>
@@ -75,24 +88,19 @@ function ShapeNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
           if (!isLine) setEditing(true);
         }}
       >
-        {!isLine &&
-          (editing ? (
-            <textarea
-              ref={inputRef}
-              rows={1}
-              className="nowheel nodrag mdbc-canvas-shape-text"
-              value={text}
-              onBlur={() => setEditing(false)}
-              onChange={(e) => updateComponent(tabId, id, { text: e.target.value })}
-            />
-          ) : (
-            <div
-              className={`mdbc-canvas-shape-label${text ? "" : " placeholder"}`}
-            >
-              {text || (selected ? "Add text" : "")}
-            </div>
-          ))}
-        {selected && component.shape === "rect" && (
+        {!isLine && (
+          <textarea
+            ref={inputRef}
+            rows={1}
+            className={`nowheel mdbc-canvas-shape-text${editing ? " nodrag" : ""}`}
+            value={text}
+            placeholder={selected ? "Add text" : ""}
+            readOnly={!editing}
+            onBlur={() => setEditing(false)}
+            onChange={(e) => updateComponent(tabId, id, { text: e.target.value })}
+          />
+        )}
+        {selected && shape.shape === "rect" && (
           <div
             className="nodrag nopan mdbc-canvas-radius-handle"
             style={{ "--radius-handle-x": `${handleX}px` } as CSSProperties}

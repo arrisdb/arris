@@ -239,7 +239,8 @@
 }
 
 .mdbc-canvas-text-input:read-only,
-.mdbc-canvas-sticky-input:read-only {
+.mdbc-canvas-sticky-input:read-only,
+.mdbc-canvas-shape-text:read-only {
   pointer-events: none;
   cursor: move;
 }
@@ -361,37 +362,29 @@
    with no pointer events, so a single click falls through to select + drag the
    shape; double-click swaps it for the editing textarea below. The "Add text"
    hint is only rendered while the shape is selected. */
-/* Label and editing textarea are both plain flex children of the shape (which
-   centers its children on both axes), so the text sits in the same centered
-   position whether it is being displayed or typed. */
-.mdbc-canvas-shape-label,
+/* The shape's label: one textarea used for both display and editing, so the
+   text never jumps between an idle and an editing position. It is auto-grown to
+   its content height in JS and centered by the shape (which centers its
+   children), so the text sits in the vertical middle without a scrollbar. */
 .mdbc-canvas-shape-text {
   box-sizing: border-box;
   width: 100%;
   height: auto;
-  padding: 8px;
+  resize: none;
+  border: none;
+  outline: none;
+  overflow: hidden;
+  background: transparent;
   color: var(--m-fg);
   font-family: var(--m-font);
   font-size: var(--m-fs-md);
   line-height: 1.4;
+  padding: 8px;
   text-align: center;
 }
 
-.mdbc-canvas-shape-label {
-  white-space: pre-wrap;
-  overflow: hidden;
-  pointer-events: none;
-}
-
-.mdbc-canvas-shape-label.placeholder {
+.mdbc-canvas-shape-text::placeholder {
   color: var(--m-fg-3);
-}
-
-.mdbc-canvas-shape-text {
-  resize: none;
-  border: none;
-  outline: none;
-  background: transparent;
 }
 
 /* The corner-radius handle: a small accent dot that rides a rectangle's top
