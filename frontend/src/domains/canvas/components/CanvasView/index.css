@@ -136,6 +136,12 @@
 
 /* ── resize handles ───────────────────────────────────────────────────────── */
 
+/* The resize controls must paint ABOVE the (now opaque) node body, otherwise the
+   anchors hide behind the fill and the object reads as un-resizable. */
+.mdbc-canvas-board .react-flow__resize-control {
+  z-index: 10;
+}
+
 .mdbc-canvas-resize-line {
   border-color: var(--m-accent);
   border-width: 1.5px;

@@ -3,6 +3,7 @@ import { act, renderHook } from "@testing-library/react";
 import type { EditorTab } from "@shell/types";
 
 import { useCanvasStore } from "../../hooks";
+import { makeComponent } from "../../utils";
 import { useCanvas } from "./hooks";
 
 const tab = { id: "tab-1", text: "", connectionId: "conn-1" } as unknown as EditorTab;
@@ -58,5 +59,19 @@ describe("useCanvas", () => {
     const { result } = renderHook(() => useCanvas(tab));
     act(() => result.current.addChart());
     expect(useCanvasStore.getState().boards["tab-1"].doc.components[0].kind).toBe("chart");
+  });
+
+  it("keeps a node selected across a non-structural store update", () => {
+    const store = useCanvasStore.getState();
+    store.ensureBoard("tab-1", "");
+    store.addComponent("tab-1", makeComponent({ kind: "shape", id: "a", shape: "rect" }));
+    store.addComponent("tab-1", makeComponent({ kind: "shape", id: "b", shape: "rect" }));
+    const { result } = renderHook(() => useCanvas(tab));
+    act(() => result.current.onNodesChange([{ id: "a", type: "select", selected: true }]));
+    expect(result.current.rfNodes.find((n) => n.id === "a")?.selected).toBe(true);
+    // Moving a different object reseeds the nodes; selection (and its anchors)
+    // must survive so the resize handles do not blink out.
+    act(() => useCanvasStore.getState().updateComponent("tab-1", "b", { x: 99 }));
+    expect(result.current.rfNodes.find((n) => n.id === "a")?.selected).toBe(true);
   });
 });

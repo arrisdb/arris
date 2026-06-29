@@ -58,8 +58,16 @@ function useCanvas(tab: EditorTab) {
       return;
     }
     setRfNodes((prev) => {
-      const positions = new Map(prev.map((n) => [n.id, n.position]));
-      return flowNodes.map((n) => ({ ...n, position: positions.get(n.id) ?? n.position }));
+      const prevById = new Map(prev.map((n) => [n.id, n]));
+      return flowNodes.map((n) => {
+        const p = prevById.get(n.id);
+        // Keep the live drag position AND the current selection/drag flags, so a
+        // store update (e.g. a debounced save or a query run) never clears the
+        // selection and makes the resize anchors blink out.
+        return p
+          ? { ...n, position: p.position, selected: p.selected, dragging: p.dragging }
+          : n;
+      });
     });
   }, [flowNodes, structuralKey]);
 
