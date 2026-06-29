@@ -7,6 +7,7 @@ import "./index.css";
 import { ContextMenu, useContextMenu } from "@shared/ui/ContextMenu";
 
 import { CanvasAgentChat } from "../CanvasAgentChat";
+import { CanvasPropertiesPane } from "./components/CanvasPropertiesPane";
 import { CanvasToolbar } from "./components/CanvasToolbar";
 import { useCanvas } from "./hooks";
 import type { CanvasViewProps } from "./types";
@@ -59,6 +60,13 @@ function CanvasView({ activeTab }: CanvasViewProps) {
           onAddShape={canvas.addShape}
         />
       </div>
+      {canvas.selectedComponent && (
+        <CanvasPropertiesPane
+          tabId={activeTab.id}
+          component={canvas.selectedComponent}
+          onChange={(patch) => canvas.update(canvas.selectedComponent!.id, patch)}
+        />
+      )}
       {menu.state && menuComponent && (
         <ContextMenu
           x={menu.state.x}

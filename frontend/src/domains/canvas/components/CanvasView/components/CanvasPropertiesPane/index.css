@@ -1,0 +1,43 @@
+/* The canvas properties pane: a fixed-width right rail shown while one object is
+   selected. Reuses the shared pane chrome (mdbc-pane right + header/body). */
+.mdbc-canvas-props {
+  width: 232px;
+  flex: 0 0 232px;
+  z-index: 5;
+}
+
+/* Two-column grid for the X/Y/W/H geometry fields. */
+.mdbc-canvas-prop-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 8px;
+}
+
+/* One labelled field: a small caption above its control. */
+.mdbc-canvas-prop {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+/* A checkbox row (e.g. Locked): caption to the right of the box. */
+.mdbc-canvas-prop-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+.mdbc-canvas-prop-check input {
+  margin: 0;
+}
+
+/* Native colour swatch, sized to line up with the text inputs. */
+.mdbc-canvas-color {
+  width: 100%;
+  height: 26px;
+  padding: 2px;
+  border: 0.5px solid var(--m-sep);
+  border-radius: var(--m-r-control);
+  background: rgb(var(--m-overlay-rgb) / 0.04);
+  cursor: pointer;
+}

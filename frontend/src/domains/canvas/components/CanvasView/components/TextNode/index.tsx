@@ -1,4 +1,5 @@
 import { memo, useEffect, useRef, useState } from "react";
+import type { CSSProperties } from "react";
 import type { NodeProps } from "reactflow";
 
 import { useCanvasStore } from "../../../../hooks";
@@ -23,6 +24,14 @@ function TextNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
   }, [editing]);
 
   if (!component || component.kind !== "text") return null;
+  const style = component.style ?? {};
+  const align = style.align ?? "left";
+  // Text styling rides CSS custom properties (the inline-style guard allows only
+  // `--`-prefixed props); bold + alignment ride classes the stylesheet keys off.
+  const css = {
+    "--canvas-text-fs": `${style.fontSize ?? 16}px`,
+    "--canvas-text-color": style.color ?? "var(--m-fg)",
+  } as CSSProperties;
   return (
     <>
       <CanvasResizer tabId={tabId} id={id} visible={selected} />
@@ -32,7 +41,8 @@ function TextNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
       >
         <textarea
           ref={inputRef}
-          className={`nowheel mdbc-canvas-text-input${editing ? " nodrag" : ""}`}
+          className={`nowheel mdbc-canvas-text-input align-${align}${style.bold ? " bold" : ""}${editing ? " nodrag" : ""}`}
+          style={css}
           value={component.text}
           placeholder="Double-click to edit"
           readOnly={!editing}

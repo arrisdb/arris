@@ -224,12 +224,19 @@
   border: none;
   outline: none;
   background: transparent;
-  color: var(--m-fg);
+  /* Font size + colour are driven by the properties pane via CSS custom
+     properties (with sensible fallbacks). Alignment + weight ride classes. */
+  color: var(--canvas-text-color, var(--m-fg));
   font-family: var(--m-font);
-  font-size: var(--m-fs-md);
+  font-size: var(--canvas-text-fs, var(--m-fs-md));
   line-height: 1.4;
   padding: 8px 10px;
 }
+
+.mdbc-canvas-text-input.bold { font-weight: 700; }
+.mdbc-canvas-text-input.align-left { text-align: left; }
+.mdbc-canvas-text-input.align-center { text-align: center; }
+.mdbc-canvas-text-input.align-right { text-align: right; }
 
 /* Idle text/sticky: clicks fall through to the node so a single click selects +
    drags it; double-click enters editing (read-only is cleared). */

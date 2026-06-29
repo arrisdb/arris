@@ -82,6 +82,30 @@ describe("useCanvas", () => {
     expect(useCanvasStore.getState().boards["tab-1"].doc.components).toHaveLength(2);
   });
 
+  it("exposes the single selected object and nothing when 0 or 2 are selected", () => {
+    const store = useCanvasStore.getState();
+    store.ensureBoard("tab-1", "");
+    store.addComponent("tab-1", makeComponent({ kind: "shape", id: "a", shape: "rect" }));
+    store.addComponent("tab-1", makeComponent({ kind: "shape", id: "b", shape: "rect" }));
+    const { result } = renderHook(() => useCanvas(tab));
+    expect(result.current.selectedComponent).toBeUndefined();
+    act(() => result.current.onNodesChange([{ id: "a", type: "select", selected: true }]));
+    expect(result.current.selectedComponent?.id).toBe("a");
+    act(() => result.current.onNodesChange([{ id: "b", type: "select", selected: true }]));
+    expect(result.current.selectedComponent).toBeUndefined();
+  });
+
+  it("update writes a patch and the node picks up the new position when not dragging", () => {
+    const store = useCanvasStore.getState();
+    store.ensureBoard("tab-1", "");
+    store.addComponent("tab-1", makeComponent({ kind: "shape", id: "a", shape: "rect", x: 0 }));
+    const { result } = renderHook(() => useCanvas(tab));
+    act(() => result.current.onNodesChange([{ id: "a", type: "select", selected: true }]));
+    act(() => result.current.update("a", { x: 50 }));
+    expect(useCanvasStore.getState().boards["tab-1"].doc.components[0].x).toBe(50);
+    expect(result.current.rfNodes.find((n) => n.id === "a")?.position.x).toBe(50);
+  });
+
   it("keeps a node selected across a non-structural store update", () => {
     const store = useCanvasStore.getState();
     store.ensureBoard("tab-1", "");
