@@ -93,8 +93,10 @@ function toInput(spec: AgentComponentSpec, connectionId: string | null): Compone
     title: spec.title,
     text: spec.text,
     color: spec.color,
-    // The agent does not know the connection id; bind query objects to the board.
-    connectionId: spec.kind === "query" ? connectionId : undefined,
+    // A query targets the connection the agent named (multi-connection boards),
+    // falling back to the board's primary connection when it named none.
+    connectionId:
+      spec.kind === "query" ? spec.connectionId ?? connectionId : undefined,
     sql: spec.sql,
     sourceQueryId: spec.sourceQueryId,
     // A new chart's spec is normalized so it always has valid arrays, even if the
@@ -116,6 +118,7 @@ function toPatch(spec: AgentComponentSpec): Partial<CanvasComponent> {
   if (spec.text !== undefined) patch.text = spec.text;
   if (spec.color !== undefined) patch.color = spec.color;
   if (spec.sql !== undefined) patch.sql = spec.sql;
+  if (spec.connectionId !== undefined) patch.connectionId = spec.connectionId;
   if (spec.spec !== undefined) patch.spec = spec.spec;
   if (spec.sourceQueryId !== undefined) patch.sourceQueryId = spec.sourceQueryId;
   if (spec.shape !== undefined) patch.shape = spec.shape;

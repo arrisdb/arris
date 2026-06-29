@@ -69,7 +69,10 @@ function parseDoc(text: string): CanvasDoc {
     typeof (doc.viewport as Record<string, unknown>).zoom === "number"
       ? (doc.viewport as CanvasDoc["viewport"])
       : undefined;
-  return { version: CANVAS_DOC_VERSION, components, edges, viewport };
+  const connectionIds = Array.isArray(doc.connectionIds)
+    ? doc.connectionIds.filter((id): id is string => typeof id === "string")
+    : undefined;
+  return { version: CANVAS_DOC_VERSION, components, edges, viewport, connectionIds };
 }
 
 export { emptyDoc, parseDoc, serializeDoc };

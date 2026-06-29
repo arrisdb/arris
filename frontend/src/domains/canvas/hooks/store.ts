@@ -43,6 +43,10 @@ interface CanvasStore {
   reorderComponent: (tabId: string, id: string, op: ReorderOp) => void;
   setEdges: (tabId: string, edges: CanvasEdge[]) => void;
   setViewport: (tabId: string, viewport: CanvasViewport) => void;
+  /// Set the connections the agent may use for this board (persisted in the doc).
+  /// The first id is the board's primary connection (the default for new query
+  /// objects); the agent reads every listed connection's schema.
+  setConnectionIds: (tabId: string, ids: string[]) => void;
   /// Apply one agent turn against the board: add new objects, patch objects the
   /// agent re-addressed by id, and remove the ids it listed. New query objects
   /// bind to `connectionId`. Returns the ids of query objects to (re)run.
@@ -195,6 +199,11 @@ const useCanvasStore = create<CanvasStore>((set, get) => ({
   setViewport: (tabId, viewport) =>
     set((s) => ({
       boards: withDoc(s.boards, tabId, (doc) => ({ ...doc, viewport })),
+    })),
+
+  setConnectionIds: (tabId, ids) =>
+    set((s) => ({
+      boards: withDoc(s.boards, tabId, (doc) => ({ ...doc, connectionIds: ids })),
     })),
 
   applyAgentSpec: (tabId, spec, connectionId) => {

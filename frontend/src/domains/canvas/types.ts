@@ -113,6 +113,11 @@ interface CanvasDoc {
   components: CanvasComponent[];
   edges: CanvasEdge[];
   viewport?: CanvasViewport;
+  /// The connections the agent may use for this board. The agent reads every
+  /// listed connection's schema and may target any of them per query object, so
+  /// one board can mix queries against different databases. Persisted so the set
+  /// survives close/reopen. Absent on older boards (treated as empty).
+  connectionIds?: string[];
 }
 
 /// Runtime execution state for a query object. Never part of `CanvasDoc`.
