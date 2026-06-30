@@ -21,7 +21,6 @@ import Screenshot from "../../components/docs/Screenshot/Screenshot.astro";
     { label: "The properties pane", href: "#properties" },
     { label: "Working on the board", href: "#board" },
     { label: "Saving", href: "#saving" },
-    { label: "Limitations & tips", href: "#limits" },
   ]}
   currentPath="/canvas"
   prev={{ label: "Trino", href: "/supported-data-sources/trino", section: "Supported data sources" }}
@@ -140,8 +139,7 @@ import Screenshot from "../../components/docs/Screenshot/Screenshot.astro";
     database. It writes a new query that selects <code>FROM</code> an existing cell (referenced by that
     cell's title), which runs in an in-memory engine (Apache DataFusion). This is the same cell-chaining
     you can write by hand. The agent falls back to a fresh database query only when no cell has the
-    columns or grain it needs. See <a href="#limits">Limitations &amp; tips</a> for the rules that apply
-    to chained cells.
+    columns or grain it needs.
   </p>
 
   <h3>Sharing results when the agent asks</h3>
@@ -336,14 +334,4 @@ import Screenshot from "../../components/docs/Screenshot/Screenshot.astro";
     delete can be restored).
   </p>
 
-  <h2 id="limits">Limitations &amp; tips</h2>
-
-  <ul>
-    <li><strong>Chained cells run in DataFusion, so use ANSI SQL.</strong> A query that reads another cell with <code>FROM &lt;cell title&gt;</code> runs in the in-memory engine, not the source database. Use standard SQL (<code>SUM</code>, <code>GROUP BY</code>, <code>date_trunc</code>, and so on), not source-specific syntax, and reference only the columns the upstream cell's <code>SELECT</code> returned.</li>
-    <li><strong>You cannot join a live table and a cell in one statement.</strong> Pull the live data into its own cell first, then chain off that cell.</li>
-    <li><strong>Cells are referenced by their title.</strong> The title is normalized to an identifier (lowercased, spaces and punctuation become <code>_</code>), so renaming a cell changes the name downstream queries must use. Keep titles distinct, since two cells with the same name collide.</li>
-    <li><strong>A failed or cyclic dependency blocks downstream cells.</strong> If an upstream cell errors, cells that read it report "blocked: an upstream cell failed"; a dependency cycle is reported as an error.</li>
-    <li><strong>A query needs a connection.</strong> An unbound query cell errors until you pick a connection for it in the properties pane.</li>
-    <li><strong>MongoDB.</strong> For a MongoDB connection the agent writes <code>db.&lt;collection&gt;.&lt;verb&gt;(...)</code> with the argument as strict JSON (every key and string double-quoted), and collection fields are sampled rather than declared, so the agent sees sampled field names and types.</li>
-  </ul>
 </DocsLayout>
