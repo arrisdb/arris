@@ -1,4 +1,5 @@
 mod agent;
+mod canvas;
 mod connection;
 mod dbt;
 mod federation;
@@ -13,6 +14,7 @@ mod sqlmesh;
 mod terminal;
 
 pub use agent::*;
+pub use canvas::*;
 pub use connection::*;
 pub use dbt::*;
 pub use federation::*;

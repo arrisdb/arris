@@ -156,6 +156,7 @@ fn main() {
             cmd_run_query,
             cmd_cancel_query,
             cmd_run_federation_query,
+            cmd_run_canvas_cell,
             cmd_explain_query,
             cmd_primary_key,
             cmd_object_definition,

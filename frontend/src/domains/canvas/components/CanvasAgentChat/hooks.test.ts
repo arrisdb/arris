@@ -17,12 +17,14 @@ vi.mock("./ipc", () => ({
 }));
 
 vi.mock("../../ipc", () => ({
-  runCanvasQueryIPC: vi.fn().mockResolvedValue({ columns: [], rows: [], elapsed: 0 }),
+  runCanvasCellIPC: vi
+    .fn()
+    .mockResolvedValue([{ id: "q1", result: { columns: [], rows: [], elapsed: 0 } }]),
 }));
 
 import { useConnectionsStore } from "@domains/connection/hooks";
 import { useTabsStore } from "@shell/hooks/tabsStore";
-import { runCanvasQueryIPC } from "../../ipc";
+import { runCanvasCellIPC } from "../../ipc";
 import { useCanvasStore } from "../../hooks";
 import { makeComponent } from "../../utils";
 import { sendCanvasAgentIPC } from "./ipc";
@@ -180,7 +182,7 @@ describe("useCanvasAgentChat", () => {
 
     const board = useCanvasStore.getState().boards[TAB];
     expect(board.doc.components).toHaveLength(3);
-    expect(vi.mocked(runCanvasQueryIPC)).toHaveBeenCalledWith("conn-1", expect.any(String));
+    expect(vi.mocked(runCanvasCellIPC)).toHaveBeenCalledWith(TAB, "q1", expect.any(Array));
     expect(result.current.streaming).toBe(false);
     expect(result.current.entries.at(-1)?.text).toMatch(/Added 3 objects/);
   });

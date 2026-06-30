@@ -78,7 +78,11 @@ import DocTable from "../../components/docs/DocTable/DocTable.astro";
           connection, the same engine the editor uses. The query object shows no rows itself: the
           first time you run it, Arris drops a preview <strong>table</strong> beside it (joined with an
           arrow) so the rows show without any extra step. Bind a chart to it instead if you want a
-          visualization rather than a grid.
+          visualization rather than a grid. A query can also read <strong>another query's result</strong>
+          by its title: write <code>FROM &lt;other cell title&gt;</code> and that cell becomes an
+          in-memory table. Running a query auto-runs the upstream cells it reads first, and a
+          dependency arrow is drawn between them. (Joining a live database table and another cell's
+          result in the same query is not supported yet; pull the live data into its own cell first.)
         </td>
       </tr>
       <tr>
