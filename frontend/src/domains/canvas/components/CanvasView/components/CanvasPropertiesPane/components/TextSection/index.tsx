@@ -1,5 +1,3 @@
-import { NumberStepper } from "@shared/ui";
-
 import { DEFAULT_TEXT_COLOR } from "../../constants";
 import type { TextAlign } from "../../../../../../types";
 import type { SectionProps } from "../../types";
@@ -8,8 +6,8 @@ const ALIGNS: TextAlign[] = ["left", "center", "right"];
 const ALIGN_LABEL: Record<TextAlign, string> = { left: "L", center: "C", right: "R" };
 
 /// Text-specific controls: font size, bold toggle, alignment, and colour. All
-/// write into the object's `style`, which the TextNode renderer consumes. Rows
-/// match the shared form controls (NumberStepper + the chart-editor colour swatch).
+/// write into the object's `style`, which the TextNode renderer consumes. Each
+/// control sits in a label-left row.
 function TextSection({ component, onChange }: SectionProps) {
   if (component.kind !== "text") return null;
   const style = component.style ?? {};
@@ -17,16 +15,17 @@ function TextSection({ component, onChange }: SectionProps) {
 
   return (
     <div className="mdbc-pane-form">
-      <div className="mdbc-canvas-prop-row">
+      <label className="mdbc-canvas-prop-row">
         <span className="mdbc-pane-label">Font size</span>
-        <NumberStepper
+        <input
+          type="number"
+          className="mdbc-pane-input"
           value={style.fontSize ?? 16}
-          onChange={(fontSize) => onChange({ style: { ...style, fontSize } })}
-          min={1}
-          max={400}
-          aria-label="Font size"
+          onChange={(e) =>
+            onChange({ style: { ...style, fontSize: Math.max(1, Number(e.target.value)) } })
+          }
         />
-      </div>
+      </label>
       <div className="mdbc-canvas-prop-row">
         <span className="mdbc-pane-label">Align</span>
         <div className="mdbc-segmented mdbc-segmented-compact">
