@@ -10,7 +10,7 @@ import { useCanvasStore } from "../../hooks";
 import type { CanvasComponent, CanvasEdge, ReorderOp, ShapeKind } from "../../types";
 import { makeComponent, serializeDoc } from "../../utils";
 import type { CanvasMode, CanvasNodeData } from "./types";
-import { toFlowEdges, toFlowNodes } from "./utils";
+import { hasActiveTextSelection, toFlowEdges, toFlowNodes } from "./utils";
 
 const EMPTY_COMPONENTS: CanvasComponent[] = [];
 const EMPTY_EDGES: CanvasEdge[] = [];
@@ -202,6 +202,10 @@ function useCanvas(tab: EditorTab) {
       if (isEditable(e.target)) return;
       const key = e.key.toLowerCase();
       if (key === "c" && selectedComponent) {
+        // A live text selection means the user is copying text (e.g. an agent
+        // reply in the side chat), not the selected object: let the browser's
+        // native copy run instead of cloning the node.
+        if (hasActiveTextSelection()) return;
         e.preventDefault();
         copyComponent(tabId, selectedComponent.id);
       } else if (key === "v") {

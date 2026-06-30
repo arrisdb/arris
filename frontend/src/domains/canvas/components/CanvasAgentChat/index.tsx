@@ -2,6 +2,7 @@ import { useState } from "react";
 import { ChatBubble, ChatEmpty, ChatInput, ChatTyping, MultiSelect, Spinner } from "@shared/ui";
 import { Icon } from "@shared/ui/Icon";
 import { AgentProviderSelect } from "@domains/agent";
+import { markdownToHtml } from "@domains/editor";
 
 import { AgentQuestionCard } from "./components/AgentQuestionCard";
 import { useCanvasAgentChat } from "./hooks";
@@ -86,7 +87,16 @@ function CanvasAgentChat({ tab }: CanvasAgentChatProps) {
             .map((entry) => (
               <div key={entry.id} className={`mdbc-canvas-chat-row ${entry.role}`}>
                 {entry.text.length > 0 ? (
-                  <ChatBubble role={entry.role} text={entry.text} />
+                  entry.role === "agent" ? (
+                    <div
+                      className="mdbc-agent-msg agent mdbc-canvas-chat-md"
+                      // Agent prose is markdown; the renderer escapes HTML, so this
+                      // shows headings/lists/code/bold instead of raw syntax.
+                      dangerouslySetInnerHTML={{ __html: markdownToHtml(entry.text) }}
+                    />
+                  ) : (
+                    <ChatBubble role={entry.role} text={entry.text} />
+                  )
                 ) : null}
                 {entry.action ? (
                   <div className="mdbc-canvas-chat-action">
