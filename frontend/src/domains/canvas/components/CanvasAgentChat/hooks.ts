@@ -13,6 +13,7 @@ import {
   genId,
   parseAgentCanvas,
   parseAgentQuestion,
+  summarizeAgentChanges,
 } from "../../utils";
 import type { ShareableQuery } from "../../utils";
 import type { AgentQuestionAnswer } from "../../types";
@@ -261,16 +262,29 @@ function useCanvasAgentChat(tab: EditorTab) {
           }
           const spec = parseAgentCanvas(accumRef.current);
           if (spec) {
+            // Summarize against the board as it stands BEFORE applying, so an
+            // emitted id already present reads as an update, not an add.
+            const before =
+              useCanvasStore.getState().boards[tabId]?.doc.components ?? [];
+            const action = summarizeAgentChanges(spec, before);
             const queryIds = useCanvasStore
               .getState()
               .applyAgentSpec(tabId, spec, connectionId);
             for (const id of queryIds) {
               void useCanvasStore.getState().runQueryComponent(tabId, id);
             }
-            const n = spec.components.length;
+            // Keep the agent's prose and the action it took as separate fields so
+            // they render with their own fixed styling (prose bubble vs action
+            // chip) instead of being concatenated into one bubble.
             const prose = displayText(accumRef.current);
-            const summary = `Added ${n} object${n === 1 ? "" : "s"} to the canvas.`;
-            setAgentText(prose ? `${prose}\n\n${summary}` : summary, false);
+            const entryId = agentEntryIdRef.current;
+            if (entryId) {
+              setEntries((prev) =>
+                prev.map((e) =>
+                  e.id === entryId ? { ...e, text: prose, action, pending: false } : e,
+                ),
+              );
+            }
           } else {
             setAgentText(displayText(accumRef.current) || "No objects were generated.", false);
           }

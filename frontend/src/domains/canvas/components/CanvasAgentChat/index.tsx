@@ -82,11 +82,17 @@ function CanvasAgentChat({ tab }: CanvasAgentChatProps) {
           />
         ) : (
           entries
-            .filter((entry) => entry.text.length > 0 || entry.question)
+            .filter((entry) => entry.text.length > 0 || entry.question || entry.action)
             .map((entry) => (
-              <div key={entry.id}>
+              <div key={entry.id} className={`mdbc-canvas-chat-row ${entry.role}`}>
                 {entry.text.length > 0 ? (
                   <ChatBubble role={entry.role} text={entry.text} />
+                ) : null}
+                {entry.action ? (
+                  <div className="mdbc-canvas-chat-action">
+                    <Icon name="check" size={12} />
+                    <span>{entry.action}</span>
+                  </div>
                 ) : null}
                 {entry.question ? (
                   <AgentQuestionCard

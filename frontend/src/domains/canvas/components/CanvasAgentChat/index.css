@@ -1,3 +1,45 @@
+/* One turn's row: the bubble, the action line, and any question card stack
+   together and align to the speaker's side (user right, agent left). The wrapper
+   exists so a turn's pieces move as a unit; it must carry the side alignment,
+   because the inner bubble's own `align-self` does nothing inside a full-width
+   block wrapper (it only worked when the bubble was a direct flex child). */
+.mdbc-canvas-chat-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mdbc-canvas-chat-row.user {
+  align-items: flex-end;
+}
+
+.mdbc-canvas-chat-row.agent {
+  align-items: flex-start;
+}
+
+/* The action line: a fixed, distinct style for what the agent DID to the board
+   (added/updated/removed objects), kept visually separate from its prose reply
+   so the response and the action never blur into one block. */
+.mdbc-canvas-chat-action {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 85%;
+  padding: 5px 9px;
+  border-radius: var(--m-r-control);
+  border: 0.5px solid rgb(var(--m-accent-rgb) / 0.35);
+  background: rgb(var(--m-accent-rgb) / 0.08);
+  color: var(--m-fg-2);
+  font-family: var(--m-font-mono);
+  font-size: var(--m-fs-xs);
+  line-height: 1.45;
+}
+
+.mdbc-canvas-chat-action svg {
+  flex-shrink: 0;
+  color: rgb(var(--m-accent-rgb));
+}
+
 /* The board's connection picker row, under the agent header. The connection is
    canvas-wide (the agent's schema source and every query object's target), so it
    sits at the top of the chat where the "connect a database" prompt appears. */
