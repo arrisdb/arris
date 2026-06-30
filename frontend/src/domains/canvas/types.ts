@@ -124,6 +124,26 @@ interface CanvasViewport {
   zoom: number;
 }
 
+type ChatRole = "user" | "agent";
+
+/// One turn in the canvas agent chat log. Persisted with the board (in `CanvasDoc`)
+/// so the conversation survives close/reopen and restart until the user clears it.
+/// The agent entry streams (`pending`) then settles into a summary of what it did;
+/// when the agent asks the user something instead of changing the board, the entry
+/// carries a `question` and renders a question card (`answered` once resolved).
+interface ChatEntry {
+  id: string;
+  role: ChatRole;
+  text: string;
+  pending?: boolean;
+  /// The board change the agent made this turn (added/updated/removed objects),
+  /// kept separate from `text` so the reply prose and the action chip render with
+  /// their own styling instead of running together.
+  action?: string;
+  question?: AgentQuestion;
+  answered?: boolean;
+}
+
 /// The persisted board document. Serialized into `EditorTab.text` (the same trick
 /// the notebook uses for nbformat), so a board survives close/reopen and restart.
 interface CanvasDoc {
@@ -136,6 +156,10 @@ interface CanvasDoc {
   /// one board can mix queries against different databases. Persisted so the set
   /// survives close/reopen. Absent on older boards (treated as empty).
   connectionIds?: string[];
+  /// The agent conversation log, persisted so it survives close/reopen and
+  /// restart until the user clears it. Settled entries only (no in-flight
+  /// streaming state). Absent on older boards (treated as empty).
+  chat?: ChatEntry[];
 }
 
 /// Runtime execution state for a query object. Never part of `CanvasDoc`.
@@ -217,6 +241,8 @@ export type {
   CanvasDoc,
   CanvasEdge,
   CanvasViewport,
+  ChatEntry,
+  ChatRole,
   ChartComponent,
   ComponentKind,
   QueryComponent,

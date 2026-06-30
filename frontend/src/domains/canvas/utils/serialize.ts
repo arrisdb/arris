@@ -1,5 +1,5 @@
 import { CANVAS_DOC_VERSION } from "../constants";
-import type { CanvasComponent, CanvasDoc, CanvasEdge } from "../types";
+import type { CanvasComponent, CanvasDoc, CanvasEdge, ChatEntry } from "../types";
 import { sanitizeChartSpec } from "./chartSpec";
 
 /// A fresh, empty board document.
@@ -27,6 +27,19 @@ function isEdge(value: unknown): value is CanvasEdge {
     typeof e.id === "string" &&
     typeof e.source === "string" &&
     typeof e.target === "string"
+  );
+}
+
+/// True when a parsed value looks like a settled chat entry. `pending` is forced
+/// off on load so a half-streamed entry (should never persist) can't read as
+/// stuck, and the streaming refs that drive it are gone after a reload anyway.
+function isChatEntry(value: unknown): value is ChatEntry {
+  if (!value || typeof value !== "object") return false;
+  const e = value as Record<string, unknown>;
+  return (
+    typeof e.id === "string" &&
+    (e.role === "user" || e.role === "agent") &&
+    typeof e.text === "string"
   );
 }
 
@@ -72,7 +85,20 @@ function parseDoc(text: string): CanvasDoc {
   const connectionIds = Array.isArray(doc.connectionIds)
     ? doc.connectionIds.filter((id): id is string => typeof id === "string")
     : undefined;
-  return { version: CANVAS_DOC_VERSION, components, edges, viewport, connectionIds };
+  const chat = Array.isArray(doc.chat)
+    ? (doc.chat.filter(isChatEntry) as ChatEntry[]).map((e) => ({
+        ...e,
+        pending: false,
+      }))
+    : undefined;
+  return {
+    version: CANVAS_DOC_VERSION,
+    components,
+    edges,
+    viewport,
+    connectionIds,
+    chat,
+  };
 }
 
 export { emptyDoc, parseDoc, serializeDoc };

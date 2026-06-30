@@ -6,6 +6,7 @@ import type {
   CanvasDoc,
   CanvasEdge,
   CanvasViewport,
+  ChatEntry,
   QueryComponent,
   QueryRunState,
   ReorderOp,
@@ -61,6 +62,12 @@ interface CanvasStore {
   /// The first id is the board's primary connection (the default for new query
   /// objects); the agent reads every listed connection's schema.
   setConnectionIds: (tabId: string, ids: string[]) => void;
+  /// Persist the agent chat log into the board doc (so it survives close/reopen
+  /// and restart). The hook keeps the live, per-token entries in local state and
+  /// calls this only at turn boundaries, so streaming never thrashes the doc.
+  setChat: (tabId: string, chat: ChatEntry[]) => void;
+  /// Wipe the board's chat log (the Clear button). Empties the persisted history.
+  clearChat: (tabId: string) => void;
   /// Apply one agent turn against the board: add new objects, patch objects the
   /// agent re-addressed by id, and remove the ids it listed. New query objects
   /// bind to `connectionId`. Returns the ids of query objects to (re)run.
@@ -255,6 +262,19 @@ const useCanvasStore = create<CanvasStore>((set, get) => ({
   setConnectionIds: (tabId, ids) =>
     set((s) => ({
       boards: withDoc(s.boards, tabId, (doc) => ({ ...doc, connectionIds: ids })),
+    })),
+
+  // `withDoc` keeps the `components`/`edges` array references intact, so writing
+  // chat never re-renders the board nodes (their selectors read those arrays),
+  // only the chat panel and the persistence effect.
+  setChat: (tabId, chat) =>
+    set((s) => ({
+      boards: withDoc(s.boards, tabId, (doc) => ({ ...doc, chat })),
+    })),
+
+  clearChat: (tabId) =>
+    set((s) => ({
+      boards: withDoc(s.boards, tabId, (doc) => ({ ...doc, chat: [] })),
     })),
 
   addEdge: (tabId, source, target) =>

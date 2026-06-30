@@ -152,6 +152,14 @@ import DocTable from "../../components/docs/DocTable/DocTable.astro";
   </p>
 
   <p>
+    The conversation is saved with the board, so reopening a canvas (or restarting Arris) brings back
+    the full chat history and the agent picks up where it left off. Use the <strong>Clear
+    conversation</strong> button (the trash icon in the panel header) to wipe the history and start a
+    fresh thread; clearing also drops the agent's session, so the next message begins a new
+    conversation rather than resuming the old one.
+  </p>
+
+  <p>
     Because each turn sees the current board, follow-up messages refine it in place rather than only
     piling on new objects. The agent can <strong>add</strong> any object kind (a query, table, chart,
     text block, sticky note, or shape), <strong>modify</strong> one that is already there (re-spec a chart
@@ -205,7 +213,8 @@ import DocTable from "../../components/docs/DocTable/DocTable.astro";
     Arris. Closed boards are listed in the <strong>Canvas</strong> section of the left sidebar
     alongside SQL consoles and notebooks; click one to reopen it. Reopening a board fits the view to
     its objects, so you always land on your work rather than an empty patch of the infinite board.
-    Query results are not saved with the board; reopen a canvas and run its query objects to refresh
-    the data.
+    The agent conversation is saved too, so a reopened board shows its full chat history until you
+    clear it. Query results are not saved with the board; reopen a canvas and run its query objects to
+    refresh the data.
   </p>
 </DocsLayout>

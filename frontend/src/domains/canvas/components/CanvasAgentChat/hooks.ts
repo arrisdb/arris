@@ -117,6 +117,26 @@ function useCanvasAgentChat(tab: EditorTab) {
   const [streaming, setStreaming] = useState(false);
   const board = useCanvasStore((s) => s.boards[tabId]);
 
+  // Hydrate the chat log from the persisted board doc the first time the board is
+  // available, so a reopened canvas (or a restart) shows its prior conversation.
+  // Runs once: live edits afterward are the source of truth and flow back via the
+  // persist effect below.
+  const hydratedRef = useRef(false);
+  useEffect(() => {
+    if (hydratedRef.current || !board) return;
+    hydratedRef.current = true;
+    const persisted = board.doc.chat;
+    if (persisted && persisted.length > 0) setEntries(persisted);
+  }, [board]);
+
+  // Persist settled entries back into the doc (which the board's save effect
+  // serializes into the tab text). Gated on `!streaming` so per-token streaming
+  // updates stay local and only the final, settled log is written once per turn.
+  useEffect(() => {
+    if (!hydratedRef.current || streaming) return;
+    useCanvasStore.getState().setChat(tabId, entries);
+  }, [entries, streaming, tabId]);
+
   // The connections the agent may use, from the persisted board doc. An older
   // board with no set falls back to the tab's primary connection. The first id
   // is the primary (drives the "no connection" gating and the single-connection
@@ -409,10 +429,27 @@ function useCanvasAgentChat(tab: EditorTab) {
     endTurn();
   }, [endTurn, setAgentText]);
 
+  // Clear the conversation: stop any in-flight turn, drop the live agent session
+  // (so the next message starts fresh rather than resuming the cleared thread),
+  // and wipe both the local log and its persisted copy.
+  const clearChat = useCallback(() => {
+    const turnId = turnIdRef.current;
+    if (turnId) void cancelCanvasAgentIPC(turnId);
+    turnIdRef.current = null;
+    agentEntryIdRef.current = null;
+    accumRef.current = "";
+    sessionRef.current = null;
+    sessionProviderRef.current = null;
+    setStreaming(false);
+    setEntries([]);
+    useCanvasStore.getState().clearChat(tabId);
+  }, [tabId]);
+
   return {
     answerQuestion,
     buildContext,
     cancel,
+    clearChat,
     connectionId,
     connectionIds,
     connectionOptions,

@@ -241,4 +241,44 @@ describe("useCanvasAgentChat", () => {
     // Still streaming: the foreign done was ignored.
     expect(result.current.streaming).toBe(true);
   });
+
+  it("hydrates the chat log from the persisted board doc", async () => {
+    useCanvasStore.getState().setChat(TAB, [
+      { id: "u1", role: "user", text: "monthly sales" },
+      { id: "a1", role: "agent", text: "done", action: "Added query" },
+    ]);
+    const { result } = renderHook(() => useCanvasAgentChat(withConn));
+    await waitFor(() => expect(result.current.entries).toHaveLength(2));
+    expect(result.current.entries[0]).toMatchObject({ role: "user", text: "monthly sales" });
+  });
+
+  it("persists the settled log back into the board doc after a turn", async () => {
+    const { result } = renderHook(() => useCanvasAgentChat(withConn));
+    act(() => result.current.send("monthly sales by category"));
+    const turnId = vi.mocked(sendCanvasAgentIPC).mock.calls[0][0].turnId;
+    fire({ turn_id: turnId, kind: "message", text: reply({ components: [], edges: [] }) });
+    await act(async () => {
+      hoisted.handler?.({ turn_id: turnId, kind: "done" });
+      await Promise.resolve();
+    });
+    // Streaming has settled, so the user + agent entries are written into the doc
+    // (which the board's save effect serializes into the tab text).
+    await waitFor(() => {
+      const chat = useCanvasStore.getState().boards[TAB].doc.chat ?? [];
+      expect(chat.length).toBe(2);
+    });
+    const chat = useCanvasStore.getState().boards[TAB].doc.chat!;
+    expect(chat[0]).toMatchObject({ role: "user", text: "monthly sales by category" });
+    expect(chat.every((e) => !e.pending)).toBe(true);
+  });
+
+  it("clearChat wipes the local and persisted log", async () => {
+    useCanvasStore.getState().setChat(TAB, [{ id: "u1", role: "user", text: "hi" }]);
+    const { result } = renderHook(() => useCanvasAgentChat(withConn));
+    await waitFor(() => expect(result.current.entries).toHaveLength(1));
+
+    act(() => result.current.clearChat());
+    expect(result.current.entries).toHaveLength(0);
+    expect(useCanvasStore.getState().boards[TAB].doc.chat).toEqual([]);
+  });
 });
