@@ -1,5 +1,3 @@
-import { NumberStepper } from "@shared/ui";
-
 import {
   DEFAULT_SHAPE_FILL,
   DEFAULT_SHAPE_STROKE,
@@ -8,8 +6,7 @@ import type { SectionProps } from "../../types";
 
 /// Shape-specific controls: fill and stroke colour, stroke width, and (for a
 /// rectangle) corner radius. Colours write into the object's `style`, which the
-/// ShapeNode renderer already consumes. Rows match the shared form controls
-/// (NumberStepper + the chart-editor colour swatch).
+/// ShapeNode renderer already consumes. Each control sits in a label-left row.
 function ShapeSection({ component, onChange }: SectionProps) {
   if (component.kind !== "shape") return null;
   const style = component.style ?? {};
@@ -18,7 +15,7 @@ function ShapeSection({ component, onChange }: SectionProps) {
   return (
     <div className="mdbc-pane-form">
       {!isLine && (
-        <div className="mdbc-canvas-prop-row">
+        <label className="mdbc-canvas-prop-row">
           <span className="mdbc-pane-label">Fill</span>
           <input
             type="color"
@@ -27,9 +24,9 @@ function ShapeSection({ component, onChange }: SectionProps) {
             onChange={(e) => onChange({ style: { ...style, fill: e.target.value } })}
             aria-label="Fill"
           />
-        </div>
+        </label>
       )}
-      <div className="mdbc-canvas-prop-row">
+      <label className="mdbc-canvas-prop-row">
         <span className="mdbc-pane-label">Stroke</span>
         <input
           type="color"
@@ -38,28 +35,28 @@ function ShapeSection({ component, onChange }: SectionProps) {
           onChange={(e) => onChange({ style: { ...style, stroke: e.target.value } })}
           aria-label="Stroke"
         />
-      </div>
-      <div className="mdbc-canvas-prop-row">
+      </label>
+      <label className="mdbc-canvas-prop-row">
         <span className="mdbc-pane-label">Stroke width</span>
-        <NumberStepper
+        <input
+          type="number"
+          className="mdbc-pane-input"
           value={style.strokeWidth ?? 1}
-          onChange={(strokeWidth) => onChange({ style: { ...style, strokeWidth } })}
-          min={0}
-          max={100}
-          aria-label="Stroke width"
+          onChange={(e) =>
+            onChange({ style: { ...style, strokeWidth: Math.max(0, Number(e.target.value)) } })
+          }
         />
-      </div>
+      </label>
       {component.shape === "rect" && (
-        <div className="mdbc-canvas-prop-row">
+        <label className="mdbc-canvas-prop-row">
           <span className="mdbc-pane-label">Corner radius</span>
-          <NumberStepper
+          <input
+            type="number"
+            className="mdbc-pane-input"
             value={component.radius ?? 0}
-            onChange={(radius) => onChange({ radius })}
-            min={0}
-            max={500}
-            aria-label="Corner radius"
+            onChange={(e) => onChange({ radius: Math.max(0, Number(e.target.value)) })}
           />
-        </div>
+        </label>
       )}
     </div>
   );

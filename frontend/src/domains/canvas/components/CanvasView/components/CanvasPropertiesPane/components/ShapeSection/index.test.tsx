@@ -41,13 +41,11 @@ describe("ShapeSection", () => {
     expect(container.querySelector(".mdbc-pane-form")).toBeNull();
   });
 
-  it("uses the shared NumberStepper and the small colour swatch", () => {
+  it("uses the compact colour swatch for fill and stroke", () => {
     const comp = makeComponent({ kind: "shape", id: "s", shape: "rect" });
     const { container } = render(
       <ShapeSection tabId="t" component={comp} onChange={vi.fn()} />,
     );
-    // Stroke width + corner radius are shared NumberSteppers.
-    expect(container.querySelectorAll(".mdbc-stepper")).toHaveLength(2);
     // Fill + stroke are the compact swatch, not a full-width bar.
     expect(container.querySelectorAll(".mdbc-canvas-color")).toHaveLength(2);
   });

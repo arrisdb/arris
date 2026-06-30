@@ -171,6 +171,9 @@
   color: var(--m-fg);
   font-family: var(--m-font);
   outline: none;
+  /* Render native widgets (the number-input spinner arrows) in dark mode so the
+     up/down arrows are light and visible against the dark theme. */
+  color-scheme: dark;
 }
 .mdbc-pane-input:focus {
   border-color: rgb(var(--m-accent-rgb) / 0.45);
