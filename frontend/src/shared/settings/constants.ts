@@ -36,7 +36,6 @@ export const ACTIONS = {
 
   canvasMoveTool: { label: "Canvas: Move Tool", category: "canvas", defaultShortcut: { key: "v" } },
   canvasHandTool: { label: "Canvas: Hand Tool", category: "canvas", defaultShortcut: { key: "h" } },
-  canvasConnectTool: { label: "Canvas: Arrow / Connect Tool", category: "canvas", defaultShortcut: { key: "a" } },
   canvasAddSqlCell: { label: "Canvas: Add SQL Cell", category: "canvas", defaultShortcut: { key: "/" } },
   canvasAddRectangle: { label: "Canvas: Add Rectangle", category: "canvas", defaultShortcut: { key: "r" } },
   canvasAddEllipse: { label: "Canvas: Add Ellipse", category: "canvas", defaultShortcut: { key: "o" } },

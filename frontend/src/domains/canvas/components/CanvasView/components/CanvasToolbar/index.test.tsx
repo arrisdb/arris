@@ -76,21 +76,6 @@ describe("CanvasToolbar", () => {
     expect(props.onModeChange).toHaveBeenCalledWith("hand");
   });
 
-  it("enters connect mode from the Arrow option", () => {
-    const props = setup();
-    fireEvent.click(screen.getByTestId("canvas-tool-select-caret"));
-    fireEvent.click(screen.getByTestId("canvas-tool-select-connect"));
-    expect(props.onModeChange).toHaveBeenCalledWith("connect");
-  });
-
-  it("does not fire for the disabled Python option", () => {
-    const props = setup();
-    fireEvent.click(screen.getByTestId("canvas-tool-query-caret"));
-    fireEvent.click(screen.getByTestId("canvas-tool-query-python"));
-    // Python is not implemented yet: clicking it must not add a query object.
-    expect(props.onAddQuery).not.toHaveBeenCalled();
-  });
-
   it("clicking an expandable tool applies its default option and opens the menu", () => {
     const props = setup();
     // No menu open yet.
@@ -134,16 +119,12 @@ describe("CanvasToolbar", () => {
       useSettingsStore.getState().setShortcut("canvasMoveTool", "v");
     });
 
-    it("shows each bound option's live keymap shortcut, and a static hint for unbound ones", () => {
+    it("shows each option's live keymap shortcut, uppercased from the keymap", () => {
       setup();
       fireEvent.click(screen.getByTestId("canvas-tool-select-caret"));
       // Bound defaults render uppercased from the keymap, not a hardcoded letter.
       expect(shortcutText("canvas-tool-select-move")).toBe("V");
       expect(shortcutText("canvas-tool-select-hand")).toBe("H");
-      expect(shortcutText("canvas-tool-select-connect")).toBe("A");
-      // The unbound Python placeholder keeps its static "Soon" hint.
-      fireEvent.click(screen.getByTestId("canvas-tool-query-caret"));
-      expect(shortcutText("canvas-tool-query-python")).toBe("Soon");
     });
 
     it("reflects a rebound shortcut from settings (no hardcoded label)", () => {

@@ -55,21 +55,6 @@
   cursor: grabbing;
 }
 
-/* Connect tool: a crosshair everywhere, and objects read as click targets while
-   drawing a relationship arrow. */
-.mdbc-canvas-board.connect .react-flow__pane,
-.mdbc-canvas-board.connect .react-flow__node {
-  cursor: crosshair;
-}
-
-/* The object picked as the arrow's source, highlighted until its target is
-   chosen. */
-.react-flow__node.mdbc-connect-source {
-  outline: 2px solid var(--m-accent);
-  outline-offset: 3px;
-  border-radius: 4px;
-}
-
 /* The two endpoint handles every object carries exist only so an arrow has
    something to attach to; the floating edge draws the visible line to the
    object's border, so the handles themselves stay invisible and inert. */
@@ -502,6 +487,15 @@
   position: relative;
   align-items: center;
   justify-content: center;
+}
+
+/* A line shape: a single horizontal rule spanning the (chrome-less) node box,
+   centered vertically by the shape's flex centering. Its height and colour come
+   from the stroke style inline. */
+.mdbc-canvas-shape-line {
+  width: 100%;
+  flex: 0 0 auto;
+  border-radius: 2px;
 }
 
 /* The shape's label, vertically + horizontally centered. Idle it is a plain div

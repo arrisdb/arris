@@ -43,6 +43,18 @@ describe("ShapeNode", () => {
     expect(container.querySelector(".mdbc-canvas-shape")).toBeNull();
   });
 
+  it("draws a horizontal rule for a line, not a labelled box", () => {
+    seed(makeComponent({ kind: "shape", id: "ln", shape: "line" }));
+    const { container } = renderNode("ln");
+    // A line has its own rule element and no editable label textarea (so it
+    // reads as a line, not a card).
+    expect(container.querySelector(".mdbc-canvas-shape-line")).toBeTruthy();
+    expect(container.querySelector("textarea")).toBeNull();
+    // The box itself carries no rounded-card radius.
+    const box = container.querySelector(".mdbc-canvas-shape") as HTMLElement;
+    expect(box.style.borderRadius).toBe("0");
+  });
+
   it("offers the 'Add text' placeholder only while selected", () => {
     seed(makeComponent({ kind: "shape", id: "s", shape: "rect" }));
     const idle = renderNode("s", false);

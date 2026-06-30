@@ -41,17 +41,16 @@ function ShapeNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
   const style = shape.style ?? {};
   const isLine = shape.shape === "line";
   const radius = shape.radius ?? 0;
+  // A line carries no card chrome: its box is transparent with no border or
+  // radius, and a single horizontal rule is drawn centered across the width
+  // (rendered below). A rect/ellipse fills and is bordered as usual.
+  const stroke = style.stroke ?? "rgb(var(--m-accent-rgb) / 0.6)";
   const css = {
     background: isLine ? "transparent" : (style.fill ?? "#3a3950"),
-    border: isLine
-      ? "none"
-      : `${style.strokeWidth ?? 1}px solid ${style.stroke ?? "rgb(var(--m-accent-rgb) / 0.6)"}`,
-    borderTop: isLine
-      ? `${style.strokeWidth ?? 2}px solid ${style.stroke ?? "rgb(var(--m-accent-rgb) / 0.6)"}`
-      : undefined,
-    borderRadius:
-      shape.shape === "ellipse" ? "50%" : isLine ? undefined : `${radius}px`,
+    border: isLine ? "none" : `${style.strokeWidth ?? 1}px solid ${stroke}`,
+    borderRadius: shape.shape === "ellipse" ? "50%" : isLine ? "0" : `${radius}px`,
   };
+  const lineCss = { height: `${style.strokeWidth ?? 2}px`, background: stroke };
 
   // Drag the radius handle right to round the corners, left to square them.
   // Bounded to half the shorter side (a fully-rounded "stadium"). Adjusts in
@@ -88,6 +87,13 @@ function ShapeNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
           if (!isLine) setEditing(true);
         }}
       >
+        {isLine && (
+          <div
+            className="mdbc-canvas-shape-line"
+            style={lineCss}
+            data-testid="canvas-shape-line"
+          />
+        )}
         {!isLine && (
           <textarea
             ref={inputRef}
