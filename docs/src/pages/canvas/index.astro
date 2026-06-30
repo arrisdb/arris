@@ -3,9 +3,9 @@ import "../../styles/global.css";
 import DocsLayout from "../../layouts/DocsLayout.astro";
 import DocTable from "../../components/docs/DocTable/DocTable.astro";
 import Callout from "../../components/docs/Callout/Callout.astro";
+import Screenshot from "../../components/docs/Screenshot/Screenshot.astro";
 
-// Screenshots to capture (shared Screenshot component):
-// - A board with an agent-built query + chart + text, Agent panel on the left.
+// Screenshot still to capture (shared Screenshot component):
 // - The New Canvas (+) button in the editor tab bar.
 ---
 
@@ -66,6 +66,12 @@ import Callout from "../../components/docs/Callout/Callout.astro";
     objects to add: usually a query that aggregates the data, a chart bound to it, and a one-line
     summary. Arris drops them on the board, runs the query, and renders the chart from the result.
   </p>
+
+  <Screenshot
+    src="/screenshots/canvas-board.png"
+    alt="A canvas board with the Agent panel on the left, two query objects, a preview table, a line chart bound to a query, and a sticky note, with the chart properties panel open on the right."
+    caption="A board the agent built and refined turn by turn: a query and its preview table, a chart re-pointed to a filtered query, and a sticky-note annotation."
+  />
 
   <p>
     Pick <strong>Codex</strong> or <strong>Claude</strong> in the chat header (one shared preference
