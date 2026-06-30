@@ -193,18 +193,14 @@ function useCanvasAgentChat(tab: EditorTab) {
     const components =
       useCanvasStore.getState().boards[tabId]?.doc.components ?? [];
     const board = describeBoard(components);
-    const schema = multiConnection
-      ? agentSchema()
-      : (schemaByConn[connectionId ?? ""] ?? "").trim() ||
-        "(no schema loaded for this connection)";
     return [
       "# Database schema (sent to the agent)",
-      schema,
+      agentSchema(),
       "",
       "# Current board",
       board || "The board is empty.",
     ].join("\n");
-  }, [agentSchema, connectionId, multiConnection, schemaByConn, tabId]);
+  }, [agentSchema, tabId]);
 
   const turnIdRef = useRef<string | null>(null);
   const agentEntryIdRef = useRef<string | null>(null);
@@ -331,13 +327,18 @@ function useCanvasAgentChat(tab: EditorTab) {
       );
       sendCanvasAgentIPC({
         provider,
-        // A multi-connection board hands the backend a pre-assembled schema and
-        // no single connection; a single-connection board lets the backend
-        // resolve the schema for its one connection.
+        // A multi-connection board carries several dialects, so the prompt stays
+        // dialect-generic (connectionId null); a single-connection board passes
+        // its connection so the prompt names that dialect.
         connectionId: multiConnection ? null : connectionId,
         prompt,
         boardContext,
-        schemaOverride: multiConnection ? agentSchema() : null,
+        // Always hand the backend the id-headed schema, even for one connection.
+        // Each `## Connection ... id=<id>` header tells the agent the id to write
+        // when it MOVES a query onto that connection; without it a single-
+        // connection turn can rewrite a cell's SQL but never change its
+        // connectionId (it has no id to reference).
+        schemaOverride: agentSchema(),
         turnId,
         resumeSession,
       }).catch((e) => {

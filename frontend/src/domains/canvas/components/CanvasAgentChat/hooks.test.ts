@@ -159,6 +159,22 @@ describe("useCanvasAgentChat", () => {
     expect(args.schemaOverride).toContain('## Connection "Events" (id=conn-b, mysql)');
   });
 
+  it("sends the id-headed schema even for a single connection so the agent can move a query", async () => {
+    useConnectionsStore.setState({
+      connections: [{ id: "conn-1", name: "Sales", kind: "postgres", isConnected: true }],
+    } as never);
+    const { result } = renderHook(() => useCanvasAgentChat(withConn));
+    await waitFor(() => expect(result.current.schemaLoading).toBe(false));
+
+    act(() => result.current.send("move this query to postgres"));
+    const args = vi.mocked(sendCanvasAgentIPC).mock.calls[0][0];
+    // Single connection still names its dialect (connectionId set) AND carries the
+    // `## Connection ... id=` header, so the agent has an id to write when moving a
+    // cell onto this connection.
+    expect(args.connectionId).toBe("conn-1");
+    expect(args.schemaOverride).toContain('## Connection "Sales" (id=conn-1, postgres)');
+  });
+
   it("dispatches a canvas turn and shows a user + pending agent entry", () => {
     const { result } = renderHook(() => useCanvasAgentChat(withConn));
     act(() => result.current.send("monthly sales by category"));
