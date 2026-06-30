@@ -6,9 +6,11 @@ import {
   buildNodeMenuItems,
   COMPONENT_KINDS,
   hasActiveTextSelection,
+  isEditableTarget,
   nodeTypes,
   toFlowEdges,
   toFlowNodes,
+  viewportCenterPlacement,
 } from "./utils";
 
 describe("nodeTypes registry", () => {
@@ -136,5 +138,64 @@ describe("hasActiveTextSelection", () => {
     expect(hasActiveTextSelection()).toBe(true);
     sel?.removeAllRanges();
     document.body.removeChild(p);
+  });
+});
+
+describe("isEditableTarget", () => {
+  it("is false for a non-editable element (so bare-key shortcuts fire)", () => {
+    const div = document.createElement("div");
+    expect(isEditableTarget(div)).toBe(false);
+    expect(isEditableTarget(null)).toBe(false);
+  });
+
+  it("is true for inputs, textareas, contenteditable, and CodeMirror", () => {
+    expect(isEditableTarget(document.createElement("input"))).toBe(true);
+    expect(isEditableTarget(document.createElement("textarea"))).toBe(true);
+    const ce = document.createElement("div");
+    ce.contentEditable = "true";
+    // jsdom doesn't compute isContentEditable from the attribute, so assert it directly.
+    Object.defineProperty(ce, "isContentEditable", { value: true });
+    expect(isEditableTarget(ce)).toBe(true);
+    const cm = document.createElement("div");
+    cm.className = "cm-editor";
+    const inner = document.createElement("span");
+    cm.appendChild(inner);
+    expect(isEditableTarget(inner)).toBe(true);
+  });
+});
+
+describe("viewportCenterPlacement", () => {
+  it("centers an object in the pane at the default viewport", () => {
+    const out = viewportCenterPlacement(
+      { width: 800, height: 600 },
+      { x: 0, y: 0, zoom: 1 },
+      { w: 200, h: 100 },
+      0,
+    );
+    // Pane center (400,300) minus half the object (100,50).
+    expect(out).toEqual({ x: 300, y: 250 });
+  });
+
+  it("inverts pan and zoom so the object lands where the user is looking", () => {
+    const out = viewportCenterPlacement(
+      { width: 800, height: 600 },
+      { x: -200, y: -100, zoom: 2 },
+      { w: 200, h: 100 },
+      0,
+    );
+    // centerFlow = ((400 - -200)/2, (300 - -100)/2) = (300, 200); minus half size.
+    expect(out).toEqual({ x: 200, y: 150 });
+  });
+
+  it("cascades repeated adds so they don't stack exactly", () => {
+    const a = viewportCenterPlacement({ width: 800, height: 600 }, { x: 0, y: 0, zoom: 1 }, { w: 200, h: 100 }, 0);
+    const b = viewportCenterPlacement({ width: 800, height: 600 }, { x: 0, y: 0, zoom: 1 }, { w: 200, h: 100 }, 1);
+    expect(b.x - a.x).toBe(24);
+    expect(b.y - a.y).toBe(24);
+  });
+
+  it("falls back to a zero-sized pane when the rect is unavailable", () => {
+    const out = viewportCenterPlacement(null, { x: 0, y: 0, zoom: 1 }, { w: 200, h: 100 }, 0);
+    expect(out).toEqual({ x: -100, y: -50 });
   });
 });

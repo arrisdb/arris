@@ -3,6 +3,8 @@ import { useEffect, useRef, useState } from "react";
 import { Tooltip } from "@shared/ui";
 import { Icon } from "@shared/ui/Icon";
 import { IconButton } from "@shared/ui/IconButton";
+import { useSettingsStore } from "@shared/settings";
+import { shortcutDisplay } from "@shell/utils";
 
 import type { CanvasToolbarProps } from "../../types";
 import type { Tool } from "./types";
@@ -27,6 +29,8 @@ function CanvasToolbar({
   // both reflects and re-applies that choice on the next click.
   const [lastSelect, setLastSelect] = useState<Record<string, string>>({});
   const rootRef = useRef<HTMLDivElement>(null);
+  // Live keymap, so each menu item shows the shortcut the user actually bound.
+  const shortcuts = useSettingsStore((s) => s.shortcuts);
 
   // Dismiss an open menu on outside click or Escape.
   useEffect(() => {
@@ -55,9 +59,9 @@ function CanvasToolbar({
       active: true,
       onClick: () => onModeChange("move"),
       menu: [
-        { id: "move", label: "Move", icon: "mousePointer", shortcut: "V", active: mode === "move", onSelect: () => onModeChange("move") },
-        { id: "hand", label: "Hand tool", icon: "hand", shortcut: "H", active: mode === "hand", onSelect: () => onModeChange("hand") },
-        { id: "connect", label: "Arrow / connect", icon: "arrowRight", shortcut: "A", active: mode === "connect", onSelect: () => onModeChange("connect") },
+        { id: "move", label: "Move", icon: "mousePointer", action: "canvasMoveTool", active: mode === "move", onSelect: () => onModeChange("move") },
+        { id: "hand", label: "Hand tool", icon: "hand", action: "canvasHandTool", active: mode === "hand", onSelect: () => onModeChange("hand") },
+        { id: "connect", label: "Arrow / connect", icon: "arrowRight", action: "canvasConnectTool", active: mode === "connect", onSelect: () => onModeChange("connect") },
       ],
     },
     {
@@ -66,7 +70,7 @@ function CanvasToolbar({
       title: "Query cell",
       onClick: onAddQuery,
       menu: [
-        { id: "sql", label: "SQL", icon: "database", shortcut: "/", active: true, onSelect: onAddQuery },
+        { id: "sql", label: "SQL", icon: "database", action: "canvasAddSqlCell", active: true, onSelect: onAddQuery },
         { id: "python", label: "Python", icon: "code", shortcut: "Soon", disabled: true, onSelect: () => {} },
       ],
     },
@@ -80,9 +84,9 @@ function CanvasToolbar({
       title: "Shape",
       onClick: () => onAddShape("rect"),
       menu: [
-        { id: "rect", label: "Rectangle", icon: "square", shortcut: "R", onSelect: () => onAddShape("rect") },
-        { id: "ellipse", label: "Ellipse", icon: "circle", shortcut: "O", onSelect: () => onAddShape("ellipse") },
-        { id: "line", label: "Line", icon: "minus", shortcut: "L", onSelect: () => onAddShape("line") },
+        { id: "rect", label: "Rectangle", icon: "square", action: "canvasAddRectangle", onSelect: () => onAddShape("rect") },
+        { id: "ellipse", label: "Ellipse", icon: "circle", action: "canvasAddEllipse", onSelect: () => onAddShape("ellipse") },
+        { id: "line", label: "Line", icon: "minus", action: "canvasAddLine", onSelect: () => onAddShape("line") },
       ],
     },
   ];
@@ -137,7 +141,13 @@ function CanvasToolbar({
           )}
           {tool.menu && openId === tool.id && (
             <div className="mdbc-select-menu mdbc-canvas-tool-menu" role="menu">
-              {tool.menu.map((item) => (
+              {tool.menu.map((item) => {
+                // A bound item shows its live keymap shortcut; an unbound one
+                // (e.g. the "Soon" placeholder) shows its static label.
+                const itemShortcut = item.action
+                  ? shortcutDisplay(shortcuts[item.action])
+                  : item.shortcut;
+                return (
                 <div
                   key={item.id}
                   role="menuitem"
@@ -153,9 +163,10 @@ function CanvasToolbar({
                   <Icon name={item.icon} size={14} />
                   <span className="mdbc-canvas-tool-item-label">{item.label}</span>
                   {item.active && <Icon name="check" size={12} className="mdbc-canvas-tool-item-check" />}
-                  {item.shortcut && <span className="mdbc-canvas-tool-item-shortcut">{item.shortcut}</span>}
+                  {itemShortcut && <span className="mdbc-canvas-tool-item-shortcut">{itemShortcut}</span>}
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

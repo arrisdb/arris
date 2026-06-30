@@ -1,8 +1,16 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
+
+import { useSettingsStore } from "@shared/settings";
 
 import type { CanvasToolbarProps } from "../../types";
 import { CanvasToolbar } from "./index";
+
+function shortcutText(testId: string): string | null | undefined {
+  return screen
+    .getByTestId(testId)
+    .querySelector(".mdbc-canvas-tool-item-shortcut")?.textContent;
+}
 
 function setup(overrides: Partial<CanvasToolbarProps> = {}) {
   const props: CanvasToolbarProps = {
@@ -118,5 +126,31 @@ describe("CanvasToolbar", () => {
     expect(screen.getByTestId("canvas-tool-shape-ellipse")).toBeTruthy();
     fireEvent.click(screen.getByTestId("canvas-tool-text"));
     expect(screen.queryByTestId("canvas-tool-shape-ellipse")).toBeNull();
+  });
+
+  describe("menu shortcuts", () => {
+    afterEach(() => {
+      // Restore any rebound default so tests stay independent.
+      useSettingsStore.getState().setShortcut("canvasMoveTool", "v");
+    });
+
+    it("shows each bound option's live keymap shortcut, and a static hint for unbound ones", () => {
+      setup();
+      fireEvent.click(screen.getByTestId("canvas-tool-select-caret"));
+      // Bound defaults render uppercased from the keymap, not a hardcoded letter.
+      expect(shortcutText("canvas-tool-select-move")).toBe("V");
+      expect(shortcutText("canvas-tool-select-hand")).toBe("H");
+      expect(shortcutText("canvas-tool-select-connect")).toBe("A");
+      // The unbound Python placeholder keeps its static "Soon" hint.
+      fireEvent.click(screen.getByTestId("canvas-tool-query-caret"));
+      expect(shortcutText("canvas-tool-query-python")).toBe("Soon");
+    });
+
+    it("reflects a rebound shortcut from settings (no hardcoded label)", () => {
+      useSettingsStore.getState().setShortcut("canvasMoveTool", "m");
+      setup();
+      fireEvent.click(screen.getByTestId("canvas-tool-select-caret"));
+      expect(shortcutText("canvas-tool-select-move")).toBe("M");
+    });
   });
 });

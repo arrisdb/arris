@@ -5,6 +5,8 @@ import {
   categoryOf,
   commandMenuItem,
   defaultShortcutFor,
+  isBareKeySpec,
+  isTypingTarget,
   labelFor,
   matchesShortcut,
   runCommand,
@@ -71,6 +73,7 @@ describe("ACTIONS registry", () => {
     expect(CATEGORY_ORDER).toEqual([
       "editor",
       "tabs",
+      "canvas",
       "navigation",
       "sidebar",
       "results",
@@ -161,5 +164,38 @@ describe("command registry bridge", () => {
   it("commandMenuItem is disabled when the command is not enabled", () => {
     useCommandRegistryStore.getState().register("splitTop", { run: () => {}, isEnabled: () => false });
     expect(commandMenuItem("splitTop")).toMatchObject({ disabled: true });
+  });
+});
+
+describe("isBareKeySpec", () => {
+  it("is true for a modifier-less spec (the canvas tool shortcuts)", () => {
+    expect(isBareKeySpec("v")).toBe(true);
+    expect(isBareKeySpec("/")).toBe(true);
+    expect(isBareKeySpec("]")).toBe(true);
+  });
+
+  it("is false once any modifier is present", () => {
+    expect(isBareKeySpec("Mod-Enter")).toBe(false);
+    expect(isBareKeySpec("Shift-Enter")).toBe(false);
+    expect(isBareKeySpec("Mod-Alt-l")).toBe(false);
+    expect(isBareKeySpec("Ctrl-`")).toBe(false);
+  });
+});
+
+describe("isTypingTarget", () => {
+  it("is true for text-entry surfaces so bare keys keep typing", () => {
+    expect(isTypingTarget(document.createElement("input"))).toBe(true);
+    expect(isTypingTarget(document.createElement("textarea"))).toBe(true);
+    expect(isTypingTarget(document.createElement("select"))).toBe(true);
+    const cm = document.createElement("div");
+    cm.className = "cm-editor";
+    const inner = document.createElement("span");
+    cm.appendChild(inner);
+    expect(isTypingTarget(inner)).toBe(true);
+  });
+
+  it("is false for a plain element and for null", () => {
+    expect(isTypingTarget(document.createElement("div"))).toBe(false);
+    expect(isTypingTarget(null)).toBe(false);
   });
 });

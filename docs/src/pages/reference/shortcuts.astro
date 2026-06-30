@@ -16,6 +16,7 @@ import Callout from "../../components/docs/Callout/Callout.astro";
     { label: "Connections", href: "#connections" },
     { label: "Tabs & navigation", href: "#navigation" },
     { label: "Results grid", href: "#results" },
+    { label: "Canvas", href: "#canvas" },
     { label: "Customization", href: "#customization" },
   ]}
   currentPath="/reference/shortcuts"
@@ -273,6 +274,73 @@ import Callout from "../../components/docs/Callout/Callout.astro";
         <td class="font-medium text-fg"><kbd>&#8984;A</kbd></td>
         <td>Select all rows</td>
         <td>Results grid</td>
+      </tr>
+    </tbody>
+  </DocTable>
+
+  <h2 id="canvas">Canvas</h2>
+
+  <p>
+    These single-key shortcuts mirror the canvas board's bottom toolbar and an object's
+    right-click menu. They fire only while a canvas board is focused, and never while you are
+    typing in a query cell, text block, or the agent chat. Like every other shortcut, they are
+    rebindable under <strong>Settings &rarr; Keyboard Shortcuts</strong> (the <strong>Canvas</strong>
+    group), and the toolbar menus show whatever key you have bound.
+  </p>
+
+  <DocTable>
+    <thead>
+      <tr>
+        <th>Shortcut</th>
+        <th>Action</th>
+        <th>Context</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="font-medium text-fg"><kbd>V</kbd></td>
+        <td>Move tool (select and drag objects)</td>
+        <td>Canvas board</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><kbd>H</kbd></td>
+        <td>Hand tool (pan the board)</td>
+        <td>Canvas board</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><kbd>A</kbd></td>
+        <td>Arrow / connect tool</td>
+        <td>Canvas board</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><kbd>/</kbd></td>
+        <td>Add a SQL cell</td>
+        <td>Canvas board</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><kbd>R</kbd></td>
+        <td>Add a rectangle</td>
+        <td>Canvas board</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><kbd>O</kbd></td>
+        <td>Add an ellipse</td>
+        <td>Canvas board</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><kbd>L</kbd></td>
+        <td>Add a line</td>
+        <td>Canvas board</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><kbd>]</kbd></td>
+        <td>Bring the selected object to front</td>
+        <td>Canvas board</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg"><kbd>[</kbd></td>
+        <td>Send the selected object to back</td>
+        <td>Canvas board</td>
       </tr>
     </tbody>
   </DocTable>

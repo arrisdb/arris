@@ -66,6 +66,13 @@ vi.mock("@domains/notebook/components/NotebookView/ipc", () => ({
   writeNotebookFileIPC: vi.fn(),
 }));
 
+// CanvasView owns the canvas tool commands. Its agent chat panel reaches the
+// agent CLI over IPC and renders a provider picker; stub it to nothing so the
+// coverage harness only exercises the board's command registration.
+vi.mock("@domains/canvas/components/CanvasAgentChat", () => ({
+  CanvasAgentChat: () => null,
+}));
+
 vi.mock("@tanstack/react-virtual", () => ({
   useVirtualizer: (opts: { count: number }) => ({
     getVirtualItems: () =>
@@ -81,6 +88,7 @@ import { usePinnedQueriesStore } from "@domains/pinnedQueries/hooks";
 
 import { EditorPane } from "@domains/editor/components/EditorPane";
 import { NotebookView } from "@domains/notebook/components/NotebookView";
+import { CanvasView } from "@domains/canvas/components/CanvasView";
 import { ResultsTableView } from "@domains/results/components/ResultsTableView";
 import { useGlobalCommands, useRegisterCommands } from "./commands";
 import { ACTION_ORDER, useSettingsStore } from "@shared/settings";
@@ -91,6 +99,15 @@ import { useTabsStore } from "../hooks/tabsStore";
 import type { EditorTab } from "../types";
 import { useDbtStore } from "@domains/dbt/hooks";
 import { useSqlMeshStore } from "@domains/sqlmesh/hooks";
+
+// ReactFlow (mounted by CanvasView) observes its pane via ResizeObserver, which
+// jsdom does not provide. A no-op stub lets the board mount in the harness.
+class StubResizeObserver {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+vi.stubGlobal("ResizeObserver", StubResizeObserver);
 
 function chip(id: string): QueryRunResult {
   return {
@@ -138,6 +155,18 @@ function notebookTab(): EditorTab {
   } as EditorTab;
 }
 
+function canvasTab(): EditorTab {
+  return {
+    id: "cv1",
+    title: "Canvas 1",
+    text: "",
+    kind: "canvas",
+    cursor: 0,
+    tabType: "canvas",
+    connectionId: "c1",
+  } as EditorTab;
+}
+
 // Mounts every command owner in a state where it is active, so each registers
 // its full set of command ids. Global commands have no DOM, so the harness just
 // invokes the hook and renders the two context owners.
@@ -147,6 +176,7 @@ function CoverageHarness() {
     <>
       <EditorPane />
       <NotebookView activeTab={notebookTab()} />
+      <CanvasView activeTab={canvasTab()} />
       <ResultsTableView />
     </>
   );
