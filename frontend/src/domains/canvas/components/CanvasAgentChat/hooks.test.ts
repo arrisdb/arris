@@ -108,9 +108,29 @@ describe("useCanvasAgentChat", () => {
     const { result } = renderHook(() => useCanvasAgentChat(noConn));
     expect(result.current.connectionOptions).toEqual([{ value: "conn-1", label: "Sales DB" }]);
 
-    act(() => result.current.pickConnection("conn-1"));
+    act(() => result.current.pickConnections(["conn-1"]));
     expect(selectConnection).toHaveBeenCalledWith("conn-1");
     expect(updateTab).toHaveBeenCalledWith(TAB, { connectionId: "conn-1" });
+  });
+
+  it("assembles a labeled multi-connection schema and sends it as the override", async () => {
+    useConnectionsStore.setState({
+      connections: [
+        { id: "conn-a", name: "Sales", kind: "postgres", isConnected: true },
+        { id: "conn-b", name: "Events", kind: "mysql", isConnected: true },
+      ],
+    } as never);
+    useCanvasStore.getState().setConnectionIds(TAB, ["conn-a", "conn-b"]);
+    const { result } = renderHook(() => useCanvasAgentChat(withConn));
+    await waitFor(() => expect(result.current.schemaLoading).toBe(false));
+
+    act(() => result.current.send("compare sales and events"));
+    const args = vi.mocked(sendCanvasAgentIPC).mock.calls[0][0];
+    // No single connection is sent; the assembled schema rides as the override,
+    // labeled per connection with its id and dialect.
+    expect(args.connectionId).toBeNull();
+    expect(args.schemaOverride).toContain('## Connection "Sales" (id=conn-a, postgres)');
+    expect(args.schemaOverride).toContain('## Connection "Events" (id=conn-b, mysql)');
   });
 
   it("dispatches a canvas turn and shows a user + pending agent entry", () => {

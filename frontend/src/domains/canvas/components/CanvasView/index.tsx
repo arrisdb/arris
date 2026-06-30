@@ -1,6 +1,6 @@
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 import ReactFlow, { Background, Controls } from "reactflow";
-import type { Node } from "reactflow";
+import type { Edge, Node } from "reactflow";
 import type { MouseEvent as ReactMouseEvent } from "react";
 import "reactflow/dist/style.css";
 import "./index.css";
@@ -12,7 +12,7 @@ import { CanvasPropertiesPane } from "./components/CanvasPropertiesPane";
 import { CanvasToolbar } from "./components/CanvasToolbar";
 import { useCanvas } from "./hooks";
 import type { CanvasViewProps } from "./types";
-import { buildNodeMenuItems, nodeTypes } from "./utils";
+import { buildEdgeMenuItems, buildNodeMenuItems, edgeTypes, nodeTypes } from "./utils";
 
 /// The canvas thinkboard tab view: an infinite ReactFlow board of objects
 /// (text/query/chart/shape) plus a floating add-toolbar. The agent chat panel is
@@ -20,10 +20,26 @@ import { buildNodeMenuItems, nodeTypes } from "./utils";
 function CanvasView({ activeTab }: CanvasViewProps) {
   const canvas = useCanvas(activeTab);
   const handMode = canvas.mode === "hand";
+  const connectMode = canvas.mode === "connect";
   const menu = useContextMenu<string>();
+  const edgeMenu = useContextMenu<string>();
 
   const onNodeContextMenu = (event: ReactMouseEvent, node: Node) =>
     menu.open(event, node.id);
+
+  // In connect mode, clicking objects draws the arrow (source then target);
+  // otherwise ReactFlow handles normal selection.
+  const onNodeClick = (_event: ReactMouseEvent, node: Node) => {
+    if (connectMode) canvas.onConnectNodeClick(node.id);
+  };
+
+  // Clicking empty space abandons a half-drawn arrow.
+  const onPaneClick = () => canvas.clearConnect();
+
+  const onEdgeContextMenu = (event: ReactMouseEvent, edge: Edge) => {
+    event.preventDefault();
+    edgeMenu.open(event, edge.id);
+  };
 
   const menuComponent = menu.state ? canvas.componentById(menu.state.context) : undefined;
 
@@ -35,20 +51,26 @@ function CanvasView({ activeTab }: CanvasViewProps) {
         </Panel>
         <PanelResizeHandle className="mdbc-canvas-pane-resizer" />
         <Panel id="canvas-board" order={2} minSize={30}>
-          <div className={`mdbc-canvas-board${handMode ? " hand" : ""}`}>
+          <div
+            className={`mdbc-canvas-board${handMode ? " hand" : ""}${connectMode ? " connect" : ""}`}
+          >
             <ReactFlow
               nodes={canvas.rfNodes}
               edges={canvas.rfEdges}
               nodeTypes={nodeTypes}
+              edgeTypes={edgeTypes}
               onNodesChange={canvas.onNodesChange}
               onNodeDragStop={canvas.onNodeDragStop}
               onNodesDelete={canvas.onNodesDelete}
               onNodeContextMenu={onNodeContextMenu}
+              onNodeClick={onNodeClick}
+              onPaneClick={onPaneClick}
+              onEdgeContextMenu={onEdgeContextMenu}
               onMoveEnd={canvas.onMoveEnd}
               defaultViewport={canvas.defaultViewport}
               minZoom={0.2}
               maxZoom={2}
-              nodesDraggable={!handMode}
+              nodesDraggable={canvas.mode === "move"}
               nodesConnectable={false}
               deleteKeyCode={["Backspace", "Delete"]}
               proOptions={{ hideAttribution: true }}
@@ -93,6 +115,15 @@ function CanvasView({ activeTab }: CanvasViewProps) {
           })}
           onClose={menu.close}
           data-testid="canvas-node-menu"
+        />
+      )}
+      {edgeMenu.state && (
+        <ContextMenu
+          x={edgeMenu.state.x}
+          y={edgeMenu.state.y}
+          items={buildEdgeMenuItems(edgeMenu.state.context, { remove: canvas.removeEdge })}
+          onClose={edgeMenu.close}
+          data-testid="canvas-edge-menu"
         />
       )}
     </div>

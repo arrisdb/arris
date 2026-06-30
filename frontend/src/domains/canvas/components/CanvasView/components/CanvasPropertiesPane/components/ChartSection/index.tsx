@@ -1,45 +1,50 @@
-import type { ChartKind } from "@shared";
+import { ChartEditorSections } from "@domains/chart";
 import { Select } from "@shared/ui";
 
 import { useCanvasStore } from "../../../../../../hooks";
-import { CHART_KIND_OPTIONS } from "../../constants";
+import type { ChartComponent } from "../../../../../../types";
 import type { SectionProps } from "../../types";
+import { useCanvasChartEditor } from "./hooks";
 
-/// Chart-specific controls: the chart kind, the query object it draws from, and a
-/// title. The source-query options are the board's own query objects.
+/// Chart-specific controls. The canvas-only "Source query" picker binds the chart
+/// to one of the board's query objects; everything else (chart type, axes,
+/// appearance, legend, colours) is the shared chart-editor surface, identical to
+/// the results-pane editor, driven from the bound query's last run.
 function ChartSection({ tabId, component, onChange }: SectionProps) {
-  const components = useCanvasStore((s) => s.boards[tabId]?.doc.components);
   if (component.kind !== "chart") return null;
+  return <ChartSectionBody tabId={tabId} component={component} onChange={onChange} />;
+}
+
+function ChartSectionBody({
+  tabId,
+  component,
+  onChange,
+}: {
+  tabId: string;
+  component: ChartComponent;
+  onChange: (patch: Partial<ChartComponent>) => void;
+}) {
+  const components = useCanvasStore((s) => s.boards[tabId]?.doc.components);
+  const pane = useCanvasChartEditor(tabId, component, onChange);
 
   const sourceOptions = (components ?? [])
     .filter((c) => c.kind === "query")
     .map((c) => ({ value: c.id, label: c.title || c.id }));
 
   return (
-    <div className="mdbc-pane-form">
-      <span className="mdbc-pane-label">Chart type</span>
-      <Select
-        value={component.spec.kind ?? "bar"}
-        options={CHART_KIND_OPTIONS}
-        onChange={(v) => onChange({ spec: { ...component.spec, kind: v as ChartKind } })}
-        data-testid="chart-kind-select"
-      />
-      <span className="mdbc-pane-label">Source query</span>
-      <Select
-        value={component.sourceQueryId}
-        options={sourceOptions}
-        placeholder="Pick a query object"
-        onChange={(v) => onChange({ sourceQueryId: v })}
-        data-testid="chart-source-select"
-      />
-      <span className="mdbc-pane-label">Title</span>
-      <input
-        className="mdbc-pane-input"
-        value={component.title ?? ""}
-        placeholder="Untitled chart"
-        onChange={(e) => onChange({ title: e.target.value })}
-      />
-    </div>
+    <>
+      <div className="mdbc-pane-form">
+        <span className="mdbc-pane-label">Source query</span>
+        <Select
+          value={component.sourceQueryId}
+          options={sourceOptions}
+          placeholder="Pick a query object"
+          onChange={(v) => onChange({ sourceQueryId: v })}
+          data-testid="chart-source-select"
+        />
+      </div>
+      <ChartEditorSections pane={pane} />
+    </>
   );
 }
 

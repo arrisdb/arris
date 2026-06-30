@@ -50,10 +50,12 @@ import DocTable from "../../components/docs/DocTable/DocTable.astro";
   <p>
     Open a new board with the <strong>New Canvas</strong> button (the sparkles icon) in the editor
     tab bar, or run the <strong>New Canvas</strong> command from the keymap. A canvas opens as a
-    center tab, just like a query or a notebook, and you can rename it. The board inherits the
-    connection that is currently selected, so its query objects and the agent both target that
-    database. You can also set or change it any time from the <strong>Connection</strong> picker at
-    the top of the agent panel; the choice is board-wide, shared by the agent and every query object.
+    center tab, just like a query or a notebook, and you can rename it. The board starts on the
+    connection that is currently selected, but the <strong>Connection</strong> picker at the top of
+    the agent panel is a multi-select: choose several connections and the agent reads every one's
+    schema and can run each query object against a different database. The first connection you pick
+    is the primary, used as the default for query objects you add by hand. The set is saved with the
+    board.
   </p>
 
   <h2 id="objects">Objects</h2>
@@ -116,17 +118,21 @@ import DocTable from "../../components/docs/DocTable/DocTable.astro";
     choice as the SQL agent (it is one shared preference). The agent runs that provider's local CLI
     under the same guardrails as the SQL agent: it runs locally in a read-only mode, never touches
     your filesystem,
-    and only receives your prompt, the connection's <strong>schema as DDL</strong> and dialect, and a
+    and only receives your prompt, each chosen connection's <strong>schema as DDL</strong> and
+    dialect, and a
     short summary of the objects already on the board (their kinds, ids, titles, and SQL), all capped
     in size. Your row data is not sent. Because the agent needs the schema to write correct SQL, the
     chat asks you to connect a database to the canvas first.
   </p>
 
   <p>
-    When you pick a connection, the panel shows a <strong>fetching schema</strong> indicator while it
-    reads the database's tables and columns (the same deep read the schema browser does, not just the
-    table names). The <strong>Context</strong> button previews the exact text handed to the agent: the
-    schema DDL plus the current board summary, so you can see what it is working from.
+    When you pick connections, the panel shows a <strong>fetching schema</strong> indicator while it
+    reads each database's tables and columns (the same deep read the schema browser does, not just the
+    table names). Expand the collapsible <strong>Context</strong> section to preview the exact text
+    handed to the agent: the schema DDL (one labeled block per connection) plus the current board
+    summary, so you can see what it is working from. On a multi-connection board each block is headed
+    with its connection's id and dialect, and the agent tags every query object it writes with the
+    matching connection.
   </p>
 
   <p>
@@ -152,8 +158,11 @@ import DocTable from "../../components/docs/DocTable/DocTable.astro";
   <ul>
     <li><strong>Add</strong> objects from the toolbar at the bottom of the board: a query, chart, sticky note, text, or shape. Tools with a caret have options (the shape kind, the query language, the pointer mode): clicking the tool applies its last-used option and opens the menu at the same time, so switching to another option is one more click. The caret alone just toggles the menu.</li>
     <li><strong>Select</strong> an object with a single click; its resize anchors stay shown until you click an empty part of the board.</li>
-    <li><strong>Adjust properties</strong> in the panel that opens on the right while one object is selected. Every object shows its position, size, and a lock toggle; below that each kind has its own controls (a shape's fill, stroke, and corner radius; a text block's font size, weight, alignment, and colour; a sticky note's tint; a query's title, connection, and Run; a chart's type, source query, and title).</li>
+    <li><strong>Adjust properties</strong> in the panel that opens on the right while one object is selected. Every object shows its position, size, and a lock toggle; below that each kind has its own controls (a shape's fill, stroke, and corner radius; a text block's font size, weight, alignment, and colour; a sticky note's tint; a query's title, connection, and Run; a chart's source query plus the full chart
+      editor: type, axes, series, aggregation, colours, legend, and labels, the same
+      control surface as the results-view chart editor).</li>
     <li><strong>Move</strong> an object by dragging it; objects may overlap. Text and sticky notes move on a single drag and open for editing on double-click. Switch the pointer to the <strong>Hand</strong> tool to pan the board from anywhere instead of dragging objects.</li>
+    <li><strong>Connect</strong> two objects with a relationship arrow: pick the <strong>Arrow</strong> tool from the pointer menu, click the source object, then the target. The arrow sticks to both objects' borders and re-routes automatically as you move or resize them. Right-click an arrow to delete it.</li>
     <li><strong>Resize</strong> a selected object by dragging any of its borders or corner handles.</li>
     <li><strong>Copy, reorder, lock, and delete</strong> from an object's right-click menu: Copy (<kbd>⌘C</kbd>) puts it on the clipboard and Paste (<kbd>⌘V</kbd>) drops a fresh copy nearby, the four restacking actions (Bring to front, Bring forward, Send backward, Send to back) change its overlap order, Lock freezes it (a locked object can't be moved or resized until you unlock it), and Delete removes it.</li>
     <li><strong>Pan</strong> by dragging the empty canvas, and <strong>zoom</strong> with the scroll wheel or the controls in the corner.</li>

@@ -15,6 +15,23 @@ describe("serialize", () => {
     expect(parseDoc(serializeDoc(doc))).toEqual(doc);
   });
 
+  it("roundtrips the board's connection set and drops non-string ids", () => {
+    const doc = {
+      version: CANVAS_DOC_VERSION,
+      components: [],
+      edges: [],
+      connectionIds: ["conn-a", "conn-b"],
+    };
+    expect(parseDoc(serializeDoc(doc)).connectionIds).toEqual(["conn-a", "conn-b"]);
+    const dirty = JSON.stringify({
+      version: CANVAS_DOC_VERSION,
+      components: [],
+      edges: [],
+      connectionIds: ["conn-a", 7, null, "conn-b"],
+    });
+    expect(parseDoc(dirty).connectionIds).toEqual(["conn-a", "conn-b"]);
+  });
+
   it("returns an empty doc for blank text", () => {
     expect(parseDoc("")).toEqual(emptyDoc());
     expect(parseDoc("   ")).toEqual(emptyDoc());

@@ -32,12 +32,14 @@ describe("CanvasPropertiesPane", () => {
     expect(container.querySelector('input[type="color"]')).toBeTruthy();
   });
 
-  it("shows the chart section (kind + source pickers) for a chart", () => {
+  it("shows the chart section (source picker + shared editor surface) for a chart", () => {
     const comp = makeComponent({ kind: "chart", id: "c", sourceQueryId: "" });
     const { getByTestId } = render(
       <CanvasPropertiesPane tabId={TAB} component={comp} onChange={vi.fn()} />,
     );
-    expect(getByTestId("chart-kind-select")).toBeTruthy();
     expect(getByTestId("chart-source-select")).toBeTruthy();
+    // The shared chart-editor controls are embedded (type grid, x-axis picker).
+    expect(getByTestId("chart-editor-kind-bar")).toBeTruthy();
+    expect(getByTestId("chart-editor-x-axis")).toBeTruthy();
   });
 });

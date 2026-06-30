@@ -136,6 +136,34 @@ describe("useCanvasStore", () => {
     expect(get().boards[TAB].doc.components).toHaveLength(1);
   });
 
+  it("setConnectionIds persists the board's connection set", () => {
+    get().ensureBoard(TAB, "");
+    get().setConnectionIds(TAB, ["conn-a", "conn-b"]);
+    expect(get().boards[TAB].doc.connectionIds).toEqual(["conn-a", "conn-b"]);
+  });
+
+  it("addEdge connects two objects, ignoring self-links and duplicates", () => {
+    get().ensureBoard(TAB, "");
+    get().addComponent(TAB, makeComponent({ kind: "shape", id: "a", shape: "rect" }));
+    get().addComponent(TAB, makeComponent({ kind: "shape", id: "b", shape: "rect" }));
+    get().addEdge(TAB, "a", "b");
+    expect(get().boards[TAB].doc.edges).toMatchObject([{ source: "a", target: "b" }]);
+    // A self-link and a duplicate are both no-ops.
+    get().addEdge(TAB, "a", "a");
+    get().addEdge(TAB, "a", "b");
+    expect(get().boards[TAB].doc.edges).toHaveLength(1);
+  });
+
+  it("removeEdges drops arrows by id", () => {
+    get().ensureBoard(TAB, "");
+    get().addComponent(TAB, makeComponent({ kind: "shape", id: "a", shape: "rect" }));
+    get().addComponent(TAB, makeComponent({ kind: "shape", id: "b", shape: "rect" }));
+    get().addEdge(TAB, "a", "b");
+    const edgeId = get().boards[TAB].doc.edges[0].id;
+    get().removeEdges(TAB, [edgeId]);
+    expect(get().boards[TAB].doc.edges).toHaveLength(0);
+  });
+
   it("reorderComponent restacks objects by z", () => {
     get().ensureBoard(TAB, "");
     get().addComponent(TAB, makeComponent({ kind: "shape", id: "a", shape: "rect", z: 0 }));
