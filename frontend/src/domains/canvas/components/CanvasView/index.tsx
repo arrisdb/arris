@@ -6,6 +6,7 @@ import "reactflow/dist/style.css";
 import "./index.css";
 
 import { ContextMenu, useContextMenu } from "@shared/ui/ContextMenu";
+import { useRegisterCommands } from "@shell/utils";
 
 import { CanvasAgentChat } from "../CanvasAgentChat";
 import { CanvasPropertiesPane } from "./components/CanvasPropertiesPane";
@@ -19,6 +20,34 @@ import { buildEdgeMenuItems, buildNodeMenuItems, edgeTypes, nodeTypes } from "./
 /// rendered alongside the board.
 function CanvasView({ activeTab }: CanvasViewProps) {
   const canvas = useCanvas(activeTab);
+
+  // The board's keyboard shortcuts flow through the command registry (so they
+  // show up in Settings -> Keymap and are user-rebindable) rather than a private
+  // keydown switch. Registered while this canvas tab is mounted; the bare-key
+  // bindings are suppressed while typing by the global keymap's typing guard.
+  // The toolbar buttons and context menu call these same handlers directly.
+  useRegisterCommands({
+    canvasMoveTool: { run: () => canvas.setMode("move") },
+    canvasHandTool: { run: () => canvas.setMode("hand") },
+    canvasConnectTool: { run: () => canvas.setMode("connect") },
+    canvasAddSqlCell: { run: () => canvas.addQuery() },
+    canvasAddRectangle: { run: () => canvas.addShape("rect") },
+    canvasAddEllipse: { run: () => canvas.addShape("ellipse") },
+    canvasAddLine: { run: () => canvas.addShape("line") },
+    canvasBringToFront: {
+      run: () => {
+        if (canvas.selectedComponent) canvas.reorder(canvas.selectedComponent.id, "front");
+      },
+      isEnabled: () => Boolean(canvas.selectedComponent),
+    },
+    canvasSendToBack: {
+      run: () => {
+        if (canvas.selectedComponent) canvas.reorder(canvas.selectedComponent.id, "back");
+      },
+      isEnabled: () => Boolean(canvas.selectedComponent),
+    },
+  });
+
   const handMode = canvas.mode === "hand";
   const connectMode = canvas.mode === "connect";
   const menu = useContextMenu<string>();
@@ -52,6 +81,7 @@ function CanvasView({ activeTab }: CanvasViewProps) {
         <PanelResizeHandle className="mdbc-canvas-pane-resizer" />
         <Panel id="canvas-board" order={2} minSize={30}>
           <div
+            ref={canvas.boardRef}
             className={`mdbc-canvas-board${handMode ? " hand" : ""}${connectMode ? " connect" : ""}`}
           >
             <ReactFlow

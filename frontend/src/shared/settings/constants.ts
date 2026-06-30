@@ -34,6 +34,16 @@ export const ACTIONS = {
   newCanvasTab: { label: "New Canvas", category: "tabs", defaultShortcut: null },
   runCellAndInsertBelow: { label: "Run Cell and Insert Below", category: "tabs", defaultShortcut: { key: "Shift-Enter" } },
 
+  canvasMoveTool: { label: "Canvas: Move Tool", category: "canvas", defaultShortcut: { key: "v" } },
+  canvasHandTool: { label: "Canvas: Hand Tool", category: "canvas", defaultShortcut: { key: "h" } },
+  canvasConnectTool: { label: "Canvas: Arrow / Connect Tool", category: "canvas", defaultShortcut: { key: "a" } },
+  canvasAddSqlCell: { label: "Canvas: Add SQL Cell", category: "canvas", defaultShortcut: { key: "/" } },
+  canvasAddRectangle: { label: "Canvas: Add Rectangle", category: "canvas", defaultShortcut: { key: "r" } },
+  canvasAddEllipse: { label: "Canvas: Add Ellipse", category: "canvas", defaultShortcut: { key: "o" } },
+  canvasAddLine: { label: "Canvas: Add Line", category: "canvas", defaultShortcut: { key: "l" } },
+  canvasBringToFront: { label: "Canvas: Bring to Front", category: "canvas", defaultShortcut: { key: "]" } },
+  canvasSendToBack: { label: "Canvas: Send to Back", category: "canvas", defaultShortcut: { key: "[" } },
+
   openSettings: { label: "Open Settings", category: "navigation", defaultShortcut: { key: "Mod-," } },
   searchFiles: { label: "Search Files", category: "navigation", defaultShortcut: { key: "Mod-p" } },
   searchContent: { label: "Search Content", category: "navigation", defaultShortcut: { key: "Mod-Shift-f" } },
@@ -100,6 +110,7 @@ export const ACTION_ORDER = Object.keys(ACTIONS) as KeymapAction[];
 export const CATEGORY_ORDER: KeymapCategory[] = [
   "editor",
   "tabs",
+  "canvas",
   "navigation",
   "sidebar",
   "results",
@@ -112,6 +123,7 @@ export const CATEGORY_ORDER: KeymapCategory[] = [
 export const CATEGORY_LABELS: Record<KeymapCategory, string> = {
   editor: "Editor",
   tabs: "Tabs",
+  canvas: "Canvas",
   navigation: "Navigation",
   sidebar: "Sidebar",
   results: "Results",
@@ -124,6 +136,7 @@ export const CATEGORY_LABELS: Record<KeymapCategory, string> = {
 export const CATEGORY_DESCRIPTIONS: Record<KeymapCategory, string> = {
   editor: "Shortcuts while writing in the SQL and code editor",
   tabs: "Open, close, and arrange editor tabs and splits",
+  canvas: "Tools and object actions while working on a canvas board",
   navigation: "Move around the app and open things quickly",
   sidebar: "Toggle and focus the sidebar panes",
   results: "Work with query results, views, and exports",

@@ -26,6 +26,8 @@ import type { AppViewModel } from "../types";
 import {
   handleDroppedPath,
   hydrateFrontendStores,
+  isBareKeySpec,
+  isTypingTarget,
   matchesShortcut,
   openProjectFromMenu,
   refreshOnAppFocus,
@@ -312,6 +314,8 @@ function useAppKeymap(): void {
         const spec = shortcuts[action]?.key;
         if (!spec) continue;
         if (!matchesShortcut(event, spec)) continue;
+        // Never let a bare-key binding fire while the user is typing.
+        if (isBareKeySpec(spec) && isTypingTarget(event.target)) return;
         const handled = runCommand(action);
         if (handled) event.preventDefault();
         return;

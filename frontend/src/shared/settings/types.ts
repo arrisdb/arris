@@ -16,6 +16,7 @@ export type FilesPaneView = "project" | "dbt" | "sqlmesh";
 export type KeymapCategory =
   | "editor"
   | "tabs"
+  | "canvas"
   | "navigation"
   | "sidebar"
   | "results"
