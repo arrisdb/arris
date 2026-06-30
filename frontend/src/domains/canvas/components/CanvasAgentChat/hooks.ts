@@ -4,7 +4,7 @@ import type { EditorTab } from "@shell/types";
 
 import { CANVAS_SPEC_FENCE } from "../../constants";
 import { useCanvasStore } from "../../hooks";
-import { genId, parseAgentCanvas } from "../../utils";
+import { describeBoard, genId, parseAgentCanvas } from "../../utils";
 import {
   cancelCanvasAgentIPC,
   listenCanvasAgentEventsIPC,
@@ -63,7 +63,7 @@ function useCanvasAgentChat(tab: EditorTab) {
         case "message":
           if (evt.text) {
             accumRef.current += evt.text;
-            setAgentText(displayText(accumRef.current) || "Working…", true);
+            setAgentText(displayText(accumRef.current), true);
           }
           return;
         case "error":
@@ -133,12 +133,16 @@ function useCanvasAgentChat(tab: EditorTab) {
       setEntries((prev) => [
         ...prev,
         { id: genId("msg"), role: "user", text },
-        { id: agentId, role: "agent", text: "Working…", pending: true },
+        { id: agentId, role: "agent", text: "", pending: true },
       ]);
       setStreaming(true);
+      const boardContext = describeBoard(
+        useCanvasStore.getState().boards[tabId]?.doc.components ?? [],
+      );
       sendCanvasAgentIPC({
         connectionId,
         prompt: text,
+        boardContext,
         turnId,
         resumeSession: sessionRef.current,
       }).catch((e) => {

@@ -135,8 +135,10 @@ interface AgentComponentSpec {
   // chart
   sourceQueryId?: string;
   spec?: ChartSpec;
-  // text
+  // text + sticky + shape
   text?: string;
+  // sticky
+  color?: StickyColor;
   // shape
   shape?: ShapeKind;
   // shared
@@ -150,6 +152,8 @@ interface AgentComponentSpec {
 interface AgentCanvasSpec {
   components: AgentComponentSpec[];
   edges?: CanvasEdge[];
+  /// Ids of objects already on the board that the agent wants removed.
+  remove?: string[];
 }
 
 export type {

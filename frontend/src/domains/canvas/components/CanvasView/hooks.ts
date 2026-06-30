@@ -63,11 +63,18 @@ function useCanvas(tab: EditorTab) {
       const prevById = new Map(prev.map((n) => [n.id, n]));
       return flowNodes.map((n) => {
         const p = prevById.get(n.id);
-        // Keep the live drag position AND the current selection/drag flags, so a
-        // store update (e.g. a debounced save or a query run) never clears the
-        // selection and makes the resize anchors blink out.
+        // Keep the live drag position ONLY while a drag is in flight (the store
+        // isn't updated until drag-stop); otherwise take the store's position so
+        // a pane-driven X/Y edit moves the node. Always keep the live selection/
+        // drag flags so a store update never clears the selection and makes the
+        // resize anchors blink out.
         return p
-          ? { ...n, position: p.position, selected: p.selected, dragging: p.dragging }
+          ? {
+              ...n,
+              position: p.dragging ? p.position : n.position,
+              selected: p.selected,
+              dragging: p.dragging,
+            }
           : n;
       });
     });
@@ -117,6 +124,25 @@ function useCanvas(tab: EditorTab) {
     (id: string) => components.find((c) => c.id === id),
     [components],
   );
+
+  // Merge a prop patch into one object (the properties pane writes through here).
+  const update = useCallback(
+    (id: string, patch: Partial<CanvasComponent>) =>
+      updateComponent(tabId, id, patch),
+    [updateComponent, tabId],
+  );
+
+  // The object whose properties pane is shown: exactly one selected node. Reading
+  // the live `selected` flag off the local RF nodes keeps it in sync with the
+  // board without a second selection source of truth.
+  const selectedIds = useMemo(
+    () => rfNodes.filter((n) => n.selected).map((n) => n.id),
+    [rfNodes],
+  );
+  const selectedComponent =
+    selectedIds.length === 1
+      ? components.find((c) => c.id === selectedIds[0])
+      : undefined;
 
   // The active pointer tool. `move` drags objects; `hand` pans the board.
   const [mode, setMode] = useState<CanvasMode>("move");
@@ -193,6 +219,8 @@ function useCanvas(tab: EditorTab) {
     reorder,
     toggleLock,
     componentById,
+    update,
+    selectedComponent,
   };
 }
 

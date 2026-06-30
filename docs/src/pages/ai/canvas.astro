@@ -111,14 +111,19 @@ import DocTable from "../../components/docs/DocTable/DocTable.astro";
   <p>
     The agent uses Anthropic's <strong>Claude CLI</strong> (<code>claude -p</code>) under the same
     guardrails as the SQL agent: it runs locally in a read-only mode, never touches your filesystem,
-    and only receives your prompt plus the connection's <strong>schema as DDL</strong> and dialect
-    (capped in size). Your row data is not sent. Because the agent needs the schema to write correct
-    SQL, the chat asks you to connect a database to the canvas first.
+    and only receives your prompt, the connection's <strong>schema as DDL</strong> and dialect, and a
+    short summary of the objects already on the board (their kinds, ids, titles, and SQL), all capped
+    in size. Your row data is not sent. Because the agent needs the schema to write correct SQL, the
+    chat asks you to connect a database to the canvas first.
   </p>
 
   <p>
-    Follow-up messages refine the same board: ask for a different chart type, another breakdown, or a
-    second query, and the new objects are added alongside the existing ones.
+    Because each turn sees the current board, follow-up messages refine it in place rather than only
+    piling on new objects. The agent can <strong>add</strong> any object kind (a query, chart, text
+    block, sticky note, or shape), <strong>modify</strong> one that is already there (re-spec a chart
+    as a line chart, rewrite a query, retitle an object), or <strong>remove</strong> objects you no
+    longer want. A query the agent adds or changes runs automatically, and any chart bound to it
+    updates.
   </p>
 
   <h2 id="board">Working on the board</h2>
@@ -126,6 +131,7 @@ import DocTable from "../../components/docs/DocTable/DocTable.astro";
   <ul>
     <li><strong>Add</strong> objects from the toolbar at the bottom of the board: a query, chart, sticky note, text, or shape. Tools with a caret open a small menu of options (the shape kind, the query language, the pointer mode).</li>
     <li><strong>Select</strong> an object with a single click; its resize anchors stay shown until you click an empty part of the board.</li>
+    <li><strong>Adjust properties</strong> in the panel that opens on the right while one object is selected. Every object shows its position, size, and a lock toggle; below that each kind has its own controls (a shape's fill, stroke, and corner radius; a text block's font size, weight, alignment, and colour; a sticky note's tint; a query's title, connection, and Run; a chart's type, source query, and title).</li>
     <li><strong>Move</strong> an object by dragging it; objects may overlap. Text and sticky notes move on a single drag and open for editing on double-click. Switch the pointer to the <strong>Hand</strong> tool to pan the board from anywhere instead of dragging objects.</li>
     <li><strong>Resize</strong> a selected object by dragging any of its borders or corner handles.</li>
     <li><strong>Reorder, copy, and lock</strong> from an object's right-click menu: Copy duplicates it, the four restacking actions (Bring to front, Bring forward, Send backward, Send to back) change its overlap order, and Lock freezes it (a locked object can't be moved or resized until you unlock it).</li>

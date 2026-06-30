@@ -45,6 +45,19 @@ describe("TextNode", () => {
     });
   });
 
+  it("applies font size, colour, bold, and alignment from the object style", () => {
+    seed(makeComponent({ kind: "text", id: "t", text: "x" }));
+    useCanvasStore.getState().updateComponent(TAB, "t", {
+      style: { fontSize: 22, color: "#ff0000", bold: true, align: "center" },
+    });
+    const { container } = renderNode("t");
+    const input = container.querySelector("textarea") as HTMLTextAreaElement;
+    expect(input.classList.contains("bold")).toBe(true);
+    expect(input.classList.contains("align-center")).toBe(true);
+    expect(input.style.getPropertyValue("--canvas-text-fs")).toBe("22px");
+    expect(input.style.getPropertyValue("--canvas-text-color")).toBe("#ff0000");
+  });
+
   it("is read-only and draggable until double-clicked, then editable", () => {
     seed(makeComponent({ kind: "text", id: "t", text: "" }));
     const { container } = renderNode("t");

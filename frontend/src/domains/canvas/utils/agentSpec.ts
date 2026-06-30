@@ -4,6 +4,7 @@ import type {
   AgentComponentSpec,
   CanvasComponent,
   CanvasEdge,
+  ChartComponent,
   ComponentKind,
 } from "../types";
 import { autoLayout } from "./layout";
@@ -11,6 +12,22 @@ import { makeComponent, makeEdge } from "./factory";
 import type { ComponentInput } from "./factory";
 
 const KNOWN_KINDS: ComponentKind[] = ["text", "sticky", "query", "chart", "shape"];
+
+/// One object to patch onto an existing component (the agent reused its id).
+interface ComponentUpdate {
+  id: string;
+  patch: Partial<CanvasComponent>;
+}
+
+/// The plan for one agent turn against the current board: new objects to add,
+/// patches to existing objects the agent re-addressed by id, ids to remove, and
+/// the connector edges to add.
+interface BoardChanges {
+  created: CanvasComponent[];
+  updates: ComponentUpdate[];
+  removeIds: string[];
+  edges: CanvasEdge[];
+}
 
 /// Pull the JSON body out of the agent's ```arris-canvas fenced block. Returns
 /// null when no such block is present (the agent replied with prose only).
@@ -37,8 +54,8 @@ function isEdgeSpec(value: unknown): value is CanvasEdge {
 }
 
 /// Parse the agent's reply into a canvas spec. Tolerant: a missing block, bad
-/// JSON, or a spec with no usable components all yield null, so a chatty or
-/// malformed turn simply produces no objects rather than an error.
+/// JSON, or a spec with no usable components or removals all yield null, so a
+/// chatty or malformed turn simply produces no change rather than an error.
 function parseAgentCanvas(text: string): AgentCanvasSpec | null {
   const block = extractBlock(text);
   if (!block) return null;
@@ -53,13 +70,17 @@ function parseAgentCanvas(text: string): AgentCanvasSpec | null {
   const components = Array.isArray(obj.components)
     ? (obj.components.filter(isComponentSpec) as AgentComponentSpec[])
     : [];
-  if (components.length === 0) return null;
+  const remove = Array.isArray(obj.remove)
+    ? (obj.remove.filter((id): id is string => typeof id === "string"))
+    : [];
+  if (components.length === 0 && remove.length === 0) return null;
   const edges = Array.isArray(obj.edges)
     ? (obj.edges.filter(isEdgeSpec) as CanvasEdge[])
     : [];
-  return { components, edges };
+  return { components, edges, remove };
 }
 
+/// A full ComponentInput for a brand-new object: geometry omitted (auto-laid).
 function toInput(spec: AgentComponentSpec, connectionId: string | null): ComponentInput {
   return {
     kind: spec.kind,
@@ -70,51 +91,88 @@ function toInput(spec: AgentComponentSpec, connectionId: string | null): Compone
     h: spec.h,
     title: spec.title,
     text: spec.text,
-    sql: spec.sql,
+    color: spec.color,
     // The agent does not know the connection id; bind query objects to the board.
     connectionId: spec.kind === "query" ? connectionId : undefined,
+    sql: spec.sql,
     sourceQueryId: spec.sourceQueryId,
     spec: spec.spec,
     shape: spec.shape,
   };
 }
 
-/// Edges connecting each chart to its source query, plus any the agent supplied,
-/// deduped by (source, target). Charts always get a connector even when the
-/// agent omitted `edges`, so the data link is visible.
+/// A partial patch for an EXISTING object: only the fields the agent supplied,
+/// so untouched fields (geometry, connection, the rest of a chart spec) survive.
+function toPatch(spec: AgentComponentSpec): Partial<CanvasComponent> {
+  const patch: Record<string, unknown> = {};
+  if (spec.x !== undefined) patch.x = spec.x;
+  if (spec.y !== undefined) patch.y = spec.y;
+  if (spec.w !== undefined) patch.w = spec.w;
+  if (spec.h !== undefined) patch.h = spec.h;
+  if (spec.title !== undefined) patch.title = spec.title;
+  if (spec.text !== undefined) patch.text = spec.text;
+  if (spec.color !== undefined) patch.color = spec.color;
+  if (spec.sql !== undefined) patch.sql = spec.sql;
+  if (spec.spec !== undefined) patch.spec = spec.spec;
+  if (spec.sourceQueryId !== undefined) patch.sourceQueryId = spec.sourceQueryId;
+  if (spec.shape !== undefined) patch.shape = spec.shape;
+  return patch as Partial<CanvasComponent>;
+}
+
+/// Connector edges to add: the agent's explicit edges plus one per newly created
+/// chart to its source query. Validated against the ids present after the turn,
+/// and deduped by (source, target).
 function buildEdges(
   spec: AgentCanvasSpec,
-  components: CanvasComponent[],
+  idsAfter: Set<string>,
+  createdCharts: ChartComponent[],
 ): CanvasEdge[] {
-  const ids = new Set(components.map((c) => c.id));
   const out: CanvasEdge[] = [];
   const seen = new Set<string>();
   const push = (source: string, target: string, id?: string) => {
-    if (!ids.has(source) || !ids.has(target)) return;
+    if (!idsAfter.has(source) || !idsAfter.has(target)) return;
     const key = `${source}->${target}`;
     if (seen.has(key)) return;
     seen.add(key);
     out.push(makeEdge(source, target, id));
   };
   for (const e of spec.edges ?? []) push(e.source, e.target, e.id);
-  for (const c of components) {
-    if (c.kind === "chart" && c.sourceQueryId) push(c.sourceQueryId, c.id);
+  for (const c of createdCharts) {
+    if (c.sourceQueryId) push(c.sourceQueryId, c.id);
   }
   return out;
 }
 
-/// Convert a parsed agent spec into board objects: build each object (preserving
-/// agent ids so cross-references hold), auto-lay-out the unplaced ones below the
-/// existing content, and connect charts to their source queries.
-function specToBoard(
+/// Diff a parsed agent spec against the current board: components whose id is
+/// already on the board become patches (the agent is editing them), the rest are
+/// created and auto-laid-out below existing content, removals are filtered to ids
+/// that actually exist, and charts are connected to their source queries.
+function planAgentChanges(
   spec: AgentCanvasSpec,
   existing: CanvasComponent[],
   connectionId: string | null,
-): { components: CanvasComponent[]; edges: CanvasEdge[] } {
-  const created = spec.components.map((s) => makeComponent(toInput(s, connectionId)));
-  const components = autoLayout(created, existing);
-  const edges = buildEdges(spec, components);
-  return { components, edges };
+): BoardChanges {
+  const existingIds = new Set(existing.map((c) => c.id));
+  const newSpecs = spec.components.filter((s) => !existingIds.has(s.id));
+  const updateSpecs = spec.components.filter((s) => existingIds.has(s.id));
+
+  const created = autoLayout(
+    newSpecs.map((s) => makeComponent(toInput(s, connectionId))),
+    existing,
+  );
+  const updates = updateSpecs.map((s) => ({ id: s.id, patch: toPatch(s) }));
+  const removeIds = (spec.remove ?? []).filter((id) => existingIds.has(id));
+
+  const removed = new Set(removeIds);
+  const idsAfter = new Set<string>([
+    ...[...existingIds].filter((id) => !removed.has(id)),
+    ...created.map((c) => c.id),
+  ]);
+  const createdCharts = created.filter((c): c is ChartComponent => c.kind === "chart");
+  const edges = buildEdges(spec, idsAfter, createdCharts);
+
+  return { created, updates, removeIds, edges };
 }
 
-export { parseAgentCanvas, specToBoard };
+export { parseAgentCanvas, planAgentChanges };
+export type { BoardChanges, ComponentUpdate };

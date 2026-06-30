@@ -1,15 +1,42 @@
 .mdbc-canvas-view {
-  display: flex;
   height: 100%;
   width: 100%;
   min-height: 0;
 }
 
+/* The horizontal split: agent | board | properties. Each pane lives in a Panel
+   so the dividers drag to resize, matching the app's sidebar UX. */
+.mdbc-canvas-panels {
+  height: 100%;
+  width: 100%;
+}
+
+/* Drag divider between canvas panes: a 1px hairline with a wider hit area and a
+   resize cursor, accenting on hover/drag (mirrors the app's sidebar resizers). */
+.mdbc-canvas-pane-resizer {
+  width: 1px;
+  background: var(--m-sep);
+  cursor: col-resize;
+  position: relative;
+}
+.mdbc-canvas-pane-resizer::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -3px;
+  right: -3px;
+}
+.mdbc-canvas-pane-resizer:hover,
+.mdbc-canvas-pane-resizer[data-resize-handle-state="drag"] {
+  background: var(--m-accent);
+}
+
 .mdbc-canvas-board {
   position: relative;
-  flex: 1 1 auto;
-  min-width: 0;
+  width: 100%;
   height: 100%;
+  min-width: 0;
 }
 
 .mdbc-canvas-board .react-flow {
@@ -224,12 +251,19 @@
   border: none;
   outline: none;
   background: transparent;
-  color: var(--m-fg);
+  /* Font size + colour are driven by the properties pane via CSS custom
+     properties (with sensible fallbacks). Alignment + weight ride classes. */
+  color: var(--canvas-text-color, var(--m-fg));
   font-family: var(--m-font);
-  font-size: var(--m-fs-md);
+  font-size: var(--canvas-text-fs, var(--m-fs-md));
   line-height: 1.4;
   padding: 8px 10px;
 }
+
+.mdbc-canvas-text-input.bold { font-weight: 700; }
+.mdbc-canvas-text-input.align-left { text-align: left; }
+.mdbc-canvas-text-input.align-center { text-align: center; }
+.mdbc-canvas-text-input.align-right { text-align: right; }
 
 /* Idle text/sticky: clicks fall through to the node so a single click selects +
    drags it; double-click enters editing (read-only is cleared). */

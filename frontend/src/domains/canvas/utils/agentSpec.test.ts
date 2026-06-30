@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { AgentCanvasSpec } from "../types";
-import { parseAgentCanvas, specToBoard } from "./agentSpec";
+import { parseAgentCanvas, planAgentChanges } from "./agentSpec";
 
 const wrap = (json: unknown) =>
   "Here is your canvas:\n```arris-canvas\n" + JSON.stringify(json) + "\n```\nDone.";
@@ -33,9 +33,19 @@ describe("parseAgentCanvas", () => {
     );
     expect(spec?.components).toHaveLength(1);
   });
+
+  it("reads the remove list, and a remove-only turn is still a spec", () => {
+    const spec = parseAgentCanvas(wrap({ components: [], remove: ["q1", "c1", 7] }));
+    expect(spec?.remove).toEqual(["q1", "c1"]);
+    expect(spec?.components).toHaveLength(0);
+  });
+
+  it("returns null when there are no components and nothing to remove", () => {
+    expect(parseAgentCanvas(wrap({ components: [], remove: [] }))).toBeNull();
+  });
 });
 
-describe("specToBoard", () => {
+describe("planAgentChanges", () => {
   const spec: AgentCanvasSpec = {
     components: [
       { kind: "query", id: "q1", sql: "select category, sum(total) t from orders group by 1" },
@@ -51,9 +61,11 @@ describe("specToBoard", () => {
   };
 
   it("creates objects, binds the query connection, and links chart to query", () => {
-    const { components, edges } = specToBoard(spec, [], "conn-1");
-    expect(components).toHaveLength(3);
-    const q = components.find((c) => c.id === "q1");
+    const { created, updates, removeIds, edges } = planAgentChanges(spec, [], "conn-1");
+    expect(created).toHaveLength(3);
+    expect(updates).toHaveLength(0);
+    expect(removeIds).toHaveLength(0);
+    const q = created.find((c) => c.id === "q1");
     expect(q).toMatchObject({ kind: "query", connectionId: "conn-1" });
     expect(edges).toEqual([{ id: expect.any(String), source: "q1", target: "c1" }]);
   });
@@ -63,17 +75,46 @@ describe("specToBoard", () => {
       components: spec.components,
       edges: [{ id: "e1", source: "q1", target: "c1" }],
     };
-    expect(specToBoard(withEdge, [], null).edges).toHaveLength(1);
+    expect(planAgentChanges(withEdge, [], null).edges).toHaveLength(1);
   });
 
   it("auto-lays-out below existing content", () => {
-    const existing = specToBoard(spec, [], null).components;
-    const more = specToBoard(
+    const existing = planAgentChanges(spec, [], null).created;
+    const more = planAgentChanges(
       { components: [{ kind: "text", id: "t2", text: "more" }], edges: [] },
       existing,
       null,
-    ).components;
+    ).created;
     const lowestExisting = Math.max(...existing.map((c) => c.y + c.h));
     expect(more[0].y).toBeGreaterThan(lowestExisting);
+  });
+
+  it("patches an existing object by id instead of creating a duplicate", () => {
+    const existing = planAgentChanges(spec, [], "conn-1").created;
+    const plan = planAgentChanges(
+      {
+        components: [
+          { kind: "query", id: "q1", sql: "select category, count(*) t from orders group by 1" },
+        ],
+        edges: [],
+      },
+      existing,
+      "conn-1",
+    );
+    expect(plan.created).toHaveLength(0);
+    expect(plan.updates).toEqual([
+      { id: "q1", patch: { sql: "select category, count(*) t from orders group by 1" } },
+    ]);
+  });
+
+  it("only removes ids that exist on the board", () => {
+    const existing = planAgentChanges(spec, [], null).created;
+    const plan = planAgentChanges(
+      { components: [], edges: [], remove: ["q1", "ghost"] },
+      existing,
+      null,
+    );
+    expect(plan.removeIds).toEqual(["q1"]);
+    expect(plan.created).toHaveLength(0);
   });
 });

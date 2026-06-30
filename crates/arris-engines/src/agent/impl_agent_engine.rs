@@ -47,11 +47,18 @@ impl AgentEngine {
         dialect: Option<DatabaseKind>,
         schema_ddl: String,
         user_prompt: String,
+        board_context: Option<String>,
         resume_session: Option<String>,
         cancel: oneshot::Receiver<()>,
     ) -> Result<mpsc::Receiver<AgentEvent>, AgentError> {
         let (tx, rx) = mpsc::channel(64);
-        let prompt = Self::build_prompt(profile, dialect, &schema_ddl, &user_prompt);
+        let prompt = Self::build_prompt(
+            profile,
+            dialect,
+            &schema_ddl,
+            &user_prompt,
+            board_context.as_deref().unwrap_or(""),
+        );
         let cwd = Self::working_dir()?;
         let cli = provider.cli();
         let binary = cli.binary();
@@ -162,12 +169,15 @@ impl AgentEngine {
         dialect: Option<DatabaseKind>,
         schema_ddl: &str,
         user_prompt: &str,
+        board_context: &str,
     ) -> String {
         let name = dialect.map(Self::dialect_name).unwrap_or("SQL");
         let schema = Self::clamp_schema(schema_ddl);
         match profile {
             AgentProfile::Sql => Self::build_sql_prompt(name, &schema, user_prompt),
-            AgentProfile::Canvas => Self::build_canvas_prompt(name, &schema, user_prompt),
+            AgentProfile::Canvas => {
+                Self::build_canvas_prompt(name, &schema, board_context, user_prompt)
+            }
         }
     }
 
@@ -207,13 +217,27 @@ impl AgentEngine {
     /// `arris-canvas` JSON block. The client parses the block, creates the
     /// objects, runs each query object, and binds charts to their source query's
     /// results. The contract mirrors the frontend `CanvasComponent` union.
-    fn build_canvas_prompt(name: &str, schema: &str, user_prompt: &str) -> String {
+    fn build_canvas_prompt(
+        name: &str,
+        schema: &str,
+        board_context: &str,
+        user_prompt: &str,
+    ) -> String {
+        let board = if board_context.trim().is_empty() {
+            "The board is empty.".to_string()
+        } else {
+            board_context.trim().to_string()
+        };
         format!(
             "You design analytics objects on a visual canvas inside a database \
              client, for the user's {name} database. You do not chat at length and \
              you cannot run shell commands, read files, or execute queries.\n\n\
              # Database schema ({name})\n\
              {schema}\n\n\
+             # Current board\n\
+             These objects already exist on the canvas. Reference them by id to \
+             reuse, modify, or remove them.\n\
+             {board}\n\n\
              # Output contract\n\
              Reply with ONE fenced code block tagged `arris-canvas` containing a \
              single JSON object, optionally preceded by one short sentence of \
@@ -224,25 +248,38 @@ impl AgentEngine {
              \x20   {{ \"kind\": \"query\", \"id\": \"q1\", \"title\": \"<label>\", \"sql\": \"<one {name} statement>\" }},\n\
              \x20   {{ \"kind\": \"chart\", \"id\": \"c1\", \"sourceQueryId\": \"q1\",\n\
              \x20     \"spec\": {{ \"kind\": \"bar\", \"xColumn\": \"<col>\", \"yColumns\": [\"<col>\"], \"seriesColumn\": \"<col?>\", \"aggregation\": \"sum\", \"title\": \"<title>\", \"style\": {{ \"stackMode\": \"stacked\" }} }} }},\n\
-             \x20   {{ \"kind\": \"text\", \"id\": \"t1\", \"text\": \"## Heading\\nMarkdown commentary.\" }}\n\
+             \x20   {{ \"kind\": \"text\", \"id\": \"t1\", \"text\": \"## Heading\\nMarkdown commentary.\" }},\n\
+             \x20   {{ \"kind\": \"sticky\", \"id\": \"s1\", \"text\": \"<short note>\", \"color\": \"yellow\" }},\n\
+             \x20   {{ \"kind\": \"shape\", \"id\": \"sh1\", \"shape\": \"rect\", \"text\": \"<optional label>\" }}\n\
              \x20 ],\n\
-             \x20 \"edges\": [ {{ \"id\": \"e1\", \"source\": \"q1\", \"target\": \"c1\" }} ]\n\
+             \x20 \"edges\": [ {{ \"id\": \"e1\", \"source\": \"q1\", \"target\": \"c1\" }} ],\n\
+             \x20 \"remove\": []\n\
              }}\n\
              ```\n\n\
              # Rules\n\
              - Use dialect-appropriate {name} syntax and only the tables/columns above.\n\
-             - Every `chart` MUST set `sourceQueryId` to the `id` of a `query` in the \
-             same block; `xColumn`/`yColumns`/`seriesColumn` MUST be columns that \
-             query returns. `spec.kind` is one of bar, line, area, pie, scatter, \
-             combo, donut, radar, treemap, funnel, kpi. Omit `seriesColumn` and \
-             `style` when not needed; `aggregation` is one of none, sum, avg, min, \
-             max, count.\n\
+             - To ADD an object, use a new `id`. To MODIFY an object already on the \
+             board, return a component whose `id` matches the existing one and \
+             include only the fields you are changing (the client merges them). To \
+             REMOVE objects, list their ids in `remove`.\n\
+             - You may reference any id on the current board: e.g. point a new \
+             `chart`'s `sourceQueryId` at an existing `query`, or re-`spec` an \
+             existing chart by its id.\n\
+             - Every `chart` MUST set `sourceQueryId` to the `id` of a `query` (new \
+             in this block or already on the board); `xColumn`/`yColumns`/\
+             `seriesColumn` MUST be columns that query returns. `spec.kind` is one of \
+             bar, line, area, pie, scatter, combo, donut, radar, treemap, funnel, \
+             kpi. Omit `seriesColumn` and `style` when not needed; `aggregation` is \
+             one of none, sum, avg, min, max, count.\n\
+             - `sticky.color` is one of yellow, green, blue, pink, purple. \
+             `shape.shape` is one of rect, ellipse, line; rect/ellipse may carry \
+             optional `text`.\n\
              - Each `query.sql` is exactly one statement, no trailing semicolon, no \
              comments. Prefer a single query that returns tidy rows for charting \
              (e.g. group by the x bucket and the series column).\n\
-             - Add a short `text` object summarising the finding. Do not invent ids; \
-             reference queries only by ids you defined. Positions/sizes are optional \
-             (the client lays objects out). Emit nothing after the closing fence.\n\n\
+             - Do not invent ids you have not defined or seen on the board. \
+             Positions/sizes are optional (the client lays objects out). Emit \
+             nothing after the closing fence.\n\n\
              # Request\n\
              {user_prompt}\n",
         )
@@ -379,6 +416,7 @@ mod tests {
             Some(DatabaseKind::Postgres),
             "CREATE TABLE users (id INT);",
             "list all users",
+            "",
         );
         assert!(prompt.contains("PostgreSQL"));
         assert!(prompt.contains("CREATE TABLE users (id INT);"));
@@ -389,7 +427,7 @@ mod tests {
     #[test]
     fn build_prompt_without_dialect_uses_generic_sql() {
         // No connection selected: the agent still writes/explains generic SQL.
-        let prompt = AgentEngine::build_prompt(AgentProfile::Sql, None, "", "write a select");
+        let prompt = AgentEngine::build_prompt(AgentProfile::Sql, None, "", "write a select", "");
         assert!(prompt.contains("SQL"));
         assert!(!prompt.contains("PostgreSQL"));
         assert!(prompt.contains("write a select"));
@@ -403,6 +441,7 @@ mod tests {
             Some(DatabaseKind::Sqlite),
             &huge,
             "go",
+            "",
         );
         assert!(prompt.contains("(schema truncated)"));
     }
@@ -414,6 +453,7 @@ mod tests {
             Some(DatabaseKind::Postgres),
             "CREATE TABLE orders (id INT, ordered_at TIMESTAMP, category TEXT, total NUMERIC);",
             "monthly sales by category",
+            "",
         );
         // Schema and request are inlined.
         assert!(prompt.contains("PostgreSQL"));
@@ -424,13 +464,43 @@ mod tests {
         assert!(prompt.contains("sourceQueryId"));
         assert!(prompt.contains("\"kind\": \"query\""));
         assert!(prompt.contains("\"kind\": \"chart\""));
+        // All five object kinds are offered, plus the modify/remove affordances.
+        assert!(prompt.contains("\"kind\": \"sticky\""));
+        assert!(prompt.contains("\"kind\": \"shape\""));
+        assert!(prompt.contains("\"remove\""));
         assert!(!prompt.contains("return exactly one ```sql fenced block"));
+    }
+
+    #[test]
+    fn canvas_prompt_inlines_the_current_board() {
+        // With an empty board the prompt says so; with objects, it lists them so
+        // the agent can reference, modify, or remove them by id.
+        let empty = AgentEngine::build_prompt(
+            AgentProfile::Canvas,
+            Some(DatabaseKind::Postgres),
+            "",
+            "add a chart",
+            "",
+        );
+        assert!(empty.contains("# Current board"));
+        assert!(empty.contains("The board is empty."));
+
+        let with_board = AgentEngine::build_prompt(
+            AgentProfile::Canvas,
+            Some(DatabaseKind::Postgres),
+            "",
+            "make it a line chart",
+            "- query id=q1 title=\"Monthly sales\"\n- chart id=c1 source=q1 kind=bar",
+        );
+        assert!(with_board.contains("query id=q1"));
+        assert!(with_board.contains("chart id=c1 source=q1"));
+        assert!(!with_board.contains("The board is empty."));
     }
 
     #[test]
     fn canvas_prompt_truncates_oversized_schema() {
         let huge = "x".repeat(SCHEMA_PROMPT_MAX_BYTES + 1000);
-        let prompt = AgentEngine::build_prompt(AgentProfile::Canvas, None, &huge, "go");
+        let prompt = AgentEngine::build_prompt(AgentProfile::Canvas, None, &huge, "go", "");
         assert!(prompt.contains("(schema truncated)"));
     }
 }
