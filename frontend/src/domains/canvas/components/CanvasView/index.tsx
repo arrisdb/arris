@@ -84,7 +84,8 @@ function CanvasView({ activeTab }: CanvasViewProps) {
               onNodeContextMenu={onNodeContextMenu}
               onEdgeContextMenu={onEdgeContextMenu}
               onMoveEnd={canvas.onMoveEnd}
-              defaultViewport={canvas.defaultViewport}
+              fitView
+              fitViewOptions={{ padding: 0.2, maxZoom: 1 }}
               minZoom={0.2}
               maxZoom={2}
               nodesDraggable={canvas.mode === "move"}

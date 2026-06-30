@@ -275,7 +275,6 @@ function useCanvas(tab: EditorTab) {
     onNodeDragStop,
     onNodesDelete,
     onMoveEnd,
-    defaultViewport: board?.doc.viewport ?? DEFAULT_VIEWPORT,
     mode,
     setMode,
     addText,

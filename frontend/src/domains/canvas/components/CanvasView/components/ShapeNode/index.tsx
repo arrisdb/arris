@@ -41,15 +41,18 @@ function ShapeNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
   const style = shape.style ?? {};
   const isLine = shape.shape === "line";
   const radius = shape.radius ?? 0;
-  // A line carries no card chrome: its box is transparent with no border or
-  // radius, and a single horizontal rule is drawn centered across the width
-  // (rendered below). A rect/ellipse fills and is bordered as usual.
+  // A line carries no card chrome at all (the `mdbc-canvas-shape-line-node`
+  // class strips the node's background, border, radius, and shadow); it just
+  // draws a single horizontal rule centered across its width (rendered below).
+  // A rect/ellipse fills and is bordered as usual via the inline `css` below.
   const stroke = style.stroke ?? "rgb(var(--m-accent-rgb) / 0.6)";
-  const css = {
-    background: isLine ? "transparent" : (style.fill ?? "#3a3950"),
-    border: isLine ? "none" : `${style.strokeWidth ?? 1}px solid ${stroke}`,
-    borderRadius: shape.shape === "ellipse" ? "50%" : isLine ? "0" : `${radius}px`,
-  };
+  const css = isLine
+    ? undefined
+    : {
+        background: style.fill ?? "#3a3950",
+        border: `${style.strokeWidth ?? 1}px solid ${stroke}`,
+        borderRadius: shape.shape === "ellipse" ? "50%" : `${radius}px`,
+      };
   const lineCss = { height: `${style.strokeWidth ?? 2}px`, background: stroke };
 
   // Drag the radius handle right to round the corners, left to square them.
@@ -81,7 +84,7 @@ function ShapeNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
     <>
       <CanvasResizer tabId={tabId} id={id} visible={selected} />
       <div
-        className={`mdbc-canvas-node mdbc-canvas-shape${selected ? " selected" : ""}`}
+        className={`mdbc-canvas-node mdbc-canvas-shape${isLine ? " mdbc-canvas-shape-line-node" : ""}${selected ? " selected" : ""}`}
         style={css}
         onDoubleClick={() => {
           if (!isLine) setEditing(true);

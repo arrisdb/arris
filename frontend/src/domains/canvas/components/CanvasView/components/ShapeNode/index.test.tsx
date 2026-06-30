@@ -50,9 +50,11 @@ describe("ShapeNode", () => {
     // reads as a line, not a card).
     expect(container.querySelector(".mdbc-canvas-shape-line")).toBeTruthy();
     expect(container.querySelector("textarea")).toBeNull();
-    // The box itself carries no rounded-card radius.
+    // The node carries the chrome-stripping modifier (no card bg/border/shadow)
+    // and no inline card style.
     const box = container.querySelector(".mdbc-canvas-shape") as HTMLElement;
-    expect(box.style.borderRadius).toBe("0");
+    expect(box.classList.contains("mdbc-canvas-shape-line-node")).toBe(true);
+    expect(box.getAttribute("style")).toBeNull();
   });
 
   it("offers the 'Add text' placeholder only while selected", () => {

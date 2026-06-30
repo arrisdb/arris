@@ -489,6 +489,19 @@
   justify-content: center;
 }
 
+/* A line node has no card chrome whatsoever: strip the node's background,
+   border, radius, and shadow (even while selected) so only the rule shows.
+   The `.selected` variant is listed explicitly so its specificity wins over
+   `.mdbc-canvas-node.selected`. */
+.mdbc-canvas-node.mdbc-canvas-shape-line-node,
+.mdbc-canvas-node.mdbc-canvas-shape-line-node.selected {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  overflow: visible;
+}
+
 /* A line shape: a single horizontal rule spanning the (chrome-less) node box,
    centered vertically by the shape's flex centering. Its height and colour come
    from the stroke style inline. */
