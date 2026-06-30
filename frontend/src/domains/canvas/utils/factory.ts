@@ -27,9 +27,11 @@ interface ComponentInput {
   // query
   connectionId?: string | null;
   sql?: string;
-  // chart
-  sourceQueryId?: string;
+  // chart + table
+  sourceQueryId?: string | null;
   spec?: ChartSpec;
+  // table
+  previewRows?: number;
   // shape
   shape?: ShapeKind;
   radius?: number;
@@ -96,8 +98,17 @@ function makeComponent(input: ComponentInput): CanvasComponent {
         id,
         kind: "chart",
         ...geom,
-        sourceQueryId: input.sourceQueryId ?? "",
+        sourceQueryId: input.sourceQueryId ?? null,
         spec: input.spec ?? fallbackChartSpec(),
+        title: input.title,
+      };
+    case "table":
+      return {
+        id,
+        kind: "table",
+        ...geom,
+        sourceQueryId: input.sourceQueryId ?? null,
+        previewRows: input.previewRows,
         title: input.title,
       };
     case "shape":

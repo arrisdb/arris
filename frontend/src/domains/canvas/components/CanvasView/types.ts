@@ -23,6 +23,7 @@ interface CanvasToolbarProps {
   onModeChange: (mode: CanvasMode) => void;
   onAddQuery: () => void;
   onAddChart: () => void;
+  onAddTable: () => void;
   onAddSticky: () => void;
   onAddText: () => void;
   onAddShape: (shape: ShapeKind) => void;

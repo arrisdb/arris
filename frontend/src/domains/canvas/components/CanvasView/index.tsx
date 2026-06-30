@@ -83,6 +83,7 @@ function CanvasView({ activeTab }: CanvasViewProps) {
               onModeChange={canvas.setMode}
               onAddQuery={canvas.addQuery}
               onAddChart={canvas.addChart}
+              onAddTable={canvas.addTable}
               onAddSticky={canvas.addSticky}
               onAddText={canvas.addText}
               onAddShape={canvas.addShape}

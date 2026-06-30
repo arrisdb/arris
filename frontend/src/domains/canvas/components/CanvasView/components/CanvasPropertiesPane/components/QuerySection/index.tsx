@@ -1,14 +1,13 @@
 import { useConnectionsStore } from "@domains/connection/hooks";
 import { Select } from "@shared/ui";
 
-import { useCanvasStore } from "../../../../../../hooks";
 import type { SectionProps } from "../../types";
 
-/// Query-specific controls: a title, the connection the SQL runs against, and a
-/// Run button. The SQL text itself is edited inside the node body, not here.
-function QuerySection({ tabId, component, onChange }: SectionProps) {
+/// Query-specific controls: a title and the connection the SQL runs against. The
+/// SQL text is edited inside the node body, and the node's own Run button runs
+/// it, so the properties pane carries no Run control.
+function QuerySection({ component, onChange }: SectionProps) {
   const connections = useConnectionsStore((s) => s.connections);
-  const runQuery = useCanvasStore((s) => s.runQueryComponent);
   if (component.kind !== "query") return null;
 
   const options = connections.map((c) => ({ value: c.id, label: c.name || c.id }));
@@ -30,13 +29,6 @@ function QuerySection({ tabId, component, onChange }: SectionProps) {
         onChange={(v) => onChange({ connectionId: v })}
         data-testid="query-connection-select"
       />
-      <button
-        type="button"
-        className="mdbc-btn"
-        onClick={() => void runQuery(tabId, component.id)}
-      >
-        Run query
-      </button>
     </div>
   );
 }

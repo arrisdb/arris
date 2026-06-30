@@ -14,7 +14,7 @@ function ChartNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
   const board = useCanvasStore((s) => s.boards[tabId]);
   const component = board?.doc.components.find((c) => c.id === id);
   if (!component || component.kind !== "chart") return null;
-  const run = board?.runs[component.sourceQueryId];
+  const run = component.sourceQueryId ? board?.runs[component.sourceQueryId] : undefined;
 
   return (
     <>

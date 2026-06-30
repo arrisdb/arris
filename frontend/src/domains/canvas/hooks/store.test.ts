@@ -213,4 +213,34 @@ describe("useCanvasStore", () => {
     expect(get().boards[TAB].runs.q1.error).toBeTruthy();
     expect(runCanvasQueryIPC).not.toHaveBeenCalled();
   });
+
+  it("runQueryComponent auto-adds a preview table + arrow bound to the query", async () => {
+    vi.mocked(runCanvasQueryIPC).mockResolvedValue({ columns: [], rows: [], elapsed: 1 });
+    get().ensureBoard(TAB, "");
+    get().addComponent(
+      TAB,
+      makeComponent({ kind: "query", id: "q1", sql: "select 1", connectionId: "conn" }),
+    );
+    await get().runQueryComponent(TAB, "q1");
+    const board = get().boards[TAB];
+    const table = board.doc.components.find((c) => c.kind === "table");
+    expect(table).toBeDefined();
+    expect(table).toMatchObject({ sourceQueryId: "q1" });
+    expect(board.doc.edges).toEqual([
+      expect.objectContaining({ source: "q1", target: table!.id }),
+    ]);
+  });
+
+  it("a second run does not pile on a duplicate preview table", async () => {
+    vi.mocked(runCanvasQueryIPC).mockResolvedValue({ columns: [], rows: [], elapsed: 1 });
+    get().ensureBoard(TAB, "");
+    get().addComponent(
+      TAB,
+      makeComponent({ kind: "query", id: "q1", sql: "select 1", connectionId: "conn" }),
+    );
+    await get().runQueryComponent(TAB, "q1");
+    await get().runQueryComponent(TAB, "q1");
+    const tables = get().boards[TAB].doc.components.filter((c) => c.kind === "table");
+    expect(tables).toHaveLength(1);
+  });
 });

@@ -220,6 +220,23 @@ const useConnectionsStore = create<ConnectionsState>((set, get) => {
       .catch((error) => setConnError(id, ipcErrorMessage(error)))
       .finally(() => stopRefreshing(id));
   },
+  loadAllSchemaTables: (id) => {
+    const s = get();
+    const conn = s.connections.find((c) => c.id === id);
+    if (!conn) return Promise.resolve();
+    const driver = driverForKind(conn.kind);
+    // Eager sources already ship their tables in the base list; nothing to fetch.
+    if (!driver.lazySchemaTables) return Promise.resolve();
+    const nodes = s.schemaCache[id];
+    if (!nodes) return Promise.resolve();
+    // Only the schemas whose tables have not been loaded yet, so a repeat call
+    // (e.g. the editor re-running its effect after a merge) is a no-op.
+    const toLoad = driver
+      .extractSchemaNames(nodes)
+      .filter((name) => !isSchemaNodeLoaded(nodes, name));
+    if (toLoad.length === 0) return Promise.resolve();
+    return get().loadSchemaNodes(id, toLoad);
+  },
   reorderConnections: (orderedIds) => {
     const rank = new Map(orderedIds.map((id, index) => [id, index] as const));
     // Optimistically reorder the displayed list to match the drop, then persist.

@@ -5,6 +5,7 @@ import { ChartSection } from "./components/ChartSection";
 import { QuerySection } from "./components/QuerySection";
 import { ShapeSection } from "./components/ShapeSection";
 import { StickySection } from "./components/StickySection";
+import { TableSection } from "./components/TableSection";
 import { TextSection } from "./components/TextSection";
 import type { SectionProps } from "./types";
 
@@ -16,6 +17,7 @@ const PROP_SECTION_KINDS: ComponentKind[] = [
   "sticky",
   "query",
   "chart",
+  "table",
   "shape",
 ];
 
@@ -28,6 +30,7 @@ const SECTION_FOR: Record<ComponentKind, FC<SectionProps>> = {
   sticky: StickySection,
   query: QuerySection,
   chart: ChartSection,
+  table: TableSection,
   shape: ShapeSection,
 };
 

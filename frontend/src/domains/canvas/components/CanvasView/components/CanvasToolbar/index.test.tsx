@@ -10,6 +10,7 @@ function setup(overrides: Partial<CanvasToolbarProps> = {}) {
     onModeChange: vi.fn(),
     onAddQuery: vi.fn(),
     onAddChart: vi.fn(),
+    onAddTable: vi.fn(),
     onAddSticky: vi.fn(),
     onAddText: vi.fn(),
     onAddShape: vi.fn(),
@@ -25,10 +26,12 @@ describe("CanvasToolbar", () => {
     fireEvent.click(screen.getByTestId("canvas-tool-text"));
     fireEvent.click(screen.getByTestId("canvas-tool-sticky"));
     fireEvent.click(screen.getByTestId("canvas-tool-chart"));
+    fireEvent.click(screen.getByTestId("canvas-tool-table"));
     fireEvent.click(screen.getByTestId("canvas-tool-query"));
     expect(props.onAddText).toHaveBeenCalledTimes(1);
     expect(props.onAddSticky).toHaveBeenCalledTimes(1);
     expect(props.onAddChart).toHaveBeenCalledTimes(1);
+    expect(props.onAddTable).toHaveBeenCalledTimes(1);
     expect(props.onAddQuery).toHaveBeenCalledTimes(1);
   });
 

@@ -260,6 +260,12 @@ function useCanvas(tab: EditorTab) {
     addComponent(tabId, makeComponent({ kind: "chart", ...placementFor() }));
   }, [addComponent, placementFor, tabId]);
 
+  // A table previews a query object's rows. It starts unbound; the user picks
+  // its source query in the properties pane.
+  const addTable = useCallback(() => {
+    addComponent(tabId, makeComponent({ kind: "table", ...placementFor() }));
+  }, [addComponent, placementFor, tabId]);
+
   // Debounced serialize of the live board into the tab's text (persistence).
   const doc = board?.doc;
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -289,6 +295,7 @@ function useCanvas(tab: EditorTab) {
     addShape,
     addQuery,
     addChart,
+    addTable,
     copy,
     paste,
     remove,

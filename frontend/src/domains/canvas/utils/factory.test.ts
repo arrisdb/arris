@@ -34,6 +34,17 @@ describe("makeComponent", () => {
     if (c.kind === "chart") expect(c.spec).toBeDefined();
   });
 
+  it("leaves a new table unbound (no source query) by default", () => {
+    const c = makeComponent({ kind: "table", id: "t1" });
+    expect(c).toMatchObject({ kind: "table", sourceQueryId: null });
+    if (c.kind === "table") expect(c.previewRows).toBeUndefined();
+  });
+
+  it("carries an explicit table source query and preview-row cap", () => {
+    const c = makeComponent({ kind: "table", id: "t2", sourceQueryId: "q1", previewRows: 25 });
+    expect(c).toMatchObject({ kind: "table", sourceQueryId: "q1", previewRows: 25 });
+  });
+
   it("generates an id when none is supplied", () => {
     const c = makeComponent({ kind: "shape", shape: "ellipse" });
     expect(c.id).toBeTruthy();

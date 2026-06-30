@@ -17,6 +17,8 @@ function describeComponent(c: CanvasComponent): string {
       const series = s.seriesColumn ? ` series=${s.seriesColumn}` : "";
       return `- chart id=${c.id} source=${c.sourceQueryId || "(unset)"} kind=${s.kind} x=${s.xColumn || "(unset)"} y=[${s.yColumns.join(",")}]${series}`;
     }
+    case "table":
+      return `- table id=${c.id} source=${c.sourceQueryId || "(unset)"}`;
     case "text":
       return `- text id=${c.id} ${JSON.stringify(clip(c.text))}`;
     case "sticky":

@@ -1,4 +1,4 @@
-import { CANVAS_SPEC_FENCE } from "../constants";
+import { CANVAS_SPEC_FENCE, KNOWN_KINDS } from "../constants";
 import type {
   AgentCanvasSpec,
   AgentComponentSpec,
@@ -6,13 +6,12 @@ import type {
   CanvasEdge,
   ChartComponent,
   ComponentKind,
+  TableComponent,
 } from "../types";
 import { autoLayout } from "./layout";
 import { sanitizeChartSpec } from "./chartSpec";
 import { makeComponent, makeEdge } from "./factory";
 import type { ComponentInput } from "./factory";
-
-const KNOWN_KINDS: ComponentKind[] = ["text", "sticky", "query", "chart", "shape"];
 
 /// One object to patch onto an existing component (the agent reused its id).
 interface ComponentUpdate {
@@ -126,12 +125,12 @@ function toPatch(spec: AgentComponentSpec): Partial<CanvasComponent> {
 }
 
 /// Connector edges to add: the agent's explicit edges plus one per newly created
-/// chart to its source query. Validated against the ids present after the turn,
-/// and deduped by (source, target).
+/// query-bound object (chart or table) to its source query. Validated against the
+/// ids present after the turn, and deduped by (source, target).
 function buildEdges(
   spec: AgentCanvasSpec,
   idsAfter: Set<string>,
-  createdCharts: ChartComponent[],
+  createdSourced: { id: string; sourceQueryId: string | null }[],
 ): CanvasEdge[] {
   const out: CanvasEdge[] = [];
   const seen = new Set<string>();
@@ -143,7 +142,7 @@ function buildEdges(
     out.push(makeEdge(source, target, id));
   };
   for (const e of spec.edges ?? []) push(e.source, e.target, e.id);
-  for (const c of createdCharts) {
+  for (const c of createdSourced) {
     if (c.sourceQueryId) push(c.sourceQueryId, c.id);
   }
   return out;
@@ -185,8 +184,14 @@ function planAgentChanges(
     ...[...existingIds].filter((id) => !removed.has(id)),
     ...created.map((c) => c.id),
   ]);
-  const createdCharts = created.filter((c): c is ChartComponent => c.kind === "chart");
-  const edges = buildEdges(spec, idsAfter, createdCharts);
+  // Charts and tables both bind to a source query, so both get an auto-edge.
+  const createdSourced = created
+    .filter(
+      (c): c is ChartComponent | TableComponent =>
+        c.kind === "chart" || c.kind === "table",
+    )
+    .map((c) => ({ id: c.id, sourceQueryId: c.sourceQueryId }));
+  const edges = buildEdges(spec, idsAfter, createdSourced);
 
   return { created, updates, removeIds, edges };
 }

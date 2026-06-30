@@ -33,10 +33,11 @@ import DocTable from "../../components/docs/DocTable/DocTable.astro";
   <p>
     The canvas is an infinite, freeform board (pan, zoom, and drag) where the unit of work is an
     <strong>object</strong> rather than a single query tab. Each object sits at its own position and
-    size and can overlap its neighbours. An object is one of five kinds today: a <strong>query</strong>
-    that runs SQL and shows its rows, a <strong>chart</strong> that visualizes another query's
-    results, a block of <strong>text</strong>, a <strong>sticky note</strong>, or a simple
-    <strong>shape</strong>. The kinds are designed to grow, so more object types can be added later.
+    size and can overlap its neighbours. An object is one of six kinds today: a <strong>query</strong>
+    that runs SQL, a <strong>table</strong> that previews another query's rows, a <strong>chart</strong>
+    that visualizes another query's results, a block of <strong>text</strong>, a <strong>sticky
+    note</strong>, or a simple <strong>shape</strong>. The kinds are designed to grow, so more object
+    types can be added later.
   </p>
 
   <p>
@@ -71,10 +72,20 @@ import DocTable from "../../components/docs/DocTable/DocTable.astro";
       <tr>
         <td class="font-medium text-fg">Query</td>
         <td>
-          Holds one SQL statement with a <strong>Run</strong> button and a compact result grid. Its
+          Holds one SQL statement with a <strong>Run</strong> button and a one-line run status. Its
           editor is the same CodeMirror as the main SQL editor, so you get the connection's dialect
           highlighting and schema-aware table and column autocomplete. It runs against the canvas's
-          connection, the same engine the editor uses.
+          connection, the same engine the editor uses. The query object shows no rows itself: the
+          first time you run it, Arris drops a preview <strong>table</strong> beside it (joined with an
+          arrow) so the rows show without any extra step. Bind a chart to it instead if you want a
+          visualization rather than a grid.
+        </td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">Table</td>
+        <td>
+          Previews a query object's rows as a scrollable grid. A table is bound to its source query,
+          so when that query runs the table updates. Pick its source in the properties pane.
         </td>
       </tr>
       <tr>
@@ -137,8 +148,8 @@ import DocTable from "../../components/docs/DocTable/DocTable.astro";
 
   <p>
     Because each turn sees the current board, follow-up messages refine it in place rather than only
-    piling on new objects. The agent can <strong>add</strong> any object kind (a query, chart, text
-    block, sticky note, or shape), <strong>modify</strong> one that is already there (re-spec a chart
+    piling on new objects. The agent can <strong>add</strong> any object kind (a query, table, chart,
+    text block, sticky note, or shape), <strong>modify</strong> one that is already there (re-spec a chart
     as a line chart, restyle it (set axis bounds, toggle the legend, change colours), rewrite a
     query, retitle an object), or <strong>remove</strong> objects you no longer want. A query the
     agent adds or changes runs automatically, and any chart bound to it updates.
@@ -156,9 +167,9 @@ import DocTable from "../../components/docs/DocTable/DocTable.astro";
   <h2 id="board">Working on the board</h2>
 
   <ul>
-    <li><strong>Add</strong> objects from the toolbar at the bottom of the board: a query, chart, sticky note, text, or shape. Tools with a caret have options (the shape kind, the query language, the pointer mode): clicking the tool applies its last-used option and opens the menu at the same time, so switching to another option is one more click. The caret alone just toggles the menu.</li>
+    <li><strong>Add</strong> objects from the toolbar at the bottom of the board: a query, table, chart, sticky note, text, or shape. Tools with a caret have options (the shape kind, the query language, the pointer mode): clicking the tool applies its last-used option and opens the menu at the same time, so switching to another option is one more click. The caret alone just toggles the menu.</li>
     <li><strong>Select</strong> an object with a single click; its resize anchors stay shown until you click an empty part of the board.</li>
-    <li><strong>Adjust properties</strong> in the panel that opens on the right while one object is selected. Every object shows its position, size, and a lock toggle; below that each kind has its own controls (a shape's fill, stroke, and corner radius; a text block's font size, weight, alignment, and colour; a sticky note's tint; a query's title, connection, and Run; a chart's source query plus the full chart
+    <li><strong>Adjust properties</strong> in the panel that opens on the right while one object is selected. Every object shows its position, size, and a lock toggle; below that each kind has its own controls (a shape's fill, stroke, and corner radius; a text block's font size, weight, alignment, and colour; a sticky note's tint; a query's title and connection; a table's source query and preview-row cap; a chart's source query plus the full chart
       editor: type, axes, series, aggregation, colours, legend, and labels, the same
       control surface as the results-view chart editor).</li>
     <li><strong>Move</strong> an object by dragging it; objects may overlap. Text and sticky notes move on a single drag and open for editing on double-click. Switch the pointer to the <strong>Hand</strong> tool to pan the board from anywhere instead of dragging objects.</li>
@@ -167,7 +178,7 @@ import DocTable from "../../components/docs/DocTable/DocTable.astro";
     <li><strong>Copy, reorder, lock, and delete</strong> from an object's right-click menu: Copy (<kbd>⌘C</kbd>) puts it on the clipboard and Paste (<kbd>⌘V</kbd>) drops a fresh copy nearby, the four restacking actions (Bring to front, Bring forward, Send backward, Send to back) change its overlap order, Lock freezes it (a locked object can't be moved or resized until you unlock it), and Delete removes it.</li>
     <li><strong>Pan</strong> by dragging the empty canvas, and <strong>zoom</strong> with the scroll wheel or the controls in the corner.</li>
     <li><strong>Delete</strong> a selected object with <kbd>Delete</kbd> or <kbd>Backspace</kbd>.</li>
-    <li><strong>Run</strong> a query object at any time with its Run button to refresh the charts bound to it.</li>
+    <li><strong>Run</strong> a query object at any time with its Run button to refresh the tables and charts bound to it.</li>
   </ul>
 
   <h2 id="saving">Saving</h2>
