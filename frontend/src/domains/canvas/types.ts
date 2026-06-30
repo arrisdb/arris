@@ -12,6 +12,8 @@ type ShapeKind = "rect" | "ellipse" | "line";
 /// Preset sticky-note tints. The note picks one; the renderer maps it to a colour.
 type StickyColor = "yellow" | "green" | "blue" | "pink" | "purple";
 type TextAlign = "left" | "center" | "right";
+/// How a line shape's rule is drawn.
+type LineStyle = "solid" | "dashed" | "dotted";
 
 interface TextStyle {
   fontSize?: number;
@@ -24,6 +26,7 @@ interface ShapeStyle {
   fill?: string;
   stroke?: string;
   strokeWidth?: number;
+  lineStyle?: LineStyle;
 }
 
 /// Geometry shared by every object: canvas-space position, size, and z-order.
@@ -226,6 +229,7 @@ export type {
   StickyComponent,
   TableComponent,
   TextAlign,
+  LineStyle,
   TextComponent,
   TextStyle,
 };

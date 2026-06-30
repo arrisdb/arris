@@ -57,6 +57,15 @@ describe("ShapeNode", () => {
     expect(box.getAttribute("style")).toBeNull();
   });
 
+  it("draws the line rule with the chosen line style", () => {
+    seed(makeComponent({ kind: "shape", id: "ln", shape: "line" }));
+    useCanvasStore.getState().updateComponent(TAB, "ln", { style: { lineStyle: "dashed" } });
+    const { container } = renderNode("ln");
+    const line = container.querySelector(".mdbc-canvas-shape-line") as HTMLElement;
+    // The rule is a top border so dashed/dotted/solid render natively.
+    expect(line.style.borderTopStyle).toBe("dashed");
+  });
+
   it("offers the 'Add text' placeholder only while selected", () => {
     seed(makeComponent({ kind: "shape", id: "s", shape: "rect" }));
     const idle = renderNode("s", false);

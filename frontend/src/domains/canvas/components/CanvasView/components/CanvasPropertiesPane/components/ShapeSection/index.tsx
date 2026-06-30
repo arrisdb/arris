@@ -1,6 +1,10 @@
+import { Select } from "@shared/ui";
+
+import type { LineStyle } from "../../../../../../types";
 import {
   DEFAULT_SHAPE_FILL,
   DEFAULT_SHAPE_STROKE,
+  LINE_STYLE_OPTIONS,
 } from "../../constants";
 import type { SectionProps } from "../../types";
 
@@ -36,6 +40,17 @@ function ShapeSection({ component, onChange }: SectionProps) {
           aria-label="Stroke"
         />
       </label>
+      {isLine && (
+        <div className="mdbc-canvas-prop-row">
+          <span className="mdbc-pane-label">Style</span>
+          <Select
+            value={style.lineStyle ?? "solid"}
+            options={LINE_STYLE_OPTIONS}
+            onChange={(v) => onChange({ style: { ...style, lineStyle: v as LineStyle } })}
+            data-testid="line-style-select"
+          />
+        </div>
+      )}
       <label className="mdbc-canvas-prop-row">
         <span className="mdbc-pane-label">Stroke width</span>
         <input

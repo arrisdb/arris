@@ -112,7 +112,8 @@ import DocTable from "../../components/docs/DocTable/DocTable.astro";
         <td>
           A rectangle, ellipse, or line for grouping and annotation. Rectangles and
           ellipses hold optional centered text (double-click to add it), and a rectangle's
-          corners can be rounded by dragging its radius handle.
+          corners can be rounded by dragging its radius handle. A line can be drawn solid,
+          dashed, or dotted.
         </td>
       </tr>
     </tbody>
@@ -185,7 +186,7 @@ import DocTable from "../../components/docs/DocTable/DocTable.astro";
   <ul>
     <li><strong>Add</strong> objects from the toolbar at the bottom of the board: a query, table, chart, sticky note, text, or shape. New objects appear centered in your current view, not at a fixed origin, so they never land off-screen after you pan. Tools with a caret have options (the shape kind, the pointer mode): clicking the tool applies its last-used option and opens the menu at the same time, so switching to another option is one more click. The caret alone just toggles the menu. Single-key shortcuts drive the same actions (<kbd>V</kbd> move, <kbd>H</kbd> hand, <kbd>/</kbd> SQL cell, <kbd>R</kbd>/<kbd>O</kbd>/<kbd>L</kbd> shapes); the keys fire only while the board is focused, never while you are typing, and are rebindable under Settings.</li>
     <li><strong>Select</strong> an object with a single click; its resize anchors stay shown until you click an empty part of the board.</li>
-    <li><strong>Adjust properties</strong> in the panel that opens on the right while one object is selected. Every object shows its position, size, and a lock toggle; below that each kind has its own controls (a shape's fill, stroke, and corner radius; a text block's font size, weight, alignment, and colour; a sticky note's tint; a query's title and connection; a table's source query and preview-row cap; a chart's source query plus the full chart
+    <li><strong>Adjust properties</strong> in the panel that opens on the right while one object is selected. Every object shows its position, size, and a lock toggle; below that each kind has its own controls (a shape's fill, stroke, line style, and corner radius; a text block's font size, weight, alignment, and colour; a sticky note's tint; a query's title and connection; a table's source query and preview-row cap; a chart's source query plus the full chart
       editor: type, axes, series, aggregation, colours, legend, and labels, the same
       control surface as the results-view chart editor).</li>
     <li><strong>Move</strong> an object by dragging it; objects may overlap. Text and sticky notes move on a single drag and open for editing on double-click. Switch the pointer to the <strong>Hand</strong> tool to pan the board from anywhere instead of dragging objects.</li>
