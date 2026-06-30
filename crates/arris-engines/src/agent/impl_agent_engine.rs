@@ -303,6 +303,22 @@ impl AgentEngine {
              `connectionId` is not that listed connection's `id`, set it to that \
              `id` to move the query onto the board's connection. The client re-runs \
              a query whose `connectionId` changed.\n\
+             - BUILD ON EXISTING RESULTS when you can. Each `query` line in the \
+             board shows a `table=<name>`: a new query may read ANOTHER query \
+             cell's already-computed RESULTS by selecting `FROM <that table name>` \
+             (or JOIN), instead of re-querying the database. PREFER this whenever \
+             the data you need is derivable from a cell already on the board: to \
+             filter it, re-aggregate it, reshape it, or join two cells. A query \
+             that reads a cell runs in an in-memory engine (Apache DataFusion), so \
+             it has three constraints: (1) use standard ANSI SQL (e.g. `SUM`, \
+             `GROUP BY`, `date_trunc`), NOT source-database-specific syntax; (2) it \
+             may reference ONLY other cells' `table=` names (and SQL literals), \
+             NEVER a live database table in the SAME statement (a query that needs \
+             both must read the live data in its own cell first, then a second cell \
+             reads that cell); (3) it can only use the columns the upstream cell \
+             actually returns (its SELECT list). Re-query the database only when no \
+             existing cell has the columns or grain you need (e.g. a weekly-summed \
+             cell cannot be split back into days).\n\
              - To ADD an object, use a new `id`. To MODIFY an object already on the \
              board, return a component whose `id` matches the existing one and \
              include only the fields you are changing (the client merges them). To \
@@ -673,6 +689,13 @@ mod tests {
         // moving a stray cell onto the board's connection).
         assert!(prompt.contains("MOVE an existing query"));
         assert!(prompt.contains("even when only ONE connection is listed"));
+        // The agent is taught to chain off an existing cell's results (read it by
+        // its `table=` name in the in-memory engine) instead of always re-querying
+        // the source database.
+        assert!(prompt.contains("BUILD ON EXISTING RESULTS"));
+        assert!(prompt.contains("table=<name>"));
+        assert!(prompt.contains("DataFusion"));
+        assert!(prompt.contains("ANSI SQL"));
         // The agent can ASK the user for data it cannot see (the question
         // abstraction), with share_results as the first question type.
         assert!(prompt.contains("arris-ask"));

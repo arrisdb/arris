@@ -161,6 +161,15 @@ import DocTable from "../../components/docs/DocTable/DocTable.astro";
   </p>
 
   <p>
+    When the data you ask for can be derived from a query already on the board, the agent
+    <strong>builds on that cell's results</strong> instead of re-querying the database: it writes a new
+    query that selects <code>FROM</code> the existing cell (to filter, re-aggregate, reshape, or join
+    cells), which runs in the in-memory engine. It falls back to a fresh database query only when no
+    existing cell has the columns or grain it needs (a weekly-summed cell, for instance, cannot be
+    split back into days).
+  </p>
+
+  <p>
     The agent sees your schema and the board, but never the rows a query returned. When it needs
     them, it <strong>asks</strong>: instead of changing the board it posts a <strong>Share
     results</strong> request naming the query objects it wants and why. A card appears in the chat
