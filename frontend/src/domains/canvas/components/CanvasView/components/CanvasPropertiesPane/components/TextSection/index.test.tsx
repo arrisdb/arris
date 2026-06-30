@@ -36,4 +36,14 @@ describe("TextSection", () => {
     );
     expect(container.querySelector(".mdbc-pane-form")).toBeNull();
   });
+
+  it("uses the shared NumberStepper and the small colour swatch", () => {
+    const comp = makeComponent({ kind: "text", id: "t" });
+    const { container } = render(
+      <TextSection tabId="t" component={comp} onChange={vi.fn()} />,
+    );
+    // Font size is a shared NumberStepper; colour is the compact swatch.
+    expect(container.querySelectorAll(".mdbc-stepper")).toHaveLength(1);
+    expect(container.querySelectorAll(".mdbc-canvas-color")).toHaveLength(1);
+  });
 });
