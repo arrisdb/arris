@@ -39,4 +39,16 @@ describe("CommonSection", () => {
     fireEvent.click(check);
     expect(onChange).toHaveBeenCalledWith({ locked: true });
   });
+
+  it("uses the app-level NumberStepper and checkbox controls", () => {
+    const { container } = render(
+      <CommonSection tabId="t" component={comp} onChange={vi.fn()} />,
+    );
+    // One shared NumberStepper per geometry field (X/Y/W/H), not bare inputs.
+    expect(container.querySelectorAll(".mdbc-stepper")).toHaveLength(4);
+    // The lock toggle is the shared app checkbox.
+    expect(
+      container.querySelector('input[type="checkbox"]')?.classList.contains("mdbc-checkbox"),
+    ).toBe(true);
+  });
 });

@@ -1,5 +1,6 @@
 /* The canvas properties pane: a fixed-width right rail shown while one object is
-   selected. Reuses the shared pane chrome (mdbc-pane right + header/body). */
+   selected. Reuses the shared pane chrome (mdbc-pane right + header/body) and the
+   app-level form controls (NumberStepper, mdbc-checkbox, custom Select). */
 .mdbc-canvas-props {
   /* Fills its resizable Panel; the divider sets the width. */
   width: 100%;
@@ -7,38 +8,31 @@
   z-index: 5;
 }
 
-/* Two-column grid for the X/Y/W/H geometry fields. */
-.mdbc-canvas-prop-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px 8px;
-}
-
-/* One labelled field: a small caption above its control. */
-.mdbc-canvas-prop {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-
-/* A checkbox row (e.g. Locked): caption to the right of the box. */
-.mdbc-canvas-prop-check {
+/* One labelled control: caption on the left, the control flush right, so every
+   row (stepper, checkbox, colour swatch, segmented) lines up the same way. */
+.mdbc-canvas-prop-row {
   display: flex;
   align-items: center;
-  gap: 6px;
-  cursor: pointer;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 26px;
 }
-.mdbc-canvas-prop-check input {
-  margin: 0;
+.mdbc-canvas-prop-row > .mdbc-pane-label {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-/* Native colour swatch, sized to line up with the text inputs. */
+/* Small colour swatch, matching the chart editor's series-colour blob: a compact
+   square, not a full-width bar. */
 .mdbc-canvas-color {
-  width: 100%;
-  height: 26px;
+  flex: 0 0 auto;
+  width: 28px;
+  height: 24px;
   padding: 2px;
   border: 0.5px solid var(--m-sep);
   border-radius: var(--m-r-control);
-  background: rgb(var(--m-overlay-rgb) / 0.04);
+  background: transparent;
   cursor: pointer;
 }
