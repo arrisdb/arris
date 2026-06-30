@@ -5,6 +5,7 @@ import {
   barSegmentRadius,
   cartesianSeries,
   chartImageFilename,
+  yAxisDomainFor,
   reconcileChartSpec,
   toCartesianData,
   toFunnelData,
@@ -430,5 +431,26 @@ describe("barSegmentRadius", () => {
   it("rounds the left/right ends of a horizontal stack", () => {
     expect(barSegmentRadius(0, 2, true, true)).toEqual([4, 0, 0, 4]);
     expect(barSegmentRadius(1, 2, true, true)).toEqual([0, 4, 4, 0]);
+  });
+});
+
+describe("yAxisDomainFor", () => {
+  it("fits a line chart to its data instead of forcing a 0 baseline", () => {
+    expect(yAxisDomainFor({ kind: "line", xColumn: "x", yColumns: ["y"] })).toEqual(["auto", "auto"]);
+    expect(yAxisDomainFor({ kind: "area", xColumn: "x", yColumns: ["y"] })).toEqual(["auto", "auto"]);
+  });
+
+  it("keeps a bar/combo chart 0-based (undefined domain) so bar length stays proportional", () => {
+    expect(yAxisDomainFor({ kind: "bar", xColumn: "x", yColumns: ["y"] })).toBeUndefined();
+    expect(yAxisDomainFor({ kind: "combo", xColumn: "x", yColumns: ["y"] })).toBeUndefined();
+  });
+
+  it("honours an explicit yMin/yMax on any kind", () => {
+    expect(
+      yAxisDomainFor({ kind: "line", xColumn: "x", yColumns: ["y"], style: { yMin: 0, yMax: 100 } }),
+    ).toEqual([0, 100]);
+    expect(
+      yAxisDomainFor({ kind: "bar", xColumn: "x", yColumns: ["y"], style: { yMin: 10 } }),
+    ).toEqual([10, "auto"]);
   });
 });

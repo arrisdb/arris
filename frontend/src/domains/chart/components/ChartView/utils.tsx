@@ -106,6 +106,18 @@ function yDomain(style: ChartStyle | undefined): NumericDomain | undefined {
   return [style?.yMin ?? "auto", style?.yMax ?? "auto"];
 }
 
+/// The Y-axis domain to apply. An explicit yMin/yMax always wins. Otherwise a
+/// line or area chart fits the axis to the data (`["auto", "auto"]`) instead of
+/// inheriting Recharts' 0-based default, which strands the line in the top of the
+/// plot when the values sit far from zero. A bar/combo chart keeps the 0 baseline
+/// so a bar's length stays proportional to its value.
+function yAxisDomainFor(spec: ChartSpec): NumericDomain | undefined {
+  const explicit = yDomain(spec.style);
+  if (explicit) return explicit;
+  if (spec.kind === "line" || spec.kind === "area") return ["auto", "auto"];
+  return undefined;
+}
+
 function colIndex(result: QueryResult, name: string): number {
   return result.columns.findIndex((column) => column.name === name);
 }
@@ -418,7 +430,7 @@ function buildAxes(spec: ChartSpec, fonts: ChartFontScale) {
   if (style?.yAxisTitle) {
     yAxisProps.label = { value: style.yAxisTitle, angle: -90, position: "insideLeft", fontSize: fonts.axis, fill: "rgb(var(--m-overlay-rgb) / 0.5)" };
   }
-  const yAxisDomain = yDomain(style);
+  const yAxisDomain = yAxisDomainFor(spec);
   if (yAxisDomain) yAxisProps.domain = yAxisDomain;
   if (style?.yScale === "log") yAxisProps.scale = "log";
   if (isHorizontal) {
@@ -916,6 +928,7 @@ export {
   barSegmentRadius,
   cartesianSeries,
   chartEmptyMessage,
+  yAxisDomainFor,
   chartFontScale,
   chartImageFilename,
   defaultChartSpec,
