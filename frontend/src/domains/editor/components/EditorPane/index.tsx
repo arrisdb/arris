@@ -335,6 +335,7 @@ function PaneGroupView({ groupId }: { groupId: string }) {
   const addTab = useTabsStore((s) => s.addTab);
   const openTerminalTab = useTabsStore((s) => s.openTerminalTab);
   const openUntitledNotebookTab = useTabsStore((s) => s.openUntitledNotebookTab);
+  const openUntitledCanvasTab = useTabsStore((s) => s.openUntitledCanvasTab);
   const selectedConnectionId = useConnectionsStore((s) => s.selectedId);
   const selectConnection = useConnectionsStore((s) => s.selectConnection);
   const connections = useConnectionsStore((s) => s.connections);
@@ -609,6 +610,11 @@ function PaneGroupView({ groupId }: { groupId: string }) {
   function newNotebookTab() {
     focusGroup(groupId);
     openUntitledNotebookTab();
+  }
+
+  function newCanvasTab() {
+    focusGroup(groupId);
+    openUntitledCanvasTab(selectedConnectionId ?? undefined);
   }
 
   const tabConnectionId = resolveTabConnectionId({
@@ -1834,6 +1840,7 @@ function PaneGroupView({ groupId }: { groupId: string }) {
       splitBottom: { run: () => { if (activeTab) handleSplit(activeTab.id, "down"); }, isEnabled: () => !!activeTab },
       newTerminalTab: { run: () => newTerminalTab() },
       newNotebookTab: { run: () => newNotebookTab() },
+      newCanvasTab: { run: () => newCanvasTab() },
       switchTab: {
         run: () => {
           const index = groupTabs.findIndex((tab) => tab.id === activeId);
@@ -1863,6 +1870,7 @@ function PaneGroupView({ groupId }: { groupId: string }) {
         onAdd={newTab}
         onAddTerminal={newTerminalTab}
         onAddNotebook={newNotebookTab}
+        onAddCanvas={newCanvasTab}
         onSplit={handleSplit}
         onRename={handleRename}
       />

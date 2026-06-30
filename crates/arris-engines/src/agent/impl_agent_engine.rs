@@ -2,10 +2,10 @@
 //!
 //! Each turn builds a self-contained prompt (role + schema + the user's request),
 //! spawns the selected provider's CLI (`codex` or `claude`) in a read-only mode,
-//! and streams its parsed events as [`AgentEvent`]s. The agent only writes or
-//! explains SQL — it needs no live database access, so there is no MCP server:
-//! the schema is inlined into the prompt and the CLI runs with file writes and
-//! tools disabled.
+//! and streams its parsed events as [`AgentEvent`]s. The [`AgentProfile`] selects
+//! the prompt: write/explain SQL, or design canvas objects. Either way the agent
+//! needs no live database access, so there is no MCP server: the schema is
+//! inlined into the prompt and the CLI runs with file writes and tools disabled.
 
 use std::fmt::Write as _;
 use std::path::PathBuf;
@@ -17,7 +17,7 @@ use tokio::sync::{mpsc, oneshot};
 
 use super::constants::SCHEMA_PROMPT_MAX_BYTES;
 use super::errors::AgentError;
-use super::types::{AgentEvent, AgentProvider};
+use super::types::{AgentEvent, AgentProfile, AgentProvider};
 use crate::{DatabaseKind, Engine, SchemaNode, SchemaNodeKind};
 
 /// Orchestrates agentic SQL sessions for writing and explaining queries.
@@ -43,6 +43,7 @@ impl AgentEngine {
     pub async fn send(
         &self,
         provider: AgentProvider,
+        profile: AgentProfile,
         dialect: Option<DatabaseKind>,
         schema_ddl: String,
         user_prompt: String,
@@ -50,7 +51,7 @@ impl AgentEngine {
         cancel: oneshot::Receiver<()>,
     ) -> Result<mpsc::Receiver<AgentEvent>, AgentError> {
         let (tx, rx) = mpsc::channel(64);
-        let prompt = Self::build_prompt(dialect, &schema_ddl, &user_prompt);
+        let prompt = Self::build_prompt(profile, dialect, &schema_ddl, &user_prompt);
         let cwd = Self::working_dir()?;
         let cli = provider.cli();
         let binary = cli.binary();
@@ -154,21 +155,36 @@ impl AgentEngine {
 // ── prompt construction ──────────────────────────────────────────────────────
 
 impl AgentEngine {
-    /// Build the full prompt: role, schema snapshot, rules, and the user's
-    /// request. Self-contained so the turn needs no tools or file access.
+    /// Build the full prompt for `profile`: role, schema snapshot, rules, and the
+    /// user's request. Self-contained so the turn needs no tools or file access.
     pub(super) fn build_prompt(
+        profile: AgentProfile,
         dialect: Option<DatabaseKind>,
         schema_ddl: &str,
         user_prompt: &str,
     ) -> String {
         let name = dialect.map(Self::dialect_name).unwrap_or("SQL");
-        let schema = if schema_ddl.len() > SCHEMA_PROMPT_MAX_BYTES {
+        let schema = Self::clamp_schema(schema_ddl);
+        match profile {
+            AgentProfile::Sql => Self::build_sql_prompt(name, &schema, user_prompt),
+            AgentProfile::Canvas => Self::build_canvas_prompt(name, &schema, user_prompt),
+        }
+    }
+
+    /// Trim the inlined schema DDL to [`SCHEMA_PROMPT_MAX_BYTES`] so a large
+    /// database cannot blow the model's context window.
+    fn clamp_schema(schema_ddl: &str) -> String {
+        if schema_ddl.len() > SCHEMA_PROMPT_MAX_BYTES {
             let mut truncated: String = schema_ddl.chars().take(SCHEMA_PROMPT_MAX_BYTES).collect();
             truncated.push_str("\n-- (schema truncated)\n");
             truncated
         } else {
             schema_ddl.to_string()
-        };
+        }
+    }
+
+    /// The query-assistant prompt: write or explain one SQL block.
+    fn build_sql_prompt(name: &str, schema: &str, user_prompt: &str) -> String {
         format!(
             "You are a SQL assistant embedded in a database client. You ONLY write \
              or explain SQL queries for the user's {name} database — nothing else. \
@@ -182,6 +198,51 @@ impl AgentEngine {
              - When asked to explain a query, describe what it does in plain prose; \
              include SQL only if you are proposing a revision.\n\
              - You cannot execute anything — never claim you ran a query.\n\n\
+             # Request\n\
+             {user_prompt}\n",
+        )
+    }
+
+    /// The canvas prompt: design analytics objects and emit them as one
+    /// `arris-canvas` JSON block. The client parses the block, creates the
+    /// objects, runs each query object, and binds charts to their source query's
+    /// results. The contract mirrors the frontend `CanvasComponent` union.
+    fn build_canvas_prompt(name: &str, schema: &str, user_prompt: &str) -> String {
+        format!(
+            "You design analytics objects on a visual canvas inside a database \
+             client, for the user's {name} database. You do not chat at length and \
+             you cannot run shell commands, read files, or execute queries.\n\n\
+             # Database schema ({name})\n\
+             {schema}\n\n\
+             # Output contract\n\
+             Reply with ONE fenced code block tagged `arris-canvas` containing a \
+             single JSON object, optionally preceded by one short sentence of \
+             prose. The JSON has this shape:\n\
+             ```arris-canvas\n\
+             {{\n\
+             \x20 \"components\": [\n\
+             \x20   {{ \"kind\": \"query\", \"id\": \"q1\", \"title\": \"<label>\", \"sql\": \"<one {name} statement>\" }},\n\
+             \x20   {{ \"kind\": \"chart\", \"id\": \"c1\", \"sourceQueryId\": \"q1\",\n\
+             \x20     \"spec\": {{ \"kind\": \"bar\", \"xColumn\": \"<col>\", \"yColumns\": [\"<col>\"], \"seriesColumn\": \"<col?>\", \"aggregation\": \"sum\", \"title\": \"<title>\", \"style\": {{ \"stackMode\": \"stacked\" }} }} }},\n\
+             \x20   {{ \"kind\": \"text\", \"id\": \"t1\", \"text\": \"## Heading\\nMarkdown commentary.\" }}\n\
+             \x20 ],\n\
+             \x20 \"edges\": [ {{ \"id\": \"e1\", \"source\": \"q1\", \"target\": \"c1\" }} ]\n\
+             }}\n\
+             ```\n\n\
+             # Rules\n\
+             - Use dialect-appropriate {name} syntax and only the tables/columns above.\n\
+             - Every `chart` MUST set `sourceQueryId` to the `id` of a `query` in the \
+             same block; `xColumn`/`yColumns`/`seriesColumn` MUST be columns that \
+             query returns. `spec.kind` is one of bar, line, area, pie, scatter, \
+             combo, donut, radar, treemap, funnel, kpi. Omit `seriesColumn` and \
+             `style` when not needed; `aggregation` is one of none, sum, avg, min, \
+             max, count.\n\
+             - Each `query.sql` is exactly one statement, no trailing semicolon, no \
+             comments. Prefer a single query that returns tidy rows for charting \
+             (e.g. group by the x bucket and the series column).\n\
+             - Add a short `text` object summarising the finding. Do not invent ids; \
+             reference queries only by ids you defined. Positions/sizes are optional \
+             (the client lays objects out). Emit nothing after the closing fence.\n\n\
              # Request\n\
              {user_prompt}\n",
         )
@@ -314,6 +375,7 @@ mod tests {
     #[test]
     fn build_prompt_inlines_schema_and_request() {
         let prompt = AgentEngine::build_prompt(
+            AgentProfile::Sql,
             Some(DatabaseKind::Postgres),
             "CREATE TABLE users (id INT);",
             "list all users",
@@ -327,7 +389,7 @@ mod tests {
     #[test]
     fn build_prompt_without_dialect_uses_generic_sql() {
         // No connection selected: the agent still writes/explains generic SQL.
-        let prompt = AgentEngine::build_prompt(None, "", "write a select");
+        let prompt = AgentEngine::build_prompt(AgentProfile::Sql, None, "", "write a select");
         assert!(prompt.contains("SQL"));
         assert!(!prompt.contains("PostgreSQL"));
         assert!(prompt.contains("write a select"));
@@ -336,7 +398,39 @@ mod tests {
     #[test]
     fn build_prompt_truncates_oversized_schema() {
         let huge = "x".repeat(SCHEMA_PROMPT_MAX_BYTES + 1000);
-        let prompt = AgentEngine::build_prompt(Some(DatabaseKind::Sqlite), &huge, "go");
+        let prompt = AgentEngine::build_prompt(
+            AgentProfile::Sql,
+            Some(DatabaseKind::Sqlite),
+            &huge,
+            "go",
+        );
+        assert!(prompt.contains("(schema truncated)"));
+    }
+
+    #[test]
+    fn canvas_prompt_describes_object_contract() {
+        let prompt = AgentEngine::build_prompt(
+            AgentProfile::Canvas,
+            Some(DatabaseKind::Postgres),
+            "CREATE TABLE orders (id INT, ordered_at TIMESTAMP, category TEXT, total NUMERIC);",
+            "monthly sales by category",
+        );
+        // Schema and request are inlined.
+        assert!(prompt.contains("PostgreSQL"));
+        assert!(prompt.contains("CREATE TABLE orders"));
+        assert!(prompt.contains("monthly sales by category"));
+        // The canvas contract markers are present (and it is NOT the SQL prompt).
+        assert!(prompt.contains("```arris-canvas"));
+        assert!(prompt.contains("sourceQueryId"));
+        assert!(prompt.contains("\"kind\": \"query\""));
+        assert!(prompt.contains("\"kind\": \"chart\""));
+        assert!(!prompt.contains("return exactly one ```sql fenced block"));
+    }
+
+    #[test]
+    fn canvas_prompt_truncates_oversized_schema() {
+        let huge = "x".repeat(SCHEMA_PROMPT_MAX_BYTES + 1000);
+        let prompt = AgentEngine::build_prompt(AgentProfile::Canvas, None, &huge, "go");
         assert!(prompt.contains("(schema truncated)"));
     }
 }

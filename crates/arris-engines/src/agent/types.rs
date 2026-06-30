@@ -28,6 +28,21 @@ impl std::fmt::Display for AgentProvider {
     }
 }
 
+// ── agent profile (which prompt the turn uses) ───────────────────────────────
+
+/// Which task the agent turn serves, selecting the system prompt. `Sql` is the
+/// query-assistant prompt (write/explain one SQL block); `Canvas` instructs the
+/// agent to emit a structured `arris-canvas` block describing canvas objects to
+/// create (query/chart/text). Defaults to `Sql` so existing callers are
+/// unaffected.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum AgentProfile {
+    #[default]
+    Sql,
+    Canvas,
+}
+
 // ── streamed agent events (forwarded to the frontend) ────────────────────────
 
 /// A single event parsed from a provider's streamed output, forwarded to the

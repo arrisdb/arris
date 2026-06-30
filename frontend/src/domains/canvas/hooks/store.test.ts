@@ -1,0 +1,95 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("../ipc", () => ({ runCanvasQueryIPC: vi.fn() }));
+
+import type { AgentCanvasSpec } from "../types";
+import { makeComponent } from "../utils";
+import { runCanvasQueryIPC } from "../ipc";
+import { useCanvasStore } from "./store";
+
+const TAB = "tab-1";
+const get = () => useCanvasStore.getState();
+
+describe("useCanvasStore", () => {
+  beforeEach(() => {
+    useCanvasStore.setState({ boards: {} });
+    vi.clearAllMocks();
+  });
+
+  it("ensureBoard parses once and never clobbers live edits", () => {
+    get().ensureBoard(TAB, "");
+    get().addComponent(TAB, makeComponent({ kind: "text", id: "t", text: "x" }));
+    // A second ensure (e.g. a re-mount) must not reset the board.
+    get().ensureBoard(TAB, JSON.stringify({ version: 1, components: [], edges: [] }));
+    expect(get().boards[TAB].doc.components).toHaveLength(1);
+  });
+
+  it("adds, updates, and removes an object", () => {
+    get().ensureBoard(TAB, "");
+    get().addComponent(TAB, makeComponent({ kind: "text", id: "t", text: "a" }));
+    get().updateComponent(TAB, "t", { x: 50 });
+    expect(get().boards[TAB].doc.components[0]).toMatchObject({ x: 50 });
+    get().removeComponent(TAB, "t");
+    expect(get().boards[TAB].doc.components).toHaveLength(0);
+  });
+
+  it("removing an object also drops its edges and run state", () => {
+    get().ensureBoard(TAB, "");
+    get().addComponent(TAB, makeComponent({ kind: "query", id: "q1", sql: "s" }));
+    get().addComponent(TAB, makeComponent({ kind: "chart", id: "c1", sourceQueryId: "q1" }));
+    get().setEdges(TAB, [{ id: "e", source: "q1", target: "c1" }]);
+    get().setRun(TAB, "q1", { result: { columns: [], rows: [], elapsed: 0 } });
+    get().removeComponent(TAB, "q1");
+    expect(get().boards[TAB].doc.edges).toHaveLength(0);
+    expect(get().boards[TAB].runs.q1).toBeUndefined();
+  });
+
+  it("setViewport persists the viewport", () => {
+    get().ensureBoard(TAB, "");
+    get().setViewport(TAB, { x: 1, y: 2, zoom: 1.5 });
+    expect(get().boards[TAB].doc.viewport).toEqual({ x: 1, y: 2, zoom: 1.5 });
+  });
+
+  it("applyAgentSpec appends objects and returns the query ids to run", () => {
+    get().ensureBoard(TAB, "");
+    const spec: AgentCanvasSpec = {
+      components: [
+        { kind: "query", id: "q1", sql: "s" },
+        {
+          kind: "chart",
+          id: "c1",
+          sourceQueryId: "q1",
+          spec: { kind: "bar", xColumn: "a", yColumns: ["b"] },
+        },
+      ],
+      edges: [],
+    };
+    const ids = get().applyAgentSpec(TAB, spec, "conn");
+    expect(ids).toEqual(["q1"]);
+    expect(get().boards[TAB].doc.components).toHaveLength(2);
+    expect(get().boards[TAB].doc.edges).toHaveLength(1);
+  });
+
+  it("runQueryComponent stores the result on success", async () => {
+    vi.mocked(runCanvasQueryIPC).mockResolvedValue({ columns: [], rows: [], elapsed: 1 });
+    get().ensureBoard(TAB, "");
+    get().addComponent(
+      TAB,
+      makeComponent({ kind: "query", id: "q1", sql: "select 1", connectionId: "conn" }),
+    );
+    await get().runQueryComponent(TAB, "q1");
+    expect(get().boards[TAB].runs.q1.result).toBeDefined();
+    expect(get().boards[TAB].runs.q1.running).toBe(false);
+  });
+
+  it("runQueryComponent errors (without calling IPC) when no connection is set", async () => {
+    get().ensureBoard(TAB, "");
+    get().addComponent(
+      TAB,
+      makeComponent({ kind: "query", id: "q1", sql: "s", connectionId: null }),
+    );
+    await get().runQueryComponent(TAB, "q1");
+    expect(get().boards[TAB].runs.q1.error).toBeTruthy();
+    expect(runCanvasQueryIPC).not.toHaveBeenCalled();
+  });
+});

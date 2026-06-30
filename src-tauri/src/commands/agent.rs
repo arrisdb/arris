@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 
-use arris_engines::agent::{AgentEvent, AgentProvider};
+use arris_engines::agent::{AgentEvent, AgentProfile, AgentProvider};
 use arris_engines::{AppEnvironment, IpcError};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, State};
@@ -50,6 +50,7 @@ pub async fn cmd_agent_send(
     env: State<'_, Arc<AppEnvironment>>,
     runs: State<'_, AgentRuns>,
     provider: AgentProvider,
+    profile: Option<AgentProfile>,
     connection_id: Option<Uuid>,
     prompt: String,
     turn_id: String,
@@ -57,6 +58,7 @@ pub async fn cmd_agent_send(
 ) -> Result<(), IpcError> {
     let env = Arc::clone(env.inner());
     let runs = runs.inner().clone();
+    let profile = profile.unwrap_or_default();
     let (cancel_tx, cancel_rx) = oneshot::channel();
     runs.inner.lock().await.insert(turn_id.clone(), cancel_tx);
     tokio::spawn(async move {
@@ -64,6 +66,7 @@ pub async fn cmd_agent_send(
             &app,
             &env,
             provider,
+            profile,
             connection_id,
             prompt,
             turn_id.clone(),
@@ -91,6 +94,7 @@ async fn run_turn(
     app: &AppHandle,
     env: &AppEnvironment,
     provider: AgentProvider,
+    profile: AgentProfile,
     connection_id: Option<Uuid>,
     prompt: String,
     turn_id: String,
@@ -146,7 +150,15 @@ async fn run_turn(
 
     match env
         .agent
-        .send(provider, dialect, schema_ddl, prompt, resume_session, cancel)
+        .send(
+            provider,
+            profile,
+            dialect,
+            schema_ddl,
+            prompt,
+            resume_session,
+            cancel,
+        )
         .await
     {
         Ok(mut rx) => {

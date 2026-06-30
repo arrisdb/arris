@@ -1,0 +1,133 @@
+---
+import "../../styles/global.css";
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import DocTable from "../../components/docs/DocTable/DocTable.astro";
+---
+
+<!--
+  Screenshots to capture for this page (use the shared Screenshot component):
+  - The canvas board with an agent-generated query + chart + text, and the
+    Agent panel on the left.
+  - The New Canvas (+) button in the editor tab bar.
+-->
+
+<DocsLayout
+  title="Canvas - Arris Docs"
+  breadcrumbs={[{ label: "Docs", href: "/" }, { label: "AI" }, { label: "Canvas" }]}
+  heading="Canvas"
+  lede="A visual board where you chat with an AI agent that reads your schema and builds analytics objects for you: a query that runs, a chart of its results, and text that explains them."
+  tocItems={[
+    { label: "What the canvas is", href: "#overview" },
+    { label: "Opening a canvas", href: "#opening" },
+    { label: "Objects", href: "#objects" },
+    { label: "Building with the agent", href: "#agent" },
+    { label: "Working on the board", href: "#board" },
+    { label: "Saving", href: "#saving" },
+  ]}
+  currentPath="/ai/canvas"
+  prev={{ label: "AI Agent", href: "/ai/agent", section: "AI" }}
+  next={{ label: "Keyboard shortcuts", href: "/reference/shortcuts", section: "Reference" }}
+>
+  <h2 id="overview">What the canvas is</h2>
+
+  <p>
+    The canvas is an infinite, freeform board (pan, zoom, and drag) where the unit of work is an
+    <strong>object</strong> rather than a single query tab. Each object sits at its own position and
+    size and can overlap its neighbours. An object is one of four kinds today: a <strong>query</strong>
+    that runs SQL and shows its rows, a <strong>chart</strong> that visualizes another query's
+    results, a block of <strong>text</strong>, or a simple <strong>shape</strong>. The kinds are
+    designed to grow, so more object types can be added later.
+  </p>
+
+  <p>
+    The point of the board is to assemble an analysis you can see all at once: the query that pulls
+    the data, the chart that makes it legible, and the commentary that explains it, side by side. You
+    can build that by hand, but the fastest path is to ask the agent.
+  </p>
+
+  <h2 id="opening">Opening a canvas</h2>
+
+  <p>
+    Open a new board with the <strong>New Canvas</strong> button (the sparkles icon) in the editor
+    tab bar, or run the <strong>New Canvas</strong> command from the keymap. A canvas opens as a
+    center tab, just like a query or a notebook, and you can rename it. The board inherits the
+    connection that is currently selected, so its query objects and the agent both target that
+    database; pick a connection before creating the canvas if you want a specific one.
+  </p>
+
+  <h2 id="objects">Objects</h2>
+
+  <DocTable>
+    <thead>
+      <tr>
+        <th>Object</th>
+        <th>What it does</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="font-medium text-fg">Query</td>
+        <td>
+          Holds one SQL statement with a <strong>Run</strong> button and a compact result grid. It
+          runs against the canvas's connection, the same engine the editor uses.
+        </td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">Chart</td>
+        <td>
+          Visualizes a query object's results. A chart is bound to its source query, so when that
+          query runs the chart updates. It uses the same chart engine as the results viewer.
+        </td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">Text</td>
+        <td>Free text for headings and commentary. Click to edit in place.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">Shape</td>
+        <td>A rectangle, ellipse, or line for grouping and annotation.</td>
+      </tr>
+    </tbody>
+  </DocTable>
+
+  <h2 id="agent">Building with the agent</h2>
+
+  <p>
+    The <strong>Agent</strong> panel runs down the left of the board. Type a request, for example
+    <em>"monthly sales by category"</em>, and the agent reads the connection's schema and replies
+    with a set of objects to add. A typical answer is a query object (the SQL that aggregates your
+    data), a chart object bound to it, and a short text summary. Arris places the new objects on the
+    board, runs the query automatically, and the chart renders from the result.
+  </p>
+
+  <p>
+    The agent uses Anthropic's <strong>Claude CLI</strong> (<code>claude -p</code>) under the same
+    guardrails as the SQL agent: it runs locally in a read-only mode, never touches your filesystem,
+    and only receives your prompt plus the connection's <strong>schema as DDL</strong> and dialect
+    (capped in size). Your row data is not sent. Because the agent needs the schema to write correct
+    SQL, the chat asks you to connect a database to the canvas first.
+  </p>
+
+  <p>
+    Follow-up messages refine the same board: ask for a different chart type, another breakdown, or a
+    second query, and the new objects are added alongside the existing ones.
+  </p>
+
+  <h2 id="board">Working on the board</h2>
+
+  <ul>
+    <li><strong>Move</strong> an object by dragging it; objects may overlap.</li>
+    <li><strong>Pan</strong> by dragging the empty canvas, and <strong>zoom</strong> with the scroll wheel or the controls in the corner.</li>
+    <li><strong>Add</strong> a text or shape object by hand from the toolbar in the top-left.</li>
+    <li><strong>Delete</strong> a selected object with <kbd>Delete</kbd> or <kbd>Backspace</kbd>.</li>
+    <li><strong>Run</strong> a query object at any time with its Run button to refresh the charts bound to it.</li>
+  </ul>
+
+  <h2 id="saving">Saving</h2>
+
+  <p>
+    A board is saved with your workspace, so it survives closing and reopening the tab and restarting
+    Arris. Query results are not saved with the board; reopen a canvas and run its query objects to
+    refresh the data.
+  </p>
+</DocsLayout>

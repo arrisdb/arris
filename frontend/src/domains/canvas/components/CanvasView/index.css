@@ -1,0 +1,178 @@
+.mdbc-canvas-view {
+  display: flex;
+  height: 100%;
+  width: 100%;
+  min-height: 0;
+}
+
+.mdbc-canvas-board {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 100%;
+}
+
+.mdbc-canvas-board .react-flow {
+  width: 100%;
+  height: 100%;
+  background: var(--m-bg-app);
+}
+
+.mdbc-canvas-toolbar {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 5;
+  display: flex;
+  gap: 6px;
+}
+
+/* ── object node base ─────────────────────────────────────────────────────── */
+
+.mdbc-canvas-node {
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--m-bg-card);
+  border: 1px solid var(--m-sep);
+  border-radius: var(--m-r-md);
+  box-shadow: var(--m-shadow-card);
+  color: var(--m-fg);
+  font-family: var(--m-font);
+  font-size: var(--m-fs-sm);
+}
+
+.mdbc-canvas-node.selected {
+  border-color: var(--m-accent);
+  box-shadow: 0 0 0 1px var(--m-accent), var(--m-shadow-card);
+}
+
+.mdbc-canvas-node-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--m-sep);
+  flex: 0 0 auto;
+}
+
+.mdbc-canvas-node-title {
+  font-size: var(--m-fs-sm);
+  font-weight: 600;
+  color: var(--m-fg-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mdbc-canvas-run {
+  flex: 0 0 auto;
+}
+
+/* ── text object ──────────────────────────────────────────────────────────── */
+
+.mdbc-canvas-text {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.mdbc-canvas-text.selected {
+  border-color: var(--m-accent);
+}
+
+.mdbc-canvas-text-input {
+  flex: 1 1 auto;
+  width: 100%;
+  height: 100%;
+  resize: none;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--m-fg);
+  font-family: var(--m-font);
+  font-size: var(--m-fs-md);
+  line-height: 1.4;
+  padding: 8px 10px;
+}
+
+/* ── query object ─────────────────────────────────────────────────────────── */
+
+.mdbc-canvas-sql {
+  flex: 0 0 auto;
+  height: 96px;
+  width: 100%;
+  box-sizing: border-box;
+  resize: none;
+  border: none;
+  outline: none;
+  border-bottom: 1px solid var(--m-sep);
+  background: var(--m-bg-editor);
+  color: var(--m-fg);
+  font-family: var(--m-font-mono);
+  font-size: var(--m-fs-xs);
+  line-height: 1.5;
+  padding: 8px 10px;
+}
+
+.mdbc-canvas-result {
+  flex: 1 1 auto;
+  overflow: auto;
+  padding: 0;
+}
+
+.mdbc-canvas-result-empty,
+.mdbc-canvas-result-error {
+  padding: 8px 10px;
+  font-size: var(--m-fs-xs);
+  color: var(--m-fg-3);
+}
+
+.mdbc-canvas-result-error {
+  color: var(--m-red);
+  white-space: pre-wrap;
+}
+
+.mdbc-canvas-result-table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: var(--m-fs-xs);
+  font-family: var(--m-font-mono);
+}
+
+.mdbc-canvas-result-table th,
+.mdbc-canvas-result-table td {
+  border-bottom: 1px solid var(--m-sep);
+  padding: 3px 8px;
+  text-align: left;
+  white-space: nowrap;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mdbc-canvas-result-table th {
+  position: sticky;
+  top: 0;
+  background: var(--m-bg-surface);
+  color: var(--m-fg-2);
+  font-weight: 600;
+}
+
+/* ── chart object ─────────────────────────────────────────────────────────── */
+
+.mdbc-canvas-chart-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  position: relative;
+}
+
+/* ── shape object ─────────────────────────────────────────────────────────── */
+
+.mdbc-canvas-shape {
+  overflow: visible;
+}
