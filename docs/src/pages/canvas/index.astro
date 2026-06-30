@@ -119,6 +119,12 @@ import Screenshot from "../../components/docs/Screenshot/Screenshot.astro";
     followed by a one-line-per-object summary of the board.
   </p>
 
+  <Screenshot
+    src="/screenshots/canvas-context.png"
+    alt="The expanded Context section showing the schema sent to the agent: a heading, the connection labeled with its id and dialect, and the CREATE TABLE DDL for a customers table."
+    caption="The Context section reveals the exact text handed to the agent: the schema DDL per connection, then a summary of the board."
+  />
+
   <Callout type="note" title="Your rows never leave your machine">
     The agent runs the provider's CLI locally in read-only mode, with no database access and no file or
     shell tools. It receives only your prompt, each connection's <strong>schema</strong> (as DDL and
