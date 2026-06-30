@@ -7,8 +7,9 @@ import type {
   CanvasEdge,
   CanvasViewport,
   QueryRunState,
+  ReorderOp,
 } from "../types";
-import { parseDoc, specToBoard } from "../utils";
+import { genId, parseDoc, specToBoard } from "../utils";
 import { runCanvasQueryIPC } from "../ipc";
 
 interface BoardState {
@@ -30,6 +31,10 @@ interface CanvasStore {
     patch: Partial<CanvasComponent>,
   ) => void;
   removeComponent: (tabId: string, id: string) => void;
+  /// Clone an object (new id, offset, raised to the top) and append it.
+  duplicateComponent: (tabId: string, id: string) => void;
+  /// Restack an object relative to its peers (Bring to front / forward, etc.).
+  reorderComponent: (tabId: string, id: string, op: ReorderOp) => void;
   setEdges: (tabId: string, edges: CanvasEdge[]) => void;
   setViewport: (tabId: string, viewport: CanvasViewport) => void;
   /// Append agent-generated objects, binding query objects to `connectionId`.
@@ -50,6 +55,27 @@ function errToString(err: unknown): string {
   if (typeof err === "string") return err;
   if (err instanceof Error) return err.message;
   return String(err);
+}
+
+/// Recompute z-order after restacking one object relative to its peers. Objects
+/// are sorted by current z, the target moved one step (or to an end), then z is
+/// renumbered densely from 0 so the order is always well-defined.
+function restack(
+  components: CanvasComponent[],
+  id: string,
+  op: ReorderOp,
+): CanvasComponent[] {
+  const order = [...components].sort((a, b) => a.z - b.z);
+  const i = order.findIndex((c) => c.id === id);
+  if (i < 0) return components;
+  if (op === "front") order.push(...order.splice(i, 1));
+  else if (op === "back") order.unshift(...order.splice(i, 1));
+  else if (op === "forward" && i < order.length - 1)
+    [order[i], order[i + 1]] = [order[i + 1], order[i]];
+  else if (op === "backward" && i > 0)
+    [order[i], order[i - 1]] = [order[i - 1], order[i]];
+  const zById = new Map(order.map((c, idx) => [c.id, idx]));
+  return components.map((c) => ({ ...c, z: zById.get(c.id) ?? c.z }));
 }
 
 /// Replace the doc of one board, leaving its runtime results in place.
@@ -112,6 +138,35 @@ const useCanvasStore = create<CanvasStore>((set, get) => ({
         },
       };
     }),
+
+  duplicateComponent: (tabId, id) =>
+    set((s) => {
+      const board = s.boards[tabId];
+      const src = board?.doc.components.find((c) => c.id === id);
+      if (!board || !src) return s;
+      const maxZ = board.doc.components.reduce((m, c) => Math.max(m, c.z), 0);
+      const clone = {
+        ...src,
+        id: genId(src.kind),
+        x: src.x + 24,
+        y: src.y + 24,
+        z: maxZ + 1,
+      } as CanvasComponent;
+      return {
+        boards: withDoc(s.boards, tabId, (doc) => ({
+          ...doc,
+          components: [...doc.components, clone],
+        })),
+      };
+    }),
+
+  reorderComponent: (tabId, id, op) =>
+    set((s) => ({
+      boards: withDoc(s.boards, tabId, (doc) => ({
+        ...doc,
+        components: restack(doc.components, id, op),
+      })),
+    })),
 
   setEdges: (tabId, edges) =>
     set((s) => ({

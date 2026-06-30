@@ -11,6 +11,7 @@ const CANVAS_SPEC_FENCE = "arris-canvas";
 /// when the agent omits geometry.
 const DEFAULT_SIZE: Record<ComponentKind, { w: number; h: number }> = {
   text: { w: 320, h: 120 },
+  sticky: { w: 220, h: 200 },
   query: { w: 540, h: 320 },
   chart: { w: 560, h: 360 },
   shape: { w: 220, h: 160 },

@@ -5,11 +5,10 @@ import { useCanvasStore } from "../../../../hooks";
 import type { CanvasNodeData } from "../../types";
 import { CanvasResizer } from "../CanvasResizer";
 
-/// A free-text object (a textarea styled to read as prose). A single click only
-/// selects + drags the object (the idle textarea is read-only with no pointer
-/// events, so the click falls through to the node); double-click starts editing.
-/// Selection persists until the board is clicked, so the resize anchors stay up.
-function TextNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
+/// A sticky note: free text on a coloured, shadowed card. A single click selects
+/// + drags the note (the idle textarea is read-only with no pointer events);
+/// double-click starts editing. Selection persists until the board is clicked.
+function StickyNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
   const { tabId } = data;
   const [editing, setEditing] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -22,19 +21,19 @@ function TextNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
     if (editing) inputRef.current?.focus();
   }, [editing]);
 
-  if (!component || component.kind !== "text") return null;
+  if (!component || component.kind !== "sticky") return null;
   return (
     <>
       <CanvasResizer tabId={tabId} id={id} visible={selected} />
       <div
-        className={`mdbc-canvas-node mdbc-canvas-text${selected ? " selected" : ""}`}
+        className={`mdbc-canvas-node mdbc-canvas-sticky color-${component.color ?? "yellow"}${selected ? " selected" : ""}`}
         onDoubleClick={() => setEditing(true)}
       >
         <textarea
           ref={inputRef}
-          className={`nowheel mdbc-canvas-text-input${editing ? " nodrag" : ""}`}
+          className={`nowheel mdbc-canvas-sticky-input${editing ? " nodrag" : ""}`}
           value={component.text}
-          placeholder="Double-click to edit"
+          placeholder="Note…"
           readOnly={!editing}
           onBlur={() => setEditing(false)}
           onChange={(e) => updateComponent(tabId, id, { text: e.target.value })}
@@ -44,6 +43,6 @@ function TextNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
   );
 }
 
-const TextNode = memo(TextNodeImpl);
+const StickyNode = memo(StickyNodeImpl);
 
-export { TextNode };
+export { StickyNode };

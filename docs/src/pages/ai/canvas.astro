@@ -33,10 +33,10 @@ import DocTable from "../../components/docs/DocTable/DocTable.astro";
   <p>
     The canvas is an infinite, freeform board (pan, zoom, and drag) where the unit of work is an
     <strong>object</strong> rather than a single query tab. Each object sits at its own position and
-    size and can overlap its neighbours. An object is one of four kinds today: a <strong>query</strong>
+    size and can overlap its neighbours. An object is one of five kinds today: a <strong>query</strong>
     that runs SQL and shows its rows, a <strong>chart</strong> that visualizes another query's
-    results, a block of <strong>text</strong>, or a simple <strong>shape</strong>. The kinds are
-    designed to grow, so more object types can be added later.
+    results, a block of <strong>text</strong>, a <strong>sticky note</strong>, or a simple
+    <strong>shape</strong>. The kinds are designed to grow, so more object types can be added later.
   </p>
 
   <p>
@@ -81,11 +81,19 @@ import DocTable from "../../components/docs/DocTable/DocTable.astro";
       </tr>
       <tr>
         <td class="font-medium text-fg">Text</td>
-        <td>Free text for headings and commentary. Click to edit in place.</td>
+        <td>Free text for headings and commentary. Double-click to edit in place.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">Sticky note</td>
+        <td>A coloured note for annotations, pinned on top of the board.</td>
       </tr>
       <tr>
         <td class="font-medium text-fg">Shape</td>
-        <td>A rectangle, ellipse, or line for grouping and annotation.</td>
+        <td>
+          A rectangle, ellipse, or line for grouping and annotation. Rectangles and
+          ellipses hold optional centered text (double-click to add it), and a rectangle's
+          corners can be rounded by dragging its radius handle.
+        </td>
       </tr>
     </tbody>
   </DocTable>
@@ -116,9 +124,12 @@ import DocTable from "../../components/docs/DocTable/DocTable.astro";
   <h2 id="board">Working on the board</h2>
 
   <ul>
-    <li><strong>Move</strong> an object by dragging it; objects may overlap.</li>
+    <li><strong>Add</strong> objects from the toolbar at the bottom of the board: a query, chart, sticky note, text, or shape. Tools with a caret open a small menu of options (the shape kind, the query language, the pointer mode).</li>
+    <li><strong>Select</strong> an object with a single click; its resize anchors stay shown until you click an empty part of the board.</li>
+    <li><strong>Move</strong> an object by dragging it; objects may overlap. Text and sticky notes move on a single drag and open for editing on double-click. Switch the pointer to the <strong>Hand</strong> tool to pan the board from anywhere instead of dragging objects.</li>
+    <li><strong>Resize</strong> a selected object by dragging any of its borders or corner handles.</li>
+    <li><strong>Reorder, copy, and lock</strong> from an object's right-click menu: Copy duplicates it, the four restacking actions (Bring to front, Bring forward, Send backward, Send to back) change its overlap order, and Lock freezes it (a locked object can't be moved or resized until you unlock it).</li>
     <li><strong>Pan</strong> by dragging the empty canvas, and <strong>zoom</strong> with the scroll wheel or the controls in the corner.</li>
-    <li><strong>Add</strong> a text or shape object by hand from the toolbar in the top-left.</li>
     <li><strong>Delete</strong> a selected object with <kbd>Delete</kbd> or <kbd>Backspace</kbd>.</li>
     <li><strong>Run</strong> a query object at any time with its Run button to refresh the charts bound to it.</li>
   </ul>

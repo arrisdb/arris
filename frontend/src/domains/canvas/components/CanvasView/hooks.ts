@@ -7,9 +7,9 @@ import type { EditorTab } from "@shell/types";
 
 import { CANVAS_SAVE_DEBOUNCE_MS, LAYOUT_ORIGIN } from "../../constants";
 import { useCanvasStore } from "../../hooks";
-import type { CanvasComponent, CanvasEdge } from "../../types";
+import type { CanvasComponent, CanvasEdge, ReorderOp, ShapeKind } from "../../types";
 import { makeComponent, serializeDoc } from "../../utils";
-import type { CanvasNodeData } from "./types";
+import type { CanvasMode, CanvasNodeData } from "./types";
 import { toFlowEdges, toFlowNodes } from "./utils";
 
 const EMPTY_COMPONENTS: CanvasComponent[] = [];
@@ -27,6 +27,8 @@ function useCanvas(tab: EditorTab) {
   const addComponent = useCanvasStore((s) => s.addComponent);
   const updateComponent = useCanvasStore((s) => s.updateComponent);
   const removeComponent = useCanvasStore((s) => s.removeComponent);
+  const duplicateComponent = useCanvasStore((s) => s.duplicateComponent);
+  const reorderComponent = useCanvasStore((s) => s.reorderComponent);
   const setViewport = useCanvasStore((s) => s.setViewport);
 
   // Parse the tab's text into a board exactly once (a re-mount is a no-op).
@@ -58,8 +60,16 @@ function useCanvas(tab: EditorTab) {
       return;
     }
     setRfNodes((prev) => {
-      const positions = new Map(prev.map((n) => [n.id, n.position]));
-      return flowNodes.map((n) => ({ ...n, position: positions.get(n.id) ?? n.position }));
+      const prevById = new Map(prev.map((n) => [n.id, n]));
+      return flowNodes.map((n) => {
+        const p = prevById.get(n.id);
+        // Keep the live drag position AND the current selection/drag flags, so a
+        // store update (e.g. a debounced save or a query run) never clears the
+        // selection and makes the resize anchors blink out.
+        return p
+          ? { ...n, position: p.position, selected: p.selected, dragging: p.dragging }
+          : n;
+      });
     });
   }, [flowNodes, structuralKey]);
 
@@ -87,6 +97,30 @@ function useCanvas(tab: EditorTab) {
     [tabId, setViewport],
   );
 
+  // Context-menu object actions, bound to this board.
+  const duplicate = useCallback(
+    (id: string) => duplicateComponent(tabId, id),
+    [duplicateComponent, tabId],
+  );
+  const reorder = useCallback(
+    (id: string, op: ReorderOp) => reorderComponent(tabId, id, op),
+    [reorderComponent, tabId],
+  );
+  const toggleLock = useCallback(
+    (id: string) => {
+      const comp = components.find((c) => c.id === id);
+      if (comp) updateComponent(tabId, id, { locked: !comp.locked });
+    },
+    [components, updateComponent, tabId],
+  );
+  const componentById = useCallback(
+    (id: string) => components.find((c) => c.id === id),
+    [components],
+  );
+
+  // The active pointer tool. `move` drags objects; `hand` pans the board.
+  const [mode, setMode] = useState<CanvasMode>("move");
+
   // Cascade manually-added objects so they don't stack exactly on top.
   const placementFor = useCallback(() => {
     const n = (board?.doc.components.length ?? 0) % 8;
@@ -97,8 +131,33 @@ function useCanvas(tab: EditorTab) {
     addComponent(tabId, makeComponent({ kind: "text", ...placementFor(), text: "" }));
   }, [addComponent, placementFor, tabId]);
 
-  const addShape = useCallback(() => {
-    addComponent(tabId, makeComponent({ kind: "shape", shape: "rect", ...placementFor() }));
+  const addSticky = useCallback(() => {
+    addComponent(tabId, makeComponent({ kind: "sticky", ...placementFor(), text: "" }));
+  }, [addComponent, placementFor, tabId]);
+
+  const addShape = useCallback(
+    (shape: ShapeKind) => {
+      addComponent(tabId, makeComponent({ kind: "shape", shape, ...placementFor() }));
+    },
+    [addComponent, placementFor, tabId],
+  );
+
+  // Manual query objects bind to the canvas's own connection (same one the agent
+  // reads), so Run works without any extra wiring.
+  const addQuery = useCallback(() => {
+    addComponent(
+      tabId,
+      makeComponent({
+        kind: "query",
+        ...placementFor(),
+        connectionId: tab.connectionId ?? null,
+        sql: "",
+      }),
+    );
+  }, [addComponent, placementFor, tab.connectionId, tabId]);
+
+  const addChart = useCallback(() => {
+    addComponent(tabId, makeComponent({ kind: "chart", ...placementFor() }));
   }, [addComponent, placementFor, tabId]);
 
   // Debounced serialize of the live board into the tab's text (persistence).
@@ -123,8 +182,17 @@ function useCanvas(tab: EditorTab) {
     onNodesDelete,
     onMoveEnd,
     defaultViewport: board?.doc.viewport ?? DEFAULT_VIEWPORT,
+    mode,
+    setMode,
     addText,
+    addSticky,
     addShape,
+    addQuery,
+    addChart,
+    duplicate,
+    reorder,
+    toggleLock,
+    componentById,
   };
 }
 

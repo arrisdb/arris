@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
+import { ReactFlowProvider } from "reactflow";
 import type { NodeProps } from "reactflow";
 
 vi.mock("@domains/chart", () => ({
@@ -31,7 +32,11 @@ describe("ChartNode", () => {
       }),
     );
     useCanvasStore.getState().setRun(TAB, "q", { result: { columns: [], rows: [], elapsed: 0 } });
-    render(<ChartNode {...nodeProps("c")} />);
+    render(
+      <ReactFlowProvider>
+        <ChartNode {...nodeProps("c")} />
+      </ReactFlowProvider>,
+    );
     expect(screen.getByTestId("chart-view")).toBeTruthy();
   });
 });

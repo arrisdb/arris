@@ -5,9 +5,12 @@ import type { ChartSpec, QueryResult } from "@shared";
 /// overlap. This discriminated union is the extension seam: a future object kind
 /// (e.g. a Python cell or a static-file table import) is added here, gains one
 /// renderer-registry entry, and one agent-spec arm. Nothing nests.
-type ComponentKind = "text" | "query" | "chart" | "shape"; // future: "python" | "tableImport"
+type ComponentKind = "text" | "sticky" | "query" | "chart" | "shape"; // future: "python" | "tableImport"
 
 type ShapeKind = "rect" | "ellipse" | "line";
+
+/// Preset sticky-note tints. The note picks one; the renderer maps it to a colour.
+type StickyColor = "yellow" | "green" | "blue" | "pink" | "purple";
 type TextAlign = "left" | "center" | "right";
 
 interface TextStyle {
@@ -24,6 +27,8 @@ interface ShapeStyle {
 }
 
 /// Geometry shared by every object: canvas-space position, size, and z-order.
+/// `locked` freezes the object: it can't be dragged or resized (still selectable
+/// so it can be unlocked from the context menu).
 interface BaseComponent {
   id: string;
   kind: ComponentKind;
@@ -32,12 +37,24 @@ interface BaseComponent {
   w: number;
   h: number;
   z: number;
+  locked?: boolean;
 }
+
+/// One step of restacking an object relative to its peers.
+type ReorderOp = "front" | "forward" | "backward" | "back";
 
 interface TextComponent extends BaseComponent {
   kind: "text";
   text: string;
   style?: TextStyle;
+}
+
+/// A sticky note: free text on a coloured card. Like text, but with a filled,
+/// shadowed background so it reads as an annotation pinned to the board.
+interface StickyComponent extends BaseComponent {
+  kind: "sticky";
+  text: string;
+  color?: StickyColor;
 }
 
 /// A SQL object: runs `sql` against `connectionId` and shows the result grid.
@@ -61,11 +78,17 @@ interface ChartComponent extends BaseComponent {
 interface ShapeComponent extends BaseComponent {
   kind: "shape";
   shape: ShapeKind;
+  /// Corner radius in px (rectangles only; 0 = square corners). Adjusted by the
+  /// radius handle shown when the shape is selected.
+  radius?: number;
+  /// Optional centered label (Figma puts editable text inside a shape).
+  text?: string;
   style?: ShapeStyle;
 }
 
 type CanvasComponent =
   | TextComponent
+  | StickyComponent
   | QueryComponent
   | ChartComponent
   | ShapeComponent;
@@ -141,9 +164,12 @@ export type {
   ComponentKind,
   QueryComponent,
   QueryRunState,
+  ReorderOp,
   ShapeComponent,
   ShapeKind,
   ShapeStyle,
+  StickyColor,
+  StickyComponent,
   TextAlign,
   TextComponent,
   TextStyle,

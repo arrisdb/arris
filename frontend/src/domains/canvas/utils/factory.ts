@@ -6,6 +6,7 @@ import type {
   CanvasEdge,
   ComponentKind,
   ShapeKind,
+  StickyColor,
 } from "../types";
 
 /// A loose description of an object to create. Geometry is optional (the board
@@ -19,8 +20,10 @@ interface ComponentInput {
   h?: number;
   z?: number;
   title?: string;
-  // text
+  // text + sticky
   text?: string;
+  // sticky
+  color?: StickyColor;
   // query
   connectionId?: string | null;
   sql?: string;
@@ -29,6 +32,7 @@ interface ComponentInput {
   spec?: ChartSpec;
   // shape
   shape?: ShapeKind;
+  radius?: number;
 }
 
 let seq = 0;
@@ -70,6 +74,14 @@ function makeComponent(input: ComponentInput): CanvasComponent {
   switch (input.kind) {
     case "text":
       return { id, kind: "text", ...geom, text: input.text ?? "" };
+    case "sticky":
+      return {
+        id,
+        kind: "sticky",
+        ...geom,
+        text: input.text ?? "",
+        color: input.color ?? "yellow",
+      };
     case "query":
       return {
         id,
@@ -89,7 +101,14 @@ function makeComponent(input: ComponentInput): CanvasComponent {
         title: input.title,
       };
     case "shape":
-      return { id, kind: "shape", ...geom, shape: input.shape ?? "rect" };
+      return {
+        id,
+        kind: "shape",
+        ...geom,
+        shape: input.shape ?? "rect",
+        radius: input.radius ?? 0,
+        text: input.text ?? "",
+      };
   }
 }
 

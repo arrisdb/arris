@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
+import { ReactFlowProvider } from "reactflow";
 import type { NodeProps } from "reactflow";
 
 import { useCanvasStore } from "../../../../hooks";
@@ -19,12 +20,20 @@ function seed(component: CanvasComponent) {
 const nodeProps = (id: string) =>
   ({ id, data: { tabId: TAB }, selected: false }) as unknown as NodeProps<CanvasNodeData>;
 
+function renderNode(id: string) {
+  return render(
+    <ReactFlowProvider>
+      <QueryNode {...nodeProps(id)} />
+    </ReactFlowProvider>,
+  );
+}
+
 describe("QueryNode", () => {
   beforeEach(() => useCanvasStore.setState({ boards: {} }));
 
   it("renders the SQL and writes edits back to the store", () => {
     seed(makeComponent({ kind: "query", id: "q", sql: "select 1", connectionId: "c" }));
-    render(<QueryNode {...nodeProps("q")} />);
+    renderNode("q");
     const input = screen.getByPlaceholderText("SELECT …") as HTMLTextAreaElement;
     expect(input.value).toBe("select 1");
     fireEvent.change(input, { target: { value: "select 2" } });
@@ -36,7 +45,7 @@ describe("QueryNode", () => {
 
   it("Run surfaces an error when the object has no connection", async () => {
     seed(makeComponent({ kind: "query", id: "q", sql: "select 1", connectionId: null }));
-    render(<QueryNode {...nodeProps("q")} />);
+    renderNode("q");
     fireEvent.click(screen.getByRole("button", { name: "Run" }));
     expect(await screen.findByText(/Pick a connection/)).toBeTruthy();
   });

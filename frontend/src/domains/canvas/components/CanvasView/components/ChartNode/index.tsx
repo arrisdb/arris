@@ -4,6 +4,7 @@ import { ChartView } from "@domains/chart";
 
 import { useCanvasStore } from "../../../../hooks";
 import type { CanvasNodeData } from "../../types";
+import { CanvasResizer } from "../CanvasResizer";
 
 /// A chart object bound to a query object by `sourceQueryId`. Renders through the
 /// shared ChartView with the upstream query's run result, so it updates whenever
@@ -16,22 +17,25 @@ function ChartNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
   const run = board?.runs[component.sourceQueryId];
 
   return (
-    <div className={`mdbc-canvas-node mdbc-canvas-chart nowheel${selected ? " selected" : ""}`}>
-      {component.title ? (
-        <div className="mdbc-canvas-node-head">
-          <span className="mdbc-canvas-node-title">{component.title}</span>
+    <>
+      <CanvasResizer tabId={tabId} id={id} visible={selected} />
+      <div className={`mdbc-canvas-node mdbc-canvas-chart nowheel${selected ? " selected" : ""}`}>
+        {component.title ? (
+          <div className="mdbc-canvas-node-head">
+            <span className="mdbc-canvas-node-title">{component.title}</span>
+          </div>
+        ) : null}
+        <div className="mdbc-canvas-chart-body">
+          <ChartView
+            spec={component.spec}
+            result={run?.result}
+            isRunning={run?.running}
+            error={run?.error}
+            onEdit={() => {}}
+          />
         </div>
-      ) : null}
-      <div className="mdbc-canvas-chart-body">
-        <ChartView
-          spec={component.spec}
-          result={run?.result}
-          isRunning={run?.running}
-          error={run?.error}
-          onEdit={() => {}}
-        />
       </div>
-    </div>
+    </>
   );
 }
 
