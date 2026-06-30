@@ -40,4 +40,24 @@ describe("ShapeSection", () => {
     );
     expect(container.querySelector(".mdbc-pane-form")).toBeNull();
   });
+
+  it("uses the compact colour swatch for fill and stroke", () => {
+    const comp = makeComponent({ kind: "shape", id: "s", shape: "rect" });
+    const { container } = render(
+      <ShapeSection tabId="t" component={comp} onChange={vi.fn()} />,
+    );
+    // Fill + stroke are the compact swatch, not a full-width bar.
+    expect(container.querySelectorAll(".mdbc-canvas-color")).toHaveLength(2);
+  });
+
+  it("offers a line-style selector only for a line", () => {
+    const line = makeComponent({ kind: "shape", id: "l", shape: "line" });
+    const lineView = render(<ShapeSection tabId="t" component={line} onChange={vi.fn()} />);
+    expect(lineView.queryByTestId("line-style-select")).toBeTruthy();
+    lineView.unmount();
+
+    const rect = makeComponent({ kind: "shape", id: "r", shape: "rect" });
+    const rectView = render(<ShapeSection tabId="t" component={rect} onChange={vi.fn()} />);
+    expect(rectView.queryByTestId("line-style-select")).toBeNull();
+  });
 });

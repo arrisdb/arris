@@ -36,4 +36,12 @@ describe("TextSection", () => {
     );
     expect(container.querySelector(".mdbc-pane-form")).toBeNull();
   });
+
+  it("uses the compact colour swatch", () => {
+    const comp = makeComponent({ kind: "text", id: "t" });
+    const { container } = render(
+      <TextSection tabId="t" component={comp} onChange={vi.fn()} />,
+    );
+    expect(container.querySelectorAll(".mdbc-canvas-color")).toHaveLength(1);
+  });
 });

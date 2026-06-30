@@ -112,7 +112,8 @@ import DocTable from "../../components/docs/DocTable/DocTable.astro";
         <td>
           A rectangle, ellipse, or line for grouping and annotation. Rectangles and
           ellipses hold optional centered text (double-click to add it), and a rectangle's
-          corners can be rounded by dragging its radius handle.
+          corners can be rounded by dragging its radius handle. A line can be drawn solid,
+          dashed, or dotted.
         </td>
       </tr>
     </tbody>
@@ -151,6 +152,14 @@ import DocTable from "../../components/docs/DocTable/DocTable.astro";
   </p>
 
   <p>
+    The conversation is saved with the board, so reopening a canvas (or restarting Arris) brings back
+    the full chat history and the agent picks up where it left off. Use the <strong>Clear
+    conversation</strong> button (the trash icon in the panel header) to wipe the history and start a
+    fresh thread; clearing also drops the agent's session, so the next message begins a new
+    conversation rather than resuming the old one.
+  </p>
+
+  <p>
     Because each turn sees the current board, follow-up messages refine it in place rather than only
     piling on new objects. The agent can <strong>add</strong> any object kind (a query, table, chart,
     text block, sticky note, or shape), <strong>modify</strong> one that is already there (re-spec a chart
@@ -183,15 +192,15 @@ import DocTable from "../../components/docs/DocTable/DocTable.astro";
   <h2 id="board">Working on the board</h2>
 
   <ul>
-    <li><strong>Add</strong> objects from the toolbar at the bottom of the board: a query, table, chart, sticky note, text, or shape. Tools with a caret have options (the shape kind, the query language, the pointer mode): clicking the tool applies its last-used option and opens the menu at the same time, so switching to another option is one more click. The caret alone just toggles the menu.</li>
+    <li><strong>Add</strong> objects from the toolbar at the bottom of the board: a query, table, chart, sticky note, text, or shape. New objects appear centered in your current view, not at a fixed origin, so they never land off-screen after you pan. Tools with a caret have options (the shape kind, the pointer mode): clicking the tool applies its last-used option and opens the menu at the same time, so switching to another option is one more click. The caret alone just toggles the menu. Single-key shortcuts drive the same actions (<kbd>V</kbd> move, <kbd>H</kbd> hand, <kbd>/</kbd> SQL cell, <kbd>R</kbd>/<kbd>O</kbd>/<kbd>L</kbd> shapes); the keys fire only while the board is focused, never while you are typing, and are rebindable under Settings.</li>
     <li><strong>Select</strong> an object with a single click; its resize anchors stay shown until you click an empty part of the board.</li>
-    <li><strong>Adjust properties</strong> in the panel that opens on the right while one object is selected. Every object shows its position, size, and a lock toggle; below that each kind has its own controls (a shape's fill, stroke, and corner radius; a text block's font size, weight, alignment, and colour; a sticky note's tint; a query's title and connection; a table's source query and preview-row cap; a chart's source query plus the full chart
+    <li><strong>Adjust properties</strong> in the panel that opens on the right while one object is selected. Every object shows its position, size, and a lock toggle; below that each kind has its own controls (a shape's fill, stroke, line style, and corner radius; a text block's font size, weight, alignment, and colour; a sticky note's tint; a query's title and connection; a table's source query and preview-row cap; a chart's source query plus the full chart
       editor: type, axes, series, aggregation, colours, legend, and labels, the same
       control surface as the results-view chart editor).</li>
     <li><strong>Move</strong> an object by dragging it; objects may overlap. Text and sticky notes move on a single drag and open for editing on double-click. Switch the pointer to the <strong>Hand</strong> tool to pan the board from anywhere instead of dragging objects.</li>
-    <li><strong>Connect</strong> two objects with a relationship arrow: pick the <strong>Arrow</strong> tool from the pointer menu, click the source object, then the target. The arrow sticks to both objects' borders and re-routes automatically as you move or resize them. Right-click an arrow to delete it.</li>
+    <li><strong>Relationship arrows are drawn automatically</strong>: when a query reads another cell's result (<code>FROM &lt;other cell title&gt;</code>) or a chart or table binds to its source query, Arris draws an arrow between the two objects. The arrow sticks to both objects' borders and re-routes automatically as you move or resize them. Right-click an arrow to delete it.</li>
     <li><strong>Resize</strong> a selected object by dragging any of its borders or corner handles.</li>
-    <li><strong>Copy, reorder, lock, and delete</strong> from an object's right-click menu: Copy (<kbd>⌘C</kbd>) puts it on the clipboard and Paste (<kbd>⌘V</kbd>) drops a fresh copy nearby, the four restacking actions (Bring to front, Bring forward, Send backward, Send to back) change its overlap order, Lock freezes it (a locked object can't be moved or resized until you unlock it), and Delete removes it.</li>
+    <li><strong>Copy, reorder, lock, and delete</strong> from an object's right-click menu: Copy (<kbd>⌘C</kbd>) puts it on the clipboard and Paste (<kbd>⌘V</kbd>) drops a fresh copy nearby, the four restacking actions (Bring to front (<kbd>]</kbd>), Bring forward, Send backward, Send to back (<kbd>[</kbd>)) change its overlap order, Lock freezes it (a locked object can't be moved or resized until you unlock it), and Delete removes it.</li>
     <li><strong>Pan</strong> by dragging the empty canvas, and <strong>zoom</strong> with the scroll wheel or the controls in the corner.</li>
     <li><strong>Delete</strong> a selected object with <kbd>Delete</kbd> or <kbd>Backspace</kbd>.</li>
     <li><strong>Run</strong> a query object at any time with its Run button to refresh the tables and charts bound to it, or hit <strong>Run all</strong> at the right end of the toolbar to run every query on the board at once (each query's upstream cells run first).</li>
@@ -202,7 +211,10 @@ import DocTable from "../../components/docs/DocTable/DocTable.astro";
   <p>
     A board is saved with your workspace, so it survives closing and reopening the tab and restarting
     Arris. Closed boards are listed in the <strong>Canvas</strong> section of the left sidebar
-    alongside SQL consoles and notebooks; click one to reopen it. Query results are not saved with the
-    board; reopen a canvas and run its query objects to refresh the data.
+    alongside SQL consoles and notebooks; click one to reopen it. Reopening a board fits the view to
+    its objects, so you always land on your work rather than an empty patch of the infinite board.
+    The agent conversation is saved too, so a reopened board shows its full chat history until you
+    clear it. Query results are not saved with the board; reopen a canvas and run its query objects to
+    refresh the data.
   </p>
 </DocsLayout>

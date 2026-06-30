@@ -196,3 +196,9 @@
   word-break: break-word;
   color: var(--m-fg-2);
 }
+
+/* Clear-conversation button: sits at the far right of the header, after the
+   model label (which carries the margin-left:auto that pushes the group right). */
+.mdbc-canvas-chat-clear {
+  margin-left: 8px;
+}

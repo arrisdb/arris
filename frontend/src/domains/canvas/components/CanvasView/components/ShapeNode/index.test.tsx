@@ -43,6 +43,29 @@ describe("ShapeNode", () => {
     expect(container.querySelector(".mdbc-canvas-shape")).toBeNull();
   });
 
+  it("draws a horizontal rule for a line, not a labelled box", () => {
+    seed(makeComponent({ kind: "shape", id: "ln", shape: "line" }));
+    const { container } = renderNode("ln");
+    // A line has its own rule element and no editable label textarea (so it
+    // reads as a line, not a card).
+    expect(container.querySelector(".mdbc-canvas-shape-line")).toBeTruthy();
+    expect(container.querySelector("textarea")).toBeNull();
+    // The node carries the chrome-stripping modifier (no card bg/border/shadow)
+    // and no inline card style.
+    const box = container.querySelector(".mdbc-canvas-shape") as HTMLElement;
+    expect(box.classList.contains("mdbc-canvas-shape-line-node")).toBe(true);
+    expect(box.getAttribute("style")).toBeNull();
+  });
+
+  it("draws the line rule with the chosen line style", () => {
+    seed(makeComponent({ kind: "shape", id: "ln", shape: "line" }));
+    useCanvasStore.getState().updateComponent(TAB, "ln", { style: { lineStyle: "dashed" } });
+    const { container } = renderNode("ln");
+    const line = container.querySelector(".mdbc-canvas-shape-line") as HTMLElement;
+    // The rule is a top border so dashed/dotted/solid render natively.
+    expect(line.style.borderTopStyle).toBe("dashed");
+  });
+
   it("offers the 'Add text' placeholder only while selected", () => {
     seed(makeComponent({ kind: "shape", id: "s", shape: "rect" }));
     const idle = renderNode("s", false);

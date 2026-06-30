@@ -44,13 +44,15 @@ function CommonSection({ component, onChange }: SectionProps) {
           />
         </label>
       </div>
-      <label className="mdbc-canvas-prop-check">
+      <label className="mdbc-canvas-prop-row">
+        <span className="mdbc-pane-label">Locked</span>
         <input
           type="checkbox"
+          className="mdbc-checkbox"
           checked={!!component.locked}
           onChange={(e) => onChange({ locked: e.target.checked })}
+          aria-label="Locked"
         />
-        <span className="mdbc-pane-label">Locked</span>
       </label>
     </div>
   );

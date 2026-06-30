@@ -5,12 +5,18 @@ import type { Node, NodeChange, Viewport } from "reactflow";
 import { useTabsStore } from "@shell/hooks/tabsStore";
 import type { EditorTab } from "@shell/types";
 
-import { CANVAS_SAVE_DEBOUNCE_MS, LAYOUT_ORIGIN } from "../../constants";
+import { CANVAS_SAVE_DEBOUNCE_MS, DEFAULT_SIZE } from "../../constants";
 import { useCanvasStore } from "../../hooks";
-import type { CanvasComponent, CanvasEdge, ReorderOp, ShapeKind } from "../../types";
+import type { CanvasComponent, CanvasEdge, ComponentKind, ReorderOp, ShapeKind } from "../../types";
 import { makeComponent, serializeDoc } from "../../utils";
 import type { CanvasMode, CanvasNodeData } from "./types";
-import { hasActiveTextSelection, toFlowEdges, toFlowNodes } from "./utils";
+import {
+  hasActiveTextSelection,
+  isEditableTarget,
+  toFlowEdges,
+  toFlowNodes,
+  viewportCenterPlacement,
+} from "./utils";
 
 const EMPTY_COMPONENTS: CanvasComponent[] = [];
 const EMPTY_EDGES: CanvasEdge[] = [];
@@ -30,19 +36,13 @@ function useCanvas(tab: EditorTab) {
   const copyComponent = useCanvasStore((s) => s.copyComponent);
   const pasteComponent = useCanvasStore((s) => s.pasteComponent);
   const reorderComponent = useCanvasStore((s) => s.reorderComponent);
-  const addEdge = useCanvasStore((s) => s.addEdge);
   const removeEdges = useCanvasStore((s) => s.removeEdges);
   const setViewport = useCanvasStore((s) => s.setViewport);
   const runAllQueries = useCanvasStore((s) => s.runAllQueries);
 
-  // While drawing a relationship arrow, the id of the object clicked first (the
-  // arrow's source); the next object clicked becomes its target. A ref mirrors it
-  // so a click handler reads the latest value without a stale closure.
-  const [pendingConnect, setPendingConnect] = useState<string | null>(null);
-  const pendingConnectRef = useRef<string | null>(null);
-  useEffect(() => {
-    pendingConnectRef.current = pendingConnect;
-  }, [pendingConnect]);
+  // The board pane element, so a freshly added object can be centered in the
+  // current viewport (its pixel size is needed to invert ReactFlow's transform).
+  const boardRef = useRef<HTMLDivElement>(null);
 
   // Parse the tab's text into a board exactly once (a re-mount is a no-op).
   useEffect(() => {
@@ -55,8 +55,8 @@ function useCanvas(tab: EditorTab) {
   const edges = board?.doc.edges ?? EMPTY_EDGES;
 
   const flowNodes = useMemo(
-    () => toFlowNodes(components, tabId, pendingConnect),
-    [components, tabId, pendingConnect],
+    () => toFlowNodes(components, tabId),
+    [components, tabId],
   );
   const rfEdges = useMemo(() => toFlowEdges(edges), [edges]);
 
@@ -146,22 +146,6 @@ function useCanvas(tab: EditorTab) {
     [components],
   );
 
-  // Connect mode: the first object clicked is the arrow's source; the next a
-  // different object becomes its target and the arrow is drawn. Clicking the same
-  // object again is ignored (no self-arrows).
-  const onConnectNodeClick = useCallback(
-    (id: string) => {
-      const prev = pendingConnectRef.current;
-      if (!prev) {
-        setPendingConnect(id);
-        return;
-      }
-      if (prev !== id) addEdge(tabId, prev, id);
-      setPendingConnect(null);
-    },
-    [addEdge, tabId],
-  );
-  const clearConnect = useCallback(() => setPendingConnect(null), []);
   const removeEdge = useCallback(
     (id: string) => removeEdges(tabId, [id]),
     [removeEdges, tabId],
@@ -190,16 +174,9 @@ function useCanvas(tab: EditorTab) {
   // Skipped while typing in an input, textarea, or code editor so ordinary text
   // copy/paste still works inside a query cell or text block.
   useEffect(() => {
-    function isEditable(t: EventTarget | null): boolean {
-      const el = t as HTMLElement | null;
-      if (!el) return false;
-      if (el.isContentEditable) return true;
-      const tag = el.tagName;
-      return tag === "INPUT" || tag === "TEXTAREA" || !!el.closest(".cm-editor");
-    }
     function onKey(e: KeyboardEvent) {
       if (!(e.metaKey || e.ctrlKey) || e.altKey || e.shiftKey) return;
-      if (isEditable(e.target)) return;
+      if (isEditableTarget(e.target)) return;
       const key = e.key.toLowerCase();
       if (key === "c" && selectedComponent) {
         // A live text selection means the user is copying text (e.g. an agent
@@ -217,32 +194,32 @@ function useCanvas(tab: EditorTab) {
     return () => document.removeEventListener("keydown", onKey);
   }, [tabId, selectedComponent, copyComponent, pasteComponent]);
 
-  // The active pointer tool. `move` drags objects; `hand` pans the board;
-  // `connect` draws relationship arrows.
+  // The active pointer tool. `move` drags objects; `hand` pans the board.
   const [mode, setMode] = useState<CanvasMode>("move");
 
-  // Leaving connect mode abandons any half-drawn arrow.
-  useEffect(() => {
-    if (mode !== "connect") setPendingConnect(null);
-  }, [mode]);
-
-  // Cascade manually-added objects so they don't stack exactly on top.
-  const placementFor = useCallback(() => {
-    const n = (board?.doc.components.length ?? 0) % 8;
-    return { x: LAYOUT_ORIGIN.x + n * 24, y: LAYOUT_ORIGIN.y + n * 24 };
-  }, [board]);
+  // Place a manually-added object centered in the current viewport (so it's never
+  // lost off-screen after panning), cascaded slightly so repeated adds don't stack.
+  const placementFor = useCallback(
+    (kind: ComponentKind) => {
+      const vp = board?.doc.viewport ?? DEFAULT_VIEWPORT;
+      const rect = boardRef.current?.getBoundingClientRect() ?? null;
+      const cascade = board?.doc.components.length ?? 0;
+      return viewportCenterPlacement(rect, vp, DEFAULT_SIZE[kind], cascade);
+    },
+    [board],
+  );
 
   const addText = useCallback(() => {
-    addComponent(tabId, makeComponent({ kind: "text", ...placementFor(), text: "" }));
+    addComponent(tabId, makeComponent({ kind: "text", ...placementFor("text"), text: "" }));
   }, [addComponent, placementFor, tabId]);
 
   const addSticky = useCallback(() => {
-    addComponent(tabId, makeComponent({ kind: "sticky", ...placementFor(), text: "" }));
+    addComponent(tabId, makeComponent({ kind: "sticky", ...placementFor("sticky"), text: "" }));
   }, [addComponent, placementFor, tabId]);
 
   const addShape = useCallback(
     (shape: ShapeKind) => {
-      addComponent(tabId, makeComponent({ kind: "shape", shape, ...placementFor() }));
+      addComponent(tabId, makeComponent({ kind: "shape", shape, ...placementFor("shape") }));
     },
     [addComponent, placementFor, tabId],
   );
@@ -254,7 +231,7 @@ function useCanvas(tab: EditorTab) {
       tabId,
       makeComponent({
         kind: "query",
-        ...placementFor(),
+        ...placementFor("query"),
         connectionId: tab.connectionId ?? null,
         sql: "",
       }),
@@ -262,7 +239,7 @@ function useCanvas(tab: EditorTab) {
   }, [addComponent, placementFor, tab.connectionId, tabId]);
 
   const addChart = useCallback(() => {
-    addComponent(tabId, makeComponent({ kind: "chart", ...placementFor() }));
+    addComponent(tabId, makeComponent({ kind: "chart", ...placementFor("chart") }));
   }, [addComponent, placementFor, tabId]);
 
   // Run every query object on the board in one click (toolbar "Run all").
@@ -273,7 +250,7 @@ function useCanvas(tab: EditorTab) {
   // A table previews a query object's rows. It starts unbound; the user picks
   // its source query in the properties pane.
   const addTable = useCallback(() => {
-    addComponent(tabId, makeComponent({ kind: "table", ...placementFor() }));
+    addComponent(tabId, makeComponent({ kind: "table", ...placementFor("table") }));
   }, [addComponent, placementFor, tabId]);
 
   // Debounced serialize of the live board into the tab's text (persistence).
@@ -291,13 +268,13 @@ function useCanvas(tab: EditorTab) {
   }, [doc, tabId]);
 
   return {
+    boardRef,
     rfNodes,
     rfEdges,
     onNodesChange,
     onNodeDragStop,
     onNodesDelete,
     onMoveEnd,
-    defaultViewport: board?.doc.viewport ?? DEFAULT_VIEWPORT,
     mode,
     setMode,
     addText,
@@ -315,10 +292,7 @@ function useCanvas(tab: EditorTab) {
     componentById,
     update,
     selectedComponent,
-    onConnectNodeClick,
-    clearConnect,
     removeEdge,
-    pendingConnect,
   };
 }
 

@@ -2,8 +2,10 @@ import { describe, it, expect } from "vitest";
 import type { ChartSpec } from "@shared";
 import type { QueryResult } from "@domains/results";
 import {
+  barSegmentRadius,
   cartesianSeries,
   chartImageFilename,
+  yAxisDomainFor,
   reconcileChartSpec,
   toCartesianData,
   toFunnelData,
@@ -407,5 +409,48 @@ describe("toKpiData", () => {
     const result: QueryResult = { columns: COLS, rows: [], elapsed: 0.01 };
     const kpi = toKpiData(SPEC, result);
     expect(kpi.value).toBe(0);
+  });
+});
+
+describe("barSegmentRadius", () => {
+  it("rounds all corners of a non-stacked bar", () => {
+    expect(barSegmentRadius(0, 3, false, false)).toBe(4);
+  });
+
+  it("rounds all corners of a single-series stack", () => {
+    expect(barSegmentRadius(0, 1, true, false)).toBe(4);
+  });
+
+  it("rounds only the outer edges of a vertical stack, leaving inner segments square", () => {
+    // bottom segment rounds its bottom, top segment rounds its top, middle is flush.
+    expect(barSegmentRadius(0, 3, true, false)).toEqual([0, 0, 4, 4]);
+    expect(barSegmentRadius(1, 3, true, false)).toBe(0);
+    expect(barSegmentRadius(2, 3, true, false)).toEqual([4, 4, 0, 0]);
+  });
+
+  it("rounds the left/right ends of a horizontal stack", () => {
+    expect(barSegmentRadius(0, 2, true, true)).toEqual([4, 0, 0, 4]);
+    expect(barSegmentRadius(1, 2, true, true)).toEqual([0, 4, 4, 0]);
+  });
+});
+
+describe("yAxisDomainFor", () => {
+  it("fits a line chart to its data instead of forcing a 0 baseline", () => {
+    expect(yAxisDomainFor({ kind: "line", xColumn: "x", yColumns: ["y"] })).toEqual(["auto", "auto"]);
+    expect(yAxisDomainFor({ kind: "area", xColumn: "x", yColumns: ["y"] })).toEqual(["auto", "auto"]);
+  });
+
+  it("keeps a bar/combo chart 0-based (undefined domain) so bar length stays proportional", () => {
+    expect(yAxisDomainFor({ kind: "bar", xColumn: "x", yColumns: ["y"] })).toBeUndefined();
+    expect(yAxisDomainFor({ kind: "combo", xColumn: "x", yColumns: ["y"] })).toBeUndefined();
+  });
+
+  it("honours an explicit yMin/yMax on any kind", () => {
+    expect(
+      yAxisDomainFor({ kind: "line", xColumn: "x", yColumns: ["y"], style: { yMin: 0, yMax: 100 } }),
+    ).toEqual([0, 100]);
+    expect(
+      yAxisDomainFor({ kind: "bar", xColumn: "x", yColumns: ["y"], style: { yMin: 10 } }),
+    ).toEqual([10, "auto"]);
   });
 });

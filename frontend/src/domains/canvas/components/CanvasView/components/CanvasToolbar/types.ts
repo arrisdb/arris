@@ -1,11 +1,14 @@
 import type { IconName } from "@shared/ui/Icon";
+import type { KeymapAction } from "@shared/settings";
 
 /// One entry in a tool's pop-up menu (e.g. the shape kinds under the Shape tool).
+/// When `action` is set, the displayed shortcut is read live from the keymap so
+/// it tracks user rebinds.
 interface ToolMenuItem {
   id: string;
   label: string;
   icon: IconName;
-  shortcut?: string;
+  action?: KeymapAction;
   disabled?: boolean;
   active?: boolean;
   onSelect: () => void;

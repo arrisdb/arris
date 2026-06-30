@@ -6,6 +6,7 @@ import "reactflow/dist/style.css";
 import "./index.css";
 
 import { ContextMenu, useContextMenu } from "@shared/ui/ContextMenu";
+import { useRegisterCommands } from "@shell/utils";
 
 import { CanvasAgentChat } from "../CanvasAgentChat";
 import { CanvasPropertiesPane } from "./components/CanvasPropertiesPane";
@@ -19,22 +20,39 @@ import { buildEdgeMenuItems, buildNodeMenuItems, edgeTypes, nodeTypes } from "./
 /// rendered alongside the board.
 function CanvasView({ activeTab }: CanvasViewProps) {
   const canvas = useCanvas(activeTab);
+
+  // The board's keyboard shortcuts flow through the command registry (so they
+  // show up in Settings -> Keymap and are user-rebindable) rather than a private
+  // keydown switch. Registered while this canvas tab is mounted; the bare-key
+  // bindings are suppressed while typing by the global keymap's typing guard.
+  // The toolbar buttons and context menu call these same handlers directly.
+  useRegisterCommands({
+    canvasMoveTool: { run: () => canvas.setMode("move") },
+    canvasHandTool: { run: () => canvas.setMode("hand") },
+    canvasAddSqlCell: { run: () => canvas.addQuery() },
+    canvasAddRectangle: { run: () => canvas.addShape("rect") },
+    canvasAddEllipse: { run: () => canvas.addShape("ellipse") },
+    canvasAddLine: { run: () => canvas.addShape("line") },
+    canvasBringToFront: {
+      run: () => {
+        if (canvas.selectedComponent) canvas.reorder(canvas.selectedComponent.id, "front");
+      },
+      isEnabled: () => Boolean(canvas.selectedComponent),
+    },
+    canvasSendToBack: {
+      run: () => {
+        if (canvas.selectedComponent) canvas.reorder(canvas.selectedComponent.id, "back");
+      },
+      isEnabled: () => Boolean(canvas.selectedComponent),
+    },
+  });
+
   const handMode = canvas.mode === "hand";
-  const connectMode = canvas.mode === "connect";
   const menu = useContextMenu<string>();
   const edgeMenu = useContextMenu<string>();
 
   const onNodeContextMenu = (event: ReactMouseEvent, node: Node) =>
     menu.open(event, node.id);
-
-  // In connect mode, clicking objects draws the arrow (source then target);
-  // otherwise ReactFlow handles normal selection.
-  const onNodeClick = (_event: ReactMouseEvent, node: Node) => {
-    if (connectMode) canvas.onConnectNodeClick(node.id);
-  };
-
-  // Clicking empty space abandons a half-drawn arrow.
-  const onPaneClick = () => canvas.clearConnect();
 
   const onEdgeContextMenu = (event: ReactMouseEvent, edge: Edge) => {
     event.preventDefault();
@@ -52,7 +70,8 @@ function CanvasView({ activeTab }: CanvasViewProps) {
         <PanelResizeHandle className="mdbc-canvas-pane-resizer" />
         <Panel id="canvas-board" order={2} minSize={30}>
           <div
-            className={`mdbc-canvas-board${handMode ? " hand" : ""}${connectMode ? " connect" : ""}`}
+            ref={canvas.boardRef}
+            className={`mdbc-canvas-board${handMode ? " hand" : ""}`}
           >
             <ReactFlow
               nodes={canvas.rfNodes}
@@ -63,11 +82,10 @@ function CanvasView({ activeTab }: CanvasViewProps) {
               onNodeDragStop={canvas.onNodeDragStop}
               onNodesDelete={canvas.onNodesDelete}
               onNodeContextMenu={onNodeContextMenu}
-              onNodeClick={onNodeClick}
-              onPaneClick={onPaneClick}
               onEdgeContextMenu={onEdgeContextMenu}
               onMoveEnd={canvas.onMoveEnd}
-              defaultViewport={canvas.defaultViewport}
+              fitView
+              fitViewOptions={{ padding: 0.2, maxZoom: 1 }}
               minZoom={0.2}
               maxZoom={2}
               nodesDraggable={canvas.mode === "move"}

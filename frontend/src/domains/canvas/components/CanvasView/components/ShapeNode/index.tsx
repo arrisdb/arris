@@ -41,16 +41,24 @@ function ShapeNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
   const style = shape.style ?? {};
   const isLine = shape.shape === "line";
   const radius = shape.radius ?? 0;
-  const css = {
-    background: isLine ? "transparent" : (style.fill ?? "#3a3950"),
-    border: isLine
-      ? "none"
-      : `${style.strokeWidth ?? 1}px solid ${style.stroke ?? "rgb(var(--m-accent-rgb) / 0.6)"}`,
-    borderTop: isLine
-      ? `${style.strokeWidth ?? 2}px solid ${style.stroke ?? "rgb(var(--m-accent-rgb) / 0.6)"}`
-      : undefined,
-    borderRadius:
-      shape.shape === "ellipse" ? "50%" : isLine ? undefined : `${radius}px`,
+  // A line carries no card chrome at all (the `mdbc-canvas-shape-line-node`
+  // class strips the node's background, border, radius, and shadow); it just
+  // draws a single horizontal rule centered across its width (rendered below).
+  // A rect/ellipse fills and is bordered as usual via the inline `css` below.
+  const stroke = style.stroke ?? "rgb(var(--m-accent-rgb) / 0.6)";
+  const css = isLine
+    ? undefined
+    : {
+        background: style.fill ?? "#3a3950",
+        border: `${style.strokeWidth ?? 1}px solid ${stroke}`,
+        borderRadius: shape.shape === "ellipse" ? "50%" : `${radius}px`,
+      };
+  // The rule is drawn as a top border so its line-style (solid/dashed/dotted)
+  // applies; strokeWidth is the border thickness and the div carries no height.
+  const lineCss: CSSProperties = {
+    borderTopWidth: `${style.strokeWidth ?? 2}px`,
+    borderTopStyle: style.lineStyle ?? "solid",
+    borderTopColor: stroke,
   };
 
   // Drag the radius handle right to round the corners, left to square them.
@@ -82,12 +90,19 @@ function ShapeNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
     <>
       <CanvasResizer tabId={tabId} id={id} visible={selected} />
       <div
-        className={`mdbc-canvas-node mdbc-canvas-shape${selected ? " selected" : ""}`}
+        className={`mdbc-canvas-node mdbc-canvas-shape${isLine ? " mdbc-canvas-shape-line-node" : ""}${selected ? " selected" : ""}`}
         style={css}
         onDoubleClick={() => {
           if (!isLine) setEditing(true);
         }}
       >
+        {isLine && (
+          <div
+            className="mdbc-canvas-shape-line"
+            style={lineCss}
+            data-testid="canvas-shape-line"
+          />
+        )}
         {!isLine && (
           <textarea
             ref={inputRef}

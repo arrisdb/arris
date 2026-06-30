@@ -77,7 +77,6 @@ const nodeTypes: NodeTypes = {
 function toFlowNodes(
   components: CanvasComponent[],
   tabId: string,
-  connectingId?: string | null,
 ): Node<CanvasNodeData>[] {
   return components.map((c) => ({
     id: c.id,
@@ -86,8 +85,6 @@ function toFlowNodes(
     data: { tabId },
     // A locked object can't be dragged (the resizer self-hides too).
     draggable: !c.locked,
-    // The pending source object is highlighted while choosing an arrow's target.
-    className: c.id === connectingId ? "mdbc-connect-source" : undefined,
     style: { width: c.w, height: c.h, zIndex: c.z },
   }));
 }
@@ -172,14 +169,50 @@ function hasActiveTextSelection(): boolean {
   return Boolean(sel && !sel.isCollapsed && sel.toString().trim().length > 0);
 }
 
+/// True when a keyboard event targets a text-entry surface (an input, textarea,
+/// contenteditable, or a CodeMirror editor). The board's bare-key tool shortcuts
+/// must not fire while the user is typing into a query cell, text block, or the
+/// agent chat, so letters keep typing normally there.
+function isEditableTarget(target: EventTarget | null): boolean {
+  const el = target as HTMLElement | null;
+  if (!el) return false;
+  if (el.isContentEditable) return true;
+  const tag = el.tagName;
+  return tag === "INPUT" || tag === "TEXTAREA" || !!el.closest(".cm-editor");
+}
+
+/// Flow-coordinate top-left for a freshly added object so it lands centered in
+/// the board's current viewport (not at a fixed origin the user may have panned
+/// away from). `rect` is the board pane's pixel size; `viewport` is ReactFlow's
+/// live pan/zoom; `size` the object's default extent; `cascade` a small per-add
+/// step so repeated adds don't stack exactly on top of each other.
+function viewportCenterPlacement(
+  rect: { width: number; height: number } | null,
+  viewport: { x: number; y: number; zoom: number },
+  size: { w: number; h: number },
+  cascade: number,
+): { x: number; y: number } {
+  const paneW = rect?.width ?? 0;
+  const paneH = rect?.height ?? 0;
+  const zoom = viewport.zoom || 1;
+  // Invert ReactFlow's transform: screen = flow * zoom + pan, so the flow point
+  // under the pane's pixel center is (center - pan) / zoom.
+  const centerX = (paneW / 2 - viewport.x) / zoom;
+  const centerY = (paneH / 2 - viewport.y) / zoom;
+  const jitter = (cascade % 8) * 24;
+  return { x: centerX - size.w / 2 + jitter, y: centerY - size.h / 2 + jitter };
+}
+
 export {
   buildEdgeMenuItems,
   buildNodeMenuItems,
   COMPONENT_KINDS,
   edgeTypes,
   hasActiveTextSelection,
+  isEditableTarget,
   nodeTypes,
   toFlowEdges,
   toFlowNodes,
+  viewportCenterPlacement,
 };
 export type { EdgeMenuActions, NodeMenuActions };

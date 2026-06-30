@@ -6,7 +6,8 @@ const ALIGNS: TextAlign[] = ["left", "center", "right"];
 const ALIGN_LABEL: Record<TextAlign, string> = { left: "L", center: "C", right: "R" };
 
 /// Text-specific controls: font size, bold toggle, alignment, and colour. All
-/// write into the object's `style`, which the TextNode renderer consumes.
+/// write into the object's `style`, which the TextNode renderer consumes. Each
+/// control sits in a label-left row.
 function TextSection({ component, onChange }: SectionProps) {
   if (component.kind !== "text") return null;
   const style = component.style ?? {};
@@ -14,7 +15,7 @@ function TextSection({ component, onChange }: SectionProps) {
 
   return (
     <div className="mdbc-pane-form">
-      <label className="mdbc-canvas-prop">
+      <label className="mdbc-canvas-prop-row">
         <span className="mdbc-pane-label">Font size</span>
         <input
           type="number"
@@ -25,7 +26,7 @@ function TextSection({ component, onChange }: SectionProps) {
           }
         />
       </label>
-      <div className="mdbc-canvas-prop">
+      <div className="mdbc-canvas-prop-row">
         <span className="mdbc-pane-label">Align</span>
         <div className="mdbc-segmented mdbc-segmented-compact">
           <button
@@ -49,15 +50,16 @@ function TextSection({ component, onChange }: SectionProps) {
           ))}
         </div>
       </div>
-      <label className="mdbc-canvas-prop">
+      <div className="mdbc-canvas-prop-row">
         <span className="mdbc-pane-label">Colour</span>
         <input
           type="color"
           className="mdbc-canvas-color"
           value={style.color ?? DEFAULT_TEXT_COLOR}
           onChange={(e) => onChange({ style: { ...style, color: e.target.value } })}
+          aria-label="Colour"
         />
-      </label>
+      </div>
     </div>
   );
 }

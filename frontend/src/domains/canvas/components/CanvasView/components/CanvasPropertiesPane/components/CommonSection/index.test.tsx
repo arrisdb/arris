@@ -39,4 +39,13 @@ describe("CommonSection", () => {
     fireEvent.click(check);
     expect(onChange).toHaveBeenCalledWith({ locked: true });
   });
+
+  it("uses the shared app checkbox for the lock toggle", () => {
+    const { container } = render(
+      <CommonSection tabId="t" component={comp} onChange={vi.fn()} />,
+    );
+    expect(
+      container.querySelector('input[type="checkbox"]')?.classList.contains("mdbc-checkbox"),
+    ).toBe(true);
+  });
 });
