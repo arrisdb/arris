@@ -86,7 +86,7 @@ import Screenshot from "../../components/docs/Screenshot/Screenshot.astro";
     The agent pane runs down the left of the board. Describe what you want, for example
     <em>"monthly sales by category"</em>, and the agent reads your schema and replies with objects to
     add: usually a query that aggregates the data, a chart bound to it, and a one-line summary. Arris
-    drops them on the board, runs the query, and renders the chart from the result. A green check chip
+    places them on the board, runs the query, and renders the chart from the result. A green check chip
     under each reply summarizes exactly what changed ("Added / Updated / Removed ...").
   </p>
 
@@ -102,7 +102,7 @@ import Screenshot from "../../components/docs/Screenshot/Screenshot.astro";
     <li><strong>Pick the provider</strong> (<strong>Codex</strong> or <strong>Claude</strong>) in the chat header. This is the same preference the SQL agent uses, shared app-wide rather than per board. Switching provider mid-board starts a fresh agent session.</li>
     <li><strong>You must have a connection selected.</strong> Without one the agent cannot write correct SQL, so it replies asking you to connect a database first.</li>
     <li>Type your request and press <kbd>&#8984;&#8629;</kbd> to send. Replies stream in as markdown; a <strong>Stop</strong> control appears while the agent is working.</li>
-    <li>Each turn also sees the current board, so follow-ups <strong>refine it in place</strong> instead of only piling on. Ask the agent to switch a chart to a line, set axis bounds, rewrite a query, retitle a cell, move a query to another connection, or remove objects you no longer want. It can add, modify, or remove any object kind. Any query it adds or changes runs automatically, and the charts and tables bound to that query update.</li>
+    <li>Each turn also sees the current board, so follow-ups <strong>refine it in place</strong> rather than only adding to it. Ask the agent to switch a chart to a line, set axis bounds, rewrite a query, retitle a cell, move a query to another connection, or remove objects you no longer want. It can add, modify, or remove any object kind. Any query it adds or changes runs automatically, and the charts and tables bound to that query update.</li>
   </ul>
 
   <h3>What the agent sees</h3>
@@ -136,8 +136,8 @@ import Screenshot from "../../components/docs/Screenshot/Screenshot.astro";
   <h3>Sharing results when the agent asks</h3>
 
   <p>
-    Because the agent cannot see row data, it <strong>asks</strong> when it needs some. Instead of
-    changing the board it posts a <strong>Share results with the agent?</strong> card listing the cells
+    Because the agent cannot see row data, it <strong>asks</strong> when it needs it. Instead of
+    changing the board, it posts a <strong>Share results with the agent?</strong> card listing the cells
     it wants (each with its row and column count) and why. You choose:
   </p>
 
@@ -146,7 +146,7 @@ import Screenshot from "../../components/docs/Screenshot/Screenshot.astro";
     <li><strong>Decline</strong> tells the agent to continue without them.</li>
   </ul>
 
-  <p>Nothing leaves your machine until you click Share results; once you answer, the card freezes.</p>
+  <p>Nothing leaves your machine until you click Share results. After you answer, the card is marked as answered and takes no further input.</p>
 
   <h3>The conversation</h3>
 
@@ -232,7 +232,7 @@ import Screenshot from "../../components/docs/Screenshot/Screenshot.astro";
 
   <h2 id="objects">Object kinds</h2>
 
-  <p>Every object can be positioned, sized, locked, and overlapped freely. What each one is:</p>
+  <p>Every object can be positioned, sized, locked, and overlapped freely. What each one does:</p>
 
   <DocTable>
     <thead>
@@ -302,7 +302,7 @@ import Screenshot from "../../components/docs/Screenshot/Screenshot.astro";
     <li><strong>Resize.</strong> Drag any border or corner handle of a selected object. Handles only appear while it is selected.</li>
     <li><strong>Overlap and reorder.</strong> Objects may overlap. Right-click for <strong>Bring to front</strong> (<kbd>]</kbd>), <strong>Bring forward</strong>, <strong>Send backward</strong>, and <strong>Send to back</strong> (<kbd>[</kbd>).</li>
     <li><strong>Copy, paste, lock, delete.</strong> <kbd>&#8984;C</kbd> copies the selected object to an in-app clipboard and <kbd>&#8984;V</kbd> pastes a clone nearby; <strong>Lock</strong> freezes an object (still selectable, but not movable or resizable until unlocked); <kbd>Delete</kbd> or <kbd>Backspace</kbd> removes it. All are also in the right-click menu.</li>
-    <li><strong>Pan and zoom.</strong> Pan with the Hand tool or by dragging empty board; zoom with the scroll wheel or the controls in the corner (0.2x to 2x). Scrolling inside a table, chart, or query cell scrolls that object, not the board.</li>
+    <li><strong>Pan and zoom.</strong> Pan with the Hand tool or by dragging an empty part of the board; zoom with the scroll wheel or the controls in the corner (0.2x to 2x). Scrolling inside a table, chart, or query cell scrolls that object, not the board.</li>
     <li><strong>Dependency arrows are automatic.</strong> Arrows are drawn when a chart or table binds to its source query, and when one query reads another with <code>FROM &lt;cell title&gt;</code>. They anchor to both objects' borders and re-route as you move them. You cannot draw them by hand, but you can delete one from its right-click menu.</li>
     <li><strong>Run.</strong> Run a single query with its Run button (or the editor's run shortcut). <strong>Run all</strong> on the toolbar runs every query, resolving upstream cells first.</li>
     <li><strong>Fit on open.</strong> Reopening a board frames its existing content, so you land on your work rather than empty space.</li>
@@ -311,11 +311,11 @@ import Screenshot from "../../components/docs/Screenshot/Screenshot.astro";
   <h2 id="saving">Saving</h2>
 
   <p>
-    A board saves with your workspace a fraction of a second after each change, surviving a closed tab or
-    an app restart. Saved with it: the objects (geometry, z-order, lock state, and per-kind settings),
-    the dependency arrows, the pan and zoom, the connection set, and the agent conversation.
-    <strong>Query results are not saved</strong>: after reopening, query cells show their "Run the
-    query..." state and tables and charts are blank until you re-run their source (or hit
+    A board is saved with your workspace shortly after each change, and survives closing the tab or
+    restarting the app. It stores the objects (their geometry, z-order, lock state, and per-kind
+    settings), the dependency arrows, the pan and zoom, the connection set, and the agent conversation.
+    <strong>Query results are not saved.</strong> After reopening, query cells show their "Run the
+    query..." state, and tables and charts stay blank until you re-run their source query (or use
     <strong>Run all</strong>).
   </p>
 
