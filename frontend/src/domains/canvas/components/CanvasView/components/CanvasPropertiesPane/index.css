@@ -30,10 +30,11 @@
   gap: 10px;
   min-height: 26px;
 }
-/* A number field in an inline row fills the space after its caption. */
+/* A number field in an inline row stays compact, sitting just after its caption
+   rather than stretching to the pane edge. */
 .mdbc-canvas-prop-row .mdbc-pane-input {
-  flex: 1 1 auto;
-  width: auto;
+  flex: 0 0 auto;
+  width: 88px;
 }
 
 /* Small colour swatch, matching the chart editor's series-colour blob: a compact
