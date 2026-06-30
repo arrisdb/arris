@@ -51,6 +51,12 @@ const docsNav: NavGroup[] = [
     ],
   },
   {
+    title: "Canvas",
+    items: [
+      { label: "Overview", href: "/canvas", badge: "New" },
+    ],
+  },
+  {
     title: "Querying",
     items: [
       { label: "Editor", href: "/querying/editor" },
@@ -76,7 +82,6 @@ const docsNav: NavGroup[] = [
     title: "AI",
     items: [
       { label: "AI Agent", href: "/ai/agent" },
-      { label: "Canvas", href: "/ai/canvas" },
     ],
   },
   {

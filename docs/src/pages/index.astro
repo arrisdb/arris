@@ -32,6 +32,12 @@ import styles from "./index.module.css";
   </p>
 
   <p>
+    New in this release: the <a href="/canvas">Canvas</a>, a board where you describe an analysis in
+    plain English and an AI agent builds it for you, the query, the chart, and the explanation, all
+    laid out together.
+  </p>
+
+  <p>
     This documentation covers everything from installing the app and running your first query to
     advanced topics like cross-source federation, analytics engineering workflows, and configuring
     AI providers. Use the sidebar to navigate, or pick a section below to get started.
@@ -67,9 +73,18 @@ import styles from "./index.module.css";
       <div class={styles.cardCount}>17 articles</div>
     </a>
 
+    <a href="/canvas" class={styles.card}>
+      <div class={styles.cardTitle}>
+        <span class={styles.cardIcon} class:list={["bg-[rgba(195,155,255,0.15)] text-accent-2"]}>4</span>
+        Canvas
+      </div>
+      <div class={styles.cardDesc}>New: a board where an AI agent turns a plain-English request into a running query, a chart, and the text that explains it.</div>
+      <div class={styles.cardCount}>1 article</div>
+    </a>
+
     <a href="/querying/editor" class={styles.card}>
       <div class={styles.cardTitle}>
-        <span class={styles.cardIcon} class:list={["bg-[rgba(122,220,228,0.15)] text-teal"]}>4</span>
+        <span class={styles.cardIcon} class:list={["bg-[rgba(122,220,228,0.15)] text-teal"]}>5</span>
         Querying
       </div>
       <div class={styles.cardDesc}>The editor, the results viewer with charts, and the session command logs.</div>
@@ -78,7 +93,7 @@ import styles from "./index.module.css";
 
     <a href="/querying/cross-source" class={styles.card}>
       <div class={styles.cardTitle}>
-        <span class={styles.cardIcon} class:list={["bg-[rgba(195,155,255,0.15)] text-accent-2"]}>5</span>
+        <span class={styles.cardIcon} class:list={["bg-[rgba(195,155,255,0.15)] text-accent-2"]}>6</span>
         Federation
       </div>
       <div class={styles.cardDesc}>Query multiple databases in one SQL statement, powered by the built-in DataFusion engine.</div>
@@ -87,7 +102,7 @@ import styles from "./index.module.css";
 
     <a href="/git/version-control" class={styles.card}>
       <div class={styles.cardTitle}>
-        <span class={styles.cardIcon} class:list={["bg-[rgba(255,107,107,0.15)] text-red"]}>6</span>
+        <span class={styles.cardIcon} class:list={["bg-[rgba(255,107,107,0.15)] text-red"]}>7</span>
         Git
       </div>
       <div class={styles.cardDesc}>Track changes to your SQL files with built-in Git support: stage, commit, push, and view diffs without leaving Arris.</div>
@@ -96,7 +111,7 @@ import styles from "./index.module.css";
 
     <a href="/analytics-engineering/dbt" class={styles.card}>
       <div class={styles.cardTitle}>
-        <span class={styles.cardIcon} class:list={["bg-[rgba(91,227,154,0.15)] text-green"]}>7</span>
+        <span class={styles.cardIcon} class:list={["bg-[rgba(91,227,154,0.15)] text-green"]}>8</span>
         Analytics engineering
       </div>
       <div class={styles.cardDesc}>Work with dbt and SQLMesh projects, explore lineage, and run models directly from the editor.</div>
@@ -105,7 +120,7 @@ import styles from "./index.module.css";
 
     <a href="/ai/codex-agent" class={styles.card}>
       <div class={styles.cardTitle}>
-        <span class={styles.cardIcon} class:list={["bg-[rgba(255,161,74,0.15)] text-orange"]}>8</span>
+        <span class={styles.cardIcon} class:list={["bg-[rgba(255,161,74,0.15)] text-orange"]}>9</span>
         AI
       </div>
       <div class={styles.cardDesc}>Chat with a local Codex agent to write, explain, and fix schema-aware SQL (requires a Codex subscription or OPENAI_API_KEY).</div>
