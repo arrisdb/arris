@@ -72,6 +72,12 @@ import Screenshot from "../../components/docs/Screenshot/Screenshot.astro";
     automatically.
   </p>
 
+  <Screenshot
+    src="/screenshots/canvas-connections.png"
+    alt="The Connection picker at the top of the agent pane, open as a checklist of databases (test_postgres, prod_mysql, prod_mongodb, prod_bigquery, and more) so several can be selected at once."
+    caption="The Connection picker is a multi-select: tick every database the board should use. The first one ticked becomes the board's primary connection."
+  />
+
   <p>
     The <strong>first</strong> connection in the set is the board's <strong>primary</strong>: it is the
     default for query cells you add by hand. Every query cell also stores its own connection, which you
@@ -98,7 +104,7 @@ import Screenshot from "../../components/docs/Screenshot/Screenshot.astro";
   <h3>Sending a turn</h3>
 
   <ul>
-    <li><strong>Pick the provider</strong> (<strong>Codex</strong> or <strong>Claude</strong>) in the chat header. This is the same preference the SQL agent uses, shared app-wide rather than per board. Switching provider mid-board starts a fresh agent session.</li>
+    <li><strong>Pick the provider</strong> (<strong>Codex</strong> or <strong>Claude</strong>) in the chat header.</li>
     <li><strong>You must have a connection selected.</strong> Without one the agent cannot write correct SQL, so it replies asking you to connect a database first.</li>
     <li>Type your request and press <kbd>&#8984;&#8629;</kbd> to send. Replies stream in as markdown; a <strong>Stop</strong> control appears while the agent is working.</li>
     <li>Each turn also sees the current board, so follow-ups <strong>refine it in place</strong> rather than only adding to it. Ask the agent to switch a chart to a line, set axis bounds, rewrite a query, retitle a cell, move a query to another connection, or remove objects you no longer want. It can add, modify, or remove any object kind. Any query it adds or changes runs automatically, and the charts and tables bound to that query update.</li>
