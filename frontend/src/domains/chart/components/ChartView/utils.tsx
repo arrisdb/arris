@@ -453,16 +453,52 @@ function prepareData(spec: ChartSpec, result: QueryResult | undefined): DataDisp
   };
 }
 
+/// Corner radius for one bar segment. A non-stacked bar rounds all corners; in a
+/// stack only the OUTERMOST segment is rounded on its outer edge (the top for a
+/// vertical stack, the far end for a horizontal one) so inner segments meet flush
+/// instead of leaving a rounded notch mid-bar. A single-series stack rounds fully.
+/// The array is Recharts' `[topLeft, topRight, bottomRight, bottomLeft]`.
+function barSegmentRadius(
+  index: number,
+  count: number,
+  stacked: boolean,
+  isHorizontal: boolean,
+): number | [number, number, number, number] {
+  const r = 4;
+  if (!stacked || count <= 1) return r;
+  const isFirst = index === 0;
+  const isLast = index === count - 1;
+  if (isHorizontal) {
+    // A horizontal stack grows left to right: the first segment is the left end,
+    // the last is the right end.
+    if (isFirst) return [r, 0, 0, r];
+    if (isLast) return [0, r, r, 0];
+    return 0;
+  }
+  // A vertical stack grows bottom to top: the first segment is the bottom, the
+  // last is the top.
+  if (isFirst) return [0, 0, r, r];
+  if (isLast) return [r, r, 0, 0];
+  return 0;
+}
+
 function renderBarChart(spec: ChartSpec, data: DataDispatch, fonts: ChartFontScale): ReactElement {
   const style = spec.style;
   const isHorizontal = style?.barOrientation === "horizontal";
   const stacked = style?.stackMode === "stacked" || style?.stackMode === "percent";
   const stackId = stacked ? "a" : undefined;
+  const count = data.cartesianSeries.length;
   return (
     <BarChart data={data.cartesian} layout={isHorizontal ? "vertical" : "horizontal"}>
       {buildAxes(spec, fonts)}
       {data.cartesianSeries.map((column, index) => (
-        <Bar key={column} dataKey={column} fill={getColor(style, index)} radius={4} stackId={stackId}>
+        <Bar
+          key={column}
+          dataKey={column}
+          fill={getColor(style, index)}
+          radius={barSegmentRadius(index, count, stacked, isHorizontal)}
+          stackId={stackId}
+        >
           {style?.showDataLabels && <LabelList dataKey={column} fontSize={fonts.dataLabel} fill="rgb(var(--m-overlay-rgb) / 0.7)" />}
         </Bar>
       ))}
@@ -877,6 +913,7 @@ function chartEmptyMessage(
 }
 
 export {
+  barSegmentRadius,
   cartesianSeries,
   chartEmptyMessage,
   chartFontScale,
