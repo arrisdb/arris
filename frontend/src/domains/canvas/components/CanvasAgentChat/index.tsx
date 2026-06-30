@@ -1,28 +1,30 @@
 import { useState } from "react";
-import { ChatBubble, ChatEmpty, ChatInput, ChatTyping, MultiSelect, Select, Spinner } from "@shared/ui";
+import { ChatBubble, ChatEmpty, ChatInput, ChatTyping, MultiSelect, Spinner } from "@shared/ui";
 import { Icon } from "@shared/ui/Icon";
 import { AgentProviderSelect } from "@domains/agent";
+import { markdownToHtml } from "@domains/editor";
 
+import { AgentQuestionCard } from "./components/AgentQuestionCard";
 import { useCanvasAgentChat } from "./hooks";
 import type { CanvasAgentChatProps } from "./types";
 import "./index.css";
 
 /// The board's agent chat: pick the board's connections, type a request, and the
 /// agent reads their schemas and the current board, then adds or revises objects.
-/// Renders the shared agent-chat chrome so it matches the SQL agent pane.
+/// When it needs data it cannot see (a query's rows), it asks with a question
+/// card the user answers in place. Renders the shared agent-chat chrome so it
+/// matches the SQL agent pane.
 function CanvasAgentChat({ tab }: CanvasAgentChatProps) {
   const {
-    attachResult,
-    attachments,
+    answerQuestion,
     buildContext,
     cancel,
     connectionId,
     connectionIds,
     connectionOptions,
+    describeQuery,
     entries,
     pickConnections,
-    removeAttachment,
-    resultOptions,
     schemaLoading,
     send,
     streaming,
@@ -35,17 +37,6 @@ function CanvasAgentChat({ tab }: CanvasAgentChatProps) {
       <div className="mdbc-pane-header">
         <span className="mdbc-pane-title">AGENT</span>
         <AgentProviderSelect />
-        {resultOptions.length > 0 ? (
-          <div className="mdbc-canvas-chat-addresults">
-            <Select
-              value=""
-              options={resultOptions}
-              onChange={attachResult}
-              placeholder="+ Add results"
-              data-testid="canvas-add-results"
-            />
-          </div>
-        ) : null}
       </div>
       <div className="mdbc-canvas-chat-conn">
         <span className="mdbc-canvas-chat-conn-label">Connection</span>
@@ -92,30 +83,40 @@ function CanvasAgentChat({ tab }: CanvasAgentChatProps) {
           />
         ) : (
           entries
-            .filter((entry) => entry.text.length > 0)
+            .filter((entry) => entry.text.length > 0 || entry.question || entry.action)
             .map((entry) => (
-              <ChatBubble key={entry.id} role={entry.role} text={entry.text} />
+              <div key={entry.id} className={`mdbc-canvas-chat-row ${entry.role}`}>
+                {entry.text.length > 0 ? (
+                  entry.role === "agent" ? (
+                    <div
+                      className="mdbc-agent-msg agent mdbc-canvas-chat-md"
+                      // Agent prose is markdown; the renderer escapes HTML, so this
+                      // shows headings/lists/code/bold instead of raw syntax.
+                      dangerouslySetInnerHTML={{ __html: markdownToHtml(entry.text) }}
+                    />
+                  ) : (
+                    <ChatBubble role={entry.role} text={entry.text} />
+                  )
+                ) : null}
+                {entry.action ? (
+                  <div className="mdbc-canvas-chat-action">
+                    <Icon name="check" size={12} />
+                    <span>{entry.action}</span>
+                  </div>
+                ) : null}
+                {entry.question ? (
+                  <AgentQuestionCard
+                    question={entry.question}
+                    answered={Boolean(entry.answered)}
+                    describeQuery={describeQuery}
+                    onAnswer={(answer) => answerQuestion(entry.id, answer)}
+                  />
+                ) : null}
+              </div>
             ))
         )}
         {streaming ? <ChatTyping onStop={cancel} /> : null}
       </div>
-      {attachments.length > 0 ? (
-        <div className="mdbc-canvas-chat-chips">
-          {attachments.map((att) => (
-            <span key={att.id} className="mdbc-canvas-chat-chip" title={att.label}>
-              {att.label}
-              <button
-                type="button"
-                className="mdbc-canvas-chat-chip-remove"
-                aria-label={`Remove ${att.label}`}
-                onClick={() => removeAttachment(att.id)}
-              >
-                ✕
-              </button>
-            </span>
-          ))}
-        </div>
-      ) : null}
       <ChatInput
         placeholder={
           connectionId ? "Ask the agent… (⌘↵ to send)" : "Connect a database to use the agent"

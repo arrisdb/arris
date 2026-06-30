@@ -10,7 +10,7 @@ import { useCanvasStore } from "../../hooks";
 import type { CanvasComponent, CanvasEdge, ReorderOp, ShapeKind } from "../../types";
 import { makeComponent, serializeDoc } from "../../utils";
 import type { CanvasMode, CanvasNodeData } from "./types";
-import { toFlowEdges, toFlowNodes } from "./utils";
+import { hasActiveTextSelection, toFlowEdges, toFlowNodes } from "./utils";
 
 const EMPTY_COMPONENTS: CanvasComponent[] = [];
 const EMPTY_EDGES: CanvasEdge[] = [];
@@ -33,6 +33,7 @@ function useCanvas(tab: EditorTab) {
   const addEdge = useCanvasStore((s) => s.addEdge);
   const removeEdges = useCanvasStore((s) => s.removeEdges);
   const setViewport = useCanvasStore((s) => s.setViewport);
+  const runAllQueries = useCanvasStore((s) => s.runAllQueries);
 
   // While drawing a relationship arrow, the id of the object clicked first (the
   // arrow's source); the next object clicked becomes its target. A ref mirrors it
@@ -201,6 +202,10 @@ function useCanvas(tab: EditorTab) {
       if (isEditable(e.target)) return;
       const key = e.key.toLowerCase();
       if (key === "c" && selectedComponent) {
+        // A live text selection means the user is copying text (e.g. an agent
+        // reply in the side chat), not the selected object: let the browser's
+        // native copy run instead of cloning the node.
+        if (hasActiveTextSelection()) return;
         e.preventDefault();
         copyComponent(tabId, selectedComponent.id);
       } else if (key === "v") {
@@ -260,6 +265,11 @@ function useCanvas(tab: EditorTab) {
     addComponent(tabId, makeComponent({ kind: "chart", ...placementFor() }));
   }, [addComponent, placementFor, tabId]);
 
+  // Run every query object on the board in one click (toolbar "Run all").
+  const runAll = useCallback(() => {
+    void runAllQueries(tabId);
+  }, [runAllQueries, tabId]);
+
   // A table previews a query object's rows. It starts unbound; the user picks
   // its source query in the properties pane.
   const addTable = useCallback(() => {
@@ -296,6 +306,7 @@ function useCanvas(tab: EditorTab) {
     addQuery,
     addChart,
     addTable,
+    runAll,
     copy,
     paste,
     remove,

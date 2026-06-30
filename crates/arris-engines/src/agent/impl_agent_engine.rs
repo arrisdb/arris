@@ -174,11 +174,37 @@ impl AgentEngine {
     ) -> String {
         let name = dialect.map(Self::dialect_name).unwrap_or("SQL");
         let schema = Self::clamp_schema(schema_ddl);
+        let syntax_note = Self::dialect_syntax_note(dialect);
         match profile {
-            AgentProfile::Sql => Self::build_sql_prompt(name, &schema, user_prompt),
+            AgentProfile::Sql => Self::build_sql_prompt(name, &schema, syntax_note, user_prompt),
             AgentProfile::Canvas => {
-                Self::build_canvas_prompt(name, &schema, board_context, user_prompt)
+                Self::build_canvas_prompt(name, &schema, syntax_note, board_context, user_prompt)
             }
+        }
+    }
+
+    /// Dialect-specific syntax guidance appended to the generic "use {name}
+    /// syntax" rule. Most SQL databases need none. A non-SQL store whose query
+    /// language the model would otherwise get wrong returns a note here. For
+    /// MongoDB the driver parses the statement's argument as STRICT JSON, so the
+    /// model must double-quote every key (the default mongosh/JS style with
+    /// unquoted keys fails with `invalid JSON ... key must be a string`).
+    fn dialect_syntax_note(dialect: Option<DatabaseKind>) -> &'static str {
+        match dialect {
+            Some(DatabaseKind::Mongodb) => {
+                "\n- This is MongoDB, not SQL. Write each statement as \
+                 `db.<collection>.<verb>(...)` (analytics use \
+                 `db.<collection>.aggregate([ ... ])`; also `find`, `insertOne`, \
+                 `updateMany`, `deleteMany`). The argument is parsed as STRICT JSON: \
+                 EVERY key MUST be double-quoted, including `$`-operators (\"$group\", \
+                 \"$match\", \"$sum\", \"$project\", \"$sort\", \"$dateToString\") and \
+                 field names (\"_id\", \"category\", \"total_sales\"); string values are \
+                 double-quoted too. NEVER use mongosh/JavaScript style with unquoted \
+                 keys, and never use shell helpers like ObjectId(...) or ISODate(...). \
+                 Example: db.sales.aggregate([{\"$group\":{\"_id\":\"$category\",\"total\":\
+                 {\"$sum\":\"$amount\"}}},{\"$sort\":{\"total\":-1}}])."
+            }
+            _ => "",
         }
     }
 
@@ -195,15 +221,15 @@ impl AgentEngine {
     }
 
     /// The query-assistant prompt: write or explain one SQL block.
-    fn build_sql_prompt(name: &str, schema: &str, user_prompt: &str) -> String {
+    fn build_sql_prompt(name: &str, schema: &str, syntax_note: &str, user_prompt: &str) -> String {
         format!(
             "You are a SQL assistant embedded in a database client. You ONLY write \
-             or explain SQL queries for the user's {name} database — nothing else. \
+             or explain SQL queries for the user's {name} database, nothing else. \
              Do not run shell commands, read files, or do unrelated work.\n\n\
              # Database schema ({name})\n\
              {schema}\n\n\
              # Rules\n\
-             - Use dialect-appropriate {name} syntax and the tables/columns above.\n\
+             - Use dialect-appropriate {name} syntax and the tables/columns above.{syntax_note}\n\
              - When you write a query, return exactly one ```sql fenced block, then \
              one short sentence describing it. The user reviews and applies it.\n\
              - When asked to explain a query, describe what it does in plain prose; \
@@ -221,6 +247,7 @@ impl AgentEngine {
     fn build_canvas_prompt(
         name: &str,
         schema: &str,
+        syntax_note: &str,
         board_context: &str,
         user_prompt: &str,
     ) -> String {
@@ -259,13 +286,39 @@ impl AgentEngine {
              }}\n\
              ```\n\n\
              # Rules\n\
-             - Use dialect-appropriate {name} syntax and only the tables/columns above.\n\
-             - Each `query` runs against ONE database connection. When the schema \
-             section above lists more than one connection (each under a \
-             `## Connection ... id=<id>` header), every `query` MUST include a \
-             `connectionId` set to the matching `id`, so the board can run queries \
-             against different databases in the same answer. With a single \
-             connection, omit `connectionId`.\n\
+             - Use dialect-appropriate {name} syntax and only the tables/columns above.{syntax_note}\n\
+             - Each `query` runs against ONE database connection. The schema \
+             section above lists every connection available to this board, each \
+             under a `## Connection \"<name>\" (id=<id>, <dialect>)` header. When \
+             more than one is listed, every `query` MUST include a `connectionId` \
+             set to the matching `id`, so the board can run queries against \
+             different databases in the same answer. With a single connection you \
+             may omit `connectionId` on a NEW query (it defaults to that one).\n\
+             - Each existing `query` line in the board summary shows its current \
+             `connectionId=<id>`. To MOVE an existing query to a different \
+             connection, re-emit it by its `id` with the new `connectionId` set to \
+             the `id` of the target `## Connection` header, AND rewrite its `sql` \
+             into that connection's dialect when the dialects differ. This applies \
+             even when only ONE connection is listed: if a query's current \
+             `connectionId` is not that listed connection's `id`, set it to that \
+             `id` to move the query onto the board's connection. The client re-runs \
+             a query whose `connectionId` changed.\n\
+             - BUILD ON EXISTING RESULTS when you can. Each `query` line in the \
+             board shows a `table=<name>`: a new query may read ANOTHER query \
+             cell's already-computed RESULTS by selecting `FROM <that table name>` \
+             (or JOIN), instead of re-querying the database. PREFER this whenever \
+             the data you need is derivable from a cell already on the board: to \
+             filter it, re-aggregate it, reshape it, or join two cells. A query \
+             that reads a cell runs in an in-memory engine (Apache DataFusion), so \
+             it has three constraints: (1) use standard ANSI SQL (e.g. `SUM`, \
+             `GROUP BY`, `date_trunc`), NOT source-database-specific syntax; (2) it \
+             may reference ONLY other cells' `table=` names (and SQL literals), \
+             NEVER a live database table in the SAME statement (a query that needs \
+             both must read the live data in its own cell first, then a second cell \
+             reads that cell); (3) it can only use the columns the upstream cell \
+             actually returns (its SELECT list). Re-query the database only when no \
+             existing cell has the columns or grain you need (e.g. a weekly-summed \
+             cell cannot be split back into days).\n\
              - To ADD an object, use a new `id`. To MODIFY an object already on the \
              board, return a component whose `id` matches the existing one and \
              include only the fields you are changing (the client merges them). To \
@@ -306,6 +359,21 @@ impl AgentEngine {
              - Do not invent ids you have not defined or seen on the board. \
              Positions/sizes are optional (the client lays objects out). Emit \
              nothing after the closing fence.\n\n\
+             # Asking the user\n\
+             You never receive the ROW DATA a query returned, only the schema and \
+             the board summary. If you cannot complete the request without input \
+             only the user can give (most commonly those rows), ASK instead of \
+             guessing. To ask, reply with ONE fenced block tagged `arris-ask` \
+             containing a single JSON object with a `type` field, and emit NO \
+             `arris-canvas` block in that turn (you are waiting for the answer). \
+             Supported question types:\n\
+             ```arris-ask\n\
+             {{ \"type\": \"share_results\", \"queryIds\": [\"q1\"], \"reason\": \"<one short sentence>\" }}\n\
+             ```\n\
+             - `share_results`: request the rows of one or more existing query \
+             objects (by their board ids) so you can summarize or build on them. \
+             The user approves (the rows arrive in the next message) or declines. \
+             Only ask for results you actually need.\n\n\
              # Request\n\
              {user_prompt}\n",
         )
@@ -615,6 +683,23 @@ mod tests {
         // one answer (canvas multi-connection support).
         assert!(prompt.contains("connectionId"));
         assert!(prompt.contains("## Connection"));
+        // The agent is explicitly told it may move an existing query to another
+        // connection by re-emitting it by id with a new connectionId, AND that this
+        // works even when the board lists only one connection (the common case of
+        // moving a stray cell onto the board's connection).
+        assert!(prompt.contains("MOVE an existing query"));
+        assert!(prompt.contains("even when only ONE connection is listed"));
+        // The agent is taught to chain off an existing cell's results (read it by
+        // its `table=` name in the in-memory engine) instead of always re-querying
+        // the source database.
+        assert!(prompt.contains("BUILD ON EXISTING RESULTS"));
+        assert!(prompt.contains("table=<name>"));
+        assert!(prompt.contains("DataFusion"));
+        assert!(prompt.contains("ANSI SQL"));
+        // The agent can ASK the user for data it cannot see (the question
+        // abstraction), with share_results as the first question type.
+        assert!(prompt.contains("arris-ask"));
+        assert!(prompt.contains("share_results"));
         assert!(!prompt.contains("return exactly one ```sql fenced block"));
     }
 
@@ -649,6 +734,35 @@ mod tests {
         let huge = "x".repeat(SCHEMA_PROMPT_MAX_BYTES + 1000);
         let prompt = AgentEngine::build_prompt(AgentProfile::Canvas, None, &huge, "go", "");
         assert!(prompt.contains("(schema truncated)"));
+    }
+
+    #[test]
+    fn mongo_prompt_demands_strict_json_keys() {
+        // The MongoDB driver parses each statement's argument as strict JSON, so
+        // both profiles must tell the model to double-quote every key (otherwise it
+        // emits mongosh/JS unquoted keys that the driver rejects).
+        for profile in [AgentProfile::Canvas, AgentProfile::Sql] {
+            let prompt = AgentEngine::build_prompt(
+                profile,
+                Some(DatabaseKind::Mongodb),
+                "sales_transactions: { amount, category, sale_date }",
+                "monthly sales by category",
+                "",
+            );
+            assert!(prompt.contains("MongoDB, not SQL"));
+            assert!(prompt.contains("STRICT JSON"));
+            assert!(prompt.contains("double-quoted"));
+            assert!(prompt.contains("aggregate"));
+        }
+        // A SQL database gets no MongoDB note.
+        let pg = AgentEngine::build_prompt(
+            AgentProfile::Canvas,
+            Some(DatabaseKind::Postgres),
+            "CREATE TABLE t (id INT);",
+            "x",
+            "",
+        );
+        assert!(!pg.contains("STRICT JSON"));
     }
 
     fn schema(name: &str) -> SchemaNode {

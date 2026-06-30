@@ -1,3 +1,127 @@
+/* One turn's row: the bubble, the action line, and any question card stack
+   together and align to the speaker's side (user right, agent left). The wrapper
+   exists so a turn's pieces move as a unit; it must carry the side alignment,
+   because the inner bubble's own `align-self` does nothing inside a full-width
+   block wrapper (it only worked when the bubble was a direct flex child). */
+.mdbc-canvas-chat-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mdbc-canvas-chat-row.user {
+  align-items: flex-end;
+}
+
+.mdbc-canvas-chat-row.agent {
+  align-items: flex-start;
+}
+
+/* The action line: a fixed, distinct style for what the agent DID to the board
+   (added/updated/removed objects), kept visually separate from its prose reply
+   so the response and the action never blur into one block. */
+.mdbc-canvas-chat-action {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 85%;
+  padding: 5px 9px;
+  border-radius: var(--m-r-control);
+  border: 0.5px solid rgb(var(--m-accent-rgb) / 0.35);
+  background: rgb(var(--m-accent-rgb) / 0.08);
+  color: var(--m-fg-2);
+  font-family: var(--m-font-mono);
+  font-size: var(--m-fs-xs);
+  line-height: 1.45;
+}
+
+.mdbc-canvas-chat-action svg {
+  flex-shrink: 0;
+  color: rgb(var(--m-accent-rgb));
+}
+
+/* The agent bubble renders markdown to HTML, so its block children need real
+   layout instead of the bubble's plain pre-wrap. Tighten the vertical rhythm and
+   style code, lists, headings, quotes, links, and tables to the chat scale. */
+.mdbc-canvas-chat-md {
+  white-space: normal;
+}
+
+.mdbc-canvas-chat-md > :first-child {
+  margin-top: 0;
+}
+
+.mdbc-canvas-chat-md > :last-child {
+  margin-bottom: 0;
+}
+
+.mdbc-canvas-chat-md p {
+  margin: 0 0 8px;
+}
+
+.mdbc-canvas-chat-md h1,
+.mdbc-canvas-chat-md h2,
+.mdbc-canvas-chat-md h3,
+.mdbc-canvas-chat-md h4 {
+  margin: 10px 0 6px;
+  font-size: var(--m-fs-sm);
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.mdbc-canvas-chat-md ul,
+.mdbc-canvas-chat-md ol {
+  margin: 0 0 8px;
+  padding-left: 18px;
+}
+
+.mdbc-canvas-chat-md li {
+  margin: 2px 0;
+}
+
+.mdbc-canvas-chat-md code {
+  font-family: var(--m-font-mono);
+  font-size: 0.9em;
+  background: rgb(var(--m-overlay-rgb) / 0.12);
+  padding: 1px 4px;
+  border-radius: 4px;
+}
+
+.mdbc-canvas-chat-md pre {
+  margin: 0 0 8px;
+  padding: 8px;
+  background: rgb(var(--m-overlay-rgb) / 0.1);
+  border-radius: var(--m-r-control);
+  overflow-x: auto;
+}
+
+.mdbc-canvas-chat-md pre code {
+  background: none;
+  padding: 0;
+}
+
+.mdbc-canvas-chat-md a {
+  color: rgb(var(--m-accent-rgb));
+}
+
+.mdbc-canvas-chat-md blockquote {
+  margin: 0 0 8px;
+  padding-left: 10px;
+  border-left: 2px solid var(--m-sep);
+  color: var(--m-fg-2);
+}
+
+.mdbc-canvas-chat-md table {
+  border-collapse: collapse;
+  margin: 0 0 8px;
+}
+
+.mdbc-canvas-chat-md th,
+.mdbc-canvas-chat-md td {
+  border: 0.5px solid var(--m-sep);
+  padding: 3px 6px;
+}
+
 /* The board's connection picker row, under the agent header. The connection is
    canvas-wide (the agent's schema source and every query object's target), so it
    sits at the top of the chat where the "connect a database" prompt appears. */
@@ -71,53 +195,4 @@
   white-space: pre-wrap;
   word-break: break-word;
   color: var(--m-fg-2);
-}
-
-/* The "+ Add results" picker in the header keeps a compact, natural width beside
-   the provider select. */
-.mdbc-canvas-chat-addresults {
-  margin-left: auto;
-}
-
-.mdbc-canvas-chat-addresults .mdbc-select {
-  min-width: 0;
-}
-
-/* Attached-result chips, shown above the input. Each names a query object's
-   shared result with a remove button, matching the agent context-chip look. */
-.mdbc-canvas-chat-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  padding: 6px 10px 0;
-}
-
-.mdbc-canvas-chat-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  max-width: 100%;
-  padding: 2px 6px;
-  border: 0.5px solid var(--m-sep);
-  border-radius: 5px;
-  background: var(--m-bg-card);
-  color: var(--m-fg-2);
-  font-size: var(--m-fs-2xs);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.mdbc-canvas-chat-chip-remove {
-  border: 0;
-  background: transparent;
-  color: var(--m-fg-3);
-  cursor: pointer;
-  padding: 0;
-  font-size: var(--m-fs-2xs);
-  line-height: 1;
-}
-
-.mdbc-canvas-chat-chip-remove:hover {
-  color: var(--m-fg);
 }

@@ -1,4 +1,5 @@
 import type { CanvasComponent } from "../types";
+import { sanitizeCellTitle } from "./dependencies";
 
 /// Trim a value to one line and a max length so the board summary stays compact
 /// in the prompt (the agent needs the gist, not the full text/SQL).
@@ -11,7 +12,10 @@ function clip(value: string, max = 100): string {
 function describeComponent(c: CanvasComponent): string {
   switch (c.kind) {
     case "query":
-      return `- query id=${c.id} title=${JSON.stringify(c.title ?? "")} sql=${JSON.stringify(clip(c.sql))}`;
+      // `table` is the identifier a downstream cell uses to read THIS cell's
+      // results (FROM <table>), so the agent can chain off it instead of
+      // re-querying the database.
+      return `- query id=${c.id} title=${JSON.stringify(c.title ?? "")} table=${sanitizeCellTitle(c.title ?? "")} connectionId=${c.connectionId ?? "(unset)"} sql=${JSON.stringify(clip(c.sql))}`;
     case "chart": {
       const s = c.spec;
       const series = s.seriesColumn ? ` series=${s.seriesColumn}` : "";

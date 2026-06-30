@@ -155,17 +155,29 @@ import DocTable from "../../components/docs/DocTable/DocTable.astro";
     piling on new objects. The agent can <strong>add</strong> any object kind (a query, table, chart,
     text block, sticky note, or shape), <strong>modify</strong> one that is already there (re-spec a chart
     as a line chart, restyle it (set axis bounds, toggle the legend, change colours), rewrite a
-    query, retitle an object), or <strong>remove</strong> objects you no longer want. A query the
+    query, retitle an object, move a query to a different connection), or <strong>remove</strong>
+    objects you no longer want. A query the
     agent adds or changes runs automatically, and any chart bound to it updates.
   </p>
 
   <p>
-    The agent sees your schema and the board, but not the rows a query returned, unless you share
-    them. When a query object on the board has results, an <strong>Add results</strong> picker
-    appears in the chat header listing those queries; pick one and Arris attaches its result as a
-    removable chip above the input. Your next message sends those rows along, so the agent can write
-    commentary or follow-up queries grounded in the real data. Sharing is never automatic: nothing
-    leaves until you attach it and send.
+    When the data you ask for can be derived from a query already on the board, the agent
+    <strong>builds on that cell's results</strong> instead of re-querying the database: it writes a new
+    query that selects <code>FROM</code> the existing cell (to filter, re-aggregate, reshape, or join
+    cells), which runs in the in-memory engine. It falls back to a fresh database query only when no
+    existing cell has the columns or grain it needs (a weekly-summed cell, for instance, cannot be
+    split back into days).
+  </p>
+
+  <p>
+    The agent sees your schema and the board, but never the rows a query returned. When it needs
+    them, it <strong>asks</strong>: instead of changing the board it posts a <strong>Share
+    results</strong> request naming the query objects it wants and why. A card appears in the chat
+    with <strong>Share results</strong> and <strong>Decline</strong> buttons; click Share results and
+    Arris sends those rows in the next message so the agent can write commentary or follow-up queries
+    grounded in the real data. Sharing is never automatic: nothing leaves until you approve the
+    request. (Asking the user is a general mechanism, so the agent can grow other question types over
+    time; sharing results is the first.)
   </p>
 
   <h2 id="board">Working on the board</h2>
@@ -182,7 +194,7 @@ import DocTable from "../../components/docs/DocTable/DocTable.astro";
     <li><strong>Copy, reorder, lock, and delete</strong> from an object's right-click menu: Copy (<kbd>⌘C</kbd>) puts it on the clipboard and Paste (<kbd>⌘V</kbd>) drops a fresh copy nearby, the four restacking actions (Bring to front, Bring forward, Send backward, Send to back) change its overlap order, Lock freezes it (a locked object can't be moved or resized until you unlock it), and Delete removes it.</li>
     <li><strong>Pan</strong> by dragging the empty canvas, and <strong>zoom</strong> with the scroll wheel or the controls in the corner.</li>
     <li><strong>Delete</strong> a selected object with <kbd>Delete</kbd> or <kbd>Backspace</kbd>.</li>
-    <li><strong>Run</strong> a query object at any time with its Run button to refresh the tables and charts bound to it.</li>
+    <li><strong>Run</strong> a query object at any time with its Run button to refresh the tables and charts bound to it, or hit <strong>Run all</strong> at the right end of the toolbar to run every query on the board at once (each query's upstream cells run first).</li>
   </ul>
 
   <h2 id="saving">Saving</h2>

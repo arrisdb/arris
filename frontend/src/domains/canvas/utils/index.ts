@@ -1,5 +1,9 @@
 export { parseAgentCanvas, planAgentChanges } from "./agentSpec";
 export type { BoardChanges, ComponentUpdate } from "./agentSpec";
+export { summarizeAgentChanges } from "./agentSummary";
+export { parseAgentQuestion } from "./agentQuestion";
+export { buildQuestionAnswer } from "./questionAnswer";
+export type { QuestionFollowUp, ShareableQuery } from "./questionAnswer";
 export { describeBoard } from "./boardContext";
 export { sanitizeChartSpec } from "./chartSpec";
 export { deriveDataEdges, sanitizeCellTitle } from "./dependencies";

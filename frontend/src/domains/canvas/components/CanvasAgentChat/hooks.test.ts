@@ -42,6 +42,9 @@ const noConn = { id: TAB, text: "" } as unknown as EditorTab;
 const reply = (json: unknown) =>
   "Building it now.\n```arris-canvas\n" + JSON.stringify(json) + "\n```";
 
+const askReply = (json: unknown) =>
+  "I need a little more.\n```arris-ask\n" + JSON.stringify(json) + "\n```";
+
 function fire(event: Record<string, unknown>) {
   act(() => hoisted.handler?.(event));
 }
@@ -64,40 +67,61 @@ describe("useCanvasAgentChat", () => {
     expect(ctx).toContain("# Current board");
   });
 
-  it("attaches a query object's result and sends it ahead of the prompt", () => {
+  it("renders a question card when the agent asks for results, then shares them on approve", () => {
     useCanvasStore
       .getState()
       .addComponent(TAB, makeComponent({ kind: "query", id: "q1", sql: "select 1", connectionId: "conn-1", title: "Monthly sales" }));
     useCanvasStore.getState().setRun(TAB, "q1", { running: false, result: queryResult });
 
     const { result } = renderHook(() => useCanvasAgentChat(withConn));
-    expect(result.current.resultOptions).toEqual([
-      { value: "q1", label: "Monthly sales · 1×1" },
-    ]);
+    act(() => result.current.send("summarize the sales"));
+    const turnId = vi.mocked(sendCanvasAgentIPC).mock.calls[0][0].turnId;
 
-    act(() => result.current.attachResult("q1"));
-    expect(result.current.attachments).toHaveLength(1);
-    expect(result.current.attachments[0].label).toBe("Monthly sales · 1×1");
+    fire({
+      turn_id: turnId,
+      kind: "message",
+      text: askReply({ type: "share_results", queryIds: ["q1"], reason: "need the rows" }),
+    });
+    fire({ turn_id: turnId, kind: "done" });
 
-    act(() => result.current.send("describe the trend"));
+    // The agent's turn settled into a question card, not board changes.
+    const asked = result.current.entries.find((e) => e.question);
+    expect(asked?.question).toMatchObject({ type: "share_results", queryIds: ["q1"] });
+    expect(result.current.streaming).toBe(false);
+    // The card can describe the requested query for display.
+    expect(result.current.describeQuery("q1")).toMatchObject({ title: "Monthly sales", hasResult: true });
+
+    vi.mocked(sendCanvasAgentIPC).mockClear();
+    act(() => result.current.answerQuestion(asked!.id, { type: "share_results", shared: true }));
     const prompt = vi.mocked(sendCanvasAgentIPC).mock.calls[0][0].prompt;
     expect(prompt).toContain("# Results: Monthly sales");
     expect(prompt).toContain("category (text)");
-    expect(prompt).toContain("describe the trend");
-    // The chips clear after the message is dispatched.
-    expect(result.current.attachments).toHaveLength(0);
+    // The card is now resolved.
+    expect(result.current.entries.find((e) => e.id === asked!.id)?.answered).toBe(true);
   });
 
-  it("removes an attached result", () => {
+  it("declining a share request sends a follow-up that carries no rows", () => {
     useCanvasStore
       .getState()
-      .addComponent(TAB, makeComponent({ kind: "query", id: "q1", sql: "select 1", connectionId: "conn-1" }));
+      .addComponent(TAB, makeComponent({ kind: "query", id: "q1", sql: "select 1", connectionId: "conn-1", title: "Monthly sales" }));
     useCanvasStore.getState().setRun(TAB, "q1", { running: false, result: queryResult });
+
     const { result } = renderHook(() => useCanvasAgentChat(withConn));
-    act(() => result.current.attachResult("q1"));
-    const id = result.current.attachments[0].id;
-    act(() => result.current.removeAttachment(id));
-    expect(result.current.attachments).toHaveLength(0);
+    act(() => result.current.send("summarize the sales"));
+    const turnId = vi.mocked(sendCanvasAgentIPC).mock.calls[0][0].turnId;
+    fire({
+      turn_id: turnId,
+      kind: "message",
+      text: askReply({ type: "share_results", queryIds: ["q1"] }),
+    });
+    fire({ turn_id: turnId, kind: "done" });
+    const asked = result.current.entries.find((e) => e.question)!;
+
+    vi.mocked(sendCanvasAgentIPC).mockClear();
+    act(() => result.current.answerQuestion(asked.id, { type: "share_results", shared: false }));
+    const prompt = vi.mocked(sendCanvasAgentIPC).mock.calls[0][0].prompt;
+    expect(prompt).not.toContain("# Results:");
+    expect(prompt).toMatch(/not to share/i);
   });
 
   it("exposes the connections as options and binds the picked one to the tab", () => {
@@ -133,6 +157,22 @@ describe("useCanvasAgentChat", () => {
     expect(args.connectionId).toBeNull();
     expect(args.schemaOverride).toContain('## Connection "Sales" (id=conn-a, postgres)');
     expect(args.schemaOverride).toContain('## Connection "Events" (id=conn-b, mysql)');
+  });
+
+  it("sends the id-headed schema even for a single connection so the agent can move a query", async () => {
+    useConnectionsStore.setState({
+      connections: [{ id: "conn-1", name: "Sales", kind: "postgres", isConnected: true }],
+    } as never);
+    const { result } = renderHook(() => useCanvasAgentChat(withConn));
+    await waitFor(() => expect(result.current.schemaLoading).toBe(false));
+
+    act(() => result.current.send("move this query to postgres"));
+    const args = vi.mocked(sendCanvasAgentIPC).mock.calls[0][0];
+    // Single connection still names its dialect (connectionId set) AND carries the
+    // `## Connection ... id=` header, so the agent has an id to write when moving a
+    // cell onto this connection.
+    expect(args.connectionId).toBe("conn-1");
+    expect(args.schemaOverride).toContain('## Connection "Sales" (id=conn-1, postgres)');
   });
 
   it("dispatches a canvas turn and shows a user + pending agent entry", () => {
@@ -184,7 +224,14 @@ describe("useCanvasAgentChat", () => {
     expect(board.doc.components).toHaveLength(3);
     expect(vi.mocked(runCanvasCellIPC)).toHaveBeenCalledWith(TAB, "q1", expect.any(Array));
     expect(result.current.streaming).toBe(false);
-    expect(result.current.entries.at(-1)?.text).toMatch(/Added 3 objects/);
+    // The prose reply and the action it took are separate fields: the bubble keeps
+    // the prose; the explicit, object-naming summary rides on `action`.
+    const last = result.current.entries.at(-1);
+    expect(last?.text).toBe("Building it now.");
+    expect(last?.action).toMatch(/Added/);
+    expect(last?.action).toContain("query");
+    expect(last?.action).toContain("bar chart");
+    expect(last?.action).toContain("text note");
   });
 
   it("ignores events from a different turn", () => {

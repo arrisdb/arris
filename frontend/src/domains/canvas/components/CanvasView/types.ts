@@ -27,6 +27,7 @@ interface CanvasToolbarProps {
   onAddSticky: () => void;
   onAddText: () => void;
   onAddShape: (shape: ShapeKind) => void;
+  onRunAll: () => void;
 }
 
 export type { CanvasMode, CanvasNodeData, CanvasToolbarProps, CanvasViewProps };

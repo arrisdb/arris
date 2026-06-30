@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
+import { Tooltip } from "@shared/ui";
 import { Icon } from "@shared/ui/Icon";
 import { IconButton } from "@shared/ui/IconButton";
 
@@ -19,6 +20,7 @@ function CanvasToolbar({
   onAddSticky,
   onAddText,
   onAddShape,
+  onRunAll,
 }: CanvasToolbarProps) {
   const [openId, setOpenId] = useState<string | null>(null);
   // Remembers the last option chosen per expandable tool so its main button
@@ -97,26 +99,29 @@ function CanvasToolbar({
         return (
         <div className="mdbc-canvas-tool-group" key={tool.id}>
           {tool.id === "query" && <span className="mdbc-canvas-tool-divider" />}
-          <IconButton
-            icon={displayIcon}
-            label={tool.title}
-            variant={tool.active ? "primary" : "default"}
-            size={18}
-            className="mdbc-canvas-tool"
-            onClick={() => {
-              if (tool.menu) {
-                // Apply the remembered (or default) option AND open the menu so a
-                // different option is one click away.
-                const item = activeItem ?? tool.menu.find((m) => !m.disabled);
-                item?.onSelect();
-                setOpenId(tool.id);
-              } else {
-                setOpenId(null);
-                tool.onClick?.();
-              }
-            }}
-            data-testid={`canvas-tool-${tool.id}`}
-          />
+          <Tooltip label={tool.title}>
+            <IconButton
+              icon={displayIcon}
+              label={tool.title}
+              title=""
+              variant={tool.active ? "primary" : "default"}
+              size={18}
+              className="mdbc-canvas-tool"
+              onClick={() => {
+                if (tool.menu) {
+                  // Apply the remembered (or default) option AND open the menu so a
+                  // different option is one click away.
+                  const item = activeItem ?? tool.menu.find((m) => !m.disabled);
+                  item?.onSelect();
+                  setOpenId(tool.id);
+                } else {
+                  setOpenId(null);
+                  tool.onClick?.();
+                }
+              }}
+              data-testid={`canvas-tool-${tool.id}`}
+            />
+          </Tooltip>
           {tool.menu && (
             <button
               type="button"
@@ -156,6 +161,23 @@ function CanvasToolbar({
         </div>
         );
       })}
+      <div className="mdbc-canvas-tool-group">
+        <span className="mdbc-canvas-tool-divider" />
+        <Tooltip label="Run all queries">
+          <IconButton
+            icon="play"
+            label="Run all queries"
+            title=""
+            size={18}
+            className="mdbc-canvas-tool"
+            onClick={() => {
+              setOpenId(null);
+              onRunAll();
+            }}
+            data-testid="canvas-tool-run-all"
+          />
+        </Tooltip>
+      </div>
     </div>
   );
 }

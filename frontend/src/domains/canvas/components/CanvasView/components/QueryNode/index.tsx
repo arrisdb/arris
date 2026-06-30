@@ -1,6 +1,8 @@
 import { memo, useRef } from "react";
 import type { NodeProps } from "reactflow";
 
+import { DatabaseKindIcon } from "@domains/connection";
+import { useConnectionsStore } from "@domains/connection/hooks";
 import { IconButton } from "@shared/ui/IconButton";
 
 import { useCanvasStore } from "../../../../hooks";
@@ -30,6 +32,9 @@ function QueryNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
     const c = s.boards[tabId]?.doc.components.find((c) => c.id === id);
     return c?.kind === "query" ? c.connectionId : null;
   });
+  const connection = useConnectionsStore((s) =>
+    connectionId ? s.connections.find((c) => c.id === connectionId) ?? null : null,
+  );
   const run = useCanvasStore((s) => s.boards[tabId]?.runs[id]);
   const runQueryComponent = useCanvasStore((s) => s.runQueryComponent);
 
@@ -44,16 +49,25 @@ function QueryNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
       <div className={`mdbc-canvas-node mdbc-canvas-query${selected ? " selected" : ""}`}>
         <div className="mdbc-canvas-node-head">
           <span className="mdbc-canvas-node-title">{title}</span>
-          <IconButton
-            icon="play"
-            label="Run"
-            variant="primary"
-            size={14}
-            loading={run?.running}
-            disabled={run?.running}
-            className="mdbc-canvas-run"
-            onClick={() => void runQueryComponent(tabId, id)}
-          />
+          <div className="mdbc-canvas-node-head-right">
+            {connection && (
+              <span className="mdbc-canvas-conn" title={connection.name}>
+                <DatabaseKindIcon kind={connection.kind} size={14} />
+                <span className="mdbc-canvas-conn-name">{connection.name}</span>
+              </span>
+            )}
+            <span className="mdbc-canvas-head-sep" />
+            <IconButton
+              icon="play"
+              label="Run"
+              variant="primary"
+              size={14}
+              loading={run?.running}
+              disabled={run?.running}
+              className="mdbc-canvas-run"
+              onClick={() => void runQueryComponent(tabId, id)}
+            />
+          </div>
         </div>
         <div ref={hostRef} className="nodrag nowheel mdbc-canvas-sql" />
         <div className="mdbc-canvas-query-status">
