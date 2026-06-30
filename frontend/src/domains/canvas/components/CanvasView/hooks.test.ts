@@ -83,24 +83,6 @@ describe("useCanvas", () => {
     expect(useCanvasStore.getState().boards["tab-1"].doc.components).toHaveLength(2);
   });
 
-  it("connect mode draws an arrow on the second object click and clears between", () => {
-    const store = useCanvasStore.getState();
-    store.ensureBoard("tab-1", "");
-    store.addComponent("tab-1", makeComponent({ kind: "shape", id: "a", shape: "rect" }));
-    store.addComponent("tab-1", makeComponent({ kind: "shape", id: "b", shape: "rect" }));
-    const { result } = renderHook(() => useCanvas(tab));
-    // First click only arms the source; a same-object second click is ignored.
-    act(() => result.current.onConnectNodeClick("a"));
-    act(() => result.current.onConnectNodeClick("a"));
-    expect(useCanvasStore.getState().boards["tab-1"].doc.edges).toHaveLength(0);
-    // Re-arm, then a different target draws the arrow.
-    act(() => result.current.onConnectNodeClick("a"));
-    act(() => result.current.onConnectNodeClick("b"));
-    expect(useCanvasStore.getState().boards["tab-1"].doc.edges).toMatchObject([
-      { source: "a", target: "b" },
-    ]);
-  });
-
   it("removeEdge deletes an arrow by id", () => {
     const store = useCanvasStore.getState();
     store.ensureBoard("tab-1", "");

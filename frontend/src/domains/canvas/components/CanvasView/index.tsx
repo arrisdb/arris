@@ -29,7 +29,6 @@ function CanvasView({ activeTab }: CanvasViewProps) {
   useRegisterCommands({
     canvasMoveTool: { run: () => canvas.setMode("move") },
     canvasHandTool: { run: () => canvas.setMode("hand") },
-    canvasConnectTool: { run: () => canvas.setMode("connect") },
     canvasAddSqlCell: { run: () => canvas.addQuery() },
     canvasAddRectangle: { run: () => canvas.addShape("rect") },
     canvasAddEllipse: { run: () => canvas.addShape("ellipse") },
@@ -49,21 +48,11 @@ function CanvasView({ activeTab }: CanvasViewProps) {
   });
 
   const handMode = canvas.mode === "hand";
-  const connectMode = canvas.mode === "connect";
   const menu = useContextMenu<string>();
   const edgeMenu = useContextMenu<string>();
 
   const onNodeContextMenu = (event: ReactMouseEvent, node: Node) =>
     menu.open(event, node.id);
-
-  // In connect mode, clicking objects draws the arrow (source then target);
-  // otherwise ReactFlow handles normal selection.
-  const onNodeClick = (_event: ReactMouseEvent, node: Node) => {
-    if (connectMode) canvas.onConnectNodeClick(node.id);
-  };
-
-  // Clicking empty space abandons a half-drawn arrow.
-  const onPaneClick = () => canvas.clearConnect();
 
   const onEdgeContextMenu = (event: ReactMouseEvent, edge: Edge) => {
     event.preventDefault();
@@ -82,7 +71,7 @@ function CanvasView({ activeTab }: CanvasViewProps) {
         <Panel id="canvas-board" order={2} minSize={30}>
           <div
             ref={canvas.boardRef}
-            className={`mdbc-canvas-board${handMode ? " hand" : ""}${connectMode ? " connect" : ""}`}
+            className={`mdbc-canvas-board${handMode ? " hand" : ""}`}
           >
             <ReactFlow
               nodes={canvas.rfNodes}
@@ -93,8 +82,6 @@ function CanvasView({ activeTab }: CanvasViewProps) {
               onNodeDragStop={canvas.onNodeDragStop}
               onNodesDelete={canvas.onNodesDelete}
               onNodeContextMenu={onNodeContextMenu}
-              onNodeClick={onNodeClick}
-              onPaneClick={onPaneClick}
               onEdgeContextMenu={onEdgeContextMenu}
               onMoveEnd={canvas.onMoveEnd}
               defaultViewport={canvas.defaultViewport}

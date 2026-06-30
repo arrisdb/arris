@@ -77,7 +77,6 @@ const nodeTypes: NodeTypes = {
 function toFlowNodes(
   components: CanvasComponent[],
   tabId: string,
-  connectingId?: string | null,
 ): Node<CanvasNodeData>[] {
   return components.map((c) => ({
     id: c.id,
@@ -86,8 +85,6 @@ function toFlowNodes(
     data: { tabId },
     // A locked object can't be dragged (the resizer self-hides too).
     draggable: !c.locked,
-    // The pending source object is highlighted while choosing an arrow's target.
-    className: c.id === connectingId ? "mdbc-connect-source" : undefined,
     style: { width: c.w, height: c.h, zIndex: c.z },
   }));
 }

@@ -3,10 +3,10 @@ import type { EditorTab } from "@shell/types";
 import type { ShapeKind } from "../../types";
 
 /// The active pointer tool. `move` selects and drags objects (panning empty
-/// space); `hand` pans the board from anywhere and never drags an object;
-/// `connect` draws a relationship arrow between two objects (click source, then
-/// target).
-type CanvasMode = "move" | "hand" | "connect";
+/// space); `hand` pans the board from anywhere and never drags an object.
+/// Relationship arrows are drawn automatically from cell dependencies, so there
+/// is no manual connect tool.
+type CanvasMode = "move" | "hand";
 
 /// Data carried on every ReactFlow node. Nodes read their live object + run
 /// state from the store by `id` (props.id), so only the owning tab is needed.

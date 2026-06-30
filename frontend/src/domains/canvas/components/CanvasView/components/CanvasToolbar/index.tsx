@@ -54,26 +54,16 @@ function CanvasToolbar({
   const tools: Tool[] = [
     {
       id: "select",
-      icon: mode === "hand" ? "hand" : mode === "connect" ? "arrowRight" : "mousePointer",
+      icon: mode === "hand" ? "hand" : "mousePointer",
       title: "Select",
       active: true,
       onClick: () => onModeChange("move"),
       menu: [
         { id: "move", label: "Move", icon: "mousePointer", action: "canvasMoveTool", active: mode === "move", onSelect: () => onModeChange("move") },
         { id: "hand", label: "Hand tool", icon: "hand", action: "canvasHandTool", active: mode === "hand", onSelect: () => onModeChange("hand") },
-        { id: "connect", label: "Arrow / connect", icon: "arrowRight", action: "canvasConnectTool", active: mode === "connect", onSelect: () => onModeChange("connect") },
       ],
     },
-    {
-      id: "query",
-      icon: "database",
-      title: "Query cell",
-      onClick: onAddQuery,
-      menu: [
-        { id: "sql", label: "SQL", icon: "database", action: "canvasAddSqlCell", active: true, onSelect: onAddQuery },
-        { id: "python", label: "Python", icon: "code", shortcut: "Soon", disabled: true, onSelect: () => {} },
-      ],
-    },
+    { id: "query", icon: "database", title: "Query cell", onClick: onAddQuery },
     { id: "chart", icon: "barChart", title: "Chart", onClick: onAddChart },
     { id: "table", icon: "table", title: "Table", onClick: onAddTable },
     { id: "sticky", icon: "stickyNote", title: "Sticky note", onClick: onAddSticky },
@@ -142,11 +132,10 @@ function CanvasToolbar({
           {tool.menu && openId === tool.id && (
             <div className="mdbc-select-menu mdbc-canvas-tool-menu" role="menu">
               {tool.menu.map((item) => {
-                // A bound item shows its live keymap shortcut; an unbound one
-                // (e.g. the "Soon" placeholder) shows its static label.
+                // Each item shows its live keymap shortcut (so it tracks rebinds).
                 const itemShortcut = item.action
                   ? shortcutDisplay(shortcuts[item.action])
-                  : item.shortcut;
+                  : undefined;
                 return (
                 <div
                   key={item.id}

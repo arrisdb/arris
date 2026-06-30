@@ -36,22 +36,13 @@ function useCanvas(tab: EditorTab) {
   const copyComponent = useCanvasStore((s) => s.copyComponent);
   const pasteComponent = useCanvasStore((s) => s.pasteComponent);
   const reorderComponent = useCanvasStore((s) => s.reorderComponent);
-  const addEdge = useCanvasStore((s) => s.addEdge);
   const removeEdges = useCanvasStore((s) => s.removeEdges);
   const setViewport = useCanvasStore((s) => s.setViewport);
   const runAllQueries = useCanvasStore((s) => s.runAllQueries);
 
-  // While drawing a relationship arrow, the id of the object clicked first (the
-  // arrow's source); the next object clicked becomes its target. A ref mirrors it
-  // so a click handler reads the latest value without a stale closure.
-  const [pendingConnect, setPendingConnect] = useState<string | null>(null);
-  const pendingConnectRef = useRef<string | null>(null);
   // The board pane element, so a freshly added object can be centered in the
   // current viewport (its pixel size is needed to invert ReactFlow's transform).
   const boardRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    pendingConnectRef.current = pendingConnect;
-  }, [pendingConnect]);
 
   // Parse the tab's text into a board exactly once (a re-mount is a no-op).
   useEffect(() => {
@@ -64,8 +55,8 @@ function useCanvas(tab: EditorTab) {
   const edges = board?.doc.edges ?? EMPTY_EDGES;
 
   const flowNodes = useMemo(
-    () => toFlowNodes(components, tabId, pendingConnect),
-    [components, tabId, pendingConnect],
+    () => toFlowNodes(components, tabId),
+    [components, tabId],
   );
   const rfEdges = useMemo(() => toFlowEdges(edges), [edges]);
 
@@ -155,22 +146,6 @@ function useCanvas(tab: EditorTab) {
     [components],
   );
 
-  // Connect mode: the first object clicked is the arrow's source; the next a
-  // different object becomes its target and the arrow is drawn. Clicking the same
-  // object again is ignored (no self-arrows).
-  const onConnectNodeClick = useCallback(
-    (id: string) => {
-      const prev = pendingConnectRef.current;
-      if (!prev) {
-        setPendingConnect(id);
-        return;
-      }
-      if (prev !== id) addEdge(tabId, prev, id);
-      setPendingConnect(null);
-    },
-    [addEdge, tabId],
-  );
-  const clearConnect = useCallback(() => setPendingConnect(null), []);
   const removeEdge = useCallback(
     (id: string) => removeEdges(tabId, [id]),
     [removeEdges, tabId],
@@ -219,14 +194,8 @@ function useCanvas(tab: EditorTab) {
     return () => document.removeEventListener("keydown", onKey);
   }, [tabId, selectedComponent, copyComponent, pasteComponent]);
 
-  // The active pointer tool. `move` drags objects; `hand` pans the board;
-  // `connect` draws relationship arrows.
+  // The active pointer tool. `move` drags objects; `hand` pans the board.
   const [mode, setMode] = useState<CanvasMode>("move");
-
-  // Leaving connect mode abandons any half-drawn arrow.
-  useEffect(() => {
-    if (mode !== "connect") setPendingConnect(null);
-  }, [mode]);
 
   // Place a manually-added object centered in the current viewport (so it's never
   // lost off-screen after panning), cascaded slightly so repeated adds don't stack.
@@ -324,10 +293,7 @@ function useCanvas(tab: EditorTab) {
     componentById,
     update,
     selectedComponent,
-    onConnectNodeClick,
-    clearConnect,
     removeEdge,
-    pendingConnect,
   };
 }
 
