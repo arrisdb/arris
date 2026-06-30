@@ -53,7 +53,13 @@ function ShapeNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
         border: `${style.strokeWidth ?? 1}px solid ${stroke}`,
         borderRadius: shape.shape === "ellipse" ? "50%" : `${radius}px`,
       };
-  const lineCss = { height: `${style.strokeWidth ?? 2}px`, background: stroke };
+  // The rule is drawn as a top border so its line-style (solid/dashed/dotted)
+  // applies; strokeWidth is the border thickness and the div carries no height.
+  const lineCss: CSSProperties = {
+    borderTopWidth: `${style.strokeWidth ?? 2}px`,
+    borderTopStyle: style.lineStyle ?? "solid",
+    borderTopColor: stroke,
+  };
 
   // Drag the radius handle right to round the corners, left to square them.
   // Bounded to half the shorter side (a fully-rounded "stadium"). Adjusts in

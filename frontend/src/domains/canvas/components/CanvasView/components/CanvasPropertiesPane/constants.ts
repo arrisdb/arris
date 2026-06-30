@@ -21,6 +21,13 @@ const STICKY_COLOR_OPTIONS: SelectOption[] = [
   { value: "purple", label: "Purple" },
 ];
 
+/// Line-shape rule styles (mirrors the shared `LineStyle`).
+const LINE_STYLE_OPTIONS: SelectOption[] = [
+  { value: "solid", label: "Solid" },
+  { value: "dashed", label: "Dashed" },
+  { value: "dotted", label: "Dotted" },
+];
+
 /// Default hexes for the shape colour pickers (the renderer's own fallbacks use
 /// non-hex tokens, which a native colour input can't display).
 const DEFAULT_SHAPE_FILL = "#3a3950";
@@ -32,5 +39,6 @@ export {
   DEFAULT_SHAPE_STROKE,
   DEFAULT_TEXT_COLOR,
   KIND_LABEL,
+  LINE_STYLE_OPTIONS,
   STICKY_COLOR_OPTIONS,
 };
