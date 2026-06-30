@@ -32,6 +32,26 @@ describe("serialize", () => {
     expect(parseDoc(dirty).connectionIds).toEqual(["conn-a", "conn-b"]);
   });
 
+  it("roundtrips the chat log and forces pending off on load", () => {
+    const text = JSON.stringify({
+      version: CANVAS_DOC_VERSION,
+      components: [],
+      edges: [],
+      chat: [
+        { id: "u1", role: "user", text: "monthly sales" },
+        // A persisted entry should never be mid-stream, but force pending off so a
+        // stray one can't read as stuck after a reload.
+        { id: "a1", role: "agent", text: "done", action: "Added query", pending: true },
+        { bad: true },
+      ],
+    });
+    const doc = parseDoc(text);
+    expect(doc.chat).toEqual([
+      { id: "u1", role: "user", text: "monthly sales", pending: false },
+      { id: "a1", role: "agent", text: "done", action: "Added query", pending: false },
+    ]);
+  });
+
   it("returns an empty doc for blank text", () => {
     expect(parseDoc("")).toEqual(emptyDoc());
     expect(parseDoc("   ")).toEqual(emptyDoc());

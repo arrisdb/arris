@@ -326,4 +326,35 @@ describe("useCanvasStore", () => {
     const tables = get().boards[TAB].doc.components.filter((c) => c.kind === "table");
     expect(tables).toHaveLength(1);
   });
+
+  it("setChat persists the chat log into the doc", () => {
+    get().ensureBoard(TAB, "");
+    get().setChat(TAB, [
+      { id: "u1", role: "user", text: "hi" },
+      { id: "a1", role: "agent", text: "done", action: "Added query" },
+    ]);
+    expect(get().boards[TAB].doc.chat).toEqual([
+      { id: "u1", role: "user", text: "hi" },
+      { id: "a1", role: "agent", text: "done", action: "Added query" },
+    ]);
+  });
+
+  it("clearChat empties the persisted chat log", () => {
+    get().ensureBoard(TAB, "");
+    get().setChat(TAB, [{ id: "u1", role: "user", text: "hi" }]);
+    get().clearChat(TAB);
+    expect(get().boards[TAB].doc.chat).toEqual([]);
+  });
+
+  it("writing chat keeps the components/edges array references stable", () => {
+    // Board nodes subscribe to `doc.components`/`doc.edges`; writing chat must not
+    // swap those arrays, or every node would needlessly re-render per token.
+    get().ensureBoard(TAB, "");
+    get().addComponent(TAB, makeComponent({ kind: "text", id: "t", text: "x" }));
+    const beforeComps = get().boards[TAB].doc.components;
+    const beforeEdges = get().boards[TAB].doc.edges;
+    get().setChat(TAB, [{ id: "u1", role: "user", text: "hi" }]);
+    expect(get().boards[TAB].doc.components).toBe(beforeComps);
+    expect(get().boards[TAB].doc.edges).toBe(beforeEdges);
+  });
 });

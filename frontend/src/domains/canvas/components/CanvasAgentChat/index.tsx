@@ -1,5 +1,14 @@
 import { useState } from "react";
-import { ChatBubble, ChatEmpty, ChatInput, ChatTyping, MultiSelect, Spinner } from "@shared/ui";
+import {
+  ChatBubble,
+  ChatEmpty,
+  ChatInput,
+  ChatTyping,
+  IconButton,
+  MultiSelect,
+  Spinner,
+  Tooltip,
+} from "@shared/ui";
 import { Icon } from "@shared/ui/Icon";
 import { AgentProviderSelect } from "@domains/agent";
 import { markdownToHtml } from "@domains/editor";
@@ -19,6 +28,7 @@ function CanvasAgentChat({ tab }: CanvasAgentChatProps) {
     answerQuestion,
     buildContext,
     cancel,
+    clearChat,
     connectionId,
     connectionIds,
     connectionOptions,
@@ -37,6 +47,18 @@ function CanvasAgentChat({ tab }: CanvasAgentChatProps) {
       <div className="mdbc-pane-header">
         <span className="mdbc-pane-title">AGENT</span>
         <AgentProviderSelect />
+        {entries.length > 0 ? (
+          <Tooltip label="Clear conversation">
+            <IconButton
+              icon="trash"
+              label="Clear conversation"
+              variant="ghost"
+              size={14}
+              className="mdbc-canvas-chat-clear"
+              onClick={clearChat}
+            />
+          </Tooltip>
+        ) : null}
       </div>
       <div className="mdbc-canvas-chat-conn">
         <span className="mdbc-canvas-chat-conn-label">Connection</span>
