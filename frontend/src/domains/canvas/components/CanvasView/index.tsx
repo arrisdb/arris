@@ -65,7 +65,10 @@ function CanvasView({ activeTab }: CanvasViewProps) {
     <div className="mdbc-canvas-view">
       <PanelGroup className="mdbc-canvas-panels" id="canvas-horizontal" direction="horizontal">
         <Panel id="canvas-agent" order={1} defaultSize={18} minSize={12} maxSize={40}>
-          <CanvasAgentChat tab={activeTab} />
+          {/* Key by tab id so each canvas gets its own chat instance: switching
+              to or creating a canvas remounts the panel with that board's chat
+              instead of carrying over the previous board's conversation. */}
+          <CanvasAgentChat key={activeTab.id} tab={activeTab} />
         </Panel>
         <PanelResizeHandle className="mdbc-canvas-pane-resizer" />
         <Panel id="canvas-board" order={2} minSize={30}>
