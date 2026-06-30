@@ -224,7 +224,14 @@ describe("useCanvasAgentChat", () => {
     expect(board.doc.components).toHaveLength(3);
     expect(vi.mocked(runCanvasCellIPC)).toHaveBeenCalledWith(TAB, "q1", expect.any(Array));
     expect(result.current.streaming).toBe(false);
-    expect(result.current.entries.at(-1)?.text).toMatch(/Added 3 objects/);
+    // The prose reply and the action it took are separate fields: the bubble keeps
+    // the prose; the explicit, object-naming summary rides on `action`.
+    const last = result.current.entries.at(-1);
+    expect(last?.text).toBe("Building it now.");
+    expect(last?.action).toMatch(/Added/);
+    expect(last?.action).toContain("query");
+    expect(last?.action).toContain("bar chart");
+    expect(last?.action).toContain("text note");
   });
 
   it("ignores events from a different turn", () => {

@@ -29,6 +29,10 @@ interface ChatEntry {
   role: ChatRole;
   text: string;
   pending?: boolean;
+  /// The board change the agent made this turn (added/updated/removed objects),
+  /// kept separate from `text` so the reply prose and the action it took render
+  /// with their own fixed styling instead of running together.
+  action?: string;
   question?: AgentQuestion;
   answered?: boolean;
 }

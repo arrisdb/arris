@@ -39,6 +39,9 @@
   flex-direction: column;
   gap: 14px;
   padding: 12px 10px;
+  /* The app body sets `user-select: none` so canvas/list drags never select
+     text; re-enable it here so the user can select and copy (Cmd+C) a reply. */
+  user-select: text;
 }
 
 /* Rows keep their natural height; never let the column flex compress a tall SQL
