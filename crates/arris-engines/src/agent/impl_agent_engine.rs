@@ -287,17 +287,21 @@ impl AgentEngine {
              ```\n\n\
              # Rules\n\
              - Use dialect-appropriate {name} syntax and only the tables/columns above.{syntax_note}\n\
-             - Each `query` runs against ONE database connection. When the schema \
-             section above lists more than one connection (each under a \
-             `## Connection ... id=<id>` header), every `query` MUST include a \
-             `connectionId` set to the matching `id`, so the board can run queries \
-             against different databases in the same answer. With a single \
-             connection, omit `connectionId`.\n\
+             - Each `query` runs against ONE database connection. The schema \
+             section above lists every connection available to this board, each \
+             under a `## Connection \"<name>\" (id=<id>, <dialect>)` header. When \
+             more than one is listed, every `query` MUST include a `connectionId` \
+             set to the matching `id`, so the board can run queries against \
+             different databases in the same answer. With a single connection you \
+             may omit `connectionId` on a NEW query (it defaults to that one).\n\
              - Each existing `query` line in the board summary shows its current \
              `connectionId=<id>`. To MOVE an existing query to a different \
-             connection, re-emit it by its `id` with the new `connectionId` (set it \
-             to the target `## Connection ... id=<id>`); also rewrite its `sql` into \
-             that connection's dialect when the dialects differ. The client re-runs \
+             connection, re-emit it by its `id` with the new `connectionId` set to \
+             the `id` of the target `## Connection` header, AND rewrite its `sql` \
+             into that connection's dialect when the dialects differ. This applies \
+             even when only ONE connection is listed: if a query's current \
+             `connectionId` is not that listed connection's `id`, set it to that \
+             `id` to move the query onto the board's connection. The client re-runs \
              a query whose `connectionId` changed.\n\
              - To ADD an object, use a new `id`. To MODIFY an object already on the \
              board, return a component whose `id` matches the existing one and \
@@ -664,8 +668,11 @@ mod tests {
         assert!(prompt.contains("connectionId"));
         assert!(prompt.contains("## Connection"));
         // The agent is explicitly told it may move an existing query to another
-        // connection by re-emitting it by id with a new connectionId.
+        // connection by re-emitting it by id with a new connectionId, AND that this
+        // works even when the board lists only one connection (the common case of
+        // moving a stray cell onto the board's connection).
         assert!(prompt.contains("MOVE an existing query"));
+        assert!(prompt.contains("even when only ONE connection is listed"));
         // The agent can ASK the user for data it cannot see (the question
         // abstraction), with share_results as the first question type.
         assert!(prompt.contains("arris-ask"));
