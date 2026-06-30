@@ -31,8 +31,14 @@ interface CanvasStore {
     patch: Partial<CanvasComponent>,
   ) => void;
   removeComponent: (tabId: string, id: string) => void;
-  /// Clone an object (new id, offset, raised to the top) and append it.
-  duplicateComponent: (tabId: string, id: string) => void;
+  /// A snapshot of an object placed on the in-app clipboard by Copy (⌘C), for a
+  /// later Paste (⌘V). Held in memory, not the OS clipboard; never serialized.
+  clipboard: CanvasComponent | null;
+  /// Copy one object onto the clipboard.
+  copyComponent: (tabId: string, id: string) => void;
+  /// Paste the clipboard object into a board as a new object (new id, offset,
+  /// raised to the top). No-op when the clipboard is empty.
+  pasteComponent: (tabId: string) => void;
   /// Restack an object relative to its peers (Bring to front / forward, etc.).
   reorderComponent: (tabId: string, id: string, op: ReorderOp) => void;
   setEdges: (tabId: string, edges: CanvasEdge[]) => void;
@@ -97,6 +103,7 @@ function withDoc(
 
 const useCanvasStore = create<CanvasStore>((set, get) => ({
   boards: {},
+  clipboard: null,
 
   ensureBoard: (tabId, text) =>
     set((s) =>
@@ -145,11 +152,17 @@ const useCanvasStore = create<CanvasStore>((set, get) => ({
       };
     }),
 
-  duplicateComponent: (tabId, id) =>
+  copyComponent: (tabId, id) =>
     set((s) => {
+      const src = s.boards[tabId]?.doc.components.find((c) => c.id === id);
+      return src ? { clipboard: { ...src } } : s;
+    }),
+
+  pasteComponent: (tabId) =>
+    set((s) => {
+      const src = s.clipboard;
       const board = s.boards[tabId];
-      const src = board?.doc.components.find((c) => c.id === id);
-      if (!board || !src) return s;
+      if (!src || !board) return s;
       const maxZ = board.doc.components.reduce((m, c) => Math.max(m, c.z), 0);
       const clone = {
         ...src,

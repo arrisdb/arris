@@ -85,9 +85,11 @@ function CanvasView({ activeTab }: CanvasViewProps) {
           x={menu.state.x}
           y={menu.state.y}
           items={buildNodeMenuItems(menuComponent, {
-            duplicate: canvas.duplicate,
+            copy: canvas.copy,
+            paste: canvas.paste,
             reorder: canvas.reorder,
             toggleLock: canvas.toggleLock,
+            remove: canvas.remove,
           })}
           onClose={menu.close}
           data-testid="canvas-node-menu"

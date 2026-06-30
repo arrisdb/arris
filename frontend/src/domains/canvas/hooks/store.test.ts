@@ -12,7 +12,7 @@ const get = () => useCanvasStore.getState();
 
 describe("useCanvasStore", () => {
   beforeEach(() => {
-    useCanvasStore.setState({ boards: {} });
+    useCanvasStore.setState({ boards: {}, clipboard: null });
     vi.clearAllMocks();
   });
 
@@ -113,19 +113,27 @@ describe("useCanvasStore", () => {
     expect(board.runs.q1).toBeUndefined();
   });
 
-  it("duplicateComponent clones with a new id, an offset, and raised z", () => {
+  it("copy then paste clones with a new id, an offset, and raised z", () => {
     get().ensureBoard(TAB, "");
     get().addComponent(
       TAB,
       makeComponent({ kind: "shape", id: "s", shape: "rect", x: 10, y: 20, z: 0 }),
     );
-    get().duplicateComponent(TAB, "s");
+    get().copyComponent(TAB, "s");
+    get().pasteComponent(TAB);
     const comps = get().boards[TAB].doc.components;
     expect(comps).toHaveLength(2);
     const clone = comps[1];
     expect(clone.id).not.toBe("s");
     expect(clone).toMatchObject({ kind: "shape", x: 34, y: 44 });
     expect(clone.z).toBeGreaterThan(comps[0].z);
+  });
+
+  it("pasteComponent is a no-op when the clipboard is empty", () => {
+    get().ensureBoard(TAB, "");
+    get().addComponent(TAB, makeComponent({ kind: "shape", id: "s", shape: "rect" }));
+    get().pasteComponent(TAB);
+    expect(get().boards[TAB].doc.components).toHaveLength(1);
   });
 
   it("reorderComponent restacks objects by z", () => {

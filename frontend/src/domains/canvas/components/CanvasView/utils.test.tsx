@@ -41,20 +41,28 @@ describe("toFlowNodes", () => {
 });
 
 describe("buildNodeMenuItems", () => {
-  const actions = { duplicate: vi.fn(), reorder: vi.fn(), toggleLock: vi.fn() };
+  const actions = {
+    copy: vi.fn(),
+    paste: vi.fn(),
+    reorder: vi.fn(),
+    toggleLock: vi.fn(),
+    remove: vi.fn(),
+  };
 
-  it("offers copy, the four restacking steps, and a lock toggle", () => {
+  it("offers copy/paste, the four restacking steps, a lock toggle, and delete", () => {
     const c = makeComponent({ kind: "shape", id: "s", shape: "rect" });
     const labels = buildNodeMenuItems(c, actions).flatMap((i) =>
       i.kind === "separator" ? [] : [i.label],
     );
     expect(labels).toEqual([
       "Copy",
+      "Paste",
       "Bring to front",
       "Bring forward",
       "Send backward",
       "Send to back",
       "Lock",
+      "Delete",
     ]);
   });
 
@@ -74,11 +82,15 @@ describe("buildNodeMenuItems", () => {
       if (item && item.kind !== "separator") item.action();
     };
     run("copy");
+    run("paste");
     run("front");
     run("lock");
-    expect(actions.duplicate).toHaveBeenCalledWith("s");
+    run("delete");
+    expect(actions.copy).toHaveBeenCalledWith("s");
+    expect(actions.paste).toHaveBeenCalled();
     expect(actions.reorder).toHaveBeenCalledWith("s", "front");
     expect(actions.toggleLock).toHaveBeenCalledWith("s");
+    expect(actions.remove).toHaveBeenCalledWith("s");
   });
 });
 
