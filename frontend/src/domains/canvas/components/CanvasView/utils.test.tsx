@@ -5,6 +5,7 @@ import {
   buildEdgeMenuItems,
   buildNodeMenuItems,
   COMPONENT_KINDS,
+  hasActiveTextSelection,
   nodeTypes,
   toFlowEdges,
   toFlowNodes,
@@ -114,5 +115,26 @@ describe("buildEdgeMenuItems", () => {
       item.action();
     }
     expect(remove).toHaveBeenCalledWith("e1");
+  });
+});
+
+describe("hasActiveTextSelection", () => {
+  it("is false with no selection or a collapsed caret", () => {
+    window.getSelection()?.removeAllRanges();
+    expect(hasActiveTextSelection()).toBe(false);
+  });
+
+  it("is true once real text is selected (so ⌘C copies text, not the node)", () => {
+    const p = document.createElement("p");
+    p.textContent = "an agent reply";
+    document.body.appendChild(p);
+    const range = document.createRange();
+    range.selectNodeContents(p);
+    const sel = window.getSelection();
+    sel?.removeAllRanges();
+    sel?.addRange(range);
+    expect(hasActiveTextSelection()).toBe(true);
+    sel?.removeAllRanges();
+    document.body.removeChild(p);
   });
 });

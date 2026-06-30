@@ -163,11 +163,21 @@ function buildEdgeMenuItems(
   ];
 }
 
+/// True when the user has a real (non-collapsed, non-empty) text selection in
+/// the document. The board's ⌘C shortcut clones the selected object, but when
+/// the user has actually selected text (e.g. an agent reply in the side chat),
+/// ⌘C must fall through to the browser's native copy instead.
+function hasActiveTextSelection(): boolean {
+  const sel = window.getSelection();
+  return Boolean(sel && !sel.isCollapsed && sel.toString().trim().length > 0);
+}
+
 export {
   buildEdgeMenuItems,
   buildNodeMenuItems,
   COMPONENT_KINDS,
   edgeTypes,
+  hasActiveTextSelection,
   nodeTypes,
   toFlowEdges,
   toFlowNodes,
