@@ -268,6 +268,7 @@ fn main() {
             cmd_agent_send,
             cmd_agent_check,
             cmd_agent_cancel,
+            cmd_agent_schema_context,
             cmd_python_list_interpreters,
             cmd_python_add_interpreter,
             cmd_python_create_venv,

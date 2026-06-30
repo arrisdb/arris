@@ -4,22 +4,6 @@
    extras (header chips/model/info, tool cards, SQL blocks, share/result cards)
    live here. */
 
-/* Info hint next to the pane title: clarifies the Codex subscription need. */
-.mdbc-agent-info {
-  margin-left: 5px;
-  font-size: var(--m-fs-xs);
-  color: var(--m-fg-4);
-  cursor: help;
-}
-
-/* Active provider + model (e.g. "Codex · gpt-5.5"), shown right of the title. */
-.mdbc-agent-model {
-  margin-left: auto;
-  font-size: var(--m-fs-xs);
-  color: var(--m-fg);
-  font-family: var(--m-font-mono);
-}
-
 /* Context chips */
 .mdbc-agent-chips {
   display: flex;
@@ -181,6 +165,16 @@
   font-size: var(--m-fs-xs, 11px);
   white-space: pre;
   border-top: 0.5px solid var(--m-sep);
+}
+
+/* "+ Add results" picker: attaches a recent run's result as a context chip. Sits
+   to the right of the model label, before the Clear button. */
+.mdbc-agent-addresults {
+  margin-left: auto;
+}
+
+.mdbc-agent-addresults .mdbc-select {
+  min-width: 0;
 }
 
 /* Clear sits at the far right of the header, after the model label. */

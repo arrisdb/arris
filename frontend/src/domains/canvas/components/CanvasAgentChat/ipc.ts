@@ -17,6 +17,8 @@ interface CanvasAgentEventEnvelope {
 }
 
 interface SendCanvasAgentArgs {
+  /// The agent CLI to run (Codex or Claude), chosen in the chat header.
+  provider: "codex" | "claude";
   connectionId: string | null;
   prompt: string;
   /// A compact summary of the objects already on the board, so the agent can
@@ -26,12 +28,12 @@ interface SendCanvasAgentArgs {
   resumeSession: string | null;
 }
 
-/// Start one canvas-profile agent turn (Claude). The backend injects the
-/// connection's schema, the current board, and the arris-canvas contract, then
-/// streams `agent-event`s.
+/// Start one canvas-profile agent turn with the chosen provider. The backend
+/// injects the connection's schema, the current board, and the arris-canvas
+/// contract, then streams `agent-event`s.
 function sendCanvasAgentIPC(args: SendCanvasAgentArgs): Promise<void> {
   return invoke("cmd_agent_send", {
-    provider: "claude",
+    provider: args.provider,
     profile: "canvas",
     connectionId: args.connectionId,
     prompt: args.prompt,
@@ -45,11 +47,23 @@ function cancelCanvasAgentIPC(turnId: string): Promise<void> {
   return invoke("cmd_agent_cancel", { turnId });
 }
 
+/// Fetch the schema DDL the agent would receive for a connection (the same
+/// deep-loaded snapshot a turn inlines), so the chat can show a "fetching
+/// schema" indicator and preview the exact context.
+function fetchCanvasSchemaContextIPC(connectionId: string): Promise<string> {
+  return invoke("cmd_agent_schema_context", { connectionId });
+}
+
 function listenCanvasAgentEventsIPC(
   handler: (event: CanvasAgentEventEnvelope) => void,
 ): Promise<UnlistenFn> {
   return listen<CanvasAgentEventEnvelope>("agent-event", (evt) => handler(evt.payload));
 }
 
-export { cancelCanvasAgentIPC, listenCanvasAgentEventsIPC, sendCanvasAgentIPC };
+export {
+  cancelCanvasAgentIPC,
+  fetchCanvasSchemaContextIPC,
+  listenCanvasAgentEventsIPC,
+  sendCanvasAgentIPC,
+};
 export type { CanvasAgentEventEnvelope };

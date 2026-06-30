@@ -1,4 +1,4 @@
-import { act, renderHook } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { EditorTab } from "@shell/types";
 
@@ -9,6 +9,7 @@ const hoisted = vi.hoisted(() => ({
 vi.mock("./ipc", () => ({
   sendCanvasAgentIPC: vi.fn().mockResolvedValue(undefined),
   cancelCanvasAgentIPC: vi.fn().mockResolvedValue(undefined),
+  fetchCanvasSchemaContextIPC: vi.fn().mockResolvedValue("CREATE TABLE public.orders ();"),
   listenCanvasAgentEventsIPC: vi.fn((h: (e: unknown) => void) => {
     hoisted.handler = h;
     return Promise.resolve(() => {});
@@ -19,10 +20,18 @@ vi.mock("../../ipc", () => ({
   runCanvasQueryIPC: vi.fn().mockResolvedValue({ columns: [], rows: [], elapsed: 0 }),
 }));
 
+import { useConnectionsStore } from "@domains/connection/hooks";
+import { useTabsStore } from "@shell/hooks/tabsStore";
 import { runCanvasQueryIPC } from "../../ipc";
 import { useCanvasStore } from "../../hooks";
+import { makeComponent } from "../../utils";
 import { sendCanvasAgentIPC } from "./ipc";
 import { useCanvasAgentChat } from "./hooks";
+
+const queryResult = {
+  columns: [{ name: "category", type_hint: "text" }],
+  rows: [[{ kind: "text", value: "Books" }]],
+} as never;
 
 const TAB = "tab-1";
 const withConn = { id: TAB, text: "", connectionId: "conn-1" } as unknown as EditorTab;
@@ -39,8 +48,69 @@ describe("useCanvasAgentChat", () => {
   beforeEach(() => {
     useCanvasStore.setState({ boards: {} });
     useCanvasStore.getState().ensureBoard(TAB, "");
+    useConnectionsStore.setState({ connections: [], selectedId: null });
     vi.clearAllMocks();
     hoisted.handler = null;
+  });
+
+  it("fetches the schema context for the connection and previews it with the board", async () => {
+    const { result } = renderHook(() => useCanvasAgentChat(withConn));
+    await waitFor(() => expect(result.current.schemaLoading).toBe(false));
+    const ctx = result.current.buildContext();
+    expect(ctx).toContain("CREATE TABLE public.orders");
+    expect(ctx).toContain("# Database schema");
+    expect(ctx).toContain("# Current board");
+  });
+
+  it("attaches a query object's result and sends it ahead of the prompt", () => {
+    useCanvasStore
+      .getState()
+      .addComponent(TAB, makeComponent({ kind: "query", id: "q1", sql: "select 1", connectionId: "conn-1", title: "Monthly sales" }));
+    useCanvasStore.getState().setRun(TAB, "q1", { running: false, result: queryResult });
+
+    const { result } = renderHook(() => useCanvasAgentChat(withConn));
+    expect(result.current.resultOptions).toEqual([
+      { value: "q1", label: "Monthly sales · 1×1" },
+    ]);
+
+    act(() => result.current.attachResult("q1"));
+    expect(result.current.attachments).toHaveLength(1);
+    expect(result.current.attachments[0].label).toBe("Monthly sales · 1×1");
+
+    act(() => result.current.send("describe the trend"));
+    const prompt = vi.mocked(sendCanvasAgentIPC).mock.calls[0][0].prompt;
+    expect(prompt).toContain("# Results: Monthly sales");
+    expect(prompt).toContain("category (text)");
+    expect(prompt).toContain("describe the trend");
+    // The chips clear after the message is dispatched.
+    expect(result.current.attachments).toHaveLength(0);
+  });
+
+  it("removes an attached result", () => {
+    useCanvasStore
+      .getState()
+      .addComponent(TAB, makeComponent({ kind: "query", id: "q1", sql: "select 1", connectionId: "conn-1" }));
+    useCanvasStore.getState().setRun(TAB, "q1", { running: false, result: queryResult });
+    const { result } = renderHook(() => useCanvasAgentChat(withConn));
+    act(() => result.current.attachResult("q1"));
+    const id = result.current.attachments[0].id;
+    act(() => result.current.removeAttachment(id));
+    expect(result.current.attachments).toHaveLength(0);
+  });
+
+  it("exposes the connections as options and binds the picked one to the tab", () => {
+    useConnectionsStore.setState({
+      connections: [{ id: "conn-1", name: "Sales DB", isConnected: true }],
+    } as never);
+    const updateTab = vi.spyOn(useTabsStore.getState(), "updateTab");
+    const selectConnection = vi.spyOn(useConnectionsStore.getState(), "selectConnection");
+
+    const { result } = renderHook(() => useCanvasAgentChat(noConn));
+    expect(result.current.connectionOptions).toEqual([{ value: "conn-1", label: "Sales DB" }]);
+
+    act(() => result.current.pickConnection("conn-1"));
+    expect(selectConnection).toHaveBeenCalledWith("conn-1");
+    expect(updateTab).toHaveBeenCalledWith(TAB, { connectionId: "conn-1" });
   });
 
   it("dispatches a canvas turn and shows a user + pending agent entry", () => {

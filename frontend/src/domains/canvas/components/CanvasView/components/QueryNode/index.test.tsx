@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { ReactFlowProvider } from "reactflow";
 import type { NodeProps } from "reactflow";
+import { EditorView } from "@codemirror/view";
 
 import { useCanvasStore } from "../../../../hooks";
 import { makeComponent } from "../../../../utils";
@@ -31,16 +32,35 @@ function renderNode(id: string) {
 describe("QueryNode", () => {
   beforeEach(() => useCanvasStore.setState({ boards: {} }));
 
-  it("renders the SQL and writes edits back to the store", () => {
+  it("mounts a CodeMirror editor seeded with the object's SQL", () => {
     seed(makeComponent({ kind: "query", id: "q", sql: "select 1", connectionId: "c" }));
-    renderNode("q");
-    const input = screen.getByPlaceholderText("SELECT …") as HTMLTextAreaElement;
-    expect(input.value).toBe("select 1");
-    fireEvent.change(input, { target: { value: "select 2" } });
+    const { container } = renderNode("q");
+    const editor = container.querySelector(".cm-editor");
+    expect(editor).toBeTruthy();
+    // drawSelection() draws CodeMirror's own caret layer; without it the caret
+    // lags after programmatic edits (see the embedded-editor lesson).
+    expect(container.querySelector(".cm-cursorLayer")).toBeTruthy();
+    expect(container.querySelector(".cm-content")?.textContent).toContain("select 1");
+  });
+
+  it("writes editor edits back to the store", () => {
+    seed(makeComponent({ kind: "query", id: "q", sql: "select 1", connectionId: "c" }));
+    const { container } = renderNode("q");
+    const view = EditorView.findFromDOM(container.querySelector(".cm-content") as HTMLElement);
+    expect(view).toBeTruthy();
+    view!.dispatch({ changes: { from: 0, to: view!.state.doc.length, insert: "select 2" } });
     expect(useCanvasStore.getState().boards[TAB].doc.components[0]).toMatchObject({
       kind: "query",
       sql: "select 2",
     });
+  });
+
+  it("syncs an external SQL rewrite into the editor", () => {
+    seed(makeComponent({ kind: "query", id: "q", sql: "select 1", connectionId: "c" }));
+    const { container } = renderNode("q");
+    useCanvasStore.getState().updateComponent(TAB, "q", { sql: "select 42" });
+    const view = EditorView.findFromDOM(container.querySelector(".cm-content") as HTMLElement);
+    expect(view!.state.doc.toString()).toBe("select 42");
   });
 
   it("Run surfaces an error when the object has no connection", async () => {

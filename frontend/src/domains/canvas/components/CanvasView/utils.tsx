@@ -1,4 +1,5 @@
-import type { Edge, Node, NodeTypes } from "reactflow";
+import type { ComponentType } from "react";
+import type { Edge, Node, NodeProps, NodeTypes } from "reactflow";
 import type { ContextMenuItem } from "@shared/ui/ContextMenu";
 
 import type {
@@ -8,11 +9,28 @@ import type {
   ReorderOp,
 } from "../../types";
 import { ChartNode } from "./components/ChartNode";
+import { NodeBoundary } from "./components/NodeBoundary";
 import { QueryNode } from "./components/QueryNode";
 import { ShapeNode } from "./components/ShapeNode";
 import { StickyNode } from "./components/StickyNode";
 import { TextNode } from "./components/TextNode";
 import type { CanvasNodeData } from "./types";
+
+/// Wrap a node renderer in the per-object error boundary so a render error in one
+/// object (e.g. a chart fed a malformed spec) is contained to that object instead
+/// of crashing the whole board.
+function withNodeBoundary(
+  NodeComponent: ComponentType<NodeProps<CanvasNodeData>>,
+): ComponentType<NodeProps<CanvasNodeData>> {
+  function BoundedNode(props: NodeProps<CanvasNodeData>) {
+    return (
+      <NodeBoundary>
+        <NodeComponent {...props} />
+      </NodeBoundary>
+    );
+  }
+  return BoundedNode;
+}
 
 /// Every object kind, in render order. The single list the registry-completeness
 /// guard checks against; adding a kind means adding it here and to `nodeTypes`.
@@ -22,11 +40,11 @@ const COMPONENT_KINDS: ComponentKind[] = ["text", "sticky", "query", "chart", "s
 /// kind. This is the extension seam (mirrors the chart RendererRegistry): a new
 /// kind is wired by adding one entry here.
 const nodeTypes: NodeTypes = {
-  text: TextNode,
-  sticky: StickyNode,
-  query: QueryNode,
-  chart: ChartNode,
-  shape: ShapeNode,
+  text: withNodeBoundary(TextNode),
+  sticky: withNodeBoundary(StickyNode),
+  query: withNodeBoundary(QueryNode),
+  chart: withNodeBoundary(ChartNode),
+  shape: withNodeBoundary(ShapeNode),
 };
 
 /// Map board objects to ReactFlow nodes. Position/size/z come from the object;

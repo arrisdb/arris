@@ -45,4 +45,30 @@ describe("serialize", () => {
     expect(doc.components).toHaveLength(1);
     expect(doc.edges).toHaveLength(1);
   });
+
+  it("heals a persisted chart spec missing yColumns on load", () => {
+    const text = JSON.stringify({
+      version: CANVAS_DOC_VERSION,
+      components: [
+        {
+          id: "c",
+          kind: "chart",
+          x: 0,
+          y: 0,
+          w: 4,
+          h: 4,
+          z: 0,
+          sourceQueryId: "q",
+          // A spec a prior agent turn left without yColumns would crash the renderer.
+          spec: { kind: "bar", xColumn: "m" },
+        },
+      ],
+      edges: [],
+    });
+    const doc = parseDoc(text);
+    const chart = doc.components[0] as { spec: { yColumns: string[]; xColumn: string } };
+    expect(Array.isArray(chart.spec.yColumns)).toBe(true);
+    expect(chart.spec.yColumns).toEqual([]);
+    expect(chart.spec.xColumn).toBe("m");
+  });
 });

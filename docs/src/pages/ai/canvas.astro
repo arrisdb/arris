@@ -52,7 +52,8 @@ import DocTable from "../../components/docs/DocTable/DocTable.astro";
     tab bar, or run the <strong>New Canvas</strong> command from the keymap. A canvas opens as a
     center tab, just like a query or a notebook, and you can rename it. The board inherits the
     connection that is currently selected, so its query objects and the agent both target that
-    database; pick a connection before creating the canvas if you want a specific one.
+    database. You can also set or change it any time from the <strong>Connection</strong> picker at
+    the top of the agent panel; the choice is board-wide, shared by the agent and every query object.
   </p>
 
   <h2 id="objects">Objects</h2>
@@ -68,8 +69,10 @@ import DocTable from "../../components/docs/DocTable/DocTable.astro";
       <tr>
         <td class="font-medium text-fg">Query</td>
         <td>
-          Holds one SQL statement with a <strong>Run</strong> button and a compact result grid. It
-          runs against the canvas's connection, the same engine the editor uses.
+          Holds one SQL statement with a <strong>Run</strong> button and a compact result grid. Its
+          editor is the same CodeMirror as the main SQL editor, so you get the connection's dialect
+          highlighting and schema-aware table and column autocomplete. It runs against the canvas's
+          connection, the same engine the editor uses.
         </td>
       </tr>
       <tr>
@@ -109,8 +112,10 @@ import DocTable from "../../components/docs/DocTable/DocTable.astro";
   </p>
 
   <p>
-    The agent uses Anthropic's <strong>Claude CLI</strong> (<code>claude -p</code>) under the same
-    guardrails as the SQL agent: it runs locally in a read-only mode, never touches your filesystem,
+    Pick the provider in the chat header, the same <strong>Codex</strong> or <strong>Claude</strong>
+    choice as the SQL agent (it is one shared preference). The agent runs that provider's local CLI
+    under the same guardrails as the SQL agent: it runs locally in a read-only mode, never touches
+    your filesystem,
     and only receives your prompt, the connection's <strong>schema as DDL</strong> and dialect, and a
     short summary of the objects already on the board (their kinds, ids, titles, and SQL), all capped
     in size. Your row data is not sent. Because the agent needs the schema to write correct SQL, the
@@ -118,12 +123,28 @@ import DocTable from "../../components/docs/DocTable/DocTable.astro";
   </p>
 
   <p>
+    When you pick a connection, the panel shows a <strong>fetching schema</strong> indicator while it
+    reads the database's tables and columns (the same deep read the schema browser does, not just the
+    table names). The <strong>Context</strong> button previews the exact text handed to the agent: the
+    schema DDL plus the current board summary, so you can see what it is working from.
+  </p>
+
+  <p>
     Because each turn sees the current board, follow-up messages refine it in place rather than only
     piling on new objects. The agent can <strong>add</strong> any object kind (a query, chart, text
     block, sticky note, or shape), <strong>modify</strong> one that is already there (re-spec a chart
-    as a line chart, rewrite a query, retitle an object), or <strong>remove</strong> objects you no
-    longer want. A query the agent adds or changes runs automatically, and any chart bound to it
-    updates.
+    as a line chart, restyle it (set axis bounds, toggle the legend, change colours), rewrite a
+    query, retitle an object), or <strong>remove</strong> objects you no longer want. A query the
+    agent adds or changes runs automatically, and any chart bound to it updates.
+  </p>
+
+  <p>
+    The agent sees your schema and the board, but not the rows a query returned, unless you share
+    them. When a query object on the board has results, an <strong>Add results</strong> picker
+    appears in the chat header listing those queries; pick one and Arris attaches its result as a
+    removable chip above the input. Your next message sends those rows along, so the agent can write
+    commentary or follow-up queries grounded in the real data. Sharing is never automatic: nothing
+    leaves until you attach it and send.
   </p>
 
   <h2 id="board">Working on the board</h2>

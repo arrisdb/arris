@@ -51,10 +51,15 @@ interface CanvasStore {
   removeBoard: (tabId: string) => void;
 }
 
-/// Normalize any thrown value into a readable message.
+/// Normalize any thrown value into a readable message. Tauri rejects IPC with a
+/// plain `{ code, message }` object (not an Error), so pull `message` out rather
+/// than stringifying the object into a useless "[object Object]".
 function errToString(err: unknown): string {
   if (typeof err === "string") return err;
   if (err instanceof Error) return err.message;
+  if (err && typeof err === "object" && "message" in err) {
+    return String((err as { message: unknown }).message);
+  }
   return String(err);
 }
 

@@ -1,94 +1,121 @@
-.mdbc-canvas-chat {
-  flex: 0 0 320px;
-  width: 320px;
-  height: 100%;
+/* The board's connection picker row, under the agent header. The connection is
+   canvas-wide (the agent's schema source and every query object's target), so it
+   sits at the top of the chat where the "connect a database" prompt appears. */
+.mdbc-canvas-chat-conn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-bottom: 0.5px solid var(--m-sep);
+}
+
+.mdbc-canvas-chat-conn-label {
+  flex: 0 0 auto;
+  font-size: var(--m-fs-xs);
+  color: var(--m-fg-3);
+}
+
+/* The Select stretches to fill the row beside its label; the Context button
+   keeps its natural width on the right. */
+.mdbc-canvas-chat-conn .mdbc-select {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* "Fetching schema" indicator: a spinner + label shown while the agent's schema
+   context loads for the chosen connection. */
+.mdbc-canvas-chat-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-bottom: 0.5px solid var(--m-sep);
+  font-size: var(--m-fs-xs);
+  color: var(--m-fg-3);
+}
+
+/* The Context view replaces the message stream while open: the exact schema +
+   board text the agent receives, scrollable. */
+.mdbc-canvas-chat-context {
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  min-height: 0;
-  background: var(--m-bg-sidebar);
-  border-right: 1px solid var(--m-sep);
-  font-family: var(--m-font);
 }
 
-.mdbc-canvas-chat-head {
-  flex: 0 0 auto;
-  padding: 10px;
-  border-bottom: 1px solid var(--m-sep);
+.mdbc-canvas-chat-context-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  border-bottom: 0.5px solid var(--m-sep);
 }
 
-.mdbc-canvas-chat-title {
+.mdbc-canvas-chat-context-title {
   font-size: var(--m-fs-sm);
   font-weight: 600;
   color: var(--m-fg-2);
 }
 
-.mdbc-canvas-chat-log {
-  flex: 1 1 auto;
-  overflow-y: auto;
+.mdbc-canvas-chat-context-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  margin: 0;
   padding: 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.mdbc-canvas-chat-empty {
-  color: var(--m-fg-3);
+  font-family: var(--m-font-mono);
   font-size: var(--m-fs-xs);
   line-height: 1.5;
-}
-
-.mdbc-canvas-chat-msg {
-  font-size: var(--m-fs-sm);
-  line-height: 1.45;
   white-space: pre-wrap;
-  border-radius: var(--m-r-md);
-  padding: 8px 10px;
-  max-width: 100%;
   word-break: break-word;
+  color: var(--m-fg-2);
 }
 
-.mdbc-canvas-chat-msg.user {
-  align-self: flex-end;
-  background: var(--m-accent-tint);
-  color: var(--m-fg);
+/* The "+ Add results" picker in the header keeps a compact, natural width beside
+   the provider select. */
+.mdbc-canvas-chat-addresults {
+  margin-left: auto;
 }
 
-.mdbc-canvas-chat-msg.agent {
-  align-self: flex-start;
-  background: var(--m-bg-card);
-  border: 1px solid var(--m-sep);
-  color: var(--m-fg);
+.mdbc-canvas-chat-addresults .mdbc-select {
+  min-width: 0;
 }
 
-.mdbc-canvas-chat-msg.pending {
-  color: var(--m-fg-3);
-  font-style: italic;
-}
-
-.mdbc-canvas-chat-input {
-  flex: 0 0 auto;
+/* Attached-result chips, shown above the input. Each names a query object's
+   shared result with a remove button, matching the agent context-chip look. */
+.mdbc-canvas-chat-chips {
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
   gap: 6px;
-  padding: 10px;
-  border-top: 1px solid var(--m-sep);
+  padding: 6px 10px 0;
 }
 
-.mdbc-canvas-chat-textarea {
-  width: 100%;
-  box-sizing: border-box;
-  resize: none;
-  border: 1px solid var(--m-sep);
-  border-radius: var(--m-r-md);
-  background: var(--m-bg-editor);
+.mdbc-canvas-chat-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  padding: 2px 6px;
+  border: 0.5px solid var(--m-sep);
+  border-radius: 5px;
+  background: var(--m-bg-card);
+  color: var(--m-fg-2);
+  font-size: var(--m-fs-2xs);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mdbc-canvas-chat-chip-remove {
+  border: 0;
+  background: transparent;
+  color: var(--m-fg-3);
+  cursor: pointer;
+  padding: 0;
+  font-size: var(--m-fs-2xs);
+  line-height: 1;
+}
+
+.mdbc-canvas-chat-chip-remove:hover {
   color: var(--m-fg);
-  font-family: var(--m-font);
-  font-size: var(--m-fs-sm);
-  line-height: 1.4;
-  padding: 8px;
-  outline: none;
-}
-
-.mdbc-canvas-chat-textarea:focus {
-  border-color: var(--m-accent);
 }

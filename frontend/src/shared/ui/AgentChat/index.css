@@ -11,6 +11,25 @@
   min-height: 0;
 }
 
+/* Header provider controls, shared by the SQL pane and the canvas chat so both
+   offer the same Codex/Claude picker. */
+
+/* Info hint next to the provider select: clarifies the subscription need. */
+.mdbc-agent-info {
+  margin-left: 5px;
+  font-size: var(--m-fs-xs);
+  color: var(--m-fg-4);
+  cursor: help;
+}
+
+/* Active resolved model (e.g. "gpt-5.5"), pushed to the right of the header. */
+.mdbc-agent-model {
+  margin-left: auto;
+  font-size: var(--m-fs-xs);
+  color: var(--m-fg);
+  font-family: var(--m-font-mono);
+}
+
 /* Message stream */
 .mdbc-agent-stream {
   flex: 1;

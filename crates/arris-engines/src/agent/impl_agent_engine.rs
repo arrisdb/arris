@@ -7,6 +7,7 @@
 //! needs no live database access, so there is no MCP server: the schema is
 //! inlined into the prompt and the CLI runs with file writes and tools disabled.
 
+use std::collections::HashMap;
 use std::fmt::Write as _;
 use std::path::PathBuf;
 use std::process::Stdio;
@@ -247,7 +248,7 @@ impl AgentEngine {
              \x20 \"components\": [\n\
              \x20   {{ \"kind\": \"query\", \"id\": \"q1\", \"title\": \"<label>\", \"sql\": \"<one {name} statement>\" }},\n\
              \x20   {{ \"kind\": \"chart\", \"id\": \"c1\", \"sourceQueryId\": \"q1\",\n\
-             \x20     \"spec\": {{ \"kind\": \"bar\", \"xColumn\": \"<col>\", \"yColumns\": [\"<col>\"], \"seriesColumn\": \"<col?>\", \"aggregation\": \"sum\", \"title\": \"<title>\", \"style\": {{ \"stackMode\": \"stacked\" }} }} }},\n\
+             \x20     \"spec\": {{ \"kind\": \"bar\", \"xColumn\": \"<col>\", \"yColumns\": [\"<col>\"], \"seriesColumn\": \"<col?>\", \"aggregation\": \"sum\", \"title\": \"<title>\", \"style\": {{ \"stackMode\": \"stacked\", \"showLegend\": true, \"yMin\": 0, \"yMax\": 100 }} }} }},\n\
              \x20   {{ \"kind\": \"text\", \"id\": \"t1\", \"text\": \"## Heading\\nMarkdown commentary.\" }},\n\
              \x20   {{ \"kind\": \"sticky\", \"id\": \"s1\", \"text\": \"<short note>\", \"color\": \"yellow\" }},\n\
              \x20   {{ \"kind\": \"shape\", \"id\": \"sh1\", \"shape\": \"rect\", \"text\": \"<optional label>\" }}\n\
@@ -271,6 +272,19 @@ impl AgentEngine {
              bar, line, area, pie, scatter, combo, donut, radar, treemap, funnel, \
              kpi. Omit `seriesColumn` and `style` when not needed; `aggregation` is \
              one of none, sum, avg, min, max, count.\n\
+             - `spec.style` (every field optional) controls appearance, axes, and \
+             legend. Supported keys: `colors` (array of hex strings), `lineStyle` \
+             (solid|dashed|dotted), `strokeWidth` (number), `showLegend` (bool), \
+             `legendPosition` (top|bottom|left|right), `showGrid` (bool), \
+             `showDataLabels` (bool), `xMin`/`xMax`/`yMin`/`yMax` (axis bounds, \
+             numbers), `xAxisTitle`/`yAxisTitle` (strings), `xLabelAngle`/\
+             `yLabelAngle` (numbers), `yScale` (linear|log), `stackMode` \
+             (none|stacked|percent), `barOrientation` (vertical|horizontal), \
+             `sortOrder` (none|asc|desc), `curveType` (linear|monotone|step|natural), \
+             `fillOpacity` (0..1), `donutInnerRadius` (number), `referenceLineY` \
+             (number), `xTickInterval` (number). Set only the keys the request asks \
+             for. To change one of these on an existing chart, re-`spec` it by id with \
+             just the `style` keys you are changing.\n\
              - `sticky.color` is one of yellow, green, blue, pink, purple. \
              `shape.shape` is one of rect, ellipse, line; rect/ellipse may carry \
              optional `text`.\n\
@@ -316,6 +330,58 @@ impl AgentEngine {
             Self::write_ddl_node(&mut out, node, &[]);
         }
         out
+    }
+
+    /// The top-level `list_schemas` is lazy: it returns schema containers with no
+    /// relations or columns (those load on expand). For the agent prompt we need
+    /// the real tables and columns, so collect the names of the empty schema
+    /// containers (up to `max`) and deep-load each via `list_schema`.
+    pub fn schema_names_to_hydrate(nodes: &[SchemaNode], max: usize) -> Vec<String> {
+        let mut out = Vec::new();
+        Self::collect_hydrate_names(nodes, max, &mut out);
+        out
+    }
+
+    fn collect_hydrate_names(nodes: &[SchemaNode], max: usize, out: &mut Vec<String>) {
+        for node in nodes {
+            if out.len() >= max {
+                return;
+            }
+            match node.kind {
+                SchemaNodeKind::Schema => {
+                    if node.children.is_empty() && !out.contains(&node.name) {
+                        out.push(node.name.clone());
+                    }
+                }
+                SchemaNodeKind::Database => {
+                    Self::collect_hydrate_names(&node.children, max, out);
+                }
+                _ => {}
+            }
+        }
+    }
+
+    /// Attach the deep-loaded relations/columns onto each empty schema container,
+    /// keyed by the schema name. Already-populated schemas are left untouched.
+    pub fn attach_schema_children(
+        nodes: &mut [SchemaNode],
+        loaded: &HashMap<String, Vec<SchemaNode>>,
+    ) {
+        for node in nodes.iter_mut() {
+            match node.kind {
+                SchemaNodeKind::Schema => {
+                    if node.children.is_empty() {
+                        if let Some(children) = loaded.get(&node.name) {
+                            node.children = children.clone();
+                        }
+                    }
+                }
+                SchemaNodeKind::Database => {
+                    Self::attach_schema_children(&mut node.children, loaded);
+                }
+                _ => {}
+            }
+        }
     }
 
     fn write_ddl_node(out: &mut String, node: &SchemaNode, parent_names: &[&str]) {
@@ -468,6 +534,13 @@ mod tests {
         assert!(prompt.contains("\"kind\": \"sticky\""));
         assert!(prompt.contains("\"kind\": \"shape\""));
         assert!(prompt.contains("\"remove\""));
+        // The full chart-style contract is advertised so the agent knows it can set
+        // axis bounds and toggle the legend instead of refusing for lack of a field.
+        assert!(prompt.contains("yMin"));
+        assert!(prompt.contains("yMax"));
+        assert!(prompt.contains("showLegend"));
+        assert!(prompt.contains("legendPosition"));
+        assert!(prompt.contains("yScale"));
         assert!(!prompt.contains("return exactly one ```sql fenced block"));
     }
 
@@ -502,5 +575,55 @@ mod tests {
         let huge = "x".repeat(SCHEMA_PROMPT_MAX_BYTES + 1000);
         let prompt = AgentEngine::build_prompt(AgentProfile::Canvas, None, &huge, "go", "");
         assert!(prompt.contains("(schema truncated)"));
+    }
+
+    fn schema(name: &str) -> SchemaNode {
+        SchemaNode::new(name, SchemaNodeKind::Schema, name)
+    }
+
+    fn database(name: &str, schemas: Vec<SchemaNode>) -> SchemaNode {
+        SchemaNode::new(name, SchemaNodeKind::Database, name).with_children(schemas)
+    }
+
+    #[test]
+    fn schema_names_to_hydrate_collects_empty_containers_under_a_database() {
+        let tree = vec![database("postgres", vec![schema("public"), schema("analytics")])];
+        let names = AgentEngine::schema_names_to_hydrate(&tree, 10);
+        assert_eq!(names, vec!["public".to_string(), "analytics".to_string()]);
+    }
+
+    #[test]
+    fn schema_names_to_hydrate_skips_populated_schemas_and_respects_the_cap() {
+        let populated = SchemaNode::new("public", SchemaNodeKind::Schema, "public")
+            .with_children(vec![SchemaNode::new("t", SchemaNodeKind::Table, "public.t")]);
+        let tree = vec![database(
+            "db",
+            vec![populated, schema("a"), schema("b"), schema("c")],
+        )];
+        // The populated "public" is skipped; the cap of 2 trims "c".
+        let names = AgentEngine::schema_names_to_hydrate(&tree, 2);
+        assert_eq!(names, vec!["a".to_string(), "b".to_string()]);
+    }
+
+    #[test]
+    fn attach_schema_children_fills_empty_schemas_so_ddl_has_real_tables() {
+        let mut tree = vec![database("db", vec![schema("public"), schema("analytics")])];
+        let mut loaded = HashMap::new();
+        loaded.insert(
+            "public".to_string(),
+            vec![SchemaNode::new("customers", SchemaNodeKind::Table, "public.customers")
+                .with_children(vec![SchemaNode::new(
+                    "id",
+                    SchemaNodeKind::Column,
+                    "public.customers.id",
+                )])],
+        );
+        AgentEngine::attach_schema_children(&mut tree, &loaded);
+        let ddl = AgentEngine::new().schema_ddl(&tree);
+        // The deep-loaded table (and its column) now appear in the prompt DDL.
+        assert!(ddl.contains("CREATE TABLE public.customers"));
+        assert!(ddl.contains("id"));
+        // A schema with no loaded entry stays empty (no fabricated tables).
+        assert!(!ddl.contains("CREATE TABLE analytics"));
     }
 }
