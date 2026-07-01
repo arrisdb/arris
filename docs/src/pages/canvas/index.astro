@@ -1,0 +1,337 @@
+---
+import "../../styles/global.css";
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import DocTable from "../../components/docs/DocTable/DocTable.astro";
+import Callout from "../../components/docs/Callout/Callout.astro";
+import Screenshot from "../../components/docs/Screenshot/Screenshot.astro";
+---
+
+<DocsLayout
+  title="Canvas - Arris Docs"
+  breadcrumbs={[{ label: "Docs", href: "/" }, { label: "Canvas" }]}
+  heading="Canvas"
+  lede="An infinite board that holds an analysis as connected objects: SQL queries that run, charts bound to their results, and the notes that frame them. Assemble it through an AI agent that works from your schema, or build each object by hand."
+  tocItems={[
+    { label: "Why use it", href: "#why" },
+    { label: "Open a canvas", href: "#open" },
+    { label: "Connections", href: "#connections" },
+    { label: "Build with the agent", href: "#agent" },
+    { label: "Build it by hand", href: "#manual" },
+    { label: "Object kinds", href: "#objects" },
+    { label: "The properties pane", href: "#properties" },
+    { label: "Working on the board", href: "#board" },
+    { label: "Saving", href: "#saving" },
+  ]}
+  currentPath="/canvas"
+  prev={{ label: "Trino", href: "/supported-data-sources/trino", section: "Supported data sources" }}
+  next={{ label: "Editor", href: "/querying/editor", section: "Querying" }}
+>
+  <h2 id="why">Why use it</h2>
+
+  <p>
+    A query tab answers one question and scrolls away. A canvas keeps the whole analysis in view:
+    the SQL that pulls the data, the chart that makes it readable, and the notes that explain it,
+    arranged side by side on an infinite board you pan and zoom. Reach for a canvas to:
+  </p>
+
+  <ul>
+    <li><strong>Go from a question to a chart fast.</strong> Type "monthly sales by category" and the agent writes the query, builds the chart, and runs both.</li>
+    <li><strong>Assemble a dashboard-style view.</strong> Several queries, charts, and tables laid out together and refreshed on demand.</li>
+    <li><strong>Explore step by step.</strong> Chain one query off another's results, branch into variants, and annotate as you go.</li>
+    <li><strong>Work across databases.</strong> Put a query on each connection and have the agent reference them together.</li>
+  </ul>
+
+  <h2 id="open">Open a canvas</h2>
+
+  <p>There are two ways to start a board:</p>
+
+  <ul>
+    <li>
+      Click <strong>New Canvas</strong>, the sparkles button
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block align-text-bottom text-accent-2"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z" /><path d="M20 3v4" /><path d="M22 5h-4" /><path d="M4 17v2" /><path d="M5 18H3" /></svg>,
+      in the editor tab bar.
+    </li>
+    <li>Right-click an empty area of the <strong>Canvas</strong> section in the left sidebar and choose <strong>New Canvas</strong>.</li>
+  </ul>
+
+  <p>
+    A canvas opens as an ordinary editor tab (not a separate window), auto-titled <code>Canvas 1</code>,
+    <code>Canvas 2</code>, and so on. The tab splits into a resizable <strong>agent chat</strong> pane on
+    the left and the board on the right. Rename a board by double-clicking its row in the sidebar
+    Canvas list, or right-click the row and choose <strong>Rename</strong>.
+  </p>
+
+  <h2 id="connections">Connections</h2>
+
+  <p>
+    A new board adopts whatever connection the editor currently has selected. To change or add to that,
+    use the <strong>Connection</strong> picker at the top of the agent pane. It is a
+    <strong>multi-select</strong>: add several databases and the agent reads every one's schema, so a
+    single board can mix sources. Picking a database that is not connected yet connects and loads it
+    automatically.
+  </p>
+
+  <Screenshot
+    src="/screenshots/canvas-connections.png"
+    alt="The Connection picker at the top of the agent pane, open as a checklist of databases (test_postgres, prod_mysql, prod_mongodb, prod_bigquery, and more) so several can be selected at once."
+    caption="The Connection picker is a multi-select: tick every database the board should use. The first one ticked becomes the board's primary connection."
+  />
+
+  <p>
+    The <strong>first</strong> connection in the set is the board's <strong>primary</strong>: it is the
+    default for query cells you add by hand. Every query cell also stores its own connection, which you
+    can change in the properties pane, so different cells on one board can run against different
+    databases. The connection set is saved with the board.
+  </p>
+
+  <h2 id="agent">Build with the agent</h2>
+
+  <p>
+    The agent pane runs down the left of the board. Describe what you want, for example
+    <em>"monthly sales by category"</em>, and the agent reads your schema and replies with objects to
+    add: usually a query that aggregates the data, a chart bound to it, and a one-line summary. Arris
+    places them on the board, runs the query, and renders the chart from the result. A green check chip
+    under each reply summarizes exactly what changed ("Added / Updated / Removed ...").
+  </p>
+
+  <Screenshot
+    src="/screenshots/canvas-board.png"
+    alt="A canvas board with the agent pane on the left, two query cells, a preview table of monthly sales, a multi-series line chart bound to a query, and a sticky note. A dependency arrow connects the query to its chart."
+    caption="A board the agent built and refined turn by turn: a query and its preview table, a chart re-pointed to a filtered query, and a sticky-note annotation. The arrow shows the chart bound to its source query."
+  />
+
+  <h3>Sending a turn</h3>
+
+  <ul>
+    <li><strong>Pick the provider</strong> (<strong>Codex</strong> or <strong>Claude</strong>) in the chat header.</li>
+    <li><strong>You must have a connection selected.</strong> Without one the agent cannot write correct SQL, so it replies asking you to connect a database first.</li>
+    <li>Type your request and press <kbd>&#8984;&#8629;</kbd> to send. Replies stream in as markdown; a <strong>Stop</strong> control appears while the agent is working.</li>
+    <li>Each turn also sees the current board, so follow-ups <strong>refine it in place</strong> rather than only adding to it. Ask the agent to switch a chart to a line, set axis bounds, rewrite a query, retitle a cell, move a query to another connection, or remove objects you no longer want. It can add, modify, or remove any object kind. Any query it adds or changes runs automatically, and the charts and tables bound to that query update.</li>
+  </ul>
+
+  <h3>What the agent sees</h3>
+
+  <p>
+    While schemas load, the pane shows a <strong>Fetching schema &amp; table info</strong> spinner.
+    Expand the collapsible <strong>Context</strong> section to read the <em>exact</em> text handed to the
+    agent: the schema (one labeled block per connection, headed with the connection's name and dialect)
+    followed by a one-line-per-object summary of the board.
+  </p>
+
+  <Screenshot
+    src="/screenshots/canvas-context.png"
+    alt="The expanded Context section showing the schema sent to the agent: a heading, the connection labeled with its id and dialect, and the CREATE TABLE DDL for a customers table."
+    caption="The Context section reveals the exact text handed to the agent: the schema DDL per connection, then a summary of the board."
+  />
+
+  <Callout type="note" title="Your rows never leave your machine">
+    The agent runs the provider's CLI locally in read-only mode, with no database access and no file or
+    shell tools. It receives only your prompt, each connection's <strong>schema</strong> (as DDL and
+    dialect), and a short <strong>summary</strong> of the objects already on the board (their kinds,
+    ids, titles, and SQL). It <strong>never receives the rows</strong> a query returned. The schema is
+    size-capped, and a slow database is skipped after 15 seconds so a turn is never blocked.
+  </Callout>
+
+  <h3>Building on existing results</h3>
+
+  <p>
+    When the answer can come from a query already on the board, the agent does not re-query the
+    database. It writes a new query that selects <code>FROM</code> an existing cell (referenced by that
+    cell's title), which runs in an in-memory engine (Apache DataFusion). This is the same cell-chaining
+    you can write by hand. The agent falls back to a fresh database query only when no cell has the
+    columns or grain it needs.
+  </p>
+
+  <h3>Sharing results when the agent asks</h3>
+
+  <p>
+    Because the agent cannot see row data, it <strong>asks</strong> when it needs it. Instead of
+    changing the board, it posts a <strong>Share results with the agent?</strong> card listing the cells
+    it wants (each with its row and column count) and why. You choose:
+  </p>
+
+  <ul>
+    <li><strong>Share results</strong> sends those rows in the next turn so the agent can write commentary or follow-ups grounded in real data. The button is disabled until at least one listed cell has actually been run.</li>
+    <li><strong>Decline</strong> tells the agent to continue without them.</li>
+  </ul>
+
+  <p>Nothing leaves your machine until you click Share results. After you answer, the card is marked as answered and takes no further input.</p>
+
+  <h3>The conversation</h3>
+
+  <p>
+    The chat log is saved with the board, so closing and reopening a canvas (or restarting Arris) brings
+    back the full history and the agent picks up where it left off. The <strong>Clear conversation</strong>
+    button (the trash icon in the header) stops any in-flight turn, drops the agent session so the next
+    message starts fresh, and wipes the saved history.
+  </p>
+
+  <h2 id="manual">Build it by hand</h2>
+
+  <p>
+    Every object can also be added directly, without the agent. The toolbar at the bottom of the board
+    has a button for each kind; selecting one places a new object in the center of your current view, so
+    it stays in sight however far you have panned.
+  </p>
+
+  <Screenshot
+    src="/screenshots/canvas-toolbar.png"
+    alt="The canvas toolbar: a pointer tool with a caret, then query cell, chart, table, sticky note, text, and shape buttons (the shape button has a caret), and a run-all button at the far right."
+    caption="The board toolbar. The pointer and shape tools have a caret that opens a menu of options above the bar."
+  />
+
+  <DocTable>
+    <thead>
+      <tr>
+        <th>Tool</th>
+        <th>What it does</th>
+        <th>Shortcut</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="font-medium text-fg">Pointer</td>
+        <td>The caret opens two modes: <strong>Move</strong> (drag and select objects, the default) and the <strong>Hand</strong> tool (drag anywhere to pan the board without moving objects).</td>
+        <td><kbd>V</kbd> / <kbd>H</kbd></td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">Query cell</td>
+        <td>Adds a SQL cell bound to the board's primary connection.</td>
+        <td><kbd>/</kbd></td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">Chart</td>
+        <td>Adds a chart. Pick its source query in the properties pane.</td>
+        <td>None</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">Table</td>
+        <td>Adds a preview table. Pick its source query in the properties pane.</td>
+        <td>None</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">Sticky note</td>
+        <td>Adds a coloured annotation note.</td>
+        <td>None</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">Text</td>
+        <td>Adds a free text block for headings and commentary.</td>
+        <td>None</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">Shape</td>
+        <td>The caret chooses <strong>Rectangle</strong>, <strong>Ellipse</strong>, or <strong>Line</strong>.</td>
+        <td><kbd>R</kbd> / <kbd>O</kbd> / <kbd>L</kbd></td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">Run all</td>
+        <td>Runs every query on the board, resolving each query's upstream cells first.</td>
+        <td>None</td>
+      </tr>
+    </tbody>
+  </DocTable>
+
+  <p>
+    The pointer and shape tools remember your last choice: clicking the main button re-applies it and
+    opens the menu, so picking a different option is one more click. The single-key shortcuts fire only
+    while the board is focused, never while you are typing in a query cell or a text block, and every one
+    is rebindable under Settings &rsaquo; Keymap.
+  </p>
+
+  <h2 id="objects">Object kinds</h2>
+
+  <p>Every object can be positioned, sized, locked, and overlapped freely. What each one does:</p>
+
+  <DocTable>
+    <thead>
+      <tr>
+        <th>Object</th>
+        <th>What it does</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="font-medium text-fg">Query cell</td>
+        <td>
+          A SQL statement in the same dialect-aware, schema-completing editor as the main SQL editor,
+          with a <strong>Run</strong> button in its header and a one-line status below ("Running...",
+          "<em>N</em> rows &middot; <em>N</em> columns", an error, or "Run the query to preview data").
+          The cell shows no grid itself: on its first successful run a preview <strong>table</strong> is
+          auto-placed beside it and joined with an arrow, unless a table or chart is already bound to it.
+          Reference another cell by title with <code>FROM &lt;cell title&gt;</code> to build on its
+          result.
+        </td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">Table</td>
+        <td>Previews a query's rows as a scrollable grid, refreshed whenever that query runs. Shows up to 200 rows by default (configurable). Null values render as <code>NULL</code>.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">Chart</td>
+        <td>Visualizes a query's result with the same chart editor as the results viewer (type, axes, series, aggregation, colours, legend, labels), refreshed whenever that query runs.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">Text</td>
+        <td>A free text block for headings and commentary. Single-click selects and drags; double-click to edit. Font size, weight, alignment, and colour are set in the properties pane.</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">Sticky note</td>
+        <td>Free text on a coloured card pinned on top of the board. Double-click to edit; pick one of five tints (yellow, green, blue, pink, purple).</td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">Shape</td>
+        <td>A rectangle, ellipse, or line for grouping and annotation. Rectangles and ellipses hold an optional centered label (double-click to add it); a rectangle's corners round by dragging the radius handle on its top edge; a line can be solid, dashed, or dotted.</td>
+      </tr>
+    </tbody>
+  </DocTable>
+
+  <h2 id="properties">The properties pane</h2>
+
+  <p>
+    Select a single object and a properties pane opens on the right. Every kind shows
+    <strong>X</strong>, <strong>Y</strong>, <strong>W</strong>, and <strong>H</strong> inputs and a
+    <strong>Locked</strong> toggle; editing them moves or resizes the object live. Below that, each kind
+    has its own controls:
+  </p>
+
+  <ul>
+    <li><strong>Query:</strong> title and connection. (The SQL is edited in the cell body.)</li>
+    <li><strong>Table:</strong> source query and a preview-row cap (blank uses the default of 200).</li>
+    <li><strong>Chart:</strong> source query, then the full chart editor: type, axes, appearance, legend, and colours, driven from the bound query's last run.</li>
+    <li><strong>Shape:</strong> fill colour (rectangles and ellipses), stroke colour and width, line style (solid, dashed, dotted), and corner radius (rectangles).</li>
+    <li><strong>Text:</strong> font size, bold, alignment (left, center, right), and colour.</li>
+    <li><strong>Sticky note:</strong> the tint.</li>
+  </ul>
+
+  <h2 id="board">Working on the board</h2>
+
+  <ul>
+    <li><strong>Select and move.</strong> Single-click an object to select it; drag to move it (in Move mode). Selection drives the resize handles and the properties pane and persists until you click an empty part of the board.</li>
+    <li><strong>Resize.</strong> Drag any border or corner handle of a selected object. Handles only appear while it is selected.</li>
+    <li><strong>Overlap and reorder.</strong> Objects may overlap. Right-click for <strong>Bring to front</strong> (<kbd>]</kbd>), <strong>Bring forward</strong>, <strong>Send backward</strong>, and <strong>Send to back</strong> (<kbd>[</kbd>).</li>
+    <li><strong>Copy, paste, lock, delete.</strong> <kbd>&#8984;C</kbd> copies the selected object to an in-app clipboard and <kbd>&#8984;V</kbd> pastes a clone nearby; <strong>Lock</strong> freezes an object (still selectable, but not movable or resizable until unlocked); <kbd>Delete</kbd> or <kbd>Backspace</kbd> removes it. All are also in the right-click menu.</li>
+    <li><strong>Pan and zoom.</strong> Pan with the Hand tool or by dragging an empty part of the board; zoom with the scroll wheel or the controls in the corner (0.2x to 2x). Scrolling inside a table, chart, or query cell scrolls that object, not the board.</li>
+    <li><strong>Dependency arrows are automatic.</strong> Arrows are drawn when a chart or table binds to its source query, and when one query reads another with <code>FROM &lt;cell title&gt;</code>. They anchor to both objects' borders and re-route as you move them. You cannot draw them by hand, but you can delete one from its right-click menu.</li>
+    <li><strong>Run.</strong> Run a single query with its Run button (or the editor's run shortcut). <strong>Run all</strong> on the toolbar runs every query, resolving upstream cells first.</li>
+    <li><strong>Fit on open.</strong> Reopening a board frames its existing content, so you land on your work rather than empty space.</li>
+  </ul>
+
+  <h2 id="saving">Saving</h2>
+
+  <p>
+    A board is saved with your workspace shortly after each change, and survives closing the tab or
+    restarting the app. It stores the objects (their geometry, z-order, lock state, and per-kind
+    settings), the dependency arrows, the pan and zoom, the connection set, and the agent conversation.
+    <strong>Query results are not saved.</strong> After reopening, query cells show their "Run the
+    query..." state, and tables and charts stay blank until you re-run their source query (or use
+    <strong>Run all</strong>).
+  </p>
+
+  <p>
+    Closed boards live in the <strong>Canvas</strong> section of the left sidebar, newest first. Click a
+    row to reopen it, double-click to rename, or right-click to rename, move to a project, or delete (a
+    delete can be restored).
+  </p>
+
+</DocsLayout>
