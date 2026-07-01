@@ -2,7 +2,6 @@
 import "../../styles/global.css";
 import DocsLayout from "../../layouts/DocsLayout.astro";
 import DocTable from "../../components/docs/DocTable/DocTable.astro";
-import Callout from "../../components/docs/Callout/Callout.astro";
 import Screenshot from "../../components/docs/Screenshot/Screenshot.astro";
 ---
 
@@ -124,13 +123,15 @@ import Screenshot from "../../components/docs/Screenshot/Screenshot.astro";
     caption="The Context section reveals the exact text handed to the agent: the schema DDL per connection, then a summary of the board."
   />
 
-  <Callout type="note" title="Your rows never leave your machine">
+  <p>
     The agent runs the provider's CLI locally in read-only mode, with no database access and no file or
-    shell tools. It receives only your prompt, each connection's <strong>schema</strong> (as DDL and
-    dialect), and a short <strong>summary</strong> of the objects already on the board (their kinds,
-    ids, titles, and SQL). It <strong>never receives the rows</strong> a query returned. The schema is
+    shell tools. By default it receives only your prompt, each connection's <strong>schema</strong> (as
+    DDL and dialect), and a short <strong>summary</strong> of the objects already on the board (their
+    kinds, ids, titles, and SQL). Your query results stay on your machine and never leave it unless you
+    explicitly share them: when a request needs the actual rows (for example, a verbal analysis of the
+    data), the agent asks for permission to access those results first, and you can deny. The schema is
     size-capped, and a slow database is skipped after 15 seconds so a turn is never blocked.
-  </Callout>
+  </p>
 
   <h3>Building on existing results</h3>
 
