@@ -24,6 +24,7 @@ pub enum AppEnvironmentError {
 
 pub struct AppEnvironment {
     pub agent: crate::agent::AgentEngine,
+    pub canvas: crate::canvas::CanvasEngine,
     pub connection: crate::connection::ConnectionEngine,
     pub dbt: crate::dbt::DbtEngine,
     pub file: crate::file::FileEngine,
@@ -51,12 +52,20 @@ impl AppEnvironment {
     pub async fn init_at(dir: PathBuf) -> Result<Arc<Self>, AppEnvironmentError> {
         let connection = crate::connection::ConnectionEngine::new(dir.clone()).await;
         let logs_dir = dir.join(DEBUG_LOGS_DIR_NAME);
+        // Canvas cell-chaining keeps each cell's result as Arrow; the cache spills
+        // to this directory past its memory tier and is hard-capped on disk.
+        let cell_cache = Arc::new(crate::canvas::CellResultCache::new(
+            dir.join("canvas-cell-cache"),
+            crate::canvas::CELL_CACHE_MEMORY_BUDGET,
+            crate::canvas::CELL_CACHE_TOTAL_BUDGET,
+        ));
         let preferences_store = AppPreferencesStore::new(dir);
         let preferences = preferences_store.load().await.unwrap_or_default();
         let debug_log = DebugLogHandle::new(logs_dir, preferences.debug_mode);
 
         Ok(Arc::new(Self {
             agent: crate::agent::AgentEngine::new(),
+            canvas: crate::canvas::CanvasEngine::new(cell_cache),
             connection,
             dbt: crate::dbt::DbtEngine::new(),
             file: crate::file::FileEngine::new(),

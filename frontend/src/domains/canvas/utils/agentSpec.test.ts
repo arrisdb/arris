@@ -1,0 +1,186 @@
+import { describe, expect, it } from "vitest";
+
+import type { AgentCanvasSpec } from "../types";
+import { parseAgentCanvas, planAgentChanges } from "./agentSpec";
+
+const wrap = (json: unknown) =>
+  "Here is your canvas:\n```arris-canvas\n" + JSON.stringify(json) + "\n```\nDone.";
+
+describe("parseAgentCanvas", () => {
+  it("extracts the arris-canvas block", () => {
+    const spec = parseAgentCanvas(
+      wrap({ components: [{ kind: "query", id: "q1", sql: "select 1" }], edges: [] }),
+    );
+    expect(spec?.components).toHaveLength(1);
+    expect(spec?.components[0]).toMatchObject({ kind: "query", id: "q1", sql: "select 1" });
+  });
+
+  it("returns null for prose with no block", () => {
+    expect(parseAgentCanvas("no canvas block here")).toBeNull();
+  });
+
+  it("returns null for malformed JSON", () => {
+    expect(parseAgentCanvas("```arris-canvas\n{not json\n```")).toBeNull();
+  });
+
+  it("drops unknown kinds, null when none remain", () => {
+    expect(parseAgentCanvas(wrap({ components: [{ kind: "bogus", id: "x" }] }))).toBeNull();
+  });
+
+  it("keeps only well-formed components", () => {
+    const spec = parseAgentCanvas(
+      wrap({ components: [{ kind: "text", id: "t", text: "hi" }, { kind: "chart" }] }),
+    );
+    expect(spec?.components).toHaveLength(1);
+  });
+
+  it("reads the remove list, and a remove-only turn is still a spec", () => {
+    const spec = parseAgentCanvas(wrap({ components: [], remove: ["q1", "c1", 7] }));
+    expect(spec?.remove).toEqual(["q1", "c1"]);
+    expect(spec?.components).toHaveLength(0);
+  });
+
+  it("returns null when there are no components and nothing to remove", () => {
+    expect(parseAgentCanvas(wrap({ components: [], remove: [] }))).toBeNull();
+  });
+});
+
+describe("planAgentChanges", () => {
+  const spec: AgentCanvasSpec = {
+    components: [
+      { kind: "query", id: "q1", sql: "select category, sum(total) t from orders group by 1" },
+      {
+        kind: "chart",
+        id: "c1",
+        sourceQueryId: "q1",
+        spec: { kind: "bar", xColumn: "category", yColumns: ["t"] },
+      },
+      { kind: "text", id: "t1", text: "## Sales" },
+    ],
+    edges: [],
+  };
+
+  it("creates objects, binds the query connection, and links chart to query", () => {
+    const { created, updates, removeIds, edges } = planAgentChanges(spec, [], "conn-1");
+    expect(created).toHaveLength(3);
+    expect(updates).toHaveLength(0);
+    expect(removeIds).toHaveLength(0);
+    const q = created.find((c) => c.id === "q1");
+    expect(q).toMatchObject({ kind: "query", connectionId: "conn-1" });
+    expect(edges).toEqual([{ id: expect.any(String), source: "q1", target: "c1" }]);
+  });
+
+  it("auto-links a created table to its source query", () => {
+    const withTable: AgentCanvasSpec = {
+      components: [
+        { kind: "query", id: "q1", sql: "select 1" },
+        { kind: "table", id: "tb1", sourceQueryId: "q1" },
+      ],
+      edges: [],
+    };
+    const { created, edges } = planAgentChanges(withTable, [], "conn-1");
+    expect(created.find((c) => c.id === "tb1")).toMatchObject({
+      kind: "table",
+      sourceQueryId: "q1",
+    });
+    expect(edges).toEqual([{ id: expect.any(String), source: "q1", target: "tb1" }]);
+  });
+
+  it("targets a query at the connection the agent named, over the board default", () => {
+    const multi: AgentCanvasSpec = {
+      components: [
+        { kind: "query", id: "qa", sql: "select 1", connectionId: "conn-a" },
+        { kind: "query", id: "qb", sql: "select 2", connectionId: "conn-b" },
+        { kind: "query", id: "qc", sql: "select 3" },
+      ],
+      edges: [],
+    };
+    const { created } = planAgentChanges(multi, [], "conn-default");
+    expect(created.find((c) => c.id === "qa")).toMatchObject({ connectionId: "conn-a" });
+    expect(created.find((c) => c.id === "qb")).toMatchObject({ connectionId: "conn-b" });
+    // No connectionId named falls back to the board's primary connection.
+    expect(created.find((c) => c.id === "qc")).toMatchObject({ connectionId: "conn-default" });
+  });
+
+  it("re-targets an existing query to a new connection by id", () => {
+    const existing = planAgentChanges(
+      { components: [{ kind: "query", id: "q1", sql: "select 1", connectionId: "conn-a" }], edges: [] },
+      [],
+      "conn-a",
+    ).created;
+    const plan = planAgentChanges(
+      { components: [{ kind: "query", id: "q1", connectionId: "conn-b" }], edges: [] },
+      existing,
+      "conn-a",
+    );
+    expect(plan.updates[0]).toMatchObject({ id: "q1", patch: { connectionId: "conn-b" } });
+  });
+
+  it("does not duplicate an explicit edge", () => {
+    const withEdge: AgentCanvasSpec = {
+      components: spec.components,
+      edges: [{ id: "e1", source: "q1", target: "c1" }],
+    };
+    expect(planAgentChanges(withEdge, [], null).edges).toHaveLength(1);
+  });
+
+  it("auto-lays-out below existing content", () => {
+    const existing = planAgentChanges(spec, [], null).created;
+    const more = planAgentChanges(
+      { components: [{ kind: "text", id: "t2", text: "more" }], edges: [] },
+      existing,
+      null,
+    ).created;
+    const lowestExisting = Math.max(...existing.map((c) => c.y + c.h));
+    expect(more[0].y).toBeGreaterThan(lowestExisting);
+  });
+
+  it("patches an existing object by id instead of creating a duplicate", () => {
+    const existing = planAgentChanges(spec, [], "conn-1").created;
+    const plan = planAgentChanges(
+      {
+        components: [
+          { kind: "query", id: "q1", sql: "select category, count(*) t from orders group by 1" },
+        ],
+        edges: [],
+      },
+      existing,
+      "conn-1",
+    );
+    expect(plan.created).toHaveLength(0);
+    expect(plan.updates).toEqual([
+      { id: "q1", patch: { sql: "select category, count(*) t from orders group by 1" } },
+    ]);
+  });
+
+  it("merges a partial chart-spec edit onto the existing spec without wiping columns", () => {
+    const existing = planAgentChanges(spec, [], "conn-1").created;
+    // The agent re-addresses the chart with only an axis-bound tweak (no columns).
+    const plan = planAgentChanges(
+      {
+        components: [{ kind: "chart", id: "c1", spec: { style: { yMax: 9 } } as never }],
+        edges: [],
+      },
+      existing,
+      "conn-1",
+    );
+    expect(plan.updates).toHaveLength(1);
+    const patched = plan.updates[0].patch as {
+      spec: { yColumns: string[]; xColumn: string; style?: Record<string, unknown> };
+    };
+    expect(patched.spec.yColumns).toEqual(["t"]);
+    expect(patched.spec.xColumn).toBe("category");
+    expect(patched.spec.style).toMatchObject({ yMax: 9 });
+  });
+
+  it("only removes ids that exist on the board", () => {
+    const existing = planAgentChanges(spec, [], null).created;
+    const plan = planAgentChanges(
+      { components: [], edges: [], remove: ["q1", "ghost"] },
+      existing,
+      null,
+    );
+    expect(plan.removeIds).toEqual(["q1"]);
+    expect(plan.created).toHaveLength(0);
+  });
+});

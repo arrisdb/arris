@@ -1,0 +1,559 @@
+.mdbc-canvas-view {
+  height: 100%;
+  width: 100%;
+  min-height: 0;
+}
+
+/* The horizontal split: agent | board | properties. Each pane lives in a Panel
+   so the dividers drag to resize, matching the app's sidebar UX. */
+.mdbc-canvas-panels {
+  height: 100%;
+  width: 100%;
+}
+
+/* Drag divider between canvas panes: a 1px hairline with a wider hit area and a
+   resize cursor, accenting on hover/drag (mirrors the app's sidebar resizers). */
+.mdbc-canvas-pane-resizer {
+  width: 1px;
+  background: var(--m-sep);
+  cursor: col-resize;
+  position: relative;
+}
+.mdbc-canvas-pane-resizer::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -3px;
+  right: -3px;
+}
+.mdbc-canvas-pane-resizer:hover,
+.mdbc-canvas-pane-resizer[data-resize-handle-state="drag"] {
+  background: var(--m-accent);
+}
+
+.mdbc-canvas-board {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+}
+
+.mdbc-canvas-board .react-flow {
+  width: 100%;
+  height: 100%;
+  background: var(--m-bg-editor);
+}
+
+/* Hand tool: pan cursor over the whole board. */
+.mdbc-canvas-board.hand .react-flow__pane,
+.mdbc-canvas-board.hand .react-flow__node {
+  cursor: grab;
+}
+.mdbc-canvas-board.hand .react-flow__pane:active,
+.mdbc-canvas-board.hand .react-flow__node:active {
+  cursor: grabbing;
+}
+
+/* The two endpoint handles every object carries exist only so an arrow has
+   something to attach to; the floating edge draws the visible line to the
+   object's border, so the handles themselves stay invisible and inert. */
+.mdbc-canvas-node-handle {
+  width: 1px;
+  height: 1px;
+  min-width: 0;
+  min-height: 0;
+  border: 0;
+  opacity: 0;
+  background: transparent;
+  pointer-events: none;
+}
+
+/* Relationship arrows: an accent line; the right-click "Delete arrow" target
+   gets a wider invisible hit area from ReactFlow's interaction path. */
+.mdbc-canvas-board .react-flow__edge-path {
+  stroke: var(--m-accent);
+}
+.mdbc-canvas-board .react-flow__edge:hover .react-flow__edge-path {
+  stroke-width: 2.5;
+}
+
+/* ── bottom toolbar (Figma/Canva pill) ────────────────────────────────────── */
+
+.mdbc-canvas-toolbar {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 10px;
+  background: var(--m-bg-surface);
+  border: 1px solid var(--m-sep-strong);
+  border-radius: var(--m-r-lg);
+  box-shadow: var(--m-shadow-pop);
+}
+
+.mdbc-canvas-tool-group {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.mdbc-canvas-tool-divider {
+  width: 1px;
+  height: 26px;
+  margin: 0 8px;
+  background: var(--m-sep-strong);
+}
+
+.mdbc-canvas-tool.mdbc-btn.icon-only {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--m-r-sm);
+}
+
+/* Caret pill over the tool's lower-right corner, opening its options menu. A
+   filled background and border make the expand affordance obvious at a glance. */
+.mdbc-canvas-tool-caret {
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 1px solid var(--m-sep-strong);
+  border-radius: 6px;
+  background: var(--m-bg-surface-2);
+  color: var(--m-fg-2);
+  cursor: pointer;
+}
+
+.mdbc-canvas-tool-caret:hover,
+.mdbc-canvas-tool-caret.open {
+  color: var(--m-fg);
+  border-color: var(--m-accent);
+  background: var(--m-bg-card-hover);
+}
+
+.mdbc-canvas-tool-menu {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 50%;
+  transform: translateX(-50%);
+  min-width: 184px;
+  padding: 4px;
+}
+
+.mdbc-canvas-tool-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: var(--m-r-xs);
+  font-size: var(--m-fs-sm);
+  color: var(--m-fg);
+  cursor: pointer;
+}
+
+.mdbc-canvas-tool-item:hover {
+  background: rgb(var(--m-overlay-rgb) / 0.08);
+}
+
+.mdbc-canvas-tool-item-label {
+  flex: 1 1 auto;
+}
+
+.mdbc-canvas-tool-item-check {
+  color: var(--m-accent);
+}
+
+.mdbc-canvas-tool-item-shortcut {
+  color: var(--m-fg-3);
+  font-size: var(--m-fs-xs);
+}
+
+.mdbc-canvas-tool-item.disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.mdbc-canvas-tool-item.disabled:hover {
+  background: transparent;
+}
+
+/* ── resize handles ───────────────────────────────────────────────────────── */
+
+/* The resize controls must paint ABOVE the (now opaque) node body, otherwise the
+   anchors hide behind the fill and the object reads as un-resizable. */
+.mdbc-canvas-board .react-flow__resize-control {
+  z-index: 10;
+}
+
+.mdbc-canvas-resize-line {
+  border-color: var(--m-accent);
+  border-width: 1.5px;
+}
+
+.mdbc-canvas-resize-handle {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid var(--m-accent);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+/* ── object node base ─────────────────────────────────────────────────────── */
+
+.mdbc-canvas-node {
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  /* Solid, opaque card raised above the (purple) board: every surface token is
+     the same colour as the board, so a solid elevated tone is hard-coded here. */
+  background: #262430;
+  border: 1px solid var(--m-sep-strong);
+  border-radius: var(--m-r-md);
+  box-shadow: var(--m-shadow-card);
+  color: var(--m-fg);
+  font-family: var(--m-font);
+  font-size: var(--m-fs-sm);
+}
+
+.mdbc-canvas-node.selected {
+  border-color: var(--m-accent);
+  box-shadow: 0 0 0 1px var(--m-accent), var(--m-shadow-card);
+}
+
+.mdbc-canvas-node-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--m-sep);
+  flex: 0 0 auto;
+}
+
+.mdbc-canvas-node-title {
+  font-size: var(--m-fs-sm);
+  font-weight: 600;
+  color: var(--m-fg-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.mdbc-canvas-node-head-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.mdbc-canvas-conn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  font-size: var(--m-fs-sm);
+  color: var(--m-fg-2);
+}
+
+.mdbc-canvas-conn-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 120px;
+}
+
+.mdbc-canvas-head-sep {
+  width: 1px;
+  align-self: stretch;
+  margin: 2px 0;
+  background: var(--m-sep);
+}
+
+.mdbc-canvas-run {
+  flex: 0 0 auto;
+}
+
+/* ── text object ──────────────────────────────────────────────────────────── */
+
+.mdbc-canvas-text {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.mdbc-canvas-text.selected {
+  border-color: var(--m-accent);
+}
+
+.mdbc-canvas-text-input {
+  flex: 1 1 auto;
+  width: 100%;
+  height: 100%;
+  resize: none;
+  border: none;
+  outline: none;
+  background: transparent;
+  /* Font size + colour are driven by the properties pane via CSS custom
+     properties (with sensible fallbacks). Alignment + weight ride classes. */
+  color: var(--canvas-text-color, var(--m-fg));
+  font-family: var(--m-font);
+  font-size: var(--canvas-text-fs, var(--m-fs-md));
+  line-height: 1.4;
+  padding: 8px 10px;
+}
+
+.mdbc-canvas-text-input.bold { font-weight: 700; }
+.mdbc-canvas-text-input.align-left { text-align: left; }
+.mdbc-canvas-text-input.align-center { text-align: center; }
+.mdbc-canvas-text-input.align-right { text-align: right; }
+
+/* Idle text/sticky: clicks fall through to the node so a single click selects +
+   drags it; double-click enters editing (read-only is cleared). */
+.mdbc-canvas-text,
+.mdbc-canvas-sticky {
+  cursor: move;
+}
+
+.mdbc-canvas-text-input:read-only,
+.mdbc-canvas-sticky-input:read-only,
+.mdbc-canvas-shape-text:read-only {
+  pointer-events: none;
+  cursor: move;
+}
+
+/* ── query object ─────────────────────────────────────────────────────────── */
+
+/* Inline fallback when a single object fails to render (caught by NodeBoundary).
+   Fills the node frame with a muted message so the board survives a bad object. */
+.mdbc-canvas-node-error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  padding: 12px;
+  text-align: center;
+  color: var(--m-fg-3);
+  font-size: var(--m-fs-xs);
+}
+
+/* Host for the query object's CodeMirror SQL editor (schema-aware completion +
+   highlighting, same as the main editor). The editor grows to fill the node
+   between the title bar and the bottom run-status row, and scrolls internally;
+   its own theme supplies padding/colours. */
+.mdbc-canvas-sql {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+  background: var(--m-bg-editor);
+}
+
+.mdbc-canvas-sql .cm-editor {
+  height: 100%;
+}
+
+.mdbc-canvas-sql .cm-scroller {
+  overflow: auto;
+}
+
+.mdbc-canvas-result {
+  flex: 1 1 auto;
+  overflow: auto;
+  padding: 0;
+}
+
+.mdbc-canvas-result-empty,
+.mdbc-canvas-result-error {
+  padding: 8px 10px;
+  font-size: var(--m-fs-xs);
+  color: var(--m-fg-3);
+}
+
+.mdbc-canvas-result-error {
+  color: var(--m-red);
+  white-space: pre-wrap;
+}
+
+.mdbc-canvas-result-table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: var(--m-fs-xs);
+  font-family: var(--m-font-mono);
+}
+
+.mdbc-canvas-result-table th,
+.mdbc-canvas-result-table td {
+  border-bottom: 1px solid var(--m-sep);
+  padding: 3px 8px;
+  text-align: left;
+  white-space: nowrap;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mdbc-canvas-result-table th {
+  position: sticky;
+  top: 0;
+  background: var(--m-bg-surface);
+  color: var(--m-fg-2);
+  font-weight: 600;
+}
+
+/* One-line run status under the query editor. The query object no longer shows
+   its rows inline; a bound table object renders the data. */
+.mdbc-canvas-query-status {
+  flex: 0 0 auto;
+  padding: 6px 10px;
+  border-top: 1px solid var(--m-sep);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* ── table object ─────────────────────────────────────────────────────────── */
+
+/* The table object reuses the shared .mdbc-canvas-result* grid; the result area
+   fills the node frame below the optional title. */
+.mdbc-canvas-table .mdbc-canvas-result {
+  height: 100%;
+}
+
+/* ── chart object ─────────────────────────────────────────────────────────── */
+
+.mdbc-canvas-chart-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  position: relative;
+}
+
+/* ── sticky note ──────────────────────────────────────────────────────────── */
+
+.mdbc-canvas-sticky {
+  border: none;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+  color: #20212b;
+}
+
+.mdbc-canvas-sticky-input {
+  flex: 1 1 auto;
+  width: 100%;
+  height: 100%;
+  resize: none;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: inherit;
+  font-family: var(--m-font);
+  font-size: var(--m-fs-md);
+  line-height: 1.4;
+  padding: 12px;
+}
+
+.mdbc-canvas-sticky-input::placeholder {
+  color: rgba(32, 33, 43, 0.45);
+}
+
+.mdbc-canvas-sticky.color-yellow { background: #ffe9a8; }
+.mdbc-canvas-sticky.color-green { background: #c8f0c8; }
+.mdbc-canvas-sticky.color-blue { background: #bfe0ff; }
+.mdbc-canvas-sticky.color-pink { background: #ffc9de; }
+.mdbc-canvas-sticky.color-purple { background: #d9c9ff; }
+
+/* ── shape object ─────────────────────────────────────────────────────────── */
+
+.mdbc-canvas-shape {
+  overflow: visible;
+  position: relative;
+  align-items: center;
+  justify-content: center;
+}
+
+/* A line node has no card chrome whatsoever: strip the node's background,
+   border, radius, and shadow (even while selected) so only the rule shows.
+   The `.selected` variant is listed explicitly so its specificity wins over
+   `.mdbc-canvas-node.selected`. */
+.mdbc-canvas-node.mdbc-canvas-shape-line-node,
+.mdbc-canvas-node.mdbc-canvas-shape-line-node.selected {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  overflow: visible;
+}
+
+/* A line shape: a single horizontal rule spanning the (chrome-less) node box,
+   centered vertically by the shape's flex centering. Its height and colour come
+   from the stroke style inline. */
+.mdbc-canvas-shape-line {
+  width: 100%;
+  flex: 0 0 auto;
+  border-radius: 2px;
+}
+
+/* The shape's label, vertically + horizontally centered. Idle it is a plain div
+   with no pointer events, so a single click falls through to select + drag the
+   shape; double-click swaps it for the editing textarea below. The "Add text"
+   hint is only rendered while the shape is selected. */
+/* The shape's label: one textarea used for both display and editing, so the
+   text never jumps between an idle and an editing position. It is auto-grown to
+   its content height in JS and centered by the shape (which centers its
+   children), so the text sits in the vertical middle without a scrollbar. */
+.mdbc-canvas-shape-text {
+  box-sizing: border-box;
+  width: 100%;
+  height: auto;
+  resize: none;
+  border: none;
+  outline: none;
+  overflow: hidden;
+  background: transparent;
+  color: var(--m-fg);
+  font-family: var(--m-font);
+  font-size: var(--m-fs-md);
+  line-height: 1.4;
+  padding: 8px;
+  text-align: center;
+}
+
+.mdbc-canvas-shape-text::placeholder {
+  color: var(--m-fg-3);
+}
+
+/* The corner-radius handle: a small accent dot that rides a rectangle's top
+   edge; drag it horizontally to round the corners. Sized like the corner
+   resize handles so the controls read as one family. */
+.mdbc-canvas-radius-handle {
+  position: absolute;
+  top: 0;
+  left: var(--radius-handle-x);
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #fff;
+  border: 1.5px solid var(--m-accent);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  transform: translate(-50%, -50%);
+  cursor: ew-resize;
+  z-index: 11;
+}

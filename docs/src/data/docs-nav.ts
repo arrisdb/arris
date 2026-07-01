@@ -51,6 +51,12 @@ const docsNav: NavGroup[] = [
     ],
   },
   {
+    title: "Canvas",
+    items: [
+      { label: "Overview", href: "/canvas", badge: "New" },
+    ],
+  },
+  {
     title: "Querying",
     items: [
       { label: "Editor", href: "/querying/editor" },

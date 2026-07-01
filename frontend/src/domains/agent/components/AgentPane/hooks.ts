@@ -1,27 +1,29 @@
 import { useConnectionsStore } from "@domains/connection";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAgentStore } from "../../hooks/store";
 import { useEditorHandleStore } from "@domains/editor/hooks";
+import { useRunHistoryStore } from "@domains/results/hooks";
 import { useTabsStore } from "@shell/hooks/tabsStore";
 import type { SelectOption } from "@shared/ui";
 import { listenAgentEventsIPC, runShareQueryIPC } from "./ipc";
-import type { AgentProvider, ChatItem, ContextChip } from "./types";
+import type { ChatItem, ContextChip } from "./types";
 import { serializeQueryResult } from "./utils";
 
 interface AgentPaneModel {
   items: ChatItem[];
   streaming: boolean;
   chips: ContextChip[];
-  provider: AgentProvider;
   available: boolean | null;
-  model: string | null;
   hasMessages: boolean;
   canShare: boolean;
   connectionOptions: SelectOption[];
-  onSetProvider: (provider: AgentProvider) => void;
+  /// Recent results of the active tab's runs, offered in the "Add results"
+  /// picker. Empty when the tab has no run with a result.
+  resultOptions: SelectOption[];
   onSend: (text: string) => void;
   onStop: () => void;
   onClear: () => void;
+  onAttachResult: (runId: string) => void;
   onRemoveChip: (id: string) => void;
   onInsert: (sql: string) => void;
   onReplace: (sql: string) => void;
@@ -65,11 +67,47 @@ const useAgentPane = (): AgentPaneModel => {
   );
 
   const thread = useAgentStore((state) => state.threads[threadKey]);
-  const provider = useAgentStore((state) => state.provider);
   const available = useAgentStore((state) => state.available);
-  const model = useAgentStore((state) => state.model);
 
   const [removedChips, setRemovedChips] = useState<Set<string>>(new Set());
+
+  // Results the user explicitly attached to the next message (not automatic).
+  // Sourced from the active tab's run history; each rides as a `result` context
+  // chip, so `serializeChips` folds it into the prompt like any other chip.
+  const [attachedResults, setAttachedResults] = useState<ContextChip[]>([]);
+  const runsByTab = useRunHistoryStore((state) => state.runsByTab);
+
+  const resultOptions = useMemo<SelectOption[]>(() => {
+    if (!activeTab) return [];
+    return (runsByTab[activeTab.id] ?? [])
+      .filter((r) => r.status === "success" && r.result)
+      .map((r) => {
+        const rows = r.result?.rows.length ?? 0;
+        const cols = r.result?.columns.length ?? 0;
+        return { value: r.id, label: `${r.customName ?? `#${r.ordinal}`} · ${rows}×${cols}` };
+      });
+  }, [activeTab, runsByTab]);
+
+  const onAttachResult = useCallback(
+    (runId: string) => {
+      const run = (activeTab ? runsByTab[activeTab.id] ?? [] : []).find((r) => r.id === runId);
+      if (!run?.result) return;
+      const { table, rowCount, colCount } = serializeQueryResult(run.result);
+      const id = `result:${runId}`;
+      // Replace any prior attachment of the same run so re-attaching refreshes
+      // rather than duplicating.
+      setAttachedResults((prev) => [
+        ...prev.filter((c) => c.id !== id),
+        {
+          id,
+          kind: "result",
+          label: `${run.customName ?? `#${run.ordinal}`} · ${rowCount}×${colCount}`,
+          text: table,
+        },
+      ]);
+    },
+    [activeTab, runsByTab],
+  );
 
   // Subscribe once to streamed agent events and check the active provider's CLI.
   useEffect(() => {
@@ -85,6 +123,7 @@ const useAgentPane = (): AgentPaneModel => {
   useEffect(() => {
     useAgentStore.getState().setActiveConnection(editorConnectionId);
     setRemovedChips(new Set());
+    setAttachedResults([]);
     // A real editor connection takes over; drop any inline pick so it can't
     // shadow the connection the conversation now belongs to.
     setPickedConnectionId(null);
@@ -106,12 +145,15 @@ const useAgentPane = (): AgentPaneModel => {
     if (activeTab.text.trim()) {
       out.push({ id: "file", kind: "file", label: activeTab.title, text: activeTab.text });
     }
-    return out.filter((chip) => !removedChips.has(chip.id));
-  }, [activeTab, removedChips]);
+    return [...out.filter((chip) => !removedChips.has(chip.id)), ...attachedResults];
+  }, [activeTab, attachedResults, removedChips]);
 
   const onSend = (text: string) => {
     if (!text.trim()) return;
     useAgentStore.getState().sendMessage(threadKey, runConnectionId, text.trim(), chips);
+    // Attached results are one-shot context for this message; the editor
+    // selection/file chips persist as long as they apply.
+    setAttachedResults([]);
   };
 
   const onStop = () => useAgentStore.getState().cancel(threadKey);
@@ -174,17 +216,24 @@ const useAgentPane = (): AgentPaneModel => {
     items: thread?.items ?? [],
     streaming: thread?.streaming ?? false,
     chips,
-    provider,
     available,
-    model,
     hasMessages: (thread?.items.length ?? 0) > 0,
     canShare: runConnectionId !== null,
     connectionOptions,
-    onSetProvider: (next) => useAgentStore.getState().setProvider(next),
+    resultOptions,
     onSend,
     onStop,
     onClear,
-    onRemoveChip: (id) => setRemovedChips((prev) => new Set(prev).add(id)),
+    onAttachResult,
+    onRemoveChip: (id) => {
+      // A result chip lives in its own state; everything else is hidden via the
+      // removed-chips set so derived selection/file chips can be dismissed.
+      if (attachedResults.some((c) => c.id === id)) {
+        setAttachedResults((prev) => prev.filter((c) => c.id !== id));
+      } else {
+        setRemovedChips((prev) => new Set(prev).add(id));
+      }
+    },
     onInsert,
     onReplace,
     onShareResults,

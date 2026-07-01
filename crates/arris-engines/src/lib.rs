@@ -2,6 +2,7 @@ pub mod drivers;
 pub mod persistence;
 
 pub mod agent;
+pub mod canvas;
 pub mod connection;
 pub mod editor;
 pub mod dbt;
@@ -21,6 +22,7 @@ pub trait Engine: Send + Sync {
 }
 
 pub use agent::AgentEngine;
+pub use canvas::{CanvasCellRun, CanvasCellSpec, CanvasEngine, CanvasError, CellResultCache};
 pub use connection::{ConnectionEngine, ScopedConnection};
 pub use dbt::DbtEngine;
 pub use federation::FederationEngine;

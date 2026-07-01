@@ -86,6 +86,25 @@ function matchesShortcut(e: KeyboardEvent, spec: string): boolean {
   return false;
 }
 
+// A shortcut spec with no Mod/Ctrl/Alt/Shift modifier is a bare key (e.g. the
+// canvas "v"/"r"/"/" tool shortcuts). Bare keys would otherwise hijack ordinary
+// typing, so the global keymap suppresses them while a text surface is focused.
+function isBareKeySpec(spec: string): boolean {
+  const parts = spec.split("-");
+  return !parts.some((p) => p === "Mod" || p === "Ctrl" || p === "Alt" || p === "Shift");
+}
+
+// True when a key event targets a text-entry surface (input, textarea, select,
+// contenteditable, or a CodeMirror editor) where bare-key shortcuts must yield
+// to normal typing.
+function isTypingTarget(target: EventTarget | null): boolean {
+  const el = target as HTMLElement | null;
+  if (!el) return false;
+  if (el.isContentEditable) return true;
+  const tag = el.tagName;
+  return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || !!el.closest(".cm-editor");
+}
+
 function runCommand(action: KeymapAction): boolean {
   return useCommandRegistryStore.getState().run(action);
 }
@@ -113,6 +132,8 @@ export {
   categoryOf,
   commandMenuItem,
   defaultShortcutFor,
+  isBareKeySpec,
+  isTypingTarget,
   labelFor,
   matchesShortcut,
   runCommand,

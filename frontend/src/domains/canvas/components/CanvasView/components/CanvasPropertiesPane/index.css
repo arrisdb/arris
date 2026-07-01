@@ -1,0 +1,57 @@
+/* The canvas properties pane: a fixed-width right rail shown while one object is
+   selected. Reuses the shared pane chrome (mdbc-pane right + header/body) and the
+   app-level form controls (mdbc-pane-input, mdbc-checkbox, custom Select). */
+.mdbc-canvas-props {
+  /* Fills its resizable Panel; the divider sets the width. */
+  width: 100%;
+  height: 100%;
+  z-index: 5;
+}
+
+/* Two-column grid for the X/Y/W/H geometry fields. */
+.mdbc-canvas-prop-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+/* One geometry field: a small caption above its stepper. */
+.mdbc-canvas-prop {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* One inline control (checkbox, colour swatch, stroke width): caption then the
+   control with a little spacing, left-aligned (not pushed to opposite ends). */
+.mdbc-canvas-prop-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 26px;
+}
+/* A number field in an inline row stays compact, sitting just after its caption
+   rather than stretching to the pane edge. */
+.mdbc-canvas-prop-row .mdbc-pane-input {
+  flex: 0 0 auto;
+  width: 88px;
+}
+/* A dropdown in an inline row stays compact too (room for its widest option).
+   Specificity must beat `.mdbc-pane-form .mdbc-select { width: 100% }`. */
+.mdbc-pane-form .mdbc-canvas-prop-row .mdbc-select {
+  flex: 0 0 auto;
+  width: 120px;
+}
+
+/* Small colour swatch, matching the chart editor's series-colour blob: a compact
+   square, not a full-width bar. */
+.mdbc-canvas-color {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 24px;
+  padding: 2px;
+  border: 0.5px solid var(--m-sep);
+  border-radius: var(--m-r-control);
+  background: transparent;
+  cursor: pointer;
+}

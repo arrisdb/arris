@@ -459,6 +459,53 @@ describe("connections store", () => {
     );
   });
 
+  it("loadAllSchemaTables deep-loads EVERY schema of a lazy source, not just the selected", async () => {
+    const ds1Loaded = {
+      name: "ds1",
+      kind: "schema" as const,
+      path: "proj.ds1",
+      children: [{ name: "t1", kind: "table" as const, path: "proj.ds1.t1", children: [] }],
+    };
+    const ds2Loaded = {
+      name: "ds2",
+      kind: "schema" as const,
+      path: "proj.ds2",
+      children: [{ name: "t2", kind: "table" as const, path: "proj.ds2.t2", children: [] }],
+    };
+    mockByCommand({
+      cmd_list_schema: ({ schema }: { schema: string }) =>
+        schema === "ds1" ? [ds1Loaded] : [ds2Loaded],
+    });
+    useConnectionsStore.setState({
+      connections: [makeConn({ id: "bq1", kind: "bigquery" })],
+      schemaCache: { bq1: datasetsOnly },
+    });
+
+    await useConnectionsStore.getState().loadAllSchemaTables("bq1");
+
+    const datasets = useConnectionsStore.getState().schemaCache["bq1"][0].children;
+    expect(datasets[0]).toEqual(ds1Loaded);
+    expect(datasets[1]).toEqual(ds2Loaded);
+  });
+
+  it("loadAllSchemaTables is a no-op for an eager source", async () => {
+    useConnectionsStore.setState({
+      connections: [makeConn({ id: "lite1", kind: "sqlite" })],
+      schemaCache: { lite1: schemaNodes },
+    });
+    await useConnectionsStore.getState().loadAllSchemaTables("lite1");
+    expect(mockInvoke).not.toHaveBeenCalled();
+  });
+
+  it("loadAllSchemaTables is a no-op when the container list is not cached yet", async () => {
+    useConnectionsStore.setState({
+      connections: [makeConn({ id: "bq1", kind: "bigquery" })],
+      schemaCache: {},
+    });
+    await useConnectionsStore.getState().loadAllSchemaTables("bq1");
+    expect(mockInvoke).not.toHaveBeenCalled();
+  });
+
   it("connectAndLoad keeps refreshing on until lazy auto-loaded tables finish", async () => {
     let resolveListSchema: () => void = () => {};
     const listSchemaGate = new Promise<void>((res) => {
