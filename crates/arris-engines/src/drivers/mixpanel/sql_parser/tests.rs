@@ -527,6 +527,16 @@ fn default_dates_format() {
     assert!(to.contains('-'));
 }
 
+#[test]
+fn default_from_date_is_unlimited() {
+    // No WHERE time filter -> the range starts at the earliest export date, not a
+    // rolling 30-day window, so the whole project history is queryable.
+    assert_eq!(default_from_date(), EARLIEST_EXPORT_DATE);
+    let q = parse("SELECT * FROM events").unwrap();
+    assert_eq!(q.from_date, EARLIEST_EXPORT_DATE);
+    assert_eq!(q.to_date, default_to_date());
+}
+
 // --- Strip Quotes ---
 
 #[test]

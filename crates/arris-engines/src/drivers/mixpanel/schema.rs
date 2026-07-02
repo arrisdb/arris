@@ -4,52 +4,47 @@ use crate::{SchemaNode, SchemaNodeKind};
 
 use super::driver::{MP_ROOT_NAME, MP_ROOT_PATH};
 
-pub(super) fn build_schema_tree(discovered: &BTreeMap<String, BTreeMap<String, String>>) -> Vec<SchemaNode> {
-    let mut children: Vec<SchemaNode> = Vec::new();
-    let mut all_properties: BTreeMap<String, String> = BTreeMap::new();
+// Mixpanel exposes a single logical table, `events`, which every query targets
+// (`FROM events`). Each discovered event property becomes a column on it, and the
+// base columns event/time/distinct_id are always queryable.
+pub(super) const EVENTS_TABLE: &str = "events";
 
-    for (event_name, properties) in discovered {
-        let event_path = format!("{MP_ROOT_PATH}.events.{event_name}");
-        let mut prop_children: Vec<SchemaNode> = properties
-            .iter()
-            .map(|(prop_name, prop_type)| {
-                let mut node = SchemaNode::new(
-                    prop_name,
-                    SchemaNodeKind::Column,
-                    format!("{event_path}.{prop_name}"),
-                );
-                if !prop_type.is_empty() {
-                    node = node.with_detail(prop_type);
-                }
-                node
-            })
-            .collect();
-        prop_children.sort_by(|a, b| a.name.cmp(&b.name));
+pub(super) fn build_schema_tree(
+    discovered: &BTreeMap<String, BTreeMap<String, String>>,
+) -> Vec<SchemaNode> {
+    let table_path = format!("{MP_ROOT_PATH}.{EVENTS_TABLE}");
 
-        children.push(
-            SchemaNode::new(event_name, SchemaNodeKind::MixpanelEvent, event_path)
-                .with_children(prop_children),
-        );
-
-        for (k, v) in properties {
-            all_properties.entry(k.clone()).or_insert_with(|| v.clone());
+    // Union every event's properties into one column set. BTreeMap keeps the
+    // columns alphabetically ordered and de-duplicated across events.
+    let mut columns: BTreeMap<String, String> = BTreeMap::new();
+    for base in ["event", "time", "distinct_id"] {
+        columns.insert(base.to_owned(), String::new());
+    }
+    for properties in discovered.values() {
+        for (prop_name, prop_type) in properties {
+            columns
+                .entry(prop_name.clone())
+                .or_insert_with(|| prop_type.clone());
         }
     }
 
-    for (prop_name, prop_type) in &all_properties {
-        let mut node = SchemaNode::new(
-            prop_name,
-            SchemaNodeKind::MixpanelEventProperty,
-            format!("{MP_ROOT_PATH}.properties.{prop_name}"),
-        );
-        if !prop_type.is_empty() {
-            node = node.with_detail(prop_type);
-        }
-        children.push(node);
-    }
+    let column_nodes: Vec<SchemaNode> = columns
+        .iter()
+        .map(|(name, ty)| {
+            let mut node =
+                SchemaNode::new(name, SchemaNodeKind::Column, format!("{table_path}.{name}"));
+            if !ty.is_empty() {
+                node = node.with_detail(ty);
+            }
+            node
+        })
+        .collect();
 
-    children.sort_by(|a, b| a.name.cmp(&b.name));
+    let events_table = SchemaNode::new(EVENTS_TABLE, SchemaNodeKind::Table, table_path)
+        .with_children(column_nodes);
 
-    vec![SchemaNode::new(MP_ROOT_NAME, SchemaNodeKind::Database, MP_ROOT_PATH)
-        .with_children(children)]
+    vec![
+        SchemaNode::new(MP_ROOT_NAME, SchemaNodeKind::Database, MP_ROOT_PATH)
+            .with_children(vec![events_table]),
+    ]
 }

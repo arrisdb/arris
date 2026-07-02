@@ -19,11 +19,19 @@ pub(super) struct Inner {
 pub(super) async fn execute_export(
     inner: &Inner,
     parsed_query: &sql_parser::MixpanelQuery,
+    api_limit: Option<usize>,
 ) -> Result<Vec<BTreeMap<String, QueryValue>>> {
     let mut url = format!(
         "{EXPORT_BASE_URL}?project_id={}&from_date={}&to_date={}",
         inner.project_id, parsed_query.from_date, parsed_query.to_date,
     );
+
+    // The export endpoint caps returned events with `limit`, so push the query's
+    // LIMIT down to Mixpanel rather than downloading the full history and slicing
+    // in memory. Only safe when no ORDER BY / aggregation reorders the result.
+    if let Some(limit) = api_limit {
+        url.push_str(&format!("&limit={limit}"));
+    }
 
     if !parsed_query.event_filter.is_empty() {
         let json_array = serde_json::to_string(&parsed_query.event_filter)

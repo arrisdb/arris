@@ -778,9 +778,14 @@ pub fn resolve_column_names(query: &MixpanelQuery) -> Vec<String> {
     }
 }
 
+// Mixpanel's raw-event export requires an explicit from_date/to_date window, so
+// "unlimited" is expressed as the earliest date any project could hold data. It
+// predates Mixpanel itself (founded 2009), so every event is captured unless the
+// query narrows the range with a WHERE clause on `time`.
+pub const EARLIEST_EXPORT_DATE: &str = "2008-01-01";
+
 pub fn default_from_date() -> String {
-    let d = Utc::now() - chrono::Duration::days(30);
-    d.format("%Y-%m-%d").to_string()
+    EARLIEST_EXPORT_DATE.to_string()
 }
 
 pub fn default_to_date() -> String {

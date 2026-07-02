@@ -274,8 +274,6 @@ pub enum SchemaNodeKind {
     Topic,
     ConsumerGroup,
     Group,
-    MixpanelEvent,
-    MixpanelEventProperty,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -796,8 +794,6 @@ mod tests {
         assert_eq!(serde_json::to_string(&SchemaNodeKind::ElasticsearchAlias).unwrap(), "\"elasticsearchAlias\"");
         assert_eq!(serde_json::to_string(&SchemaNodeKind::ElasticsearchIndexTemplate).unwrap(), "\"elasticsearchIndexTemplate\"");
         assert_eq!(serde_json::to_string(&SchemaNodeKind::ElasticsearchDataStream).unwrap(), "\"elasticsearchDataStream\"");
-        assert_eq!(serde_json::to_string(&SchemaNodeKind::MixpanelEvent).unwrap(), "\"mixpanelEvent\"");
-        assert_eq!(serde_json::to_string(&SchemaNodeKind::MixpanelEventProperty).unwrap(), "\"mixpanelEventProperty\"");
     }
 
     #[test]

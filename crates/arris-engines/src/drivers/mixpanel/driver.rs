@@ -114,17 +114,23 @@ impl DatabaseDriver for MixpanelDriver {
         let started = Instant::now();
         let parsed_query = sql_parser::parse(text)
             .map_err(|e| DriverError::QueryFailed(e.to_string()))?;
-        let mut all_rows = api::execute_export(inner, &parsed_query).await?;
-
-        if let Some(where_expr) = &parsed_query.where_expression {
-            all_rows.retain(|row| sql_parser::evaluate(where_expr, row));
-        }
-
         let has_agg = !parsed_query.group_by.is_empty()
             || parsed_query
                 .columns
                 .iter()
                 .any(|c| matches!(c, ColumnSelection::Aggregation(..)));
+
+        // Push LIMIT down to the export API when nothing downstream reorders or
+        // collapses the rows. ORDER BY and aggregation would make an API-side cut
+        // truncate the wrong events, so those buffer fully and get limited below.
+        let api_limit = parsed_query
+            .limit
+            .filter(|_| !has_agg && parsed_query.order_by.is_empty());
+        let mut all_rows = api::execute_export(inner, &parsed_query, api_limit).await?;
+
+        if let Some(where_expr) = &parsed_query.where_expression {
+            all_rows.retain(|row| sql_parser::evaluate(where_expr, row));
+        }
 
         if has_agg {
             all_rows = query::apply_aggregations(&all_rows, &parsed_query);
@@ -256,12 +262,11 @@ mod tests {
     use super::*;
 
     #[test]
-    fn build_schema_tree_produces_correct_tree() {
+    fn build_schema_tree_produces_single_events_table() {
         let mut events = BTreeMap::new();
 
         let mut signup_props = BTreeMap::new();
         signup_props.insert("$browser".to_owned(), "string".to_owned());
-        signup_props.insert("$city".to_owned(), "string".to_owned());
         signup_props.insert("plan".to_owned(), "string".to_owned());
         events.insert("Sign Up".to_owned(), signup_props);
 
@@ -277,58 +282,75 @@ mod tests {
         assert_eq!(root.kind, SchemaNodeKind::Database);
         assert_eq!(root.path, "mixpanel");
 
-        let event_nodes: Vec<&crate::SchemaNode> = root
+        // Exactly one table node, `events`.
+        assert_eq!(root.children.len(), 1);
+        let events_table = &root.children[0];
+        assert_eq!(events_table.name, "events");
+        assert_eq!(events_table.kind, SchemaNodeKind::Table);
+        assert_eq!(events_table.path, "mixpanel.events");
+
+        // Columns = base columns + the union of every event's properties.
+        assert!(events_table
             .children
             .iter()
-            .filter(|c| c.kind == SchemaNodeKind::MixpanelEvent)
-            .collect();
-        assert_eq!(event_nodes.len(), 2);
-
-        let signup = event_nodes.iter().find(|e| e.name == "Sign Up").unwrap();
-        assert_eq!(signup.children.len(), 3);
-        let browser_col = signup.children.iter().find(|c| c.name == "$browser").unwrap();
-        assert_eq!(browser_col.kind, SchemaNodeKind::Column);
-        assert_eq!(browser_col.detail.as_deref(), Some("string"));
-
-        let purchase = event_nodes.iter().find(|e| e.name == "Purchase").unwrap();
-        assert_eq!(purchase.children.len(), 2);
-        let amount_col = purchase.children.iter().find(|c| c.name == "amount").unwrap();
-        assert_eq!(amount_col.detail.as_deref(), Some("number"));
-
-        let global_props: Vec<&crate::SchemaNode> = root
+            .all(|c| c.kind == SchemaNodeKind::Column));
+        let col_names: Vec<&str> = events_table
             .children
             .iter()
-            .filter(|c| c.kind == SchemaNodeKind::MixpanelEventProperty)
+            .map(|c| c.name.as_str())
             .collect();
-        assert_eq!(global_props.len(), 4);
-        let browser_prop = global_props.iter().find(|p| p.name == "$browser").unwrap();
-        assert_eq!(browser_prop.path, "mixpanel.properties.$browser");
+        for expected in ["event", "time", "distinct_id", "$browser", "plan", "amount"] {
+            assert!(col_names.contains(&expected), "missing column {expected}");
+        }
+        // {$browser, plan, amount} ∪ {event, time, distinct_id} = 6 columns.
+        assert_eq!(events_table.children.len(), 6);
+
+        let browser = events_table
+            .children
+            .iter()
+            .find(|c| c.name == "$browser")
+            .unwrap();
+        assert_eq!(browser.detail.as_deref(), Some("string"));
+        assert_eq!(browser.path, "mixpanel.events.$browser");
+        let amount = events_table
+            .children
+            .iter()
+            .find(|c| c.name == "amount")
+            .unwrap();
+        assert_eq!(amount.detail.as_deref(), Some("number"));
     }
 
     #[test]
     fn build_schema_tree_handles_empty_input() {
         let tree = schema::build_schema_tree(&BTreeMap::new());
         assert_eq!(tree.len(), 1);
-        assert!(tree[0].children.is_empty());
+        let events_table = &tree[0].children[0];
+        assert_eq!(events_table.name, "events");
+        assert_eq!(events_table.kind, SchemaNodeKind::Table);
+        // Even with no discovered events, the base columns are present.
+        let col_names: Vec<&str> = events_table
+            .children
+            .iter()
+            .map(|c| c.name.as_str())
+            .collect();
+        assert_eq!(col_names, vec!["distinct_id", "event", "time"]);
     }
 
     #[test]
     fn build_schema_tree_omits_detail_for_empty_type() {
         let mut events = BTreeMap::new();
         let mut props = BTreeMap::new();
-        props.insert("$browser".to_owned(), String::new());
+        props.insert("custom_prop".to_owned(), String::new());
         events.insert("Click".to_owned(), props);
 
         let tree = schema::build_schema_tree(&events);
-        let root = &tree[0];
-        let click = root
+        let events_table = &tree[0].children[0];
+        let prop = events_table
             .children
             .iter()
-            .find(|c| c.kind == SchemaNodeKind::MixpanelEvent)
+            .find(|c| c.name == "custom_prop")
             .unwrap();
-        let browser = &click.children[0];
-        assert_eq!(browser.name, "$browser");
-        assert_eq!(browser.detail, None);
+        assert_eq!(prop.detail, None);
     }
 
     #[tokio::test]

@@ -2,23 +2,21 @@ import type { SchemaGrouping } from "./types";
 import { defaultTableRefFromNode, makeExtractSchemaNames, makeGroupSchemaTree } from "./defaults";
 import type { ConnectionDriver } from "./types";
 
-const schemaGrouping: SchemaGrouping = [
-  { label: "Events", kinds: ["mixpanelEvent"] },
-  { label: "Event Properties", kinds: ["mixpanelEventProperty"] },
-];
+// Mixpanel exposes a single `events` table; its event properties are the columns.
+const schemaGrouping: SchemaGrouping = [{ label: "Tables", kinds: ["table"] }];
 
 export const mixpanelDriver: ConnectionDriver = {
   kind: "mixpanel",
   schemaGrouping,
   defaultSchemas: [],
-  databaseActsAsSchema: true,
-  schemaTermLabel: "Databases",
-  tableOpenableKinds: new Set([]),
+  databaseActsAsSchema: false,
+  schemaTermLabel: "Schemas",
+  tableOpenableKinds: new Set(["table"]),
   editableKinds: new Set([]),
   hideDetailKinds: new Set(["database", "schema", "group"]),
   defaultPort: undefined,
   uriScheme: "mixpanel",
   tableRefFromNode: defaultTableRefFromNode,
-  extractSchemaNames: makeExtractSchemaNames(true),
-  groupSchemaTree: makeGroupSchemaTree(true, schemaGrouping),
+  extractSchemaNames: makeExtractSchemaNames(false),
+  groupSchemaTree: makeGroupSchemaTree(false, schemaGrouping),
 };
