@@ -561,6 +561,16 @@
   min-width: 0;
   overflow: auto;
   background: var(--m-bg-editor);
+  /* Layout isolation for the results grid. The table below uses auto layout
+     with width:max-content, so the browser re-measures every rendered cell
+     whenever any document reflow reaches it. CodeMirror forces a reflow per
+     keystroke, which made typing stutter whenever a wide result set was on
+     screen. Overflow already clips the scroller's content, so layout/paint/
+     style containment is safe and lets the engine skip the table when outside
+     layout changes cannot affect its box. Size containment is deliberately
+     omitted: the scroller's flex sizing may still derive from content. Do not
+     remove without re-profiling typing with a wide result set loaded. */
+  contain: layout style paint;
 }
 .mdbc-results-table-scroll:focus,
 .mdbc-results-table-scroll:focus-visible {

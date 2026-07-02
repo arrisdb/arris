@@ -3,6 +3,7 @@ import { usePinnedQueriesStore } from "@domains/pinnedQueries";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { Profiler } from "react";
+import { readFileSync } from "node:fs";
 
 vi.mock("@domains/pinnedQueries/components/PinnedQueriesPane/ipc", () => ({
   loadPinnedQueriesIPC: vi.fn().mockResolvedValue([]),
@@ -129,6 +130,16 @@ describe("ResultsTableView", () => {
     expect(screen.getByText("name")).toBeTruthy();
     expect(screen.getByText("alice")).toBeTruthy();
     expect(screen.getByText("NULL")).toBeTruthy();
+  });
+
+  it("keeps layout containment on the results grid scroller", () => {
+    // Perf guard: without `contain` on the scroller, the auto-layout
+    // (width:max-content) results table is re-measured by every document
+    // reflow, and CodeMirror reflows per keystroke. Typing stuttered whenever
+    // a wide result set was on screen.
+    const css = readFileSync("src/domains/results/components/ResultsTableView/index.css", "utf8");
+    const scrollerRule = css.match(/\.mdbc-results-table-scroll\s*\{[^}]*\}/)?.[0] ?? "";
+    expect(scrollerRule).toContain("contain: layout style paint;");
   });
 
   it("does not re-render on tab text churn (keystrokes), but stays reactive to other tab fields", () => {
