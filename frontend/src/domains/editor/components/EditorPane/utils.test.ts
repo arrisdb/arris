@@ -73,6 +73,28 @@ describe("queryActions", () => {
     expect(s.tabs[0].kind).toBe("mongodb");
   });
 
+  it("openNewConsoleTab auto-loads the selected connection's schema", () => {
+    const ensureConnectedSchema = vi.fn();
+    useConnectionsStore.setState({
+      connections: [{ id: "c1", name: "mongo", kind: "mongodb" } as never],
+      selectedId: "c1",
+      ensureConnectedSchema,
+    });
+    openNewConsoleTab();
+    expect(ensureConnectedSchema).toHaveBeenCalledWith("c1");
+  });
+
+  it("openNewConsoleTab does not auto-load when no connection is selected", () => {
+    const ensureConnectedSchema = vi.fn();
+    useConnectionsStore.setState({
+      connections: [],
+      selectedId: null,
+      ensureConnectedSchema,
+    });
+    openNewConsoleTab();
+    expect(ensureConnectedSchema).not.toHaveBeenCalled();
+  });
+
   it("closeActiveTab closes the tab in the focused pane group", () => {
     const t1 = useTabsStore.getState().addTab({ kind: "sql" });
     const t2 = useTabsStore.getState().addTab({ kind: "sql" });

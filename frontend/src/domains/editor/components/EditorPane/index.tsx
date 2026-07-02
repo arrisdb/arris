@@ -643,6 +643,9 @@ function PaneGroupView({ groupId }: { groupId: string }) {
       connectionId: conn?.id,
       kind: conn ? kindForConnection(conn.kind) : "sql",
     });
+    // Populate the schema browser for the console's connection so it is ready
+    // without a manual refresh. No-op when the tree is already cached.
+    if (conn) useConnectionsStore.getState().ensureConnectedSchema(conn.id);
   }
 
   function newTerminalTab() {

@@ -206,6 +206,80 @@ describe("connections store", () => {
     expect(mockInvoke).not.toHaveBeenCalled();
   });
 
+  it("ensureConnectedSchema lists (no reconnect) when connected and uncached", async () => {
+    mockByCommand({ cmd_list_schemas: () => schemaNodes });
+    useConnectionsStore.setState({
+      connections: [makeConn({ id: "on1", isConnected: true })],
+    });
+
+    useConnectionsStore.getState().ensureConnectedSchema("on1");
+    await vi.waitFor(() =>
+      expect(useConnectionsStore.getState().schemaCache["on1"]).toEqual(schemaNodes),
+    );
+
+    expect(mockInvoke).toHaveBeenCalledWith("cmd_list_schemas", { connectionId: "on1" });
+    expect(mockInvoke).not.toHaveBeenCalledWith("cmd_connect", { connectionId: "on1" });
+  });
+
+  it("ensureConnectedSchema connects first when the connection is idle", async () => {
+    mockByCommand({ cmd_list_schemas: () => schemaNodes });
+    useConnectionsStore.setState({
+      connections: [makeConn({ id: "off1", isConnected: false })],
+    });
+
+    useConnectionsStore.getState().ensureConnectedSchema("off1");
+    await vi.waitFor(() =>
+      expect(useConnectionsStore.getState().schemaCache["off1"]).toEqual(schemaNodes),
+    );
+
+    expect(mockInvoke).toHaveBeenCalledWith("cmd_connect", { connectionId: "off1" });
+    expect(mockInvoke).toHaveBeenCalledWith("cmd_list_schemas", { connectionId: "off1" });
+  });
+
+  it("ensureConnectedSchema is a no-op when already cached", () => {
+    useConnectionsStore.setState({
+      connections: [makeConn({ id: "c1", isConnected: true })],
+      schemaCache: { c1: schemaNodes },
+    });
+    useConnectionsStore.getState().ensureConnectedSchema("c1");
+    expect(mockInvoke).not.toHaveBeenCalled();
+  });
+
+  it("ensureConnectedSchema is a no-op while that connection is already refreshing", () => {
+    useConnectionsStore.setState({
+      connections: [makeConn({ id: "busy", isConnected: true })],
+      refreshing: new Set(["busy"]),
+    });
+    useConnectionsStore.getState().ensureConnectedSchema("busy");
+    expect(mockInvoke).not.toHaveBeenCalled();
+  });
+
+  it("ensureConnectedSchema is a no-op for an unknown connection", () => {
+    useConnectionsStore.getState().ensureConnectedSchema("ghost");
+    expect(mockInvoke).not.toHaveBeenCalled();
+  });
+
+  it("selectConnection auto-loads the newly selected connection's schema", async () => {
+    mockByCommand({ cmd_list_schemas: () => schemaNodes });
+    useConnectionsStore.setState({
+      connections: [makeConn({ id: "sel1", isConnected: true })],
+    });
+
+    useConnectionsStore.getState().selectConnection("sel1");
+
+    expect(useConnectionsStore.getState().selectedId).toBe("sel1");
+    await vi.waitFor(() =>
+      expect(useConnectionsStore.getState().schemaCache["sel1"]).toEqual(schemaNodes),
+    );
+    expect(mockInvoke).toHaveBeenCalledWith("cmd_list_schemas", { connectionId: "sel1" });
+  });
+
+  it("selectConnection(null) deselects without loading anything", () => {
+    useConnectionsStore.getState().selectConnection(null);
+    expect(useConnectionsStore.getState().selectedId).toBeNull();
+    expect(mockInvoke).not.toHaveBeenCalled();
+  });
+
   it("connectAndLoad connects a disconnected connection then lists schemas", async () => {
     mockByCommand({ cmd_list_schemas: () => schemaNodes });
 

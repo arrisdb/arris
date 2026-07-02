@@ -121,7 +121,13 @@ const useConnectionsStore = create<ConnectionsState>((set, get) => {
     await deleteConnectionIPC(id);
     set((s) => ({ connections: s.connections.filter((c) => c.id !== id) }));
   },
-  selectConnection: (id) => set({ selectedId: id }),
+  selectConnection: (id) => {
+    set({ selectedId: id });
+    // Selecting a connection is an intent to use it, so auto-populate the schema
+    // browser instead of forcing a manual refresh click. No-op when its tree is
+    // already cached or a load is already in flight.
+    if (id) get().ensureConnectedSchema(id);
+  },
   setSchema: (id, nodes) =>
     set((s) => ({ schemaCache: { ...s.schemaCache, [id]: nodes } })),
   ensureSchema: (id) => {
@@ -130,6 +136,21 @@ const useConnectionsStore = create<ConnectionsState>((set, get) => {
     const conn = s.connections.find((c) => c.id === id);
     if (!conn?.isConnected) return;
     void loadSchemaInto(id);
+  },
+  // Load the schema tree if it is not already cached, connecting first when the
+  // connection is idle. Unlike ensureSchema this drives the connect+list path so
+  // selecting or opening a console against a disconnected connection still fills
+  // the browser. Single-flight gated (skips when a load is already running) and
+  // cache-gated (skips a connection whose tree is already loaded), so it is safe
+  // to fire on every select and console open without re-fetching or thrashing.
+  ensureConnectedSchema: (id) => {
+    const s = get();
+    if (s.refreshing.has(id)) return;
+    if (s.schemaCache[id]) return;
+    const conn = s.connections.find((c) => c.id === id);
+    if (!conn) return;
+    if (conn.isConnected) void loadSchemaInto(id);
+    else get().connectAndLoad(id);
   },
   connectAndLoad: (id) => {
     if (get().refreshing.has(id)) return;
