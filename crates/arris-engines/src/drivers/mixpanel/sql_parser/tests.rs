@@ -1,4 +1,5 @@
 use super::*;
+use super::super::constants::EARLIEST_EXPORT_DATE;
 use std::collections::BTreeMap;
 
 // --- Basic Parsing ---
@@ -525,6 +526,15 @@ fn default_dates_format() {
     assert_eq!(to.len(), 10);
     assert!(from.contains('-'));
     assert!(to.contains('-'));
+}
+
+#[test]
+fn schema_sample_window_is_valid_and_within_floor() {
+    let from = schema_sample_from_date();
+    assert_eq!(from.len(), 10);
+    assert!(from.contains('-'));
+    // The sampling window is recent, so it must never precede the export floor.
+    assert!(from.as_str() > EARLIEST_EXPORT_DATE);
 }
 
 #[test]

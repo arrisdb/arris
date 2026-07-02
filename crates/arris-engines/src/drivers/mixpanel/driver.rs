@@ -15,12 +15,7 @@ use super::schema;
 use super::sql_parser::{self, ColumnSelection};
 use crate::drivers::DatabaseDriver;
 
-pub(super) const EXPORT_BASE_URL: &str = "https://data.mixpanel.com/api/2.0/export";
-pub(super) const QUERY_API_BASE: &str = "https://mixpanel.com/api/query";
-pub(super) const SCHEMAS_API_BASE: &str = "https://mixpanel.com/api/app/projects";
-pub(super) const MP_ROOT_NAME: &str = "Mixpanel";
-pub(super) const MP_ROOT_PATH: &str = "mixpanel";
-pub(super) const MAX_PROPERTY_FETCHES: usize = 50;
+use super::constants::EXPORT_BASE_URL;
 
 pub struct MixpanelDriver {
     inner: Mutex<Option<api::Inner>>,

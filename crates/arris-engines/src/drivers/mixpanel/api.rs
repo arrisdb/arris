@@ -3,8 +3,8 @@ use std::collections::BTreeMap;
 use crate::{DriverError, QueryValue};
 use crate::drivers::errors::Result;
 
-use super::driver::{
-    EXPORT_BASE_URL, MAX_PROPERTY_FETCHES, QUERY_API_BASE, SCHEMAS_API_BASE,
+use super::constants::{
+    EXPORT_BASE_URL, MAX_PROPERTY_FETCHES, QUERY_API_BASE, SCHEMA_SAMPLE_LIMIT, SCHEMAS_API_BASE,
 };
 use super::query;
 use super::sql_parser;
@@ -195,6 +195,72 @@ async fn fetch_event_properties_top(
     obj.keys().map(|k| (k.clone(), String::new())).collect()
 }
 
+fn json_type_label(value: &serde_json::Value) -> &'static str {
+    match value {
+        serde_json::Value::String(_) => "string",
+        serde_json::Value::Number(_) => "number",
+        serde_json::Value::Bool(_) => "boolean",
+        serde_json::Value::Array(_) | serde_json::Value::Object(_) => "object",
+        serde_json::Value::Null => "",
+    }
+}
+
+// Read a bounded sample of recent raw events and collect each property key,
+// inferring its type from the first non-null value seen. This backfills columns
+// when the Query API metadata endpoints return nothing for the service account.
+async fn sample_event_properties(inner: &Inner) -> BTreeMap<String, BTreeMap<String, String>> {
+    let url = format!(
+        "{EXPORT_BASE_URL}?project_id={}&from_date={}&to_date={}&limit={}",
+        inner.project_id,
+        sql_parser::schema_sample_from_date(),
+        sql_parser::default_to_date(),
+        SCHEMA_SAMPLE_LIMIT,
+    );
+    let Ok(resp) = inner
+        .client
+        .get(&url)
+        .basic_auth(&inner.username, Some(&inner.password))
+        .header("Accept", "text/plain")
+        .timeout(std::time::Duration::from_secs(60))
+        .send()
+        .await
+    else {
+        return BTreeMap::new();
+    };
+    if resp.status().as_u16() != 200 {
+        return BTreeMap::new();
+    }
+    let Ok(text) = resp.text().await else {
+        return BTreeMap::new();
+    };
+
+    let mut result: BTreeMap<String, BTreeMap<String, String>> = BTreeMap::new();
+    for line in text.lines() {
+        if line.is_empty() {
+            continue;
+        }
+        let Ok(obj) = serde_json::from_str::<serde_json::Value>(line) else {
+            continue;
+        };
+        let event = obj
+            .get("event")
+            .and_then(|v| v.as_str())
+            .unwrap_or_default()
+            .to_owned();
+        let entry = result.entry(event).or_default();
+        if let Some(props) = obj.get("properties").and_then(|v| v.as_object()) {
+            for (key, value) in props {
+                let ty = json_type_label(value);
+                let slot = entry.entry(key.clone()).or_default();
+                if slot.is_empty() && !ty.is_empty() {
+                    *slot = ty.to_owned();
+                }
+            }
+        }
+    }
+    result
+}
+
 pub(super) async fn discover_events(inner: &Inner) -> BTreeMap<String, BTreeMap<String, String>> {
     let (event_names, lexicon) =
         tokio::join!(fetch_event_names(inner), fetch_lexicon_schemas(inner),);
@@ -222,6 +288,18 @@ pub(super) async fn discover_events(inner: &Inner) -> BTreeMap<String, BTreeMap<
 
     for name in &needs_properties[fetch_count..] {
         result.entry(name.clone()).or_default();
+    }
+
+    // Backfill columns from real event data for accounts whose metadata APIs are
+    // empty; keep existing typed entries, only fill gaps.
+    for (event, props) in sample_event_properties(inner).await {
+        let entry = result.entry(event).or_default();
+        for (key, ty) in props {
+            let slot = entry.entry(key).or_default();
+            if slot.is_empty() && !ty.is_empty() {
+                *slot = ty;
+            }
+        }
     }
 
     result

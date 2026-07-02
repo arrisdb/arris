@@ -8,6 +8,7 @@ use sqlparser::ast::{
 };
 
 use crate::drivers::common::sql_parser::parse_sql_statement;
+use super::constants::{EARLIEST_EXPORT_DATE, SCHEMA_SAMPLE_DAYS};
 
 #[derive(Debug, Clone)]
 pub struct MixpanelQuery {
@@ -778,18 +779,20 @@ pub fn resolve_column_names(query: &MixpanelQuery) -> Vec<String> {
     }
 }
 
-// Mixpanel's raw-event export requires an explicit from_date/to_date window, so
-// "unlimited" is expressed as the earliest date any project could hold data. It
-// predates Mixpanel itself (founded 2009), so every event is captured unless the
-// query narrows the range with a WHERE clause on `time`.
-pub const EARLIEST_EXPORT_DATE: &str = "2008-01-01";
-
 pub fn default_from_date() -> String {
     EARLIEST_EXPORT_DATE.to_string()
 }
 
 pub fn default_to_date() -> String {
     Utc::now().format("%Y-%m-%d").to_string()
+}
+
+// Recent window sampled to discover event properties (columns) when Mixpanel's
+// metadata APIs return nothing for the service account. SCHEMA_SAMPLE_DAYS bounds
+// it so schema loads stay fast; the export `limit` caps how many events are read.
+pub fn schema_sample_from_date() -> String {
+    let d = Utc::now() - chrono::Duration::days(SCHEMA_SAMPLE_DAYS);
+    d.format("%Y-%m-%d").to_string()
 }
 
 #[cfg(test)]

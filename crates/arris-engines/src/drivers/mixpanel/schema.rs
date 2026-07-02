@@ -2,13 +2,11 @@ use std::collections::BTreeMap;
 
 use crate::{SchemaNode, SchemaNodeKind};
 
-use super::driver::{MP_ROOT_NAME, MP_ROOT_PATH};
+use super::constants::{EVENTS_TABLE, MP_ROOT_NAME, MP_ROOT_PATH};
 
 // Mixpanel exposes a single logical table, `events`, which every query targets
 // (`FROM events`). Each discovered event property becomes a column on it, and the
 // base columns event/time/distinct_id are always queryable.
-pub(super) const EVENTS_TABLE: &str = "events";
-
 pub(super) fn build_schema_tree(
     discovered: &BTreeMap<String, BTreeMap<String, String>>,
 ) -> Vec<SchemaNode> {
