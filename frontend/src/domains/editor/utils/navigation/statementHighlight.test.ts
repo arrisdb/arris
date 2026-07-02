@@ -134,3 +134,50 @@ describe("findStatementAt", () => {
     expect(extracted).toBe("SELECT 2;");
   });
 });
+
+// Field-level behavior: decorations render, and a caret move INSIDE the
+// highlighted statement reuses the previous field value (no whole-document
+// boundary rescan per arrow key), while crossing into another statement
+// recomputes.
+describe("statementHighlightField", () => {
+  it("decorates the statement under the caret and reuses state within it", async () => {
+    const { EditorState } = await import("@codemirror/state");
+    const { statementHighlight, statementHighlightField } = await import("./statementHighlight");
+    const doc = "SELECT 1;\nSELECT 22;";
+    let state = EditorState.create({
+      doc,
+      selection: { anchor: 2 },
+      extensions: statementHighlight(),
+    });
+    const first = state.field(statementHighlightField);
+    expect(first.range).toEqual({ from: 0, to: 9 });
+
+    // Caret move within statement 1: same field value instance (skip path).
+    state = state.update({ selection: { anchor: 5 } }).state;
+    expect(state.field(statementHighlightField)).toBe(first);
+
+    // Caret move into statement 2: recomputed range.
+    state = state.update({ selection: { anchor: doc.indexOf("22") } }).state;
+    const second = state.field(statementHighlightField);
+    expect(second).not.toBe(first);
+    expect(second.range).toEqual({ from: 10, to: doc.length });
+  });
+
+  it("recomputes on document edits", async () => {
+    const { EditorState } = await import("@codemirror/state");
+    const { statementHighlight, statementHighlightField } = await import("./statementHighlight");
+    let state = EditorState.create({
+      doc: "SELECT 1",
+      selection: { anchor: 8 },
+      extensions: statementHighlight(),
+    });
+    const before = state.field(statementHighlightField);
+    state = state.update({
+      changes: { from: 8, to: 8, insert: "23" },
+      selection: { anchor: 10 },
+    }).state;
+    const after = state.field(statementHighlightField);
+    expect(after).not.toBe(before);
+    expect(after.range).toEqual({ from: 0, to: 10 });
+  });
+});
