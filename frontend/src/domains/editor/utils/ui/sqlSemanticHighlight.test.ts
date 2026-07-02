@@ -8,7 +8,7 @@ import { editorLanguageExtensions } from "../dialects/registry";
 import {
   classifyLeaves,
   collectLeaves,
-  sqlSemanticField,
+  sqlSemanticPlugin,
   sqlSemanticHighlight,
   type Role,
 } from "./sqlSemanticHighlight";
@@ -173,6 +173,25 @@ describe("sql semantic highlight", () => {
   it("still colours a table-valued function after FROM as a function", () => {
     expect(roleOf("SELECT * FROM generate_series(1, 10)", "generate_series")).toBe("function");
   });
+
+  // Perf contract: leaf collection is windowed so a rebuild costs O(viewport),
+  // not O(document). Out-of-window statements must contribute no leaves.
+  it("collectLeaves respects the [from, to] window", () => {
+    const head = "SELECT aaa FROM t1;\n";
+    const tail = "SELECT zzz FROM t2;";
+    const doc = head + tail;
+    const state = EditorState.create({ doc, extensions: [sql({ dialect: StandardSQL })] });
+    const windowed = collectLeaves(state, head.length, doc.length);
+    const texts = windowed.map((l) => l.text);
+    expect(texts).toContain("zzz");
+    expect(texts).toContain("t2");
+    expect(texts).not.toContain("aaa");
+    expect(texts).not.toContain("t1");
+    // Default window still covers the whole document.
+    const all = collectLeaves(state).map((l) => l.text);
+    expect(all).toContain("aaa");
+    expect(all).toContain("zzz");
+  });
 });
 
 // End-to-end through a real EditorView with the same stack the editor mounts:
@@ -197,7 +216,7 @@ describe("sql semantic highlight (mounted view)", () => {
 
   it("produces role decorations in a configured view", () => {
     const view = mount("SELECT c.email FROM customers c");
-    const decos = view.state.field(sqlSemanticField);
+    const decos = view.plugin(sqlSemanticPlugin)!.decorations;
     const ranges: string[] = [];
     const iter = decos.iter();
     while (iter.value) {
@@ -207,6 +226,23 @@ describe("sql semantic highlight (mounted view)", () => {
     expect(ranges).toContain("customers"); // table
     expect(ranges).toContain("email"); // column
     expect(ranges).toContain("c"); // alias
+    view.destroy();
+  });
+
+  it("rebuilds decorations after an edit (docChanged path)", () => {
+    const view = mount("SELECT x FROM customers");
+    view.dispatch({
+      changes: { from: view.state.doc.length, to: view.state.doc.length, insert: " JOIN orders o ON 1=1" },
+    });
+    const decos = view.plugin(sqlSemanticPlugin)!.decorations;
+    const ranges: string[] = [];
+    const iter = decos.iter();
+    while (iter.value) {
+      ranges.push(view.state.doc.sliceString(iter.from, iter.to));
+      iter.next();
+    }
+    expect(ranges).toContain("orders"); // table added by the edit
+    expect(ranges).toContain("o"); // its alias
     view.destroy();
   });
 
