@@ -107,6 +107,14 @@ interface ConnectionsState {
   ensureSchema: (id: string) => void;
   // Connects a disconnected connection, then lists and caches its schemas.
   connectAndLoad: (id: string) => void;
+  // Auto-populates the schema browser for a selected/opened connection: loads
+  // the tree if not cached, connecting first when idle. Cache- and in-flight-
+  // gated so it is safe to fire on every selection and console open.
+  ensureConnectedSchema: (id: string) => void;
+  // On startup/project restore, eagerly loads schemas for every connection whose
+  // backend session is already connected, so the tree and autocomplete are ready
+  // without a manual connection switch. Cache-gated per connection.
+  hydrateConnectedSchemas: () => void;
   // Closes the backend connection, clears its cached schema, and flips the
   // status dot off.
   disconnect: (id: string) => void;

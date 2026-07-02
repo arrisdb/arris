@@ -38,6 +38,9 @@ const useProjectStore = create<ProjectState>((set) => ({
 
       // Hydrate project-scoped stores
       useConnectionsStore.getState().setConnections(result.connections);
+      // Eagerly load schemas for connections that are already connected, so the
+      // tree and autocomplete are ready without a manual connection switch.
+      useConnectionsStore.getState().hydrateConnectedSchemas();
       useTabsStore
         .getState()
         .setTabs(result.tabs.map((t) => ({ ...t })));
