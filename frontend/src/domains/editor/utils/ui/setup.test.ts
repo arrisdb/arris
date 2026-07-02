@@ -151,7 +151,7 @@ describe("mountEditor sql with schema", () => {
       initialDoc: "select  from users",
       languageId: "sql",
       schema: { users: [{ name: "id" }, { name: "name" }] },
-      onChange: () => {},
+      onEdit: () => {},
     });
     // Lang-sql attaches as a language layer; the editor mounts with caret
     // visible. The presence of the editor with the doc proves the SQL
@@ -169,8 +169,8 @@ describe("mountEditor schema drops", () => {
       initialDoc: "select  from users",
       initialCursor: 7,
       languageId: "sql",
-      onChange: (text) => {
-        latest = text;
+      onEdit: (patch) => {
+        latest = patch.text ?? latest;
       },
     });
     const content = host.querySelector(".cm-content") as HTMLElement;
@@ -223,8 +223,8 @@ describe("mountEditor schema drops", () => {
       initialDoc: "select  from users",
       initialCursor: 7,
       languageId: "sql",
-      onChange: (text) => {
-        latest = text;
+      onEdit: (patch) => {
+        latest = patch.text ?? latest;
       },
     });
 
@@ -280,5 +280,44 @@ describe("mountEditor live shortcut compartment", () => {
     // The old binding no longer triggers Run.
     ctrlKeydown(content, "Enter");
     expect(runs).toBe(2);
+  });
+});
+
+// A single keystroke changes the document AND moves the caret. The contract is
+// ONE onEdit invocation carrying text + cursor + selection together, so the
+// owner commits exactly one store write per keystroke (three separate
+// callbacks previously meant three writes and three re-render waves).
+describe("mountEditor onEdit coalescing", () => {
+  it("fires once per edit with text, cursor and selection in one patch", () => {
+    const patches: Array<{ text?: string; cursor?: number; selection?: { from: number; to: number } }> = [];
+    unmount = mountEditor({
+      host,
+      initialDoc: "select 1",
+      initialCursor: 8,
+      languageId: "sql",
+      onEdit: (patch) => patches.push(patch),
+    });
+
+    unmount.insertAtCursor("2");
+
+    expect(patches).toHaveLength(1);
+    expect(patches[0].text).toBe("select 12");
+    expect(patches[0].cursor).toBe(9);
+    expect(patches[0].selection).toEqual({ from: 9, to: 9 });
+  });
+
+  it("does not fire for transactions that touch neither doc nor selection", () => {
+    const patches: unknown[] = [];
+    const handle = mountEditor({
+      host,
+      initialDoc: "select 1",
+      languageId: "sql",
+      onEdit: (patch) => patches.push(patch),
+    });
+    unmount = handle;
+
+    handle.updateRunStatus({ kind: "success", from: 0, startedAt: 0 });
+
+    expect(patches).toHaveLength(0);
   });
 });

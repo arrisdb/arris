@@ -793,16 +793,18 @@ function PaneGroupView({ groupId }: { groupId: string }) {
       host: editorHostRef.current,
       initialDoc: activeTab.text,
       initialCursor: activeTab.cursor,
-      onChange: (text) => {
-        updateTab(activeTab.id, { text });
+      // One patch per editor update: a keystroke changes doc AND selection, so
+      // separate callbacks meant three store writes (and three re-render waves
+      // through every tab subscriber) per key. Single write instead.
+      onEdit: (patch) => {
+        updateTab(activeTab.id, patch);
+        if (patch.text === undefined) return;
         if (currentDbtNode) {
           markCompiledStale(currentDbtNode.name);
           markDocsStale();
         }
         if (currentSqlMeshModel) markRenderedStale(currentSqlMeshModel.name);
       },
-      onCursorChange: (cursor) => updateTab(activeTab.id, { cursor }),
-      onSelectionChange: (selection) => updateTab(activeTab.id, { selection }),
       languageId: activeTab.kind,
       fileName: activeTab.filePath,
       connectionKind: tabConnection?.kind,
