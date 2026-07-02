@@ -2,6 +2,7 @@ import { useResultsTableStore, useRunHistoryStore } from "../../hooks";
 import { usePinnedQueriesStore } from "@domains/pinnedQueries";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { Profiler } from "react";
 
 vi.mock("@domains/pinnedQueries/components/PinnedQueriesPane/ipc", () => ({
   loadPinnedQueriesIPC: vi.fn().mockResolvedValue([]),
@@ -128,6 +129,32 @@ describe("ResultsTableView", () => {
     expect(screen.getByText("name")).toBeTruthy();
     expect(screen.getByText("alice")).toBeTruthy();
     expect(screen.getByText("NULL")).toBeTruthy();
+  });
+
+  it("does not re-render on tab text churn (keystrokes), but stays reactive to other tab fields", () => {
+    let commits = 0;
+    render(
+      <Profiler id="results" onRender={() => { commits += 1; }}>
+        <ResultsTableView />
+      </Profiler>,
+    );
+    const afterMount = commits;
+
+    // Editor keystrokes write { text } to the tab store; the results pane must
+    // NOT re-render for them.
+    act(() => {
+      useTabsStore.getState().updateTab("t1", { text: "select * from users where 1" });
+    });
+    act(() => {
+      useTabsStore.getState().updateTab("t1", { text: "select * from users where 1=1" });
+    });
+    expect(commits).toBe(afterMount);
+
+    // Positive control: a non-text tab change still re-renders the pane.
+    act(() => {
+      useTabsStore.getState().updateTab("t1", { isRunning: true });
+    });
+    expect(commits).toBeGreaterThan(afterMount);
   });
 
   it("does not borrow another run's result for a selected run that has none", () => {

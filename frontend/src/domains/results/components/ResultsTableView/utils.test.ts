@@ -5,8 +5,10 @@ import {
   findVisibleMatches,
   resultToCsv,
   resultToJson,
+  tabEqualIgnoringText,
   typeChipMeta,
 } from "./utils";
+import type { EditorTab } from "@shell/types";
 import type { ColumnSpec, QueryValue, VisibleResultRow } from "./types";
 
 const columns: ColumnSpec[] = [
@@ -287,5 +289,36 @@ describe("copyTextForSelectedCell", () => {
     expect(
       copyTextForSelectedCell(visibleRows, cols, { row: 0, col: 9 }, noEdits, noStaged, "t1"),
     ).toBeNull();
+  });
+});
+
+describe("tabEqualIgnoringText", () => {
+  const base = {
+    id: "t1",
+    title: "Q",
+    text: "select 1",
+    kind: "sql",
+    cursor: 0,
+  } as EditorTab;
+
+  it("treats text-only changes as equal (keystroke churn)", () => {
+    expect(tabEqualIgnoringText(base, { ...base, text: "select 2" })).toBe(true);
+    expect(tabEqualIgnoringText(base, { ...base })).toBe(true);
+    expect(tabEqualIgnoringText(base, base)).toBe(true);
+    expect(tabEqualIgnoringText(undefined, undefined)).toBe(true);
+  });
+
+  it("detects changes on any non-text field", () => {
+    expect(tabEqualIgnoringText(base, { ...base, isRunning: true } as EditorTab)).toBe(false);
+    expect(tabEqualIgnoringText(base, { ...base, error: "boom" } as EditorTab)).toBe(false);
+    expect(tabEqualIgnoringText(base, { ...base, cursor: 5 })).toBe(false);
+    expect(tabEqualIgnoringText(base, undefined)).toBe(false);
+    expect(tabEqualIgnoringText(undefined, base)).toBe(false);
+  });
+
+  it("detects fields present on only one side", () => {
+    const withChart = { ...base, chart: { kind: "bar" } } as unknown as EditorTab;
+    expect(tabEqualIgnoringText(base, withChart)).toBe(false);
+    expect(tabEqualIgnoringText(withChart, base)).toBe(false);
   });
 });

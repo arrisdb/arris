@@ -1,4 +1,5 @@
 import { type CellEdit, type PendingInsert } from "../../types";
+import type { EditorTab } from "@shell/types";
 import { save } from "@tauri-apps/plugin-dialog";
 import { writeTextFile } from "@tauri-apps/plugin-fs";
 import type {
@@ -306,6 +307,26 @@ async function exportResults(
   await writeTextFile(filePath, content);
 }
 
+// Equality guard for the results pane's tab subscription. Editor keystrokes
+// patch `tab.text` on every input, and the results pane must not re-render for
+// them; every other field change (result, isRunning, chart, error, ...) still
+// invalidates. Live text is read through dedicated selectors/handlers instead.
+function tabEqualIgnoringText(
+  a: EditorTab | undefined,
+  b: EditorTab | undefined,
+): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  const left = a as unknown as Record<string, unknown>;
+  const right = b as unknown as Record<string, unknown>;
+  const keys = new Set([...Object.keys(left), ...Object.keys(right)]);
+  keys.delete("text");
+  for (const key of keys) {
+    if (left[key] !== right[key]) return false;
+  }
+  return true;
+}
+
 export {
   buildBatchForTab,
   compareCell,
@@ -319,6 +340,7 @@ export {
   resultToJson,
   stagedKeysForTab,
   tabEditCount,
+  tabEqualIgnoringText,
   typeChipMeta,
   typeHintToKind,
   visibleRowsForResult,

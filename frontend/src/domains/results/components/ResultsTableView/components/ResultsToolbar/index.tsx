@@ -43,7 +43,7 @@ function ResultsToolbar({
   showRowDetailPane,
   stagedCount,
   tabIsTable,
-  tabText,
+  tabHasText,
   toggleDag,
   toggleRowDetailPane,
   uploadBusy,
@@ -112,7 +112,7 @@ function ResultsToolbar({
             label="Pin query"
             variant="ghost"
             onClick={onClickPinQuery}
-            disabled={!hasResult || !tabText?.trim()}
+            disabled={!hasResult || !tabHasText}
             data-testid="results-pin-btn"
           />
         </Tooltip>
