@@ -186,6 +186,12 @@ impl DatabaseDriver for MixpanelDriver {
         })
     }
 
+    fn pagination_strategy(&self) -> crate::PaginationStrategy {
+        // The driver buffers the full export result and applies LIMIT itself;
+        // the Mixpanel SQL subset cannot parse a wrapped subquery.
+        crate::PaginationStrategy::None
+    }
+
     async fn supports_explain(&self, _mode: ExplainMode) -> bool {
         false
     }
@@ -329,5 +335,11 @@ mod tests {
     async fn driver_starts_disconnected() {
         let d = MixpanelDriver::new();
         assert!(!d.is_connected().await);
+    }
+
+    #[test]
+    fn pagination_strategy_is_none() {
+        let d = MixpanelDriver::new();
+        assert_eq!(d.pagination_strategy(), crate::PaginationStrategy::None);
     }
 }
