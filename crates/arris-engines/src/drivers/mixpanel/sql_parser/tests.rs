@@ -1,4 +1,5 @@
 use super::*;
+use super::super::constants::EARLIEST_EXPORT_DATE;
 use std::collections::BTreeMap;
 
 // --- Basic Parsing ---
@@ -525,6 +526,25 @@ fn default_dates_format() {
     assert_eq!(to.len(), 10);
     assert!(from.contains('-'));
     assert!(to.contains('-'));
+}
+
+#[test]
+fn schema_sample_window_is_valid_and_within_floor() {
+    let from = schema_sample_from_date();
+    assert_eq!(from.len(), 10);
+    assert!(from.contains('-'));
+    // The sampling window is recent, so it must never precede the export floor.
+    assert!(from.as_str() > EARLIEST_EXPORT_DATE);
+}
+
+#[test]
+fn default_from_date_is_unlimited() {
+    // No WHERE time filter -> the range starts at the earliest export date, not a
+    // rolling 30-day window, so the whole project history is queryable.
+    assert_eq!(default_from_date(), EARLIEST_EXPORT_DATE);
+    let q = parse("SELECT * FROM events").unwrap();
+    assert_eq!(q.from_date, EARLIEST_EXPORT_DATE);
+    assert_eq!(q.to_date, default_to_date());
 }
 
 // --- Strip Quotes ---

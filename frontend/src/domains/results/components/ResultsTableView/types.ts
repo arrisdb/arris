@@ -124,9 +124,7 @@ type SchemaNodeKind =
   | "elasticsearchDataStream"
   | "topic"
   | "consumerGroup"
-  | "group"
-  | "mixpanelEvent"
-  | "mixpanelEventProperty";
+  | "group";
 
 interface SchemaNode {
   name: string;

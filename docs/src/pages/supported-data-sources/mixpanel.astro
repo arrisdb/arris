@@ -66,19 +66,11 @@ import DocTable from "../../components/docs/DocTable/DocTable.astro";
   <h2 id="schema">Schema browser</h2>
 
   <p>
-    Once connected, Arris fetches the project metadata and organizes it into groups.
+    Once connected, Arris fetches the project metadata and presents it as a single
+    <code>events</code> table. Its columns are the union of every event's properties,
+    plus the base columns <code>event</code>, <code>time</code>, and <code>distinct_id</code>.
+    Double-click the table to browse recent events.
   </p>
-
-  <p>
-    The schema tree displays the following object types, grouped by category:
-  </p>
-
-  <ul>
-    <li><strong>Events</strong> &mdash; tracked event types</li>
-    <li><strong>Event Properties</strong> &mdash; properties attached to events</li>
-  </ul>
-
-
 
   <h2 id="features">Supported SQL commands</h2>
 
@@ -92,7 +84,12 @@ import DocTable from "../../components/docs/DocTable/DocTable.astro";
     <tbody>
       <tr>
         <td class="font-medium text-fg"><code>SELECT</code></td>
-        <td>Query event data through the REST API, with aggregations.</td>
+        <td>
+          Query event data through the REST API, with aggregations. The full project
+          history is queried by default; narrow it with a <code>WHERE</code> filter on
+          <code>time</code>. A <code>LIMIT</code> is pushed down to the export API so
+          only the requested number of events is fetched.
+        </td>
       </tr>
     </tbody>
   </DocTable>

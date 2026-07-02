@@ -122,8 +122,10 @@ describe("driver registry", () => {
     expect(d.tableOpenableKinds.has("elasticsearchDataStream")).toBe(true);
   });
 
-  it("mixpanel has no openable kinds", () => {
-    expect(driverForKind("mixpanel").tableOpenableKinds.size).toBe(0);
+  it("mixpanel opens the single events table", () => {
+    const openable = driverForKind("mixpanel").tableOpenableKinds;
+    expect(openable.size).toBe(1);
+    expect(openable.has("table")).toBe(true);
   });
 
   it("redshift shares postgres defaults", () => {

@@ -189,18 +189,10 @@ describe("groupSchemaChildren", () => {
     ]);
   });
 
-  it("groups Mixpanel events and event properties", () => {
-    const nodes = [
-      node("Sign Up", "mixpanelEvent"),
-      node("Purchase", "mixpanelEvent"),
-      node("$browser", "mixpanelEventProperty"),
-      node("$city", "mixpanelEventProperty"),
-    ];
+  it("groups Mixpanel into a single events table", () => {
+    const nodes = [node("events", "table")];
     const grouped = groupSchemaChildren(nodes, driverForKind("mixpanel").schemaGrouping);
-    expect(grouped.map((g) => g.name)).toEqual([
-      "Events (2)",
-      "Event Properties (2)",
-    ]);
+    expect(grouped.map((g) => g.name)).toEqual(["Tables (1)"]);
   });
 
   it("groups Oracle metadata object types", () => {
