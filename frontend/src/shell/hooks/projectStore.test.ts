@@ -213,12 +213,19 @@ describe("useProjectStore — openProject schema hydration", () => {
       refreshing: new Set<string>(),
       connErrors: {},
     });
+    // Fresh layout so the restored active tab is deterministic (the first tab).
+    useTabsStore.setState({
+      tabs: [],
+      layout: null,
+      focusedPaneGroupId: null,
+      activeId: null,
+    });
     mockInvoke.mockImplementation((cmd: string) =>
       cmd === "cmd_list_schemas" ? Promise.resolve(schemaNodes) : Promise.resolve(undefined),
     );
   });
 
-  it("connects and loads the schema for an idle connection that has an open console tab", async () => {
+  it("connects and loads the schema for the idle active console's connection", async () => {
     vi.mocked(openProjectIPC).mockResolvedValue({
       root: "/projects/myapp",
       connections: [conn({ id: "dev_lextest", kind: "mongodb", isConnected: false })],
@@ -235,20 +242,26 @@ describe("useProjectStore — openProject schema hydration", () => {
     expect(mockInvoke).toHaveBeenCalledWith("cmd_list_schemas", { connectionId: "dev_lextest" });
   });
 
-  it("does not connect a connection that has no open tab", async () => {
+  it("connects ONLY the active console's connection, not other open consoles", async () => {
+    // t1 (active) targets connA; t2 targets connB. Only connA is hydrated so a
+    // second console on a heavy/prod source is not eagerly connected on launch.
     vi.mocked(openProjectIPC).mockResolvedValue({
       root: "/projects/myapp",
-      connections: [conn({ id: "used" }), conn({ id: "unused" })],
-      tabs: [{ id: "t1", title: "Console 1", text: "", kind: "sql", cursor: 0, connectionId: "used" }],
+      connections: [conn({ id: "connA" }), conn({ id: "connB" })],
+      tabs: [
+        { id: "t1", title: "Console 1", text: "", kind: "sql", cursor: 0, connectionId: "connA" },
+        { id: "t2", title: "Console 2", text: "", kind: "sql", cursor: 0, connectionId: "connB" },
+      ],
       federationTabs: [],
     } as any);
 
     await useProjectStore.getState().openProject("/projects/myapp");
 
     await vi.waitFor(() =>
-      expect(mockInvoke).toHaveBeenCalledWith("cmd_connect", { connectionId: "used" }),
+      expect(mockInvoke).toHaveBeenCalledWith("cmd_connect", { connectionId: "connA" }),
     );
-    expect(mockInvoke).not.toHaveBeenCalledWith("cmd_connect", { connectionId: "unused" });
+    expect(mockInvoke).not.toHaveBeenCalledWith("cmd_connect", { connectionId: "connB" });
+    expect(mockInvoke).not.toHaveBeenCalledWith("cmd_list_schemas", { connectionId: "connB" });
   });
 
   it("loads without reconnecting a tab connection that is already connected", async () => {
