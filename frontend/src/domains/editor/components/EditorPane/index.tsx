@@ -76,7 +76,8 @@ import { EditorTabRouter } from "./components/EditorTabRouter";
 import type { MarkdownViewMode } from "../MarkdownPreview/types";
 import { dbtSlimDiffIPC } from "./components/SlimDiff/ipc";
 import type { DbtDiffRunConfig } from "./components/SlimDiff/types";
-import { buildPreviewSql, resolveRunRange, resolveRunSql, resolveTabConnectionId, runErrorMessage, NO_CONNECTION_MESSAGE } from "./utils";
+import { buildPreviewSql, resolveRunRange, resolveRunSql, resolveTabConnectionId, runErrorMessage, tabEqualIgnoringVolatile, tabsEqualIgnoringVolatile, NO_CONNECTION_MESSAGE } from "./utils";
+import { useStoreWithEqualityFn } from "zustand/traditional";
 
 import { Icon } from "@shared/ui/Icon";
 import {
@@ -145,11 +146,14 @@ function EditorPane() {
   const addTab = useTabsStore((s) => s.addTab);
   const selectedConnectionId = useConnectionsStore((s) => s.selectedId);
   const connections = useConnectionsStore((s) => s.connections);
-  const allTabs = useTabsStore((s) => s.tabs);
   const [draggingTabId, setDraggingTabId] = useState<string | null>(null);
-  const draggingTab = draggingTabId
-    ? allTabs.find((t) => t.id === draggingTabId) ?? null
-    : null;
+  // Stable null while no drag is active, and volatile-field churn (typing in
+  // some pane) never re-renders the whole editor root mid-drag.
+  const draggingTab = useStoreWithEqualityFn(
+    useTabsStore,
+    (s) => (draggingTabId ? s.tabs.find((t) => t.id === draggingTabId) ?? null : null),
+    tabEqualIgnoringVolatile,
+  );
   const dndSensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
   );
@@ -320,7 +324,16 @@ function SplitView({ split }: { split: PaneSplit }) {
 /// instance without tearing during cross-pane focus changes.
 function PaneGroupView({ groupId }: { groupId: string }) {
   const group = useTabsStore((s) => findLeaf(s.layout, groupId));
-  const allTabs = useTabsStore((s) => s.tabs);
+  // Ignore text/cursor/selection churn: typing writes those fields to the
+  // store on every keystroke, and re-rendering this (large) component per key
+  // was a dominant editor-latency cost. Everything render-visible here is
+  // structural; the few consumers of the live buffer subscribe narrowly below
+  // or read the store at invocation time (freshActiveTab).
+  const allTabs = useStoreWithEqualityFn(
+    useTabsStore,
+    (s) => s.tabs,
+    tabsEqualIgnoringVolatile,
+  );
   const isFocusedGroup = useTabsStore((s) => s.focusedPaneGroupId === groupId);
   const updateTab = useTabsStore((s) => s.updateTab);
   const focusTab = useTabsStore((s) => s.focusTab);
@@ -437,8 +450,17 @@ function PaneGroupView({ groupId }: { groupId: string }) {
 
   const activeId = group?.selectedTabId ?? null;
   const activeTab = groupTabs.find((t) => t.id === activeId) ?? null;
+  // The subscription above deliberately keeps text/cursor/selection stale in
+  // render; any handler needing the live buffer reads it at invocation time.
+  const freshActiveTab = () =>
+    useTabsStore.getState().tabs.find((t) => t.id === activeId) ?? null;
   const isMarkdown = activeTab?.kind === "markdown";
   const showRunBar = isMarkdown || isRunnableQueryKind(activeTab?.kind);
+  // Narrow live subscription: only a markdown tab needs its buffer text per
+  // keystroke (live preview); every other tab kind returns a stable "" here.
+  const markdownLiveText = useTabsStore((s) =>
+    isMarkdown && activeId ? s.tabs.find((t) => t.id === activeId)?.text ?? "" : "",
+  );
 
   // Status + start time of the active tab's most recent run, driving the
   // editor's per-statement run-status indicator (spinner / check / X).
@@ -536,21 +558,36 @@ function PaneGroupView({ groupId }: { groupId: string }) {
     };
   }, [isDbtModel, isSqlMeshModel, dbtNodes, sqlmeshModels]);
 
-  const liveModelSql = useMemo<Record<string, string>>(() => {
-    const pick = (name: string, filePath?: string) =>
-      (filePath ? allTabs.find((t) => t.filePath === filePath)?.text : undefined) ?? modelDiskSql[name];
-    const map: Record<string, string> = {};
-    const models = isDbtModel
-      ? dbtNodes.filter((n) => n.kind === "model")
-      : isSqlMeshModel
-        ? sqlmeshModels
-        : [];
-    for (const m of models) {
-      const sql = pick(m.name, m.filePath);
-      if (sql != null) map[m.name] = sql;
-    }
-    return map;
-  }, [isDbtModel, isSqlMeshModel, dbtNodes, sqlmeshModels, modelDiskSql, allTabs]);
+  // Subscribed with value equality (not identity): the map's content only
+  // changes when a model file's buffer or disk copy changes, so plain-console
+  // keystrokes neither re-render this component nor churn the identity chain
+  // (liveModelSql -> liveModelColumns -> updateCompletionSchema effect), which
+  // previously reconfigured the completion compartment on every keystroke.
+  const liveModelSql = useStoreWithEqualityFn(
+    useTabsStore,
+    (s): Record<string, string> => {
+      const pick = (name: string, filePath?: string) =>
+        (filePath ? s.tabs.find((t) => t.filePath === filePath)?.text : undefined) ?? modelDiskSql[name];
+      const map: Record<string, string> = {};
+      const models = isDbtModel
+        ? dbtNodes.filter((n) => n.kind === "model")
+        : isSqlMeshModel
+          ? sqlmeshModels
+          : [];
+      for (const m of models) {
+        const sql = pick(m.name, m.filePath);
+        if (sql != null) map[m.name] = sql;
+      }
+      return map;
+    },
+    (a, b) => {
+      if (a === b) return true;
+      const ka = Object.keys(a);
+      const kb = Object.keys(b);
+      if (ka.length !== kb.length) return false;
+      return ka.every((k) => a[k] === b[k]);
+    },
+  );
 
   // name → live `SELECT` output columns, parsed from `liveModelSql` when the
   // model SQL is confidently flat. Used to override stale scan columns in both
@@ -585,12 +622,18 @@ function PaneGroupView({ groupId }: { groupId: string }) {
       sqlmeshTests.some((t) => t.filePath === activeTab.filePath),
     [activeTab?.filePath, sqlmeshTests],
   );
+  // Narrow live subscription: only a sqlmesh test YAML needs text/cursor per
+  // keystroke (the toolbar's test-at-cursor label); every other tab kind
+  // returns stable primitives here and skips the re-render.
+  const smTestTabText = useTabsStore((s) =>
+    isSqlMeshTestFile && activeId ? s.tabs.find((t) => t.id === activeId)?.text ?? "" : "",
+  );
+  const smTestTabCursor = useTabsStore((s) =>
+    isSqlMeshTestFile && activeId ? s.tabs.find((t) => t.id === activeId)?.cursor ?? 0 : 0,
+  );
   const currentSqlMeshTestName = useMemo(
-    () =>
-      isSqlMeshTestFile && activeTab
-        ? sqlmeshTestNameAtCursor(activeTab.text, activeTab.cursor ?? 0)
-        : null,
-    [isSqlMeshTestFile, activeTab?.text, activeTab?.cursor],
+    () => (isSqlMeshTestFile ? sqlmeshTestNameAtCursor(smTestTabText, smTestTabCursor) : null),
+    [isSqlMeshTestFile, smTestTabText, smTestTabCursor],
   );
 
   function newTab() {
@@ -945,18 +988,20 @@ function PaneGroupView({ groupId }: { groupId: string }) {
   }, [activeTab?.id, activeTab?.isRunning, activeTab?.runRange, activeRunStatus, activeRunStartedAt]);
 
   function runActiveTab() {
-    const isFed = activeTab?.isFederation;
-    if (!activeTab) return;
+    // Live read: render-scope runTab has stale text/selection by design.
+    const runTab = freshActiveTab();
+    if (!runTab) return;
+    const isFed = runTab.isFederation;
     // A table tab renders its rows inline and never uses the shared bottom
     // Results pane, so its run must leave that pane exactly as the user left it:
     // no expanding it, no switching its Command Logs/Results mode.
-    const isTable = activeTab.tabType === "table";
-    const sql = resolveRunSql(activeTab);
+    const isTable = runTab.tabType === "table";
+    const sql = resolveRunSql(runTab);
     if (!sql) return;
     const runId = crypto.randomUUID();
     const queryId = crypto.randomUUID();
     const startedAt = Date.now();
-    appendRun(activeTab.id, {
+    appendRun(runTab.id, {
       id: runId,
       sqlSnapshot: sql,
       status: "pending",
@@ -965,22 +1010,22 @@ function PaneGroupView({ groupId }: { groupId: string }) {
     });
     if (!isTable) useSettingsStore.getState().showBottomPane();
     if (!isFed && (!tabConnectionId || !tabConnection)) {
-      updateTab(activeTab.id, { error: NO_CONNECTION_MESSAGE, isRunning: false });
-      patchRun(activeTab.id, runId, { status: "error", error: NO_CONNECTION_MESSAGE, endedAt: Date.now() });
+      updateTab(runTab.id, { error: NO_CONNECTION_MESSAGE, isRunning: false });
+      patchRun(runTab.id, runId, { status: "error", error: NO_CONNECTION_MESSAGE, endedAt: Date.now() });
       if (!isTable) setRequestedPaneMode("output");
       return;
     }
-    updateTab(activeTab.id, {
+    updateTab(runTab.id, {
       isRunning: true,
       queryId,
-      runRange: resolveRunRange(activeTab),
+      runRange: resolveRunRange(runTab),
       error: undefined,
       pane: "results",
     });
     const ps = useResultsTableStore.getState();
-    ps.resetPage(activeTab.id);
-    const pSize = ps.getPageSize(activeTab.id);
-    const queryLanguage = queryLanguageForEditorKind(activeTab.kind);
+    ps.resetPage(runTab.id);
+    const pSize = ps.getPageSize(runTab.id);
+    const queryLanguage = queryLanguageForEditorKind(runTab.kind);
     // In manual transaction mode every executed statement leaves uncommitted
     // work, so the connection becomes dirty (enabling Commit/Rollback) and the
     // statement is recorded for the transaction reference pane.
@@ -1000,14 +1045,14 @@ function PaneGroupView({ groupId }: { groupId: string }) {
       .then((result) => {
         if (isFed) useFederationProgressStore.getState().endRun();
         const isDml = result.rows_affected != null;
-        updateTab(activeTab.id, {
+        updateTab(runTab.id, {
           result: isDml ? undefined : result,
           isRunning: false,
           plan: undefined,
           error: undefined,
           pane: "results",
         });
-        patchRun(activeTab.id, runId, {
+        patchRun(runTab.id, runId, {
           status: "success",
           result,
           endedAt: Date.now(),
@@ -1020,7 +1065,7 @@ function PaneGroupView({ groupId }: { groupId: string }) {
           });
         }
         if (isDml) {
-          const allRuns = useRunHistoryStore.getState().runsByTab[activeTab.id] ?? [];
+          const allRuns = useRunHistoryStore.getState().runsByTab[runTab.id] ?? [];
           const lastSelect = [...allRuns].reverse().find(
             (r) => r.id !== runId && !/^\s*(INSERT|UPDATE|DELETE)\b/i.test(r.sqlSnapshot),
           );
@@ -1033,8 +1078,8 @@ function PaneGroupView({ groupId }: { groupId: string }) {
       .catch((e) => {
         if (isFed) useFederationProgressStore.getState().endRun();
         const msg = runErrorMessage(e);
-        updateTab(activeTab.id, { error: msg, isRunning: false });
-        patchRun(activeTab.id, runId, {
+        updateTab(runTab.id, { error: msg, isRunning: false });
+        patchRun(runTab.id, runId, {
           status: "error",
           error: msg,
           endedAt: Date.now(),
@@ -1052,11 +1097,13 @@ function PaneGroupView({ groupId }: { groupId: string }) {
   }
 
   function saveActiveTab() {
+    // Live read: render-scope activeTab has stale text by design.
+    const saveTab = freshActiveTab();
     // Media tabs are read-only binary previews; their `text` is empty, so
     // writing it back would truncate the image/asset on disk.
-    if (!activeTab?.filePath || activeTab.tabType === "media") return;
-    const filePath = activeTab.filePath;
-    writeTextFileIPC(filePath, activeTab.text)
+    if (!saveTab?.filePath || saveTab.tabType === "media") return;
+    const filePath = saveTab.filePath;
+    writeTextFileIPC(filePath, saveTab.text)
       .then(async () => {
         let repo = gitRepoPath;
         if (!repo) {
@@ -1079,11 +1126,13 @@ function PaneGroupView({ groupId }: { groupId: string }) {
     saveActiveTabRef.current = saveActiveTab;
   });
 
-  const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     // Notebooks autosave themselves from the notebook store (tab.text is stale
     // for them), so skip them here. Media tabs are read-only binary previews:
     // their empty `text` would truncate the image/asset on disk.
+    // Text changes are observed via a store subscription instead of a render
+    // dependency so typing does not have to re-render this component to arm
+    // the autosave debounce.
     if (
       !autosave ||
       !activeTab?.filePath ||
@@ -1092,25 +1141,32 @@ function PaneGroupView({ groupId }: { groupId: string }) {
     )
       return;
     const filePath = activeTab.filePath;
-    const text = activeTab.text;
-    if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
-    autosaveTimerRef.current = setTimeout(() => {
-      writeTextFileIPC(filePath, text)
-        .then(async () => {
-          await useGitStore.getState().refreshFileStatuses().catch(() => {});
-          const repo = gitRepoPath ?? useFilesStore.getState().rootPath;
-          if (repo) {
-            gitFileDiffHunksIPC(repo, filePath)
-              .then(setDiffHunks)
-              .catch(() => setDiffHunks([]));
-          }
-        })
-        .catch((e) => console.error("Autosave failed", e));
-    }, 500);
+    const tabId = activeTab.id;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const unsubscribe = useTabsStore.subscribe((state, prev) => {
+      const next = state.tabs.find((t) => t.id === tabId);
+      const before = prev.tabs.find((t) => t.id === tabId);
+      if (!next || !before || next.text === before.text) return;
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        writeTextFileIPC(filePath, next.text)
+          .then(async () => {
+            await useGitStore.getState().refreshFileStatuses().catch(() => {});
+            const repo = gitRepoPath ?? useFilesStore.getState().rootPath;
+            if (repo) {
+              gitFileDiffHunksIPC(repo, filePath)
+                .then(setDiffHunks)
+                .catch(() => setDiffHunks([]));
+            }
+          })
+          .catch((e) => console.error("Autosave failed", e));
+      }, 500);
+    });
     return () => {
-      if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
+      if (timer) clearTimeout(timer);
+      unsubscribe();
     };
-  }, [autosave, activeTab?.text, activeTab?.filePath]);
+  }, [autosave, activeTab?.id, activeTab?.filePath, activeTab?.tabType, gitRepoPath]);
 
 
   function handleSplit(tabId: string, direction: SplitDirection) {
@@ -1138,12 +1194,19 @@ function PaneGroupView({ groupId }: { groupId: string }) {
   // Prefer the right-click position (so right-clicking near a star offers the
   // action without first moving the caret), but fall back to the caret when the
   // click isn't on/near a star, preserving keyboard-placed-caret expansion.
-  const starExpansion = useMemo(() => {
-    if (!activeTab) return null;
+  // Computed ON DEMAND (menu open / command dispatch), never per render: the
+  // detection scans the whole document, and running it on every keystroke was
+  // pure waste while the context menu stayed closed.
+  const computeStarExpansion = (clickPos: number | null) => {
+    const tab = freshActiveTab();
+    if (!tab) return null;
     const fromClick =
-      ctxStarPos != null ? expandStarAtCursor(activeTab.text, ctxStarPos, starSchema) : null;
-    return fromClick ?? expandStarAtCursor(activeTab.text, activeTab.cursor ?? 0, starSchema);
-  }, [activeTab?.text, activeTab?.cursor, ctxStarPos, starSchema]);
+      clickPos != null ? expandStarAtCursor(tab.text, clickPos, starSchema) : null;
+    return fromClick ?? expandStarAtCursor(tab.text, tab.cursor ?? 0, starSchema);
+  };
+  // Menu open/close is a state change, so this render-scope value exists
+  // exactly while the editor context menu is visible.
+  const starExpansion = editorMenu.state ? computeStarExpansion(ctxStarPos) : null;
 
   function onEditorContextMenu(e: ReactMouseEvent) {
     const pos = editorHandleRef.current?.posAtCoords(e.clientX, e.clientY);
@@ -1166,15 +1229,16 @@ function PaneGroupView({ groupId }: { groupId: string }) {
   }
 
   function pinFocusedQuery() {
-    if (!activeTab || !activeTab.text?.trim()) return;
-    const sql = resolveRunSql(activeTab);
+    const pinTab = freshActiveTab();
+    if (!pinTab || !pinTab.text?.trim()) return;
+    const sql = resolveRunSql(pinTab);
     if (!sql) return;
-    const conn = connections.find((c) => c.id === activeTab.connectionId);
+    const conn = connections.find((c) => c.id === pinTab.connectionId);
     const pinnedQueriesStore = usePinnedQueriesStore.getState();
     pinnedQueriesStore.addQuery({
       name: "Untitled query",
       text: sql,
-      connectionId: activeTab.connectionId,
+      connectionId: pinTab.connectionId,
       kind: conn?.kind ?? "sql",
     });
     pinnedQueriesStore.openPane();
@@ -1185,11 +1249,14 @@ function PaneGroupView({ groupId }: { groupId: string }) {
   }
 
   function expandFocusedStar() {
-    if (!starExpansion) return;
+    // Menu path reuses the render-scope detection (right-click position);
+    // the keyboard command path detects at the caret on demand.
+    const expansion = starExpansion ?? computeStarExpansion(null);
+    if (!expansion) return;
     editorHandleRef.current?.replaceRange(
-      starExpansion.from,
-      starExpansion.to,
-      starExpansion.replacement,
+      expansion.from,
+      expansion.to,
+      expansion.replacement,
     );
   }
 
@@ -1464,8 +1531,9 @@ function PaneGroupView({ groupId }: { groupId: string }) {
     try {
       // dbt compiles the model from disk, so flush the editor buffer first;
       // otherwise the diff reflects the last-saved file, not the latest edit.
-      if (activeTab.filePath) {
-        await writeTextFileIPC(activeTab.filePath, activeTab.text);
+      const diffTab = freshActiveTab();
+      if (diffTab?.filePath) {
+        await writeTextFileIPC(diffTab.filePath, diffTab.text);
       }
       const result = await dbtSlimDiffIPC({
         connectionId: tabConnectionId,
@@ -1686,10 +1754,11 @@ function PaneGroupView({ groupId }: { groupId: string }) {
   }
 
   function handleSmTestAtCursor() {
-    if (!activeTab?.filePath) return;
-    const name = sqlmeshTestNameAtCursor(activeTab.text, activeTab.cursor ?? 0);
-    const target = name ? `${activeTab.filePath}::${name}` : activeTab.filePath;
-    void handleSmTestTarget(target, name ?? activeTab.title);
+    const testTab = freshActiveTab();
+    if (!testTab?.filePath) return;
+    const name = sqlmeshTestNameAtCursor(testTab.text, testTab.cursor ?? 0);
+    const target = name ? `${testTab.filePath}::${name}` : testTab.filePath;
+    void handleSmTestTarget(target, name ?? testTab.title);
   }
 
   function handleSmTestFile() {
@@ -1827,7 +1896,10 @@ function PaneGroupView({ groupId }: { groupId: string }) {
         run: () => { setSmPrimaryAction("preview"); handleSmPreview(); },
         isEnabled: () => sqlMeshModelReady && !isSqlMeshPythonModel,
       },
-      expandStar: { run: () => expandFocusedStar(), isEnabled: () => !!starExpansion },
+      expandStar: {
+        run: () => expandFocusedStar(),
+        isEnabled: () => !!(starExpansion ?? computeStarExpansion(null)),
+      },
       pinQuery: { run: () => pinFocusedQuery(), isEnabled: () => activeTab?.tabType === "console" },
       openEditorContextMenu: { run: () => openEditorMenuAtCaret(), isEnabled: () => !!activeTab },
       switchMongoSqlMode: { run: () => switchMongoQueryMode("mongodb"), isEnabled: () => isMongoTab },
@@ -1974,7 +2046,7 @@ function PaneGroupView({ groupId }: { groupId: string }) {
           showRunBar,
           markdownView,
           onSetMarkdownView: setMarkdownView,
-          markdownSource: activeTab?.text ?? "",
+          markdownSource: markdownLiveText,
         }}
       />
     </div>

@@ -13,10 +13,21 @@ function ResultsFooterBar({ global: isGlobal = false }: { global?: boolean } = {
   // pane mode, so Command Logs ⇄ Results stays consistent across every tab.
   const globalRunTabId = useRunHistoryStore((s) => (isGlobal ? selectGlobalRun(s)?.tabId ?? null : null));
   const resolvedTabId = isGlobal ? globalRunTabId : activeId;
-  const tab = useTabsStore((state) => state.tabs.find((item) => item.id === resolvedTabId));
+  // Primitive selectors only: the tab OBJECT's identity changes on every
+  // keystroke (updateTab rebuilds it), and this footer is always mounted, so
+  // subscribing to the object re-rendered it per key. Existence and `pane`
+  // are stable primitives across text edits.
+  const tabExists = useTabsStore((state) =>
+    resolvedTabId != null && state.tabs.some((item) => item.id === resolvedTabId),
+  );
+  const tabPane = useTabsStore((state) =>
+    resolvedTabId != null
+      ? state.tabs.find((item) => item.id === resolvedTabId)?.pane
+      : undefined,
+  );
   const bottomPaneVisible = useSettingsStore((state) => state.bottomPaneVisible);
   const toggleBottomPane = useSettingsStore((state) => state.toggleBottomPaneVisible);
-  const tabId = tab?.id ?? null;
+  const tabId = tabExists ? resolvedTabId : null;
   const paneMode = useResultsTableStore((state) =>
     isGlobal ? state.globalMode : tabId ? state.modeByTab[tabId] ?? "results" : "results",
   );
@@ -64,7 +75,7 @@ function ResultsFooterBar({ global: isGlobal = false }: { global?: boolean } = {
         data-testid="footer-results-tab"
       >
         <Icon name="table" size={11} />
-        {tab?.pane === "plan" ? "Plan" : "Results"}
+        {tabPane === "plan" ? "Plan" : "Results"}
       </button>
     </div>
   );

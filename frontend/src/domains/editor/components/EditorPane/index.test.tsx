@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { act, fireEvent, render, screen } from "@testing-library/react";
+import { Profiler } from "react";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
@@ -1322,5 +1323,38 @@ describe("statement highlight box", () => {
       .map((m) => m[1]);
     expect(widths.length).toBeGreaterThanOrEqual(4);
     expect(new Set(widths)).toEqual(new Set(["1"]));
+  });
+});
+
+// Typing writes text/cursor/selection to the tabs store on every keystroke.
+// The pane subscribes with an equality fn that ignores those fields, so pure
+// typing churn must produce ZERO React commits in the editor pane; structural
+// changes (isRunning flip) must still re-render it.
+describe("keystroke re-render guard", () => {
+  it("ignores text/cursor/selection churn but re-renders on structural change", async () => {
+    let commits = 0;
+    render(
+      <Profiler id="editor-pane" onRender={() => { commits += 1; }}>
+        <EditorPane />
+      </Profiler>,
+    );
+    await act(async () => {});
+    const before = commits;
+
+    act(() => {
+      for (let i = 0; i < 5; i += 1) {
+        useTabsStore.getState().updateTab("t1", {
+          text: `select ${i}`,
+          cursor: i,
+          selection: { from: i, to: i },
+        });
+      }
+    });
+    expect(commits).toBe(before);
+
+    act(() => {
+      useTabsStore.getState().updateTab("t1", { isRunning: true });
+    });
+    expect(commits).toBeGreaterThan(before);
   });
 });

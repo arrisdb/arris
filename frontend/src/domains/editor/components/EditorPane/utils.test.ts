@@ -18,6 +18,7 @@ import { cancelQueryIPC, explainQueryIPC, runQueryIPC, writeTextFileIPC } from "
 import { leavesOf } from "@shell/utils/paneTree";
 import { useNotebookStore } from "@domains/notebook/hooks";
 import { useTabsStore } from "@shell/hooks/tabsStore";
+import type { EditorTab } from "@shell/types";
 import { parseNotebook } from "@domains/notebook";
 import { useSettingsStore } from "@shared/settings";
 import { useDbtStore } from "@domains/dbt/hooks";
@@ -34,6 +35,8 @@ import {
   runErrorMessage,
   saveActiveFile,
   stopActiveQuery,
+  tabEqualIgnoringVolatile,
+  tabsEqualIgnoringVolatile,
 } from "./utils";
 
 function reset() {
@@ -515,5 +518,58 @@ describe("resolveRunRange", () => {
     const cursor = cli.indexOf("HGETALL") + 3;
     const tab = { text: cli, kind: "rediscli", cursor } as any;
     expect(resolveRunRange(tab)).toEqual({ from: 9, to: cli.length });
+  });
+});
+
+// The pane group's tabs subscription ignores per-keystroke fields so typing
+// does not re-render the editor chrome; structural fields still count.
+describe("tabEqualIgnoringVolatile", () => {
+  const base = { id: "t1", title: "Q", text: "select 1", kind: "sql", cursor: 0 } as EditorTab;
+
+  it("treats text/cursor/selection churn as equal", () => {
+    expect(
+      tabEqualIgnoringVolatile(base, {
+        ...base,
+        text: "select 12345",
+        cursor: 12,
+        selection: { from: 3, to: 8 },
+      }),
+    ).toBe(true);
+  });
+
+  it("detects structural changes", () => {
+    expect(tabEqualIgnoringVolatile(base, { ...base, isRunning: true })).toBe(false);
+    expect(tabEqualIgnoringVolatile(base, { ...base, title: "renamed" })).toBe(false);
+    expect(tabEqualIgnoringVolatile(base, { ...base, error: "boom" })).toBe(false);
+  });
+
+  it("handles null/undefined operands", () => {
+    expect(tabEqualIgnoringVolatile(null, null)).toBe(true);
+    expect(tabEqualIgnoringVolatile(base, null)).toBe(false);
+    expect(tabEqualIgnoringVolatile(undefined, base)).toBe(false);
+  });
+
+  it("detects a field present on only one side", () => {
+    expect(tabEqualIgnoringVolatile(base, { ...base, filePath: "/a.sql" })).toBe(false);
+  });
+});
+
+describe("tabsEqualIgnoringVolatile", () => {
+  const base = { id: "t1", title: "Q", text: "select 1", kind: "sql", cursor: 0 } as EditorTab;
+
+  it("equal when only volatile fields changed on some tab", () => {
+    const a = [base, { ...base, id: "t2" }];
+    const b = [{ ...base, text: "x", cursor: 1 }, { ...base, id: "t2" }];
+    expect(tabsEqualIgnoringVolatile(a, b)).toBe(true);
+  });
+
+  it("unequal on length change or structural change", () => {
+    const a = [base];
+    expect(tabsEqualIgnoringVolatile(a, [])).toBe(false);
+    expect(
+      tabsEqualIgnoringVolatile(a, [
+        { ...base, result: { columns: [], rows: [], elapsed: 0 } } as EditorTab,
+      ]),
+    ).toBe(false);
   });
 });

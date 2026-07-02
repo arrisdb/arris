@@ -327,6 +327,36 @@ function exportActiveResults(format: ExportFormat): boolean {
   return true;
 }
 
+// Tab fields rewritten on (nearly) every keystroke. Subscriptions that only
+// need structural tab state (id/kind/title/result/isRunning/...) compare with
+// these ignored so typing does not re-render the whole pane group; handlers
+// that need the live buffer read it from the store at invocation time.
+const VOLATILE_TAB_FIELDS = new Set(["text", "cursor", "selection"]);
+
+function tabEqualIgnoringVolatile(
+  a: EditorTab | null | undefined,
+  b: EditorTab | null | undefined,
+): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  const ra = a as unknown as Record<string, unknown>;
+  const rb = b as unknown as Record<string, unknown>;
+  for (const k of new Set([...Object.keys(ra), ...Object.keys(rb)])) {
+    if (VOLATILE_TAB_FIELDS.has(k)) continue;
+    if (ra[k] !== rb[k]) return false;
+  }
+  return true;
+}
+
+function tabsEqualIgnoringVolatile(a: EditorTab[], b: EditorTab[]): boolean {
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (!tabEqualIgnoringVolatile(a[i], b[i])) return false;
+  }
+  return true;
+}
+
 export type { RunMode };
 export {
   NO_CONNECTION_MESSAGE,
@@ -342,4 +372,6 @@ export {
   stopActiveQuery,
   saveActiveFile,
   exportActiveResults,
+  tabEqualIgnoringVolatile,
+  tabsEqualIgnoringVolatile,
 };
