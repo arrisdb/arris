@@ -35,6 +35,7 @@ import type { SqlSchemaDict } from "../autocomplete/sqlSchema";
 import { gitGutterExtension, type GitHunkActions } from "./gitGutter";
 import { editorSearchExtension, openEditorSearch } from "./search";
 import { statementHighlight } from "../navigation/statementHighlight";
+import { docString } from "../docText";
 import { runStatusExtension, setRunStatus, type RunStatus } from "./runStatus";
 import type { DbtSourceEntry, DbtModelEntry, DbtMacroEntry } from "../autocomplete/providers/sql/dbtRefs";
 import type { SqlMeshModelEntry } from "../autocomplete/providers/sql/sqlmeshRefs";
@@ -339,7 +340,7 @@ function mountEditor(opts: MountOptions): EditorHandle {
         EditorState.readOnly.of(readOnly && !opts.formattable),
         EditorView.editable.of(!readOnly),
         EditorView.updateListener.of((u) => {
-          if (u.docChanged && opts.onChange) opts.onChange(u.state.doc.toString());
+          if (u.docChanged && opts.onChange) opts.onChange(docString(u.state.doc));
           if (u.selectionSet) {
             const main = u.state.selection.main;
             if (opts.onCursorChange) opts.onCursorChange(main.head);

@@ -1,5 +1,6 @@
 import { syntaxTree } from "@codemirror/language";
 import type { EditorState } from "@codemirror/state";
+import { docString } from "../../docText";
 
 type SqlClause =
   | "from"
@@ -33,7 +34,7 @@ function collectKeywords(
   to: number,
 ): KeywordHit[] {
   const tree = syntaxTree(state);
-  const doc = state.doc.toString();
+  const doc = docString(state.doc);
   const kws: KeywordHit[] = [];
   tree.iterate({
     from,
@@ -86,7 +87,7 @@ function findStatementRange(
   pos: number,
 ): { from: number; to: number } {
   const tree = syntaxTree(state);
-  const doc = state.doc.toString();
+  const doc = docString(state.doc);
   let stmtFrom = 0;
   let stmtTo = state.doc.length;
   let found = false;
@@ -108,7 +109,7 @@ function findStatementRange(
 
 function isPastAllStatements(state: EditorState, pos: number): boolean {
   const tree = syntaxTree(state);
-  const doc = state.doc.toString();
+  const doc = docString(state.doc);
   let maxTo = 0;
   let lastStmtHasSemicolon = false;
   tree.iterate({
@@ -138,7 +139,7 @@ function detectClauseFromTree(state: EditorState, pos: number): SqlClause | null
 
   if (isPastAllStatements(state, pos)) return "keyword";
 
-  const doc = state.doc.toString();
+  const doc = docString(state.doc);
   const { insideParens, parenFrom } = findParenContext(state, pos);
   const stmt = findStatementRange(state, pos);
 
@@ -195,7 +196,7 @@ function detectClauseRegex(text: string, pos: number): SqlClause {
 }
 
 function detectClause(state: EditorState, pos: number): SqlClause {
-  const doc = state.doc.toString();
+  const doc = docString(state.doc);
   // Jinja templating ({{ ... }} / {% ... %}) confuses the Lezer SQL parser, so
   // the syntax-tree clause detector misfires, e.g. reporting `keyword` in the
   // middle of a dbt model's column list, which suppresses column completions.

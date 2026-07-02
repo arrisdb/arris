@@ -1,6 +1,7 @@
 import type { Completion, CompletionContext } from "@codemirror/autocomplete";
 
 import { CompletionProvider, type CompletionAnalysis } from "../core/provider";
+import { docString } from "../../docText";
 
 type DbtYamlFileType = "project" | "schema" | "packages" | "profiles";
 
@@ -552,7 +553,7 @@ class DbtYamlCompletionProvider extends CompletionProvider<DbtYamlSituation> {
   }
 
   protected analyze(cc: CompletionContext): CompletionAnalysis<DbtYamlSituation> | null {
-    const docText = cc.state.doc.toString();
+    const docText = docString(cc.state.doc);
     const line = cc.state.doc.lineAt(cc.pos);
     const lineNumber = line.number - 1;
 
