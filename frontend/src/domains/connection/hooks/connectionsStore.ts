@@ -152,6 +152,18 @@ const useConnectionsStore = create<ConnectionsState>((set, get) => {
     if (conn.isConnected) void loadSchemaInto(id);
     else get().connectAndLoad(id);
   },
+  // On startup and project restore, connections arrive with only a connected-
+  // status snapshot, not their schema trees, and nothing calls selectConnection,
+  // so the active connection's browser stays empty until a manual switch. Eagerly
+  // load the tree for every connection whose backend session is already connected.
+  // Cache-gated per connection via ensureSchema, so re-running it (boot, then
+  // project open) is a no-op for anything already loaded.
+  hydrateConnectedSchemas: () => {
+    const s = get();
+    for (const conn of s.connections) {
+      if (conn.isConnected) s.ensureSchema(conn.id);
+    }
+  },
   connectAndLoad: (id) => {
     if (get().refreshing.has(id)) return;
     startRefreshing(id);

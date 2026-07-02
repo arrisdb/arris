@@ -98,6 +98,10 @@ function useAppBootstrap(
     Promise.all([listConnectionsIPC(), appPreferencesLoadIPC().catch(() => null)])
       .then(async ([connections, preferences]) => {
         setConnections(connections);
+        // Restore only carries the connected-status snapshot, not a schema fetch,
+        // so eagerly load schemas for already-connected connections; otherwise the
+        // active connection's tree stays empty until a manual switch.
+        useConnectionsStore.getState().hydrateConnectedSchemas();
         if (preferences) useSettingsStore.getState().hydrate(preferences);
         hydrated.current = true;
         await reopenLastProjectIfNeeded();

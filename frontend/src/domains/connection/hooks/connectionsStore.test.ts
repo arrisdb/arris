@@ -259,6 +259,35 @@ describe("connections store", () => {
     expect(mockInvoke).not.toHaveBeenCalled();
   });
 
+  it("hydrateConnectedSchemas loads schemas only for already-connected, uncached connections", async () => {
+    mockByCommand({ cmd_list_schemas: () => schemaNodes });
+    useConnectionsStore.setState({
+      connections: [
+        makeConn({ id: "up", isConnected: true }),
+        makeConn({ id: "down", isConnected: false }),
+        makeConn({ id: "cached", isConnected: true }),
+      ],
+      schemaCache: { cached: schemaNodes },
+    });
+
+    useConnectionsStore.getState().hydrateConnectedSchemas();
+
+    // Connected + uncached loads.
+    await vi.waitFor(() =>
+      expect(useConnectionsStore.getState().schemaCache["up"]).toEqual(schemaNodes),
+    );
+    expect(mockInvoke).toHaveBeenCalledWith("cmd_list_schemas", { connectionId: "up" });
+    // Disconnected is skipped; already-cached is not re-fetched.
+    expect(mockInvoke).not.toHaveBeenCalledWith("cmd_list_schemas", { connectionId: "down" });
+    expect(mockInvoke).not.toHaveBeenCalledWith("cmd_list_schemas", { connectionId: "cached" });
+    expect(mockInvoke).not.toHaveBeenCalledWith("cmd_connect", { connectionId: "down" });
+  });
+
+  it("hydrateConnectedSchemas is a no-op with no connections", () => {
+    useConnectionsStore.getState().hydrateConnectedSchemas();
+    expect(mockInvoke).not.toHaveBeenCalled();
+  });
+
   it("selectConnection auto-loads the newly selected connection's schema", async () => {
     mockByCommand({ cmd_list_schemas: () => schemaNodes });
     useConnectionsStore.setState({
