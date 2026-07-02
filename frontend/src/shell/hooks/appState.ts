@@ -43,6 +43,7 @@ import {
   fileTreeDropTargetDirAt,
   highlightFileTreeDropTargetAt,
 } from "@domains/files/components/FileTreeView/utils";
+import { useActiveConnectionSchema } from "./activeConnectionSchema";
 import { useConnectionAutoRefresh } from "./connectionAutoRefresh";
 import { useFsWatchRefresh } from "./fsWatchRefresh";
 import { useZoomKeymap } from "./zoomKeymap";
@@ -64,6 +65,7 @@ function useAppState(): AppViewModel {
   useFsWatchRefresh();
   useAppBackgroundTasks();
   useConnectionAutoRefresh();
+  useActiveConnectionSchema();
   useResultsFocusTracker();
   useAppKeymap();
 

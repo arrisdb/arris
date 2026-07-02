@@ -16,12 +16,6 @@ vi.mock("@shell/ipc", () => ({
   openProjectIPC: vi.fn(),
 }));
 
-const mockInvoke = vi.hoisted(() => vi.fn());
-
-vi.mock("@tauri-apps/api/core", () => ({
-  invoke: (...args: unknown[]) => mockInvoke(...args),
-}));
-
 import {
   closeFileIndexIPC,
   closeProjectIPC,
@@ -57,7 +51,6 @@ beforeEach(() => {
   useRecentsStore.setState({ recents: [] });
 
   // Reset mocks
-  mockInvoke.mockReset().mockResolvedValue(undefined);
   vi.mocked(openProjectIPC).mockReset();
   vi.mocked(closeProjectIPC).mockReset();
   vi.mocked(listFolderTreeIPC).mockReset();
@@ -187,98 +180,6 @@ describe("useProjectStore — openProject", () => {
     ]);
     // First (sorted) root is loaded active.
     expect(useDbtStore.getState().dbtRootPath).toBe("/projects/myapp/finance");
-  });
-});
-
-describe("useProjectStore — openProject schema hydration", () => {
-  const schemaNodes = [
-    { name: "users", kind: "table" as const, path: "users", children: [] },
-  ];
-
-  function conn(overrides: Record<string, unknown>) {
-    return {
-      id: "c",
-      name: "DB",
-      kind: "postgres",
-      scope: "local",
-      isConnected: false,
-      ...overrides,
-    };
-  }
-
-  beforeEach(() => {
-    useConnectionsStore.setState({
-      connections: [],
-      schemaCache: {},
-      refreshing: new Set<string>(),
-      connErrors: {},
-    });
-    // Fresh layout so the restored active tab is deterministic (the first tab).
-    useTabsStore.setState({
-      tabs: [],
-      layout: null,
-      focusedPaneGroupId: null,
-      activeId: null,
-    });
-    mockInvoke.mockImplementation((cmd: string) =>
-      cmd === "cmd_list_schemas" ? Promise.resolve(schemaNodes) : Promise.resolve(undefined),
-    );
-  });
-
-  it("connects and loads the schema for the idle active console's connection", async () => {
-    vi.mocked(openProjectIPC).mockResolvedValue({
-      root: "/projects/myapp",
-      connections: [conn({ id: "dev_lextest", kind: "mongodb", isConnected: false })],
-      tabs: [{ id: "t1", title: "Console 1", text: "", kind: "mongodb", cursor: 0, connectionId: "dev_lextest" }],
-      federationTabs: [],
-    } as any);
-
-    await useProjectStore.getState().openProject("/projects/myapp");
-
-    await vi.waitFor(() =>
-      expect(useConnectionsStore.getState().schemaCache["dev_lextest"]).toEqual(schemaNodes),
-    );
-    expect(mockInvoke).toHaveBeenCalledWith("cmd_connect", { connectionId: "dev_lextest" });
-    expect(mockInvoke).toHaveBeenCalledWith("cmd_list_schemas", { connectionId: "dev_lextest" });
-  });
-
-  it("connects ONLY the active console's connection, not other open consoles", async () => {
-    // t1 (active) targets connA; t2 targets connB. Only connA is hydrated so a
-    // second console on a heavy/prod source is not eagerly connected on launch.
-    vi.mocked(openProjectIPC).mockResolvedValue({
-      root: "/projects/myapp",
-      connections: [conn({ id: "connA" }), conn({ id: "connB" })],
-      tabs: [
-        { id: "t1", title: "Console 1", text: "", kind: "sql", cursor: 0, connectionId: "connA" },
-        { id: "t2", title: "Console 2", text: "", kind: "sql", cursor: 0, connectionId: "connB" },
-      ],
-      federationTabs: [],
-    } as any);
-
-    await useProjectStore.getState().openProject("/projects/myapp");
-
-    await vi.waitFor(() =>
-      expect(mockInvoke).toHaveBeenCalledWith("cmd_connect", { connectionId: "connA" }),
-    );
-    expect(mockInvoke).not.toHaveBeenCalledWith("cmd_connect", { connectionId: "connB" });
-    expect(mockInvoke).not.toHaveBeenCalledWith("cmd_list_schemas", { connectionId: "connB" });
-  });
-
-  it("loads without reconnecting a tab connection that is already connected", async () => {
-    vi.mocked(openProjectIPC).mockResolvedValue({
-      root: "/projects/myapp",
-      connections: [conn({ id: "live", isConnected: true })],
-      tabs: [{ id: "t1", title: "Console 1", text: "", kind: "sql", cursor: 0, connectionId: "live" }],
-      federationTabs: [],
-    } as any);
-
-    await useProjectStore.getState().openProject("/projects/myapp");
-
-    await vi.waitFor(() =>
-      expect(useConnectionsStore.getState().schemaCache["live"]).toEqual(schemaNodes),
-    );
-    expect(mockInvoke).toHaveBeenCalledWith("cmd_list_schemas", { connectionId: "live" });
-    expect(mockInvoke).not.toHaveBeenCalledWith("cmd_connect", { connectionId: "live" });
   });
 });
 

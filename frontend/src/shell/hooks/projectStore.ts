@@ -44,21 +44,6 @@ const useProjectStore = create<ProjectState>((set) => ({
       useTabsStore
         .getState()
         .setTabs(result.tabs.map((t) => ({ ...t })));
-      // The restored active console points at a connection the user is about to
-      // work in, but that connection is idle after a fresh launch, so its schema
-      // browser and autocomplete would stay empty until a manual connect/refresh.
-      // Connect and load ONLY the active tab's connection so it is ready on open,
-      // without eagerly connecting every other open console (which may target
-      // heavy or production sources the user has not opened yet). Cache- and
-      // in-flight-gated. Switching to another console fires the same load via
-      // selectConnection.
-      const tabsState = useTabsStore.getState();
-      const activeConnectionId = tabsState.tabs.find(
-        (t) => t.id === tabsState.activeId,
-      )?.connectionId;
-      if (activeConnectionId) {
-        useConnectionsStore.getState().ensureConnectedSchema(activeConnectionId);
-      }
       useFederationStore.getState().setTabs(result.federationTabs);
       usePinnedQueriesStore.getState().hydrate().catch(() => {});
       useRunHistoryStore.getState().hydrate().catch(() => {});
