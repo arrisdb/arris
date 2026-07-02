@@ -6,7 +6,7 @@ members = [
 exclude = ["src-tauri", ".claude"]
 
 [workspace.package]
-version = "0.8.0"
+version = "0.9.0"
 edition = "2024"
 rust-version = "1.92"
 license = "AGPL-3.0-only"
