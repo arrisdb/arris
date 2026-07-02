@@ -35,6 +35,7 @@ import type { SqlSchemaDict } from "../autocomplete/sqlSchema";
 import { gitGutterExtension, type GitHunkActions } from "./gitGutter";
 import { editorSearchExtension, openEditorSearch } from "./search";
 import { statementHighlight } from "../navigation/statementHighlight";
+import { docString } from "../docText";
 import { runStatusExtension, setRunStatus, type RunStatus } from "./runStatus";
 import type { DbtSourceEntry, DbtModelEntry, DbtMacroEntry } from "../autocomplete/providers/sql/dbtRefs";
 import type { SqlMeshModelEntry } from "../autocomplete/providers/sql/sqlmeshRefs";
@@ -59,11 +60,14 @@ interface MountOptions {
   host: HTMLElement;
   initialDoc: string;
   initialCursor?: number;
-  onChange?: (text: string) => void;
-  onCursorChange?: (cursor: number) => void;
-  /// Fired when the selection changes. `from`/`to` are equal for a collapsed
-  /// caret (no selection); a non-empty range means text is highlighted.
-  onSelectionChange?: (selection: { from: number; to: number }) => void;
+  /// Fired ONCE per editor update that changes the document and/or selection,
+  /// carrying every changed field together so the owner can commit a single
+  /// store write per keystroke (a keystroke changes doc AND selection; separate
+  /// callbacks meant separate writes and one subscriber re-render each).
+  /// `text` is present only when the document changed. `cursor`/`selection`
+  /// are present only when the selection changed; `selection.from`/`to` are
+  /// equal for a collapsed caret, a non-empty range means text is highlighted.
+  onEdit?: (patch: EditorEditPatch) => void;
   languageId: string;
   /// DatabaseKind of the tab's connection; picks the SQL dialect when `languageId === "sql"`.
   connectionKind?: DatabaseKind;
@@ -112,6 +116,12 @@ interface MountOptions {
   dbtMacros?: DbtMacroEntry[];
   sqlmeshModels?: SqlMeshModelEntry[];
   onDbtRefClick?: (reference: DbtReference) => void | Promise<void>;
+}
+
+interface EditorEditPatch {
+  text?: string;
+  cursor?: number;
+  selection?: { from: number; to: number };
 }
 
 interface CursorCoords {
@@ -339,14 +349,15 @@ function mountEditor(opts: MountOptions): EditorHandle {
         EditorState.readOnly.of(readOnly && !opts.formattable),
         EditorView.editable.of(!readOnly),
         EditorView.updateListener.of((u) => {
-          if (u.docChanged && opts.onChange) opts.onChange(u.state.doc.toString());
+          if (!opts.onEdit || (!u.docChanged && !u.selectionSet)) return;
+          const patch: EditorEditPatch = {};
+          if (u.docChanged) patch.text = docString(u.state.doc);
           if (u.selectionSet) {
             const main = u.state.selection.main;
-            if (opts.onCursorChange) opts.onCursorChange(main.head);
-            if (opts.onSelectionChange) {
-              opts.onSelectionChange({ from: main.from, to: main.to });
-            }
+            patch.cursor = main.head;
+            patch.selection = { from: main.from, to: main.to };
           }
+          opts.onEdit(patch);
         }),
         EditorView.domEventHandlers({
           dragover: (event) => {
@@ -677,5 +688,6 @@ export {
 
 export type {
   CursorCoords,
+  EditorEditPatch,
   EditorHandle,
 };

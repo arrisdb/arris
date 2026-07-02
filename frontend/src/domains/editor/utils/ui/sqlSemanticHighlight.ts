@@ -16,9 +16,16 @@
 
 import { ensureSyntaxTree, syntaxTree } from "@codemirror/language";
 import type { EditorState, Extension } from "@codemirror/state";
-import { Prec, RangeSetBuilder, StateField } from "@codemirror/state";
-import { Decoration, type DecorationSet, EditorView } from "@codemirror/view";
+import { Prec, RangeSetBuilder } from "@codemirror/state";
+import {
+  Decoration,
+  type DecorationSet,
+  type EditorView,
+  ViewPlugin,
+  type ViewUpdate,
+} from "@codemirror/view";
 import { findClosestKeyword } from "../linting/sqlLinter";
+import { SEMANTIC_CONTEXT_CHARS, SEMANTIC_PARSE_BUDGET_MS } from "./constants";
 
 type Role = "function" | "table" | "alias" | "column";
 
@@ -109,21 +116,22 @@ function prevNonSpaceChar(state: EditorState, pos: number): string {
   return m ? m[0] : "";
 }
 
-function collectLeaves(state: EditorState): Leaf[] {
-  const tree = ensureSyntaxTree(state, state.doc.length, 5000) ?? syntaxTree(state);
-  const cursor = tree.cursor();
+function collectLeaves(state: EditorState, from = 0, to = state.doc.length): Leaf[] {
+  const tree = ensureSyntaxTree(state, to, SEMANTIC_PARSE_BUDGET_MS) ?? syntaxTree(state);
   const leaves: Leaf[] = [];
-  // `cursor.next()` walks the whole tree in preorder (descending into children).
-  // Test for a leaf via `cursor.node.firstChild`, which does NOT move the cursor.
-  // (Using `cursor.firstChild()` as the test mutates position and silently skips
-  // the first child of every composite, e.g. the qualifier in `db.table`, leaving
-  // it uncoloured.)
-  do {
-    if (!cursor.node.firstChild) {
-      const text = state.doc.sliceString(cursor.from, cursor.to);
-      if (text.trim()) leaves.push({ name: cursor.name, from: cursor.from, to: cursor.to, text });
-    }
-  } while (cursor.next());
+  // `iterate` visits every node overlapping [from, to] in preorder. Test for a
+  // leaf via `n.node.firstChild` (does not move the iterator); descending into
+  // composites is what surfaces the qualifier segments of `db.table`.
+  tree.iterate({
+    from,
+    to,
+    enter: (n) => {
+      if (!n.node.firstChild) {
+        const text = state.doc.sliceString(n.from, n.to);
+        if (text.trim()) leaves.push({ name: n.name, from: n.from, to: n.to, text });
+      }
+    },
+  });
   return leaves;
 }
 
@@ -236,35 +244,60 @@ function classifyLeaves(state: EditorState, leaves: Leaf[]): RoleSpan[] {
   return spans;
 }
 
-function buildDecorations(state: EditorState): DecorationSet {
+// Decorate only what the user can see. Was previously a StateField that forced
+// a parse of the ENTIRE document (`ensureSyntaxTree(doc.length, 5000)`) and
+// walked the whole tree on every keystroke AND every caret move, synchronously
+// before paint, which made typing latency scale with document size. Now each
+// rebuild covers `view.visibleRanges` plus a fixed context window, so the cost
+// is O(viewport) regardless of how large the document grows.
+function buildDecorations(view: EditorView): DecorationSet {
+  const state = view.state;
   const caret = state.selection.main.head;
   const builder = new RangeSetBuilder<Decoration>();
-  for (const span of classifyLeaves(state, collectLeaves(state))) {
-    const typing =
-      isBeingTyped(caret, span.from, span.to) &&
-      isIncompleteKeyword(state.doc.sliceString(span.from, span.to));
-    builder.add(span.from, span.to, typing ? plainMark : roleMark(span.role));
+  // Ranges are processed in order; `emittedTo` guards against re-emitting a
+  // span when consecutive visible ranges share one context window.
+  let emittedTo = -1;
+  for (const range of view.visibleRanges) {
+    const winFrom = Math.max(0, range.from - SEMANTIC_CONTEXT_CHARS);
+    for (const span of classifyLeaves(state, collectLeaves(state, winFrom, range.to))) {
+      if (span.to <= range.from || span.from <= emittedTo) continue;
+      const typing =
+        isBeingTyped(caret, span.from, span.to) &&
+        isIncompleteKeyword(state.doc.sliceString(span.from, span.to));
+      builder.add(span.from, span.to, typing ? plainMark : roleMark(span.role));
+      emittedTo = span.to;
+    }
   }
   return builder.finish();
 }
 
-const sqlSemanticField = StateField.define<DecorationSet>({
-  create: (state) => buildDecorations(state),
-  update: (decorations, tr) => {
-    // Rebuild on edits, AND whenever the parse tree changes. lang-sql parses
-    // large docs incrementally in the background and dispatches non-doc-change
-    // transactions as the tree completes; without the tree-ref check those
-    // identifiers stay uncoloured until the next keystroke.
-    // `tr.selection` too: the token-under-caret stays plain, so the
-    // role colour must apply the moment the caret leaves it, even on a pure
-    // cursor move (arrow keys) with no doc edit.
-    if (tr.docChanged || tr.selection || syntaxTree(tr.state) !== syntaxTree(tr.startState)) {
-      return buildDecorations(tr.state);
+const sqlSemanticPlugin = ViewPlugin.fromClass(
+  class {
+    decorations: DecorationSet;
+
+    constructor(view: EditorView) {
+      this.decorations = buildDecorations(view);
     }
-    return decorations.map(tr.changes);
+
+    update(update: ViewUpdate) {
+      // Rebuild on edits, caret moves (the token-under-caret stays plain, so
+      // the role colour must apply the moment the caret leaves it), viewport
+      // scrolls, AND whenever the parse tree changes: lang-sql parses large
+      // docs incrementally in the background and flushes non-doc-change
+      // updates as the tree completes; without the tree-ref check those
+      // identifiers would stay uncoloured until the next keystroke.
+      if (
+        update.docChanged ||
+        update.selectionSet ||
+        update.viewportChanged ||
+        syntaxTree(update.state) !== syntaxTree(update.startState)
+      ) {
+        this.decorations = buildDecorations(update.view);
+      }
+    }
   },
-  provide: (f) => EditorView.decorations.from(f),
-});
+  { decorations: (v) => v.decorations },
+);
 
 function sqlSemanticHighlight(): Extension {
   // `Prec.highest` so the role decoration nests *inside* `syntaxHighlighting`'s
@@ -272,14 +305,14 @@ function sqlSemanticHighlight(): Extension {
   // token text. A child element's own `color` beats the inherited colour from a
   // parent span, so without this the flat `name` colour (on the inner highlight
   // span) wins and every identifier renders the same hue.
-  return Prec.highest(sqlSemanticField);
+  return Prec.highest(sqlSemanticPlugin);
 }
 
 export {
   buildDecorations,
   classifyLeaves,
   collectLeaves,
-  sqlSemanticField,
+  sqlSemanticPlugin,
   sqlSemanticHighlight,
 };
 export type { Role, RoleSpan };

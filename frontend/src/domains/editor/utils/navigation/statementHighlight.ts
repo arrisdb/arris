@@ -1,12 +1,22 @@
 import { StateField, type EditorState, type Range } from "@codemirror/state";
 import { EditorView, Decoration, type DecorationSet } from "@codemirror/view";
+import { docString } from "../docText";
 import { findStatementAt } from "./statementSplit";
 
-function computeDecorations(state: EditorState): DecorationSet {
-  const doc = state.doc.toString();
+// Field value keeps the highlighted statement's range beside the decorations
+// so a pure caret move INSIDE the same statement (the common case while
+// navigating) can reuse the previous value instead of rescanning the whole
+// document for statement boundaries on every transaction.
+interface StatementHighlightState {
+  deco: DecorationSet;
+  range: { from: number; to: number } | null;
+}
+
+function computeState(state: EditorState): StatementHighlightState {
+  const doc = docString(state.doc);
   const pos = state.selection.main.head;
   const range = findStatementAt(doc, pos);
-  if (!range) return Decoration.none;
+  if (!range) return { deco: Decoration.none, range: null };
 
   const firstLine = state.doc.lineAt(range.from).number;
   const lastLine = state.doc.lineAt(
@@ -37,16 +47,22 @@ function computeDecorations(state: EditorState): DecorationSet {
     );
   }
 
-  return Decoration.set(decos, true);
+  return { deco: Decoration.set(decos, true), range };
 }
 
-const statementHighlightField = StateField.define<DecorationSet>({
-  create: computeDecorations,
-  update(decos, tr) {
-    if (tr.docChanged || tr.selection) return computeDecorations(tr.state);
-    return decos;
+const statementHighlightField = StateField.define<StatementHighlightState>({
+  create: computeState,
+  update(prev, tr) {
+    if (!tr.docChanged && !tr.selection) return prev;
+    // Caret moved but stayed inside the highlighted statement: the decoration
+    // set cannot change, so skip the whole-document boundary rescan.
+    if (!tr.docChanged && prev.range) {
+      const pos = tr.state.selection.main.head;
+      if (pos >= prev.range.from && pos <= prev.range.to) return prev;
+    }
+    return computeState(tr.state);
   },
-  provide: (f) => EditorView.decorations.from(f),
+  provide: (f) => EditorView.decorations.from(f, (v) => v.deco),
 });
 
 function statementHighlight() {
@@ -56,4 +72,5 @@ function statementHighlight() {
 export {
   findStatementAt,
   statementHighlight,
+  statementHighlightField,
 };

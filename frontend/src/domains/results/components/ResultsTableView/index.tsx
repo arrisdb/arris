@@ -23,8 +23,10 @@ import {
   findVisibleMatches,
   stagedKeysForTab,
   tabEditCount,
+  tabEqualIgnoringText,
   visibleRowsForResult,
 } from "./utils";
+import { useStoreWithEqualityFn } from "zustand/traditional";
 import { ResultsDataTable } from "./components/ResultsDataTable";
 import type { SelectedCell } from "./types";
 import { ResultsToolbar } from "./components/ResultsToolbar";
@@ -50,7 +52,18 @@ function ResultsTableView({ tabId: tabIdProp, global: isGlobal = false }: { tabI
   const activeId = useTabsStore((s) => s.activeId);
   const globalRunTabId = useRunHistoryStore((s) => (isGlobal ? selectGlobalRun(s)?.tabId ?? null : null));
   const resolvedTabId = isGlobal ? globalRunTabId : tabIdProp ?? activeId;
-  const tab = useTabsStore((s) => s.tabs.find((t) => t.id === resolvedTabId));
+  // Subscribe to the tab but ignore `text`-only churn: the editor writes
+  // `{ text }` per keystroke and re-rendering the whole results pane (grid,
+  // toolbar, detail pane) for it is what makes typing stutter. Live text is
+  // read via `tabHasText` / `tabTextLive` below where it actually matters.
+  const tab = useStoreWithEqualityFn(
+    useTabsStore,
+    (s) => s.tabs.find((t) => t.id === resolvedTabId),
+    tabEqualIgnoringText,
+  );
+  const tabHasText = useTabsStore(
+    (s) => !!s.tabs.find((t) => t.id === resolvedTabId)?.text.trim(),
+  );
   const showRowDetailPane = useSettingsStore((s) => s.showRowDetailPane);
   const toggleRowDetailPane = useSettingsStore(
     (s) => s.toggleRowDetailPane,
@@ -120,7 +133,12 @@ function ResultsTableView({ tabId: tabIdProp, global: isGlobal = false }: { tabI
     ? (_tabId, mode) => setGlobalMode(mode)
     : setModeByTab;
   const openChartEditor = useChartEditorStore((s) => s.open);
-  const queryTextSql = activeRun?.sqlSnapshot ?? tab?.text ?? "";
+  // Track live tab text only while the query-text popover is open; while it is
+  // closed the selector returns null so keystrokes don't invalidate it.
+  const tabTextLive = useTabsStore((s) =>
+    showQueryText ? s.tabs.find((t) => t.id === resolvedTabId)?.text ?? null : null,
+  );
+  const queryTextSql = activeRun?.sqlSnapshot ?? tabTextLive ?? "";
   const queryRunning = !!tab?.isRunning || activeRun?.status === "pending";
   const fedDag = useFederationProgressStore((s) => s.dag);
   const showDag = useFederationProgressStore((s) => s.showDag);
@@ -443,7 +461,7 @@ function ResultsTableView({ tabId: tabIdProp, global: isGlobal = false }: { tabI
       showRowDetailPane={showRowDetailPane}
       stagedCount={stagedCount}
       tabIsTable={isTableTab}
-      tabText={tab.text}
+      tabHasText={tabHasText}
       toggleDag={toggleDag}
       toggleRowDetailPane={toggleRowDetailPane}
       uploadBusy={uploadBusy}

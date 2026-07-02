@@ -25,6 +25,7 @@ import {
 } from "./dbtRefs";
 import { buildSqlMeshFromJoinCompletions } from "./sqlmeshRefs";
 import type { SqlCompletionContext } from "./types";
+import { docString } from "../../../docText";
 
 interface QualifiedRef {
   qualifier: string;
@@ -62,7 +63,7 @@ function analyzeSqlSituation(
 ): CompletionAnalysis<SqlSituation> | null {
   const { opts, schema } = ctx;
   const word = cc.matchBefore(/[\w.$]+/);
-  const docText = cc.state.doc.toString();
+  const docText = docString(cc.state.doc);
   const qualified = qualifiedColumnContext(docText, cc.pos);
   const wordFrom = word?.from ?? cc.pos;
   const clause = detectClause(cc.state, wordFrom);

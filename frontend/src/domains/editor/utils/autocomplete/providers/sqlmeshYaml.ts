@@ -3,6 +3,7 @@ import type { Completion, CompletionContext } from "@codemirror/autocomplete";
 import { CompletionProvider, type CompletionAnalysis } from "../core/provider";
 import { resolveSchemaPath, yamlPathAtCursor } from "./dbtYaml";
 import type { YamlSchemaNode } from "./dbtYaml";
+import { docString } from "../../docText";
 
 type SqlMeshYamlFileType = "config" | "test";
 
@@ -231,7 +232,7 @@ class SqlMeshYamlCompletionProvider extends CompletionProvider<SqlMeshYamlSituat
   }
 
   protected analyze(cc: CompletionContext): CompletionAnalysis<SqlMeshYamlSituation> | null {
-    const docText = cc.state.doc.toString();
+    const docText = docString(cc.state.doc);
     const line = cc.state.doc.lineAt(cc.pos);
     const lineNumber = line.number - 1;
 

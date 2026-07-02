@@ -2,6 +2,8 @@ import { useResultsTableStore, useRunHistoryStore } from "../../hooks";
 import { usePinnedQueriesStore } from "@domains/pinnedQueries";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { Profiler } from "react";
+import { readFileSync } from "node:fs";
 
 vi.mock("@domains/pinnedQueries/components/PinnedQueriesPane/ipc", () => ({
   loadPinnedQueriesIPC: vi.fn().mockResolvedValue([]),
@@ -128,6 +130,42 @@ describe("ResultsTableView", () => {
     expect(screen.getByText("name")).toBeTruthy();
     expect(screen.getByText("alice")).toBeTruthy();
     expect(screen.getByText("NULL")).toBeTruthy();
+  });
+
+  it("keeps layout containment on the results grid scroller", () => {
+    // Perf guard: without `contain` on the scroller, the auto-layout
+    // (width:max-content) results table is re-measured by every document
+    // reflow, and CodeMirror reflows per keystroke. Typing stuttered whenever
+    // a wide result set was on screen.
+    const css = readFileSync("src/domains/results/components/ResultsTableView/index.css", "utf8");
+    const scrollerRule = css.match(/\.mdbc-results-table-scroll\s*\{[^}]*\}/)?.[0] ?? "";
+    expect(scrollerRule).toContain("contain: layout style paint;");
+  });
+
+  it("does not re-render on tab text churn (keystrokes), but stays reactive to other tab fields", () => {
+    let commits = 0;
+    render(
+      <Profiler id="results" onRender={() => { commits += 1; }}>
+        <ResultsTableView />
+      </Profiler>,
+    );
+    const afterMount = commits;
+
+    // Editor keystrokes write { text } to the tab store; the results pane must
+    // NOT re-render for them.
+    act(() => {
+      useTabsStore.getState().updateTab("t1", { text: "select * from users where 1" });
+    });
+    act(() => {
+      useTabsStore.getState().updateTab("t1", { text: "select * from users where 1=1" });
+    });
+    expect(commits).toBe(afterMount);
+
+    // Positive control: a non-text tab change still re-renders the pane.
+    act(() => {
+      useTabsStore.getState().updateTab("t1", { isRunning: true });
+    });
+    expect(commits).toBeGreaterThan(afterMount);
   });
 
   it("does not borrow another run's result for a selected run that has none", () => {

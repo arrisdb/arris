@@ -119,8 +119,10 @@ function useCsvRawEditor(tab: EditorTab, fontSize: number) {
   const editorHandleRef = useRef<EditorHandle | null>(null);
   const updateTab = useTabsStore((s) => s.updateTab);
 
-  const onChangeRawText = useCallback((text: string) => updateTab(tab.id, { text }), [tab.id, updateTab]);
-  const onCursorChangeRaw = useCallback((cursor: number) => updateTab(tab.id, { cursor }), [tab.id, updateTab]);
+  const onEditRaw = useCallback(
+    (patch: { text?: string; cursor?: number }) => updateTab(tab.id, patch),
+    [tab.id, updateTab],
+  );
 
   useEffect(() => {
     if (!editorHostRef.current) return;
@@ -128,8 +130,7 @@ function useCsvRawEditor(tab: EditorTab, fontSize: number) {
       host: editorHostRef.current,
       initialDoc: tab.text,
       initialCursor: tab.cursor,
-      onChange: onChangeRawText,
-      onCursorChange: onCursorChangeRaw,
+      onEdit: onEditRaw,
       languageId: "text",
       fontSize,
       schema: {},
@@ -139,7 +140,7 @@ function useCsvRawEditor(tab: EditorTab, fontSize: number) {
       editorHandleRef.current = null;
       handle.destroy();
     };
-  }, [fontSize, onChangeRawText, onCursorChangeRaw, tab.cursor, tab.text]);
+  }, [fontSize, onEditRaw, tab.cursor, tab.text]);
 
   return { editorHostRef };
 }

@@ -203,7 +203,7 @@ interface ResultsToolbarProps {
   showRowDetailPane: boolean;
   stagedCount: number;
   tabIsTable: boolean;
-  tabText: string | undefined;
+  tabHasText: boolean;
   toggleDag: () => void;
   toggleRowDetailPane: () => void;
   uploadBusy: boolean;

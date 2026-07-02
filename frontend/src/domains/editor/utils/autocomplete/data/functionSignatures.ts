@@ -1,6 +1,7 @@
 import { StateField, type Extension } from "@codemirror/state";
 import { showTooltip, type Tooltip } from "@codemirror/view";
 import type { DatabaseKind } from "@shared";
+import { docString } from "../../docText";
 
 interface FunctionSignature {
   name: string;
@@ -91,7 +92,7 @@ function paramHintTooltipExtension(kind?: DatabaseKind): Extension {
     update(value, tr) {
       if (!tr.docChanged && !tr.selection) return value;
       const pos = tr.state.selection.main.head;
-      const doc = tr.state.doc.toString();
+      const doc = docString(tr.state.doc);
       const ctx = findFunctionCallContext(doc, pos);
       if (!ctx) return null;
       const sig = signatures.get(ctx.funcName.toUpperCase());
