@@ -9,6 +9,7 @@ mod codex;
 
 use tokio::process::Command;
 
+use super::impl_cli_resolver::CliResolver;
 use super::types::{AgentEvent, AgentProvider};
 use claude::ClaudeProvider;
 use codex::CodexProvider;
@@ -44,9 +45,14 @@ impl AgentProvider {
         }
     }
 
-    /// Whether this provider's CLI is available on PATH (`<binary> --version`).
+    /// Whether this provider's CLI is installed (`<binary> --version` exits 0),
+    /// resolved over the user's real PATH so a GUI launch's minimal PATH does not
+    /// report an installed CLI as missing.
     pub async fn check(self) -> bool {
-        Command::new(self.cli().binary())
+        let Some(program) = CliResolver::resolve(self.cli().binary()) else {
+            return false;
+        };
+        Command::new(program)
             .arg("--version")
             .output()
             .await
