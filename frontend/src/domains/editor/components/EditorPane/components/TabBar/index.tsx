@@ -9,6 +9,9 @@ import { useEffect, useRef, useState } from "react";
 import type { MouseEvent as ReactMouseEvent } from "react";
 import type { EditorTab, SplitDirection } from "@shell/types";
 import type { TabType } from "@shared";
+import type { KeymapAction } from "@shared/settings";
+import { useSettingsStore } from "@shared/settings";
+import { labelFor, shortcutDisplay } from "@shell/utils/keymap";
 import { Icon } from "@shared/ui/Icon";
 import {
   ContextMenu,
@@ -16,6 +19,7 @@ import {
   useContextMenu,
 } from "@shared/ui/ContextMenu";
 import { Tooltip } from "@shared/ui";
+import { NEW_TAB_MENU } from "./constants";
 import { tabIconName } from "./utils";
 import "./index.css";
 
@@ -53,9 +57,36 @@ function TabBar({
   onRename,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const addButtonRef = useRef<HTMLButtonElement>(null);
   const menu = useContextMenu<{ id: string; tabType?: TabType }>();
+  const addMenu = useContextMenu<null>();
+  const shortcuts = useSettingsStore((s) => s.shortcuts);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameDraft, setRenameDraft] = useState("");
+
+  // New-tab actions creating a tab in THIS group; each menu item pulls its
+  // label and shortcut hint from the keymap action it mirrors.
+  const newTabCallbacks: Partial<Record<KeymapAction, (() => void) | undefined>> = {
+    openTab: onAdd,
+    newCanvasTab: onAddCanvas,
+    newNotebookTab: onAddNotebook,
+    newTerminalTab: onAddTerminal,
+  };
+  const newTabItems: ContextMenuItem[] = NEW_TAB_MENU.filter(
+    (entry) => newTabCallbacks[entry.action],
+  ).map((entry) => ({
+    id: entry.action,
+    label: labelFor(entry.action),
+    shortcut: shortcutDisplay(shortcuts[entry.action]) ?? undefined,
+    testId: entry.testId,
+    action: () => newTabCallbacks[entry.action]?.(),
+  }));
+
+  function onClickAddTab(event: ReactMouseEvent) {
+    event.stopPropagation();
+    const rect = addButtonRef.current?.getBoundingClientRect();
+    if (rect) addMenu.openAt(rect.left, rect.bottom, null);
+  }
 
   // Keep the active tab in view: if its edge is clipped, scroll so it's
   // visible, leaving a PEEK margin so the neighbouring tab stays slightly
@@ -168,37 +199,27 @@ function TabBar({
         </SortableContext>
       </div>
       <div className="mdbc-tabbar-actions">
-        <Tooltip label="New Query">
-          <button className="mdbc-tab-add" onClick={onAdd}>
+        <Tooltip label="New Tab">
+          <button
+            ref={addButtonRef}
+            className="mdbc-tab-add"
+            data-testid="tab-add"
+            aria-label="New tab"
+            onClick={onClickAddTab}
+          >
             <Icon name="plus" size={12} />
           </button>
         </Tooltip>
-        {onAddTerminal && (
-          <Tooltip label="New Terminal">
-            <button className="mdbc-tab-add" data-testid="tab-add-terminal" onClick={onAddTerminal}>
-              <Icon name="terminal" size={12} />
-            </button>
-          </Tooltip>
-        )}
-        {onAddNotebook && (
-          <Tooltip label="New Jupyter Notebook">
-            <button
-              className="mdbc-tab-add"
-              data-testid="tab-add-notebook"
-              onClick={onAddNotebook}
-            >
-              <Icon name="notebook" size={12} />
-            </button>
-          </Tooltip>
-        )}
-        {onAddCanvas && (
-          <Tooltip label="New Canvas">
-            <button className="mdbc-tab-add" data-testid="tab-add-canvas" onClick={onAddCanvas}>
-              <Icon name="sparkles" size={12} />
-            </button>
-          </Tooltip>
-        )}
       </div>
+      {addMenu.state && (
+        <ContextMenu
+          x={addMenu.state.x}
+          y={addMenu.state.y}
+          items={newTabItems}
+          onClose={addMenu.close}
+          data-testid="tab-add-menu"
+        />
+      )}
       {menu.state && (
         <ContextMenu
           x={menu.state.x}

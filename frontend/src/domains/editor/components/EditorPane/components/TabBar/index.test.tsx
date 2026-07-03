@@ -132,22 +132,78 @@ describe("TabBar", () => {
     });
   });
 
-  describe("terminal add button", () => {
-    it("renders when onAddTerminal is provided", () => {
-      renderBar([tab("a", "Tab A")], { onAddTerminal: vi.fn() });
-      expect(screen.getByTestId("tab-add-terminal")).toBeTruthy();
-    });
-
-    it("does not render when onAddTerminal is not provided", () => {
-      renderBar([tab("a", "Tab A")]);
-      expect(screen.queryByTestId("tab-add-terminal")).toBeNull();
-    });
-
-    it("calls onAddTerminal when clicked", () => {
+  describe("new-tab dropdown", () => {
+    function renderWithAllAdders(extra: Partial<React.ComponentProps<typeof TabBar>> = {}) {
+      const onAdd = vi.fn();
+      const onAddCanvas = vi.fn();
+      const onAddNotebook = vi.fn();
       const onAddTerminal = vi.fn();
-      renderBar([tab("a", "Tab A")], { onAddTerminal });
+      renderBar([tab("a", "Tab A")], {
+        onAdd,
+        onAddCanvas,
+        onAddNotebook,
+        onAddTerminal,
+        ...extra,
+      });
+      return { onAdd, onAddCanvas, onAddNotebook, onAddTerminal };
+    }
+
+    it("renders a single + button and no loose per-type add buttons", () => {
+      renderWithAllAdders();
+      expect(screen.getByTestId("tab-add")).toBeTruthy();
+      // The per-type buttons only exist inside the dropdown, not the bar.
+      expect(screen.queryByTestId("tab-add-menu")).toBeNull();
+    });
+
+    it("opening the + menu shows all four new-tab items in order", () => {
+      renderWithAllAdders();
+      fireEvent.click(screen.getByTestId("tab-add"));
+      const menu = screen.getByTestId("tab-add-menu");
+      const labels = Array.from(menu.querySelectorAll('[role="menuitem"] span:first-child')).map(
+        (el) => el.textContent,
+      );
+      expect(labels).toEqual([
+        "New Query Console",
+        "New Canvas",
+        "New Jupyter Notebook",
+        "New Terminal",
+      ]);
+    });
+
+    it("shows the mirrored keymap shortcut on the query item", () => {
+      renderWithAllAdders();
+      fireEvent.click(screen.getByTestId("tab-add"));
+      const queryItem = screen.getByTestId("tab-add-query");
+      expect(queryItem.querySelector(".mdbc-ctx-shortcut")?.textContent).toBe("⌘T");
+    });
+
+    it("each item fires its matching callback", () => {
+      const { onAdd, onAddCanvas, onAddNotebook, onAddTerminal } = renderWithAllAdders();
+
+      fireEvent.click(screen.getByTestId("tab-add"));
+      fireEvent.click(screen.getByTestId("tab-add-query"));
+      expect(onAdd).toHaveBeenCalledOnce();
+
+      fireEvent.click(screen.getByTestId("tab-add"));
+      fireEvent.click(screen.getByTestId("tab-add-canvas"));
+      expect(onAddCanvas).toHaveBeenCalledOnce();
+
+      fireEvent.click(screen.getByTestId("tab-add"));
+      fireEvent.click(screen.getByTestId("tab-add-notebook"));
+      expect(onAddNotebook).toHaveBeenCalledOnce();
+
+      fireEvent.click(screen.getByTestId("tab-add"));
       fireEvent.click(screen.getByTestId("tab-add-terminal"));
       expect(onAddTerminal).toHaveBeenCalledOnce();
+    });
+
+    it("omits items whose callback is not provided", () => {
+      renderBar([tab("a", "Tab A")], { onAdd: vi.fn() });
+      fireEvent.click(screen.getByTestId("tab-add"));
+      expect(screen.getByTestId("tab-add-query")).toBeTruthy();
+      expect(screen.queryByTestId("tab-add-terminal")).toBeNull();
+      expect(screen.queryByTestId("tab-add-canvas")).toBeNull();
+      expect(screen.queryByTestId("tab-add-notebook")).toBeNull();
     });
 
     it("shows Rename for terminal tab", () => {
@@ -211,10 +267,9 @@ describe("TabBar", () => {
   });
 
   describe("action button tooltips", () => {
-    it("renders tooltip labels for add query and terminal buttons", () => {
-      renderBar([tab("a", "Tab A")], { onAddTerminal: vi.fn() });
-      expect(screen.getByText("New Query")).toBeTruthy();
-      expect(screen.getByText("New Terminal")).toBeTruthy();
+    it("renders a New Tab tooltip on the + button", () => {
+      renderBar([tab("a", "Tab A")]);
+      expect(screen.getByText("New Tab")).toBeTruthy();
     });
   });
 });
