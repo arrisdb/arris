@@ -13,7 +13,9 @@ import type {
 } from "./types";
 import {
   decodePtyData,
+  ensureTerminalFontLoaded,
   loadWebglRenderer,
+  refreshWebglAtlas,
   ptySpawnOptions,
   resizePty,
   resolveTerminalShell,
@@ -38,12 +40,13 @@ function useTerminalView(): TerminalViewModel {
     if (!hostRef.current) return undefined;
     let disposed = false;
     const decoder = new TextDecoder();
-    const terminal = new Terminal(terminalOptions(terminalFontSize, terminalFontFamily));
+    const options = terminalOptions(terminalFontSize, terminalFontFamily);
+    const terminal = new Terminal(options);
     const fit = new FitAddon();
     fitAddonRef.current = fit;
     terminal.loadAddon(fit);
     terminal.open(hostRef.current);
-    loadWebglRenderer(terminal);
+    const webgl = loadWebglRenderer(terminal);
     terminal.focus();
     terminalRef.current = terminal;
 
@@ -59,6 +62,15 @@ function useTerminalView(): TerminalViewModel {
     resizeObserverRef.current = new ResizeObserver(fitAndResize);
     resizeObserverRef.current.observe(hostRef.current);
     requestAnimationFrame(fitAndResize);
+
+    // Load the font, then rebuild the atlas to render it (canvas won't lazy-load).
+    if (webgl) {
+      ensureTerminalFontLoaded(options.fontFamily, options.fontSize).then(() => {
+        if (disposed) return;
+        refreshWebglAtlas(terminal);
+        fitAndResize();
+      });
+    }
 
     terminalListShellsIPC()
       .then((shells) => {
@@ -101,12 +113,17 @@ function useTerminalView(): TerminalViewModel {
     const { fontFamily, fontSize } = terminalOptions(terminalFontSize, terminalFontFamily);
     terminal.options.fontFamily = fontFamily;
     terminal.options.fontSize = fontSize;
-    try {
-      fitAddonRef.current?.fit();
-      resizePty(terminal, ptyRef.current);
-    } catch {
-      // Hidden panels can report zero dimensions during layout.
-    }
+    // Load the new font, then rebuild the atlas and refit for the new cell size.
+    ensureTerminalFontLoaded(fontFamily, fontSize).then(() => {
+      if (terminalRef.current !== terminal) return;
+      try {
+        refreshWebglAtlas(terminal);
+        fitAddonRef.current?.fit();
+        resizePty(terminal, ptyRef.current);
+      } catch {
+        // Hidden panels can report zero dimensions during layout.
+      }
+    });
   }, [terminalFontSize, terminalFontFamily]);
 
   // Ctrl + wheel over the terminal zooms its font (passive: false so we can

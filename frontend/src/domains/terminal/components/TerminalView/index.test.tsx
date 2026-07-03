@@ -34,6 +34,7 @@ const mocks = vi.hoisted(() => {
     focus = vi.fn();
     dispose = vi.fn();
     loadAddon = vi.fn();
+    clearTextureAtlas = vi.fn();
     onData = vi.fn(() => ({ dispose: vi.fn() }));
 
     constructor(options: any) {
@@ -85,6 +86,10 @@ describe("TerminalView", () => {
     vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
       cb(0);
       return 1;
+    });
+    Object.defineProperty(document, "fonts", {
+      configurable: true,
+      value: { load: vi.fn(() => Promise.resolve([])) },
     });
     useSettingsStore.setState({ terminalShell: "" });
     useProjectStore.setState({ activeProjectPath: "/tmp/project", loading: false });
@@ -238,6 +243,38 @@ describe("TerminalView", () => {
     await waitFor(() => expect(spawn).toHaveBeenCalled());
     expect(mocks.webgl.instances).toHaveLength(0);
     expect(mocks.terminalInstances[0].open).toHaveBeenCalled();
+  });
+
+  it("loads the configured font then rebuilds the WebGL atlas", async () => {
+    useSettingsStore.setState({ terminalFontFamily: "JetBrains Mono", terminalFontSize: 13 });
+
+    render(<TerminalView />);
+
+    await waitFor(() => expect(spawn).toHaveBeenCalled());
+    // Canvas text won't lazy-load @font-face fonts, so the font is loaded up
+    // front, then the atlas is rebuilt to rasterize it instead of a fallback.
+    await waitFor(() =>
+      expect(document.fonts.load).toHaveBeenCalledWith('13px "JetBrains Mono"'),
+    );
+    await waitFor(() =>
+      expect(mocks.terminalInstances[0].clearTextureAtlas).toHaveBeenCalled(),
+    );
+  });
+
+  it("loads the new font and rebuilds the atlas on a font change", async () => {
+    useSettingsStore.setState({ terminalFontFamily: null, terminalFontSize: 13 });
+
+    render(<TerminalView />);
+    await waitFor(() => expect(spawn).toHaveBeenCalled());
+    vi.mocked(document.fonts.load).mockClear();
+
+    act(() => {
+      useSettingsStore.setState({ terminalFontFamily: "Fira Code", terminalFontSize: 18 });
+    });
+
+    await waitFor(() =>
+      expect(document.fonts.load).toHaveBeenCalledWith('18px "Fira Code"'),
+    );
   });
 
   it("falls back to the neon editor color when the token is unset", async () => {
