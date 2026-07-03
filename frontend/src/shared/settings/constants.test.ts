@@ -80,8 +80,6 @@ describe("keymap ACTIONS", () => {
       "switchEsRestMode",
       "splitRight",
       "splitLeft",
-      "newTerminalTab",
-      "newNotebookTab",
       "rerunQuery",
       "showTableView",
       "showChartView",
