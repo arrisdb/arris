@@ -1,9 +1,10 @@
 import type { Terminal } from "@xterm/xterm";
-import { WebglAddon } from "@xterm/addon-webgl";
 import type { IPty } from "tauri-pty/dist/types/index";
 import {
   DEFAULT_COLS,
   DEFAULT_ROWS,
+  DEFAULT_LINE_HEIGHT,
+  DEFAULT_LETTER_SPACING,
   DEFAULT_TERMINAL_FONT,
 } from "./constants";
 import type { PtyData } from "./types";
@@ -53,8 +54,8 @@ function terminalOptions(fontSize: number, fontFamily?: string | null) {
     convertEol: true,
     fontFamily: terminalFontFamily(fontFamily),
     fontSize,
-    letterSpacing: 0,
-    lineHeight: 1.2,
+    letterSpacing: DEFAULT_LETTER_SPACING,
+    lineHeight: DEFAULT_LINE_HEIGHT,
     scrollback: 5000,
     theme: terminalTheme(),
   };
@@ -84,45 +85,8 @@ function terminalErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-// WebGL renderer, so customGlyphs draws continuous box-drawing lines the DOM
-// renderer can't. Disposing on context loss reverts xterm to the DOM renderer.
-function loadWebglRenderer(terminal: Terminal): WebglAddon | null {
-  try {
-    const addon = new WebglAddon();
-    addon.onContextLoss(() => addon.dispose());
-    terminal.loadAddon(addon);
-    return addon;
-  } catch {
-    return null;
-  }
-}
-
-// Rebuild the glyph atlas so WebGL rasterizes the current font/DPR instead of
-// the fallback baked in at load time. No-op unless WebGL is active.
-function refreshWebglAtlas(terminal: Terminal): void {
-  terminal.clearTextureAtlas();
-}
-
-// Preload the terminal's @font-face fonts. Canvas text (WebGL's atlas) doesn't
-// lazy-load web fonts like DOM text does, so a bundled font must be loaded
-// explicitly before rebuilding the atlas or it renders as a fallback.
-function ensureTerminalFontLoaded(fontFamily: string, fontSize: number): Promise<void> {
-  if (typeof document === "undefined" || !document.fonts) return Promise.resolve();
-  const families = fontFamily
-    .split(",")
-    .map((family) => family.trim().replace(/^["']|["']$/g, ""))
-    .filter(Boolean);
-  const loads = families.map((family) =>
-    document.fonts.load(`${fontSize}px "${family}"`).catch(() => []),
-  );
-  return Promise.all(loads).then(() => undefined);
-}
-
 export {
   decodePtyData,
-  ensureTerminalFontLoaded,
-  loadWebglRenderer,
-  refreshWebglAtlas,
   ptySpawnOptions,
   resizePty,
   resolveTerminalShell,
