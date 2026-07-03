@@ -122,8 +122,7 @@
   white-space: nowrap;
 }
 .mdbc-ctx-item:hover:not(.disabled),
-.mdbc-ctx-item:focus-visible:not(.disabled),
-.mdbc-ctx-item:focus:not(.disabled) {
+.mdbc-ctx-item:focus-visible:not(.disabled) {
   background: var(--m-accent-tint, rgb(var(--m-accent-rgb) / 0.22));
   color: var(--m-fg, #f0f0f6);
   outline: none;
