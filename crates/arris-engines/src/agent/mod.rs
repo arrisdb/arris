@@ -1,6 +1,7 @@
 mod constants;
 mod errors;
 mod impl_agent_engine;
+mod impl_cli_resolver;
 mod providers;
 mod types;
 

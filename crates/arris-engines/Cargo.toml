@@ -61,6 +61,9 @@ datafusion = "52.2"
 futures = "0.3"
 regex-lite = "0.1"
 dirs = "6"
+# resolve agent CLIs (`claude`, `codex`) to an absolute path over an augmented
+# search set, so a GUI-launched app with a minimal PATH still finds them.
+which = "8.0"
 nucleo = "0.5"
 notify = "8.2"
 notify-debouncer-full = "0.7"

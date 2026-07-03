@@ -18,6 +18,7 @@ use tokio::sync::{mpsc, oneshot};
 
 use super::constants::SCHEMA_PROMPT_MAX_BYTES;
 use super::errors::AgentError;
+use super::impl_cli_resolver::CliResolver;
 use super::types::{AgentEvent, AgentProfile, AgentProvider};
 use crate::{DatabaseKind, Engine, SchemaNode, SchemaNodeKind};
 
@@ -63,8 +64,11 @@ impl AgentEngine {
         let cwd = Self::working_dir()?;
         let cli = provider.cli();
         let binary = cli.binary();
+        // Resolve to an absolute path over the user's real PATH: a GUI launch
+        // inherits a minimal PATH that omits where the CLI is installed.
+        let program = CliResolver::resolve(binary).ok_or(AgentError::CliNotFound(provider))?;
 
-        let mut cmd = Command::new(binary);
+        let mut cmd = Command::new(&program);
         cmd.current_dir(&cwd);
         cli.configure(&mut cmd, &prompt, resume_session.as_deref());
         // The CLI may drain stdin for extra input; an inherited GUI stdin never
