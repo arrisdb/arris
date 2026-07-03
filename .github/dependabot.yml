@@ -1,5 +1,3 @@
-# Security-only: open-pull-requests-limit 0 suppresses routine version bumps,
-# but Dependabot security-update PRs ignore that limit and still open.
 version: 2
 updates:
   - package-ecosystem: cargo
