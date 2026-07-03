@@ -13,6 +13,7 @@ import type {
 } from "./types";
 import {
   decodePtyData,
+  loadWebglRenderer,
   ptySpawnOptions,
   resizePty,
   resolveTerminalShell,
@@ -42,6 +43,7 @@ function useTerminalView(): TerminalViewModel {
     fitAddonRef.current = fit;
     terminal.loadAddon(fit);
     terminal.open(hostRef.current);
+    loadWebglRenderer(terminal);
     terminal.focus();
     terminalRef.current = terminal;
 

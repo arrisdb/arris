@@ -1,4 +1,5 @@
 import type { Terminal } from "@xterm/xterm";
+import { WebglAddon } from "@xterm/addon-webgl";
 import type { IPty } from "tauri-pty/dist/types/index";
 import {
   DEFAULT_COLS,
@@ -83,8 +84,27 @@ function terminalErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+// xterm's default DOM renderer draws box-drawing and block-element glyphs from
+// the font, so TUI borders/rules fragment and the rightmost columns clip once a
+// non-default line height or letter spacing is set (customGlyphs, which draws
+// those glyphs as continuous, pixel-exact shapes, only works on the WebGL/canvas
+// renderers). Load the WebGL renderer so TUIs render crisply and column widths
+// stay exact. Fall back to the DOM renderer when WebGL is unavailable or its
+// context is lost (disposing the addon reverts xterm to the DOM renderer).
+function loadWebglRenderer(terminal: Terminal): WebglAddon | null {
+  try {
+    const addon = new WebglAddon();
+    addon.onContextLoss(() => addon.dispose());
+    terminal.loadAddon(addon);
+    return addon;
+  } catch {
+    return null;
+  }
+}
+
 export {
   decodePtyData,
+  loadWebglRenderer,
   ptySpawnOptions,
   resizePty,
   resolveTerminalShell,
