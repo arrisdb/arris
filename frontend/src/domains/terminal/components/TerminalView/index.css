@@ -14,6 +14,13 @@
 .mdbc-terminal-host {
   height: 100%;
   min-height: 0;
+  background-color: var(--m-bg-editor);
+}
+/* xterm paints the viewport's background black inline from its theme; the strip
+   below the last full row would show through as a black bar. Force the editor
+   background so leftover space blends with the terminal. */
+.mdbc-terminal .xterm-viewport {
+  background-color: var(--m-bg-editor) !important;
 }
 .mdbc-terminal .xterm {
   height: 100%;
