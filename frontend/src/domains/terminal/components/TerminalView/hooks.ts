@@ -14,6 +14,7 @@ import type {
 import {
   decodePtyData,
   ptySpawnOptions,
+  remeasureTerminalFont,
   resizePty,
   resolveTerminalShell,
   terminalErrorMessage,
@@ -57,6 +58,16 @@ function useTerminalView(): TerminalViewModel {
     resizeObserverRef.current = new ResizeObserver(fitAndResize);
     resizeObserverRef.current.observe(hostRef.current);
     requestAnimationFrame(fitAndResize);
+
+    // The grid is measured before the web font loads; re-measure and refit once
+    // fonts are ready so cols/rows match the real font instead of the fallback.
+    if (typeof document !== "undefined" && document.fonts) {
+      document.fonts.ready.then(() => {
+        if (disposed) return;
+        remeasureTerminalFont(terminal, terminalOptions(terminalFontSize, terminalFontFamily).fontFamily);
+        fitAndResize();
+      });
+    }
 
     terminalListShellsIPC()
       .then((shells) => {

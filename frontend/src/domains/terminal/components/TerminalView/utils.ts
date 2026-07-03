@@ -23,7 +23,9 @@ function resolveTerminalShell(
 }
 
 function decodePtyData(data: PtyData, decoder = new TextDecoder()): string {
-  return decoder.decode(data instanceof Uint8Array ? data : Uint8Array.from(data));
+  const bytes = data instanceof Uint8Array ? data : Uint8Array.from(data);
+  // stream: true keeps partial multi-byte chars split across pty chunks intact.
+  return decoder.decode(bytes, { stream: true });
 }
 
 function terminalFontFamily(override?: string | null): string {
@@ -85,9 +87,19 @@ function terminalErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+// Force xterm to re-measure the cell size. The grid is measured once at open(),
+// before the web font loads, so it keeps fallback metrics and overflows once the
+// real font renders. Toggling the family to a different value and back triggers
+// a fresh measurement.
+function remeasureTerminalFont(terminal: Terminal, fontFamily: string): void {
+  terminal.options.fontFamily = `${fontFamily}, monospace`;
+  terminal.options.fontFamily = fontFamily;
+}
+
 export {
   decodePtyData,
   ptySpawnOptions,
+  remeasureTerminalFont,
   resizePty,
   resolveTerminalShell,
   terminalErrorMessage,

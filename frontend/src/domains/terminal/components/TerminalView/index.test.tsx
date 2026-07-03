@@ -3,6 +3,7 @@ import { act, render, waitFor } from "@testing-library/react";
 import { TerminalView } from "./index";
 import {
   decodePtyData,
+  remeasureTerminalFont,
   resolveTerminalShell,
   terminalFontFamily,
 } from "./utils";
@@ -71,6 +72,10 @@ describe("TerminalView", () => {
       cb(0);
       return 1;
     });
+    Object.defineProperty(document, "fonts", {
+      configurable: true,
+      value: { ready: Promise.resolve() },
+    });
     useSettingsStore.setState({ terminalShell: "" });
     useProjectStore.setState({ activeProjectPath: "/tmp/project", loading: false });
   });
@@ -88,6 +93,26 @@ describe("TerminalView", () => {
   it("decodes pty byte arrays from Tauri", () => {
     expect(decodePtyData([104, 105, 10])).toBe("hi\n");
     expect(decodePtyData(new Uint8Array([111, 107]))).toBe("ok");
+  });
+
+  it("reassembles a multi-byte glyph split across pty chunks", () => {
+    // The diamond U+25C6 is bytes E2 97 86; a chunk boundary must not corrupt it.
+    const decoder = new TextDecoder();
+    expect(decodePtyData([0xe2, 0x97], decoder)).toBe("");
+    expect(decodePtyData([0x86], decoder)).toBe("◆");
+  });
+
+  it("remeasures the font by toggling the family and restoring it", () => {
+    const history: string[] = [];
+    const fake = {
+      options: {
+        set fontFamily(value: string) {
+          history.push(value);
+        },
+      },
+    };
+    remeasureTerminalFont(fake as never, "JetBrains Mono");
+    expect(history).toEqual(["JetBrains Mono, monospace", "JetBrains Mono"]);
   });
 
   it("uses a concrete terminal font stack instead of CSS variables", () => {
