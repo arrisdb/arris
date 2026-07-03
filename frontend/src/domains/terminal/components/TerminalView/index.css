@@ -1,16 +1,25 @@
 /* Terminal view */
+/* Padding lives here, NOT on the host: FitAddon reads the open() target's
+   parent width but only subtracts the .xterm element's own padding, so padding
+   on the host would make it overcount columns and clip the right edge. */
 .mdbc-terminal {
   position: relative;
   height: 100%;
   min-height: 0;
+  padding: 8px 10px;
+  box-sizing: border-box;
   background: var(--m-bg-editor);
   overflow: hidden;
 }
 .mdbc-terminal-host {
   height: 100%;
   min-height: 0;
-  padding: 8px 10px;
-  box-sizing: border-box;
+}
+/* xterm paints the viewport's background black inline from its theme; the strip
+   below the last full row would show through as a black bar. Force the editor
+   background so leftover space blends with the terminal. */
+.mdbc-terminal .xterm-viewport {
+  background-color: var(--m-bg-editor) !important;
 }
 .mdbc-terminal .xterm {
   height: 100%;
