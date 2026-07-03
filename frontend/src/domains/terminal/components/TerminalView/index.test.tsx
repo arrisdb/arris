@@ -74,7 +74,7 @@ describe("TerminalView", () => {
     });
     Object.defineProperty(document, "fonts", {
       configurable: true,
-      value: { ready: Promise.resolve() },
+      value: { load: vi.fn(() => Promise.resolve([])) },
     });
     useSettingsStore.setState({ terminalShell: "" });
     useProjectStore.setState({ activeProjectPath: "/tmp/project", loading: false });
@@ -113,6 +113,17 @@ describe("TerminalView", () => {
     };
     remeasureTerminalFont(fake as never, "JetBrains Mono");
     expect(history).toEqual(["JetBrains Mono, monospace", "JetBrains Mono"]);
+  });
+
+  it("loads the configured font up front so the grid measures the real font", async () => {
+    useSettingsStore.setState({ terminalFontFamily: "JetBrains Mono", terminalFontSize: 13 });
+
+    render(<TerminalView />);
+
+    await waitFor(() => expect(spawn).toHaveBeenCalled());
+    await waitFor(() =>
+      expect(document.fonts.load).toHaveBeenCalledWith('13px "JetBrains Mono"'),
+    );
   });
 
   it("uses a concrete terminal font stack instead of CSS variables", () => {

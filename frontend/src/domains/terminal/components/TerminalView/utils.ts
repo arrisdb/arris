@@ -96,8 +96,24 @@ function remeasureTerminalFont(terminal: Terminal, fontFamily: string): void {
   terminal.options.fontFamily = fontFamily;
 }
 
+// Load the terminal's @font-face fonts. document.fonts.ready is not enough: it
+// resolves before any terminal text requests the font, so the grid would be
+// remeasured while the font is still a fallback. Loading each family explicitly
+// guarantees the real font is available before we remeasure.
+function loadTerminalFonts(fontFamily: string, fontSize: number): Promise<void> {
+  if (typeof document === "undefined" || !document.fonts) return Promise.resolve();
+  const families = fontFamily
+    .split(",")
+    .map((family) => family.trim().replace(/^["']|["']$/g, ""))
+    .filter(Boolean);
+  return Promise.all(
+    families.map((family) => document.fonts.load(`${fontSize}px "${family}"`).catch(() => [])),
+  ).then(() => undefined);
+}
+
 export {
   decodePtyData,
+  loadTerminalFonts,
   ptySpawnOptions,
   remeasureTerminalFont,
   resizePty,

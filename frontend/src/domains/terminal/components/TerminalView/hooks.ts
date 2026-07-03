@@ -13,6 +13,7 @@ import type {
 } from "./types";
 import {
   decodePtyData,
+  loadTerminalFonts,
   ptySpawnOptions,
   remeasureTerminalFont,
   resizePty,
@@ -38,7 +39,8 @@ function useTerminalView(): TerminalViewModel {
     if (!hostRef.current) return undefined;
     let disposed = false;
     const decoder = new TextDecoder();
-    const terminal = new Terminal(terminalOptions(terminalFontSize, terminalFontFamily));
+    const options = terminalOptions(terminalFontSize, terminalFontFamily);
+    const terminal = new Terminal(options);
     const fit = new FitAddon();
     fitAddonRef.current = fit;
     terminal.loadAddon(fit);
@@ -59,15 +61,14 @@ function useTerminalView(): TerminalViewModel {
     resizeObserverRef.current.observe(hostRef.current);
     requestAnimationFrame(fitAndResize);
 
-    // The grid is measured before the web font loads; re-measure and refit once
-    // fonts are ready so cols/rows match the real font instead of the fallback.
-    if (typeof document !== "undefined" && document.fonts) {
-      document.fonts.ready.then(() => {
-        if (disposed) return;
-        remeasureTerminalFont(terminal, terminalOptions(terminalFontSize, terminalFontFamily).fontFamily);
-        fitAndResize();
-      });
-    }
+    // The grid is measured at open() from fallback metrics because the web font
+    // is not loaded yet. Load it, then re-measure and refit so cols/rows match
+    // the real font and the right column is not clipped.
+    loadTerminalFonts(options.fontFamily, options.fontSize).then(() => {
+      if (disposed) return;
+      remeasureTerminalFont(terminal, options.fontFamily);
+      fitAndResize();
+    });
 
     terminalListShellsIPC()
       .then((shells) => {
@@ -110,12 +111,17 @@ function useTerminalView(): TerminalViewModel {
     const { fontFamily, fontSize } = terminalOptions(terminalFontSize, terminalFontFamily);
     terminal.options.fontFamily = fontFamily;
     terminal.options.fontSize = fontSize;
-    try {
-      fitAddonRef.current?.fit();
-      resizePty(terminal, ptyRef.current);
-    } catch {
-      // Hidden panels can report zero dimensions during layout.
-    }
+    // Load the new font before re-measuring so the grid sizes to the real font.
+    loadTerminalFonts(fontFamily, fontSize).then(() => {
+      if (terminalRef.current !== terminal) return;
+      remeasureTerminalFont(terminal, fontFamily);
+      try {
+        fitAddonRef.current?.fit();
+        resizePty(terminal, ptyRef.current);
+      } catch {
+        // Hidden panels can report zero dimensions during layout.
+      }
+    });
   }, [terminalFontSize, terminalFontFamily]);
 
   // Ctrl + wheel over the terminal zooms its font (passive: false so we can
