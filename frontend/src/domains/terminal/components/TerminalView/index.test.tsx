@@ -3,9 +3,9 @@ import { act, render, waitFor } from "@testing-library/react";
 import { TerminalView } from "./index";
 import {
   decodePtyData,
-  remeasureTerminalFont,
   resolveTerminalShell,
   terminalFontFamily,
+  terminalOptions,
 } from "./utils";
 import { useSettingsStore } from "@shared/settings";
 import { useProjectStore } from "@shell/hooks/projectStore";
@@ -14,6 +14,9 @@ import { spawn } from "tauri-pty/dist/index.es.js";
 
 const mocks = vi.hoisted(() => {
   const terminalInstances: any[] = [];
+  const webglInstances: any[] = [];
+  const callOrder: string[] = [];
+  const state = { webglThrows: false };
   const pty = {
     dataListener: null as ((data: number[] | Uint8Array) => void) | null,
     onData: vi.fn((listener: (data: number[] | Uint8Array) => void) => {
@@ -31,7 +34,7 @@ const mocks = vi.hoisted(() => {
     rows = 24;
     options: any;
     write = vi.fn();
-    open = vi.fn();
+    open = vi.fn(() => callOrder.push("open"));
     focus = vi.fn();
     dispose = vi.fn();
     loadAddon = vi.fn();
@@ -47,11 +50,22 @@ const mocks = vi.hoisted(() => {
     fit = vi.fn();
   }
 
-  return { MockFitAddon, MockTerminal, pty, terminalInstances };
+  class MockWebglAddon {
+    onContextLoss = vi.fn(() => ({ dispose: vi.fn() }));
+    dispose = vi.fn();
+
+    constructor() {
+      if (state.webglThrows) throw new Error("webgl unavailable");
+      webglInstances.push(this);
+    }
+  }
+
+  return { MockFitAddon, MockTerminal, MockWebglAddon, callOrder, pty, state, terminalInstances, webglInstances };
 });
 
 vi.mock("@xterm/xterm", () => ({ Terminal: mocks.MockTerminal }));
 vi.mock("@xterm/addon-fit", () => ({ FitAddon: mocks.MockFitAddon }));
+vi.mock("@xterm/addon-webgl", () => ({ WebglAddon: mocks.MockWebglAddon }));
 vi.mock("tauri-pty/dist/index.es.js", () => ({ spawn: vi.fn(() => mocks.pty) }));
 vi.mock("@xterm/xterm/css/xterm.css", () => ({}));
 vi.mock("./ipc", () => ({
@@ -67,6 +81,9 @@ describe("TerminalView", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.terminalInstances.length = 0;
+    mocks.webglInstances.length = 0;
+    mocks.callOrder.length = 0;
+    mocks.state.webglThrows = false;
     vi.stubGlobal("ResizeObserver", MockResizeObserver);
     vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
       cb(0);
@@ -74,7 +91,12 @@ describe("TerminalView", () => {
     });
     Object.defineProperty(document, "fonts", {
       configurable: true,
-      value: { load: vi.fn(() => Promise.resolve([])) },
+      value: {
+        load: vi.fn(() => {
+          mocks.callOrder.push("fonts");
+          return Promise.resolve([]);
+        }),
+      },
     });
     useSettingsStore.setState({ terminalShell: "" });
     useProjectStore.setState({ activeProjectPath: "/tmp/project", loading: false });
@@ -102,17 +124,35 @@ describe("TerminalView", () => {
     expect(decodePtyData([0x86], decoder)).toBe("◆");
   });
 
-  it("remeasures the font by toggling the family and restoring it", () => {
-    const history: string[] = [];
-    const fake = {
-      options: {
-        set fontFamily(value: string) {
-          history.push(value);
-        },
-      },
-    };
-    remeasureTerminalFont(fake as never, "JetBrains Mono");
-    expect(history).toEqual(["JetBrains Mono, monospace", "JetBrains Mono"]);
+  it("enables custom glyphs so box drawing renders seamlessly", () => {
+    expect(terminalOptions(13).customGlyphs).toBe(true);
+  });
+
+  it("loads fonts before opening so the grid and atlas measure the real font", async () => {
+    render(<TerminalView />);
+
+    await waitFor(() => expect(spawn).toHaveBeenCalled());
+    expect(mocks.callOrder.indexOf("fonts")).toBeGreaterThanOrEqual(0);
+    expect(mocks.callOrder.indexOf("fonts")).toBeLessThan(mocks.callOrder.indexOf("open"));
+  });
+
+  it("loads the WebGL renderer addon", async () => {
+    render(<TerminalView />);
+
+    await waitFor(() => expect(spawn).toHaveBeenCalled());
+    expect(mocks.webglInstances).toHaveLength(1);
+    expect(mocks.terminalInstances[0].loadAddon).toHaveBeenCalledWith(mocks.webglInstances[0]);
+    expect(mocks.webglInstances[0].onContextLoss).toHaveBeenCalled();
+  });
+
+  it("falls back to the DOM renderer when WebGL is unavailable", async () => {
+    mocks.state.webglThrows = true;
+
+    render(<TerminalView />);
+
+    await waitFor(() => expect(spawn).toHaveBeenCalled());
+    expect(mocks.webglInstances).toHaveLength(0);
+    expect(mocks.terminalInstances[0].open).toHaveBeenCalled();
   });
 
   it("loads the configured font up front so the grid measures the real font", async () => {
@@ -172,13 +212,15 @@ describe("TerminalView", () => {
       useSettingsStore.setState({ terminalFontSize: 18, terminalFontFamily: "Fira Code" });
     });
 
+    // Font applied live to the running terminal (after the new font loads).
+    await waitFor(() => {
+      expect(mocks.terminalInstances[0].options.fontSize).toBe(18);
+      expect(mocks.terminalInstances[0].options.fontFamily).toBe("Fira Code");
+    });
     // Same terminal + pty: no new instance, no new spawn, nothing killed.
     expect(mocks.terminalInstances).toHaveLength(1);
     expect(vi.mocked(spawn).mock.calls.length).toBe(spawnCount);
     expect(mocks.pty.kill).not.toHaveBeenCalled();
-    // Font applied live to the running terminal.
-    expect(mocks.terminalInstances[0].options.fontSize).toBe(18);
-    expect(mocks.terminalInstances[0].options.fontFamily).toBe("Fira Code");
   });
 
   it("spawns a pty in the active project and kills it on unmount", async () => {

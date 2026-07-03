@@ -14,8 +14,8 @@ import type {
 import {
   decodePtyData,
   loadTerminalFonts,
+  loadWebglRenderer,
   ptySpawnOptions,
-  remeasureTerminalFont,
   resizePty,
   resolveTerminalShell,
   terminalErrorMessage,
@@ -44,8 +44,6 @@ function useTerminalView(): TerminalViewModel {
     const fit = new FitAddon();
     fitAddonRef.current = fit;
     terminal.loadAddon(fit);
-    terminal.open(hostRef.current);
-    terminal.focus();
     terminalRef.current = terminal;
 
     const fitAndResize = () => {
@@ -57,21 +55,20 @@ function useTerminalView(): TerminalViewModel {
       }
     };
 
-    resizeObserverRef.current = new ResizeObserver(fitAndResize);
-    resizeObserverRef.current.observe(hostRef.current);
-    requestAnimationFrame(fitAndResize);
-
-    // The grid is measured at open() from fallback metrics because the web font
-    // is not loaded yet. Load it, then re-measure and refit so cols/rows match
-    // the real font and the right column is not clipped.
-    loadTerminalFonts(options.fontFamily, options.fontSize).then(() => {
-      if (disposed) return;
-      remeasureTerminalFont(terminal, options.fontFamily);
+    // Fonts load BEFORE open(): the cell grid is measured and the WebGL glyph
+    // atlas rasterized at open, and neither re-reads a font that loads later.
+    const opened = loadTerminalFonts(options.fontFamily, options.fontSize).then(() => {
+      if (disposed || !hostRef.current) return;
+      terminal.open(hostRef.current);
+      loadWebglRenderer(terminal);
+      terminal.focus();
+      resizeObserverRef.current = new ResizeObserver(fitAndResize);
+      resizeObserverRef.current.observe(hostRef.current);
       fitAndResize();
     });
 
-    terminalListShellsIPC()
-      .then((shells) => {
+    Promise.all([opened, terminalListShellsIPC()])
+      .then(([, shells]) => {
         if (disposed) return;
         const shell = resolveTerminalShell(terminalShell, shells);
         const pty = spawn(shell, [], ptySpawnOptions(terminal, activeProjectPath));
@@ -109,12 +106,12 @@ function useTerminalView(): TerminalViewModel {
     const terminal = terminalRef.current;
     if (!terminal) return;
     const { fontFamily, fontSize } = terminalOptions(terminalFontSize, terminalFontFamily);
-    terminal.options.fontFamily = fontFamily;
-    terminal.options.fontSize = fontSize;
-    // Load the new font before re-measuring so the grid sizes to the real font.
+    // Load the new font first so the re-measure and atlas rebuild triggered by
+    // the option change see the real font.
     loadTerminalFonts(fontFamily, fontSize).then(() => {
       if (terminalRef.current !== terminal) return;
-      remeasureTerminalFont(terminal, fontFamily);
+      terminal.options.fontFamily = fontFamily;
+      terminal.options.fontSize = fontSize;
       try {
         fitAddonRef.current?.fit();
         resizePty(terminal, ptyRef.current);

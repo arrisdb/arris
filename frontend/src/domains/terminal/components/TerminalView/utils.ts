@@ -1,4 +1,5 @@
 import type { Terminal } from "@xterm/xterm";
+import { WebglAddon } from "@xterm/addon-webgl";
 import type { IPty } from "tauri-pty/dist/types/index";
 import {
   DEFAULT_COLS,
@@ -54,6 +55,9 @@ function terminalOptions(fontSize: number, fontFamily?: string | null) {
   return {
     cursorBlink: true,
     convertEol: true,
+    // customGlyphs: the WebGL renderer draws box-drawing/block chars itself so
+    // TUI borders join seamlessly regardless of font coverage.
+    customGlyphs: true,
     fontFamily: terminalFontFamily(fontFamily),
     fontSize,
     letterSpacing: DEFAULT_LETTER_SPACING,
@@ -61,6 +65,20 @@ function terminalOptions(fontSize: number, fontFamily?: string | null) {
     scrollback: 5000,
     theme: terminalTheme(),
   };
+}
+
+// The DOM renderer emulates the cell grid with per-span letter-spacing; WebKit
+// renders those advances inconsistently with how xterm measures them, drifting
+// long rows past the pane so the right edge clips. The WebGL renderer draws
+// each glyph inside its exact cell, so the grid can never overflow.
+function loadWebglRenderer(terminal: Terminal): void {
+  try {
+    const webgl = new WebglAddon();
+    webgl.onContextLoss(() => webgl.dispose());
+    terminal.loadAddon(webgl);
+  } catch {
+    // WebGL unavailable: xterm keeps the DOM renderer.
+  }
 }
 
 function ptySpawnOptions(
@@ -87,19 +105,10 @@ function terminalErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-// Force xterm to re-measure the cell size. The grid is measured once at open(),
-// before the web font loads, so it keeps fallback metrics and overflows once the
-// real font renders. Toggling the family to a different value and back triggers
-// a fresh measurement.
-function remeasureTerminalFont(terminal: Terminal, fontFamily: string): void {
-  terminal.options.fontFamily = `${fontFamily}, monospace`;
-  terminal.options.fontFamily = fontFamily;
-}
-
-// Load the terminal's @font-face fonts. document.fonts.ready is not enough: it
-// resolves before any terminal text requests the font, so the grid would be
-// remeasured while the font is still a fallback. Loading each family explicitly
-// guarantees the real font is available before we remeasure.
+// Load the terminal's @font-face fonts BEFORE open(): xterm measures the cell
+// grid and rasterizes the WebGL glyph atlas at open, and neither picks up a
+// font that loads later. document.fonts.ready is not enough because it can
+// resolve before the terminal ever requests the font.
 function loadTerminalFonts(fontFamily: string, fontSize: number): Promise<void> {
   if (typeof document === "undefined" || !document.fonts) return Promise.resolve();
   const families = fontFamily
@@ -114,8 +123,8 @@ function loadTerminalFonts(fontFamily: string, fontSize: number): Promise<void> 
 export {
   decodePtyData,
   loadTerminalFonts,
+  loadWebglRenderer,
   ptySpawnOptions,
-  remeasureTerminalFont,
   resizePty,
   resolveTerminalShell,
   terminalErrorMessage,
