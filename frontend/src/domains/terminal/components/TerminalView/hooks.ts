@@ -3,6 +3,7 @@ import { useSettingsStore } from "@shared/settings";
 import { useProjectStore } from "@shell/hooks/projectStore";
 import { useTabsStore } from "@shell/hooks/tabsStore";
 import { zoomDirectionFromWheel, zoomTerminal } from "@shell/utils";
+import { RESIZE_DEBOUNCE_MS } from "./constants";
 import type { TerminalSession, TerminalViewModel } from "./types";
 import {
   acquireTerminalSession,
@@ -42,15 +43,15 @@ function useTerminalView(tabId: string): TerminalViewModel {
     host.appendChild(session.container);
     session.terminal.focus();
 
-    // Coalesce the burst of ResizeObserver callbacks a separator drag produces
-    // into one fit per frame so the grid tracks the drag without thrashing.
-    let rafId = 0;
+    // Reflow only once the drag settles: refitting mid-drag resizes (and clears)
+    // the WebGL canvas every frame, which the user sees as the terminal blinking.
+    let debounceId = 0;
     const scheduleFit = () => {
-      if (rafId) return;
-      rafId = requestAnimationFrame(() => {
-        rafId = 0;
+      if (debounceId) clearTimeout(debounceId);
+      debounceId = window.setTimeout(() => {
+        debounceId = 0;
         fitTerminalSession(session);
-      });
+      }, RESIZE_DEBOUNCE_MS);
     };
     const observer = new ResizeObserver(scheduleFit);
     observer.observe(host);
@@ -58,7 +59,7 @@ function useTerminalView(tabId: string): TerminalViewModel {
 
     return () => {
       observer.disconnect();
-      if (rafId) cancelAnimationFrame(rafId);
+      if (debounceId) clearTimeout(debounceId);
       session.container.parentNode?.removeChild(session.container);
       sessionRef.current = null;
       if (!isTerminalTabOpen(tabId)) destroyTerminalSession(tabId);

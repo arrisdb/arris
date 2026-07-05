@@ -12,6 +12,7 @@ import { useSettingsStore } from "@shared/settings";
 import { useProjectStore } from "@shell/hooks/projectStore";
 import { useTabsStore } from "@shell/hooks/tabsStore";
 import { terminalListShellsIPC } from "./ipc";
+import { RESIZE_DEBOUNCE_MS } from "./constants";
 import { spawn } from "tauri-pty/dist/index.es.js";
 
 const TAB_ID = "t1";
@@ -76,9 +77,8 @@ vi.mock("./ipc", () => ({
   terminalListShellsIPC: vi.fn().mockResolvedValue(["/bin/zsh", "/bin/bash"]),
 }));
 
-// requestAnimationFrame is stubbed to queue callbacks so a test can prove that a
-// burst of ResizeObserver ticks coalesces into a single fit per flush.
-const rafCallbacks: FrameRequestCallback[] = [];
+// Captured so a test can drive the resize path and prove the debounce coalesces
+// a burst of ticks into a single fit.
 const resizeObservers: { cb: ResizeObserverCallback; observe: any; disconnect: any }[] = [];
 
 class MockResizeObserver {
@@ -96,15 +96,9 @@ function triggerResize() {
   resizeObservers.at(-1)?.cb([], {} as ResizeObserver);
 }
 
-function flushRaf() {
-  const queued = rafCallbacks.splice(0);
-  for (const cb of queued) cb(0);
-}
-
 describe("TerminalView", () => {
   beforeEach(() => {
     resetTerminalSessions();
-    rafCallbacks.length = 0;
     resizeObservers.length = 0;
     vi.clearAllMocks();
     mocks.terminalInstances.length = 0;
@@ -112,11 +106,6 @@ describe("TerminalView", () => {
     mocks.callOrder.length = 0;
     mocks.state.webglThrows = false;
     vi.stubGlobal("ResizeObserver", MockResizeObserver);
-    vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
-      rafCallbacks.push(cb);
-      return rafCallbacks.length;
-    });
-    vi.stubGlobal("cancelAnimationFrame", vi.fn());
     Object.defineProperty(document, "fonts", {
       configurable: true,
       value: {
@@ -132,6 +121,7 @@ describe("TerminalView", () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.unstubAllGlobals();
   });
 
@@ -296,16 +286,24 @@ describe("TerminalView", () => {
     expect(mocks.pty.kill).toHaveBeenCalled();
   });
 
-  it("coalesces a burst of resize ticks into a single animation frame", async () => {
+  it("debounces a burst of resize ticks into a single fit after the drag settles", async () => {
     render(<TerminalView tabId={TAB_ID} />);
     await waitFor(() => expect(spawn).toHaveBeenCalled());
+    vi.useFakeTimers();
+    const before = mocks.pty.resize.mock.calls.length;
 
-    // A separator drag fires many observer ticks per frame; they must schedule
-    // only one fit, otherwise the grid thrashes and flickers.
+    // A separator drag fires many observer ticks; refitting on each one resizes
+    // (and clears) the WebGL canvas every frame, which reads as blinking. They
+    // must collapse to a single fit once the drag settles.
+    mocks.terminalInstances[0].cols = 90;
     triggerResize();
     triggerResize();
     triggerResize();
-    expect(rafCallbacks).toHaveLength(1);
+    expect(mocks.pty.resize).toHaveBeenCalledTimes(before);
+
+    vi.advanceTimersByTime(RESIZE_DEBOUNCE_MS);
+    expect(mocks.pty.resize).toHaveBeenCalledTimes(before + 1);
+    vi.useRealTimers();
   });
 
   it("resizes the pty only when the cell grid actually changes", async () => {
@@ -314,18 +312,20 @@ describe("TerminalView", () => {
     // The post-spawn sync sizes the pty once to the measured grid.
     expect(mocks.pty.resize).toHaveBeenCalledTimes(1);
     expect(mocks.pty.resize).toHaveBeenLastCalledWith(80, 24);
+    vi.useFakeTimers();
 
-    // A resize that does not cross a cell boundary sends no SIGWINCH.
+    // A settled resize that does not cross a cell boundary sends no SIGWINCH.
     triggerResize();
-    flushRaf();
+    vi.advanceTimersByTime(RESIZE_DEBOUNCE_MS);
     expect(mocks.pty.resize).toHaveBeenCalledTimes(1);
 
     // A real grid change forwards exactly one resize.
     mocks.terminalInstances[0].cols = 100;
     triggerResize();
-    flushRaf();
+    vi.advanceTimersByTime(RESIZE_DEBOUNCE_MS);
     expect(mocks.pty.resize).toHaveBeenCalledTimes(2);
     expect(mocks.pty.resize).toHaveBeenLastCalledWith(100, 24);
+    vi.useRealTimers();
   });
 
   it("uses the persisted shell preference when present", async () => {
