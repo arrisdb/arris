@@ -67,11 +67,6 @@ type PaneNode = PaneGroup | PaneSplit;
 
 type SplitDirection = "left" | "right" | "up" | "down";
 
-interface PersistedPaneLayout {
-  layout: PaneNode | null;
-  focusedPaneGroupId: string | null;
-}
-
 interface AppViewModel {
   activeProject: string | null;
   loading: boolean;
@@ -86,7 +81,6 @@ export type {
   PaneGroup,
   PaneNode,
   PaneSplit,
-  PersistedPaneLayout,
   RecentEntry,
   RecentKind,
   ResultPane,

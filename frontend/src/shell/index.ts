@@ -5,6 +5,7 @@ import { registerChartPane } from "@domains/chart";
 import { registerPinnedQueriesPane } from "@domains/pinnedQueries";
 import { registerConsolesSection } from "@domains/console";
 import { registerNotebookSection, registerNotebookTabView } from "@domains/notebook";
+import { registerTerminalSection } from "@domains/terminal";
 import { registerFilesPane, registerMediaTabView } from "@domains/files";
 import { registerDbtPane } from "@domains/dbt";
 import { registerSqlMeshPane } from "@domains/sqlmesh";
@@ -27,6 +28,7 @@ function registerPanes(): void {
   registerPinnedQueriesPane();
   registerConsolesSection();
   registerNotebookSection();
+  registerTerminalSection();
   registerCanvasSection();
   registerFilesPane();
   registerDbtPane();

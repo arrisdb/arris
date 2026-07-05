@@ -32,6 +32,17 @@ const mockOpenResult = {
     { id: "t2", title: "file.sql", text: "", kind: "sql", cursor: 0, tabType: "file", filePath: "/f.sql" },
   ],
   federationTabs: [{ id: "f1", title: "Fed", participatingConnectionIds: [], text: "" }],
+  paneLayout: { layout: null, focusedPaneGroupId: null },
+};
+
+const splitLayout = {
+  kind: "split",
+  id: "s0",
+  orientation: "row",
+  children: [
+    { kind: "leaf", id: "g1", tabIds: ["t1"], selectedTabId: "t1" },
+    { kind: "leaf", id: "g2", tabIds: ["t2"], selectedTabId: "t2" },
+  ],
 };
 
 const mockTree = {
@@ -49,6 +60,7 @@ beforeEach(() => {
   useConnectionsStore.setState({ connections: [] });
   useFederationStore.setState({ tabs: [], activeId: null });
   useRecentsStore.setState({ recents: [] });
+  useTabsStore.setState({ tabs: [], layout: null, focusedPaneGroupId: null, activeId: null });
 
   // Reset mocks
   vi.mocked(openProjectIPC).mockReset();
@@ -94,6 +106,34 @@ describe("useProjectStore — openProject", () => {
     expect(fileTab?.filePath).toBe("/f.sql");
   });
 
+
+  it("restores the persisted split-pane layout", async () => {
+    vi.mocked(openProjectIPC).mockResolvedValue({
+      ...mockOpenResult,
+      paneLayout: { layout: splitLayout, focusedPaneGroupId: "g2" },
+    } as any);
+    await useProjectStore.getState().openProject("/projects/myapp");
+    const layout = useTabsStore.getState().layout;
+    expect(layout?.kind).toBe("split");
+    expect(useTabsStore.getState().focusedPaneGroupId).toBe("g2");
+  });
+
+  it("does not carry a previous project's split into a project with no saved layout", async () => {
+    vi.mocked(openProjectIPC).mockResolvedValueOnce({
+      ...mockOpenResult,
+      paneLayout: { layout: splitLayout, focusedPaneGroupId: "g2" },
+    } as any);
+    await useProjectStore.getState().openProject("/projects/a");
+    expect(useTabsStore.getState().layout?.kind).toBe("split");
+
+    vi.mocked(openProjectIPC).mockResolvedValueOnce({
+      ...mockOpenResult,
+      paneLayout: { layout: null, focusedPaneGroupId: null },
+    } as any);
+    await useProjectStore.getState().openProject("/projects/b");
+    // Second project persisted no split, so the tree collapses to a single pane.
+    expect(useTabsStore.getState().layout?.kind).toBe("leaf");
+  });
 
   it("hydrates federation store", async () => {
     await useProjectStore.getState().openProject("/projects/myapp");

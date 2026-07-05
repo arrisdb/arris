@@ -23,6 +23,7 @@ vi.mock("@shell/ipc", () => ({
     tabs: [],
     boards: [],
     federationTabs: [],
+    paneLayout: { layout: null, focusedPaneGroupId: null },
   }),
 }));
 import { useConnectionsStore } from "@domains/connection/hooks";

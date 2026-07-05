@@ -61,7 +61,7 @@ vi.mock("@shell/ipc", () => ({
   }),
   openFileIndexIPC: vi.fn().mockResolvedValue(undefined),
   openProjectDialogIPC: vi.fn(),
-  openProjectIPC: vi.fn().mockResolvedValue({ root: "", connections: [], tabs: [], federationTabs: [] }),
+  openProjectIPC: vi.fn().mockResolvedValue({ root: "", connections: [], tabs: [], federationTabs: [], paneLayout: { layout: null, focusedPaneGroupId: null } }),
   readTextFileIPC: vi.fn(),
   saveTabsIPC: vi.fn(),
 }));

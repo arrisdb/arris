@@ -72,6 +72,8 @@ interface ProjectOpenResult {
   connections: ScopedConnection[];
   tabs: PersistedTab[];
   federationTabs: PersistedFederationTab[];
+  // Opaque split-pane tree (the shell's `PaneNode`); interpreted by the shell.
+  paneLayout: { layout: unknown; focusedPaneGroupId: string | null };
 }
 
 type QueryValueKind =
