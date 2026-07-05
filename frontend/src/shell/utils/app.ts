@@ -13,6 +13,9 @@ import { isSelfWrite } from "./selfWrites";
 function toPersisted(tabs: EditorTab[]): PersistedTab[] {
   // The "Uncommitted Changes" git-diff tab is transient: never restore it on
   // launch; it's reopened on demand from the Git rail.
+  // NOTE: terminal tabs MUST stay persisted here. The pane layout references
+  // tab ids; dropping terminals would make reconcileLayout prune their leaves
+  // and silently lose the split on restart.
   return tabs
     .filter((t) => t.tabType !== "gitdiff")
     .map(({ id, title, text, kind, connectionId, cursor, tabType, filePath, tableRef, tableEditable, closed, createdAt, chart }) => ({

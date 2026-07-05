@@ -95,13 +95,15 @@ impl AppEnvironment {
         let proj = self.project.read().await;
         let proj_ref = proj.as_ref().expect("project was just set");
         let connections = self.connection.all_connections(Some(proj_ref)).await;
-        let tabs = proj_ref.tabs_store.load().await.unwrap_or_default();
-        let federation_tabs = proj_ref
-            .federation_tabs_store
-            .load()
-            .await
-            .unwrap_or_default();
-        let pane_layout = proj_ref.pane_layout_store.load().await.unwrap_or_default();
+        // Independent per-project files: load them concurrently, not one-by-one.
+        let (tabs, federation_tabs, pane_layout) = tokio::join!(
+            proj_ref.tabs_store.load(),
+            proj_ref.federation_tabs_store.load(),
+            proj_ref.pane_layout_store.load(),
+        );
+        let tabs = tabs.unwrap_or_default();
+        let federation_tabs = federation_tabs.unwrap_or_default();
+        let pane_layout = pane_layout.unwrap_or_default();
         Ok(ProjectOpenResult {
             root,
             connections,
