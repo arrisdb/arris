@@ -1,8 +1,6 @@
 import type { AppPreferences, KeymapPreset } from "../backendTypes";
 import type { ActionDef, KeymapAction, KeymapCategory, KeyShortcut } from "./types";
 
-export const KEYMAP_STORAGE_KEY = "arris.keymap.shortcuts";
-
 export const ACTIONS = {
   runQuery: { label: "Run Query", category: "editor", defaultShortcut: { key: "Mod-Enter" } },
   stopQuery: { label: "Stop Query", category: "editor", defaultShortcut: null },

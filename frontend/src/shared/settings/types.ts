@@ -1,4 +1,4 @@
-import type { AppPreferences, FormatterSettings } from "../backendTypes";
+import type { AppPreferences, FormatterSettings, KeymapPreset } from "../backendTypes";
 
 export type SettingsPane =
   | "general"
@@ -75,6 +75,7 @@ export interface SettingsState extends AppPreferences {
     lang: K,
     partial: Partial<FormatterSettings[K]>,
   ) => void;
+  setPreset: (preset: KeymapPreset) => void;
   setShortcut: (action: KeymapAction, shortcut: KeyShortcut | string | null) => void;
   resetGeneral: () => void;
   resetAppearance: () => void;

@@ -452,3 +452,65 @@ describe("preferences store", () => {
     expect(persisted.terminalShell).toBe("");
   });
 });
+
+describe("keymap presets", () => {
+  beforeEach(() => {
+    vi.mocked(appPreferencesSaveIPC).mockReset().mockResolvedValue(undefined);
+    useSettingsStore.getState().hydrate();
+  });
+
+  it("default preset yields ACTIONS defaults plus null-fills", () => {
+    const s = useSettingsStore.getState();
+    expect(s.keymapPreset).toBe("default");
+    expect(s.shortcuts.toggleSidebar?.key).toBe("Mod-Shift-s");
+    expect(s.shortcuts.refreshSchema?.key).toBe("F5");
+  });
+
+  it("switching to vscode applies overlay on top of null-fills", () => {
+    useSettingsStore.getState().setPreset("vscode");
+    const s = useSettingsStore.getState();
+    expect(s.keymapPreset).toBe("vscode");
+    expect(s.shortcuts.toggleSidebar?.key).toBe("Mod-b");
+    expect(s.shortcuts.showDefinition?.key).toBe("F12");
+    expect(s.shortcuts.refreshSchema?.key).toBe("F5");
+  });
+
+  it("keeps overrides isolated per preset", () => {
+    useSettingsStore.getState().setShortcut("saveFile", "Mod-Alt-s");
+    expect(useSettingsStore.getState().keymapOverrides.default.saveFile?.key).toBe("Mod-Alt-s");
+    useSettingsStore.getState().setPreset("vscode");
+    expect(useSettingsStore.getState().shortcuts.saveFile?.key).toBe("Mod-s");
+    expect(useSettingsStore.getState().keymapOverrides.vscode.saveFile).toBeUndefined();
+  });
+
+  it("drops the override when a rebind matches the preset base", () => {
+    useSettingsStore.getState().setShortcut("saveFile", "Mod-Alt-s");
+    expect(useSettingsStore.getState().keymapOverrides.default.saveFile).toBeDefined();
+    useSettingsStore.getState().setShortcut("saveFile", "Mod-s");
+    expect(useSettingsStore.getState().keymapOverrides.default.saveFile).toBeUndefined();
+    expect(useSettingsStore.getState().shortcuts.saveFile?.key).toBe("Mod-s");
+  });
+
+  it("reset clears only the active preset overrides", () => {
+    useSettingsStore.getState().setShortcut("saveFile", "Mod-Alt-s");
+    useSettingsStore.getState().setPreset("vscode");
+    useSettingsStore.getState().setShortcut("saveFile", "Mod-Ctrl-s");
+    useSettingsStore.getState().reset();
+    expect(useSettingsStore.getState().keymapOverrides.vscode.saveFile).toBeUndefined();
+    expect(useSettingsStore.getState().keymapOverrides.default.saveFile?.key).toBe("Mod-Alt-s");
+  });
+
+  it("persists preset + overrides in the snapshot and restores on hydrate", async () => {
+    useSettingsStore.getState().setPreset("jetbrains");
+    useSettingsStore.getState().setShortcut("pinQuery", "Mod-Alt-2");
+    for (let i = 0; i < 6; i++) await Promise.resolve();
+    const persisted = vi.mocked(appPreferencesSaveIPC).mock.calls.at(-1)?.[0] as AppPreferences;
+    expect(persisted.keymapPreset).toBe("jetbrains");
+    expect(persisted.keymapOverrides.jetbrains.pinQuery?.key).toBe("Mod-Alt-2");
+
+    useSettingsStore.getState().hydrate(persisted);
+    expect(useSettingsStore.getState().keymapPreset).toBe("jetbrains");
+    expect(useSettingsStore.getState().shortcuts.gitCommit?.key).toBe("Mod-k");
+    expect(useSettingsStore.getState().shortcuts.pinQuery?.key).toBe("Mod-Alt-2");
+  });
+});
