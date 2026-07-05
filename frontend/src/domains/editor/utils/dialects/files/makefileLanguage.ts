@@ -28,6 +28,19 @@ const MAKE_FUNCTIONS: ReadonlySet<string> = new Set([
   "error", "warning", "info", "guile",
 ]);
 
+// Token patterns, hoisted so token() allocates no RegExp per call.
+const DOLLAR_ESCAPE_RE = /^\$\$/;
+const AUTO_VAR_RE = /^\$[@<^?*+|%]/;
+const FN_OPEN_RE = /^\$[({]\s*([A-Za-z][\w-]*)/;
+const REF_TAIL_RE = /^[^)}\n]*[)}]/;
+const VAR_REF_RE = /^\$[({][^)}\n]*[)}]/;
+const RECIPE_TEXT_RE = /^[^$#]+/;
+const FIRST_WORD_RE = /^[-.\w%/]+/;
+const ASSIGN_OP_RE = /^(::=|:=|\+=|\?=|!=|=)/;
+const COLON_RE = /^:/;
+const NUMBER_RE = /^\d+\b/;
+const BAREWORD_RE = /^[^\s$#]+/;
+
 interface MakefileState {
   // Current line is a tab-indented recipe body (shell), not a make directive/rule.
   inRecipe: boolean;
@@ -45,14 +58,15 @@ const makefile: StreamParser<MakefileState> = {
 
     // Make variable/function references work anywhere, including inside recipes.
     if (stream.peek() === "$") {
-      if (stream.match(/^\$\$/)) return null; // escaped literal dollar
-      if (stream.match(/^\$[@<^?*+|%]/)) return "variableName"; // automatic vars
-      const fn = stream.match(/^\$[({]\s*([A-Za-z][\w-]*)/, false) as RegExpMatchArray | null;
-      if (fn && MAKE_FUNCTIONS.has(fn[1])) {
-        stream.match(/^\$[({]\s*[A-Za-z][\w-]*/);
-        return "keyword";
+      if (stream.match(DOLLAR_ESCAPE_RE)) return null; // escaped literal dollar
+      if (stream.match(AUTO_VAR_RE)) return "variableName"; // automatic vars
+      const fn = stream.match(FN_OPEN_RE) as RegExpMatchArray | null;
+      if (fn) {
+        if (MAKE_FUNCTIONS.has(fn[1])) return "keyword";
+        stream.match(REF_TAIL_RE); // `$(VAR...)`: consume the rest of the reference
+        return "variableName";
       }
-      if (stream.match(/^\$[({][^)}\n]*[)}]/)) return "variableName";
+      if (stream.match(VAR_REF_RE)) return "variableName";
       stream.next();
       return "variableName";
     }
@@ -65,14 +79,14 @@ const makefile: StreamParser<MakefileState> = {
 
     // Recipe body: everything else is shell text, left plain.
     if (state.inRecipe) {
-      if (!stream.match(/^[^$#]+/)) stream.next();
+      if (!stream.match(RECIPE_TEXT_RE)) stream.next();
       return null;
     }
 
     // First token of a rule/assignment/directive line.
     if (state.lineStart) {
       state.lineStart = false;
-      const word = stream.match(/^[-.\w%/]+/) as RegExpMatchArray | null;
+      const word = stream.match(FIRST_WORD_RE) as RegExpMatchArray | null;
       if (word) {
         if (MAKE_DIRECTIVES.has(word[0])) return "keyword";
         if (MAKE_SPECIAL_TARGETS.has(word[0])) return "keyword";
@@ -80,8 +94,8 @@ const makefile: StreamParser<MakefileState> = {
       }
     }
 
-    if (stream.match(/^(::=|:=|\+=|\?=|!=|=)/)) return "operator";
-    if (stream.match(/^:/)) return null; // rule separator
+    if (stream.match(ASSIGN_OP_RE)) return "operator";
+    if (stream.match(COLON_RE)) return null; // rule separator
 
     const quote = stream.peek();
     if (quote === '"' || quote === "'") {
@@ -97,8 +111,8 @@ const makefile: StreamParser<MakefileState> = {
       return "string";
     }
 
-    if (stream.match(/^\d+\b/)) return "number";
-    if (!stream.match(/^[^\s$#]+/)) stream.next();
+    if (stream.match(NUMBER_RE)) return "number";
+    if (!stream.match(BAREWORD_RE)) stream.next();
     return null;
   },
 };

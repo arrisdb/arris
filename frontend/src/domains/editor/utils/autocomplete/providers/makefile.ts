@@ -16,26 +16,23 @@ import { CompletionProvider, type CompletionAnalysis } from "../core/provider";
 
 // Cursor sits right after `$(`/`${` with an optional partial function/var name.
 const VAR_OPEN_RE = /[$][({]([\w-]*)$/;
-const LEADING_WS_RE = /^\s*/;
 // The line's first token is still being typed (directive / special target).
 const FIRST_TOKEN_RE = /^[-.\w]*$/;
 // A variable definition: `NAME =` / `NAME :=` / `NAME += ...`.
 const ASSIGNMENT_RE = /^\s*([A-Za-z_]\w*)\s*(?:::=|:=|\+=|\?=|!=|=)/;
+const NAME_PARTIAL_VALID = /^[\w-]*$/;
 
-type MakefileSituation =
-  | { kind: "function" }
-  | { kind: "directive" };
+type MakefileSituation = "function" | "directive";
 
-function directiveOptions(): Completion[] {
-  return [
-    ...[...MAKE_DIRECTIVES].map((label): Completion => ({ label, type: "keyword", detail: "directive" })),
-    ...[...MAKE_SPECIAL_TARGETS].map((label): Completion => ({ label, type: "constant", detail: "special target" })),
-  ];
-}
+const toCompletions = (labels: Iterable<string>, type: string, detail: string): Completion[] =>
+  [...labels].map((label) => ({ label, type, detail }));
 
-function functionOptions(): Completion[] {
-  return [...MAKE_FUNCTIONS].map((label): Completion => ({ label, type: "function", detail: "function" }));
-}
+// Static (independent of the cursor), so built once at module load.
+const DIRECTIVE_OPTIONS: Completion[] = [
+  ...toCompletions(MAKE_DIRECTIVES, "keyword", "directive"),
+  ...toCompletions(MAKE_SPECIAL_TARGETS, "constant", "special target"),
+];
+const FUNCTION_OPTIONS: Completion[] = toCompletions(MAKE_FUNCTIONS, "function", "function");
 
 // Variable names defined anywhere in the buffer, read live so freshly-typed
 // assignments are offered immediately.
@@ -45,7 +42,7 @@ function variableOptions(cc: CompletionContext): Completion[] {
     const match = ASSIGNMENT_RE.exec(cc.state.doc.line(n).text);
     if (match) names.add(match[1]);
   }
-  return [...names].sort().map((label): Completion => ({ label, type: "variable", detail: "variable" }));
+  return [...names].sort().map((label) => ({ label, type: "variable", detail: "variable" }));
 }
 
 class MakefileCompletionProvider extends CompletionProvider<MakefileSituation> {
@@ -56,33 +53,21 @@ class MakefileCompletionProvider extends CompletionProvider<MakefileSituation> {
     const varOpen = VAR_OPEN_RE.exec(before);
     if (varOpen) {
       const partial = varOpen[1];
-      return {
-        from: cc.pos - partial.length,
-        situation: { kind: "function" },
-        validFor: /^[\w-]*$/,
-      };
+      return { from: cc.pos - partial.length, situation: "function", validFor: NAME_PARTIAL_VALID };
     }
 
-    const lead = LEADING_WS_RE.exec(before)?.[0] ?? "";
-    const rest = before.slice(lead.length);
-    const isRecipe = before.startsWith("\t");
-    if (!isRecipe && FIRST_TOKEN_RE.test(rest)) {
-      // Don't pop the menu unasked on a blank line.
-      if (!rest && !cc.explicit) return null;
-      return {
-        from: cc.pos - rest.length,
-        situation: { kind: "directive" },
-        validFor: FIRST_TOKEN_RE,
-      };
+    const rest = before.replace(/^\s*/, "");
+    if (!before.startsWith("\t") && FIRST_TOKEN_RE.test(rest)) {
+      if (!rest && !cc.explicit) return null; // don't pop the menu unasked on a blank line
+      return { from: cc.pos - rest.length, situation: "directive", validFor: FIRST_TOKEN_RE };
     }
     return null;
   }
 
   protected suggest(situation: MakefileSituation, cc: CompletionContext): Completion[] {
-    if (situation.kind === "function") {
-      return [...functionOptions(), ...variableOptions(cc)];
-    }
-    return directiveOptions();
+    return situation === "function"
+      ? [...FUNCTION_OPTIONS, ...variableOptions(cc)]
+      : DIRECTIVE_OPTIONS;
   }
 }
 

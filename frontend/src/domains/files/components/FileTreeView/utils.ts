@@ -142,12 +142,13 @@ function fileGlyphKind(name: string): string {
 function fileKindForName(name: string): string {
   const lower = name.toLowerCase();
   if (lower === "dockerfile" || lower.endsWith(".dockerfile")) return "dockerfile";
-  if (FILE_KIND_MAKEFILE_NAMES.has(lower) || lower.endsWith(".makefile")) return "makefile";
+  if (FILE_KIND_MAKEFILE_NAMES.has(lower)) return "makefile";
   if (FILE_KIND_GITIGNORE_NAMES.has(lower)) return "gitignore";
   const ext = name.split(".").pop()?.toLowerCase() ?? "";
   switch (ext) {
     case "mk":
     case "make":
+    case "makefile":
       return "makefile";
     case "sql":
       return "sql";
