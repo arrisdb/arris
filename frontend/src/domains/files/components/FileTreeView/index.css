@@ -67,8 +67,11 @@
 }
 .mdbc-file-icon {
   flex: none;
+  display: inline-flex;
+  align-items: center;
   color: var(--m-fg-3, #a0a0aa);
 }
+.mdbc-file-icon svg { display: block; }
 .mdbc-file-icon.folder { color: var(--m-fg-2, #d0d0d8); }
 .mdbc-file-icon.file.sql  { color: #6aa9ff; }
 .mdbc-file-icon.file.yaml { color: #ffd75e; }
