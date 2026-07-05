@@ -43,8 +43,7 @@ function useTerminalView(tabId: string): TerminalViewModel {
     host.appendChild(session.container);
     session.terminal.focus();
 
-    // Reflow only once the drag settles: refitting mid-drag resizes (and clears)
-    // the WebGL canvas every frame, which the user sees as the terminal blinking.
+    // Debounced so the grid reflows only once the drag settles (see the constant).
     let debounceId = 0;
     const scheduleFit = () => {
       if (debounceId) clearTimeout(debounceId);

@@ -24,9 +24,8 @@ interface TerminalSessionConfig {
   onError: (message: string) => void;
 }
 
-// A live terminal owned outside React so it survives the unmount/remount that a
-// pane split or move triggers. `container` is the persistent element xterm is
-// opened into and that moves between pane hosts.
+// A live terminal owned outside React so it survives the unmount/remount a pane
+// split or move triggers. `container` is the element xterm is opened into.
 interface TerminalSession {
   terminal: Terminal;
   fit: FitAddon;

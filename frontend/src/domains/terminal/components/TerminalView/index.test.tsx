@@ -296,9 +296,7 @@ describe("TerminalView", () => {
     vi.useFakeTimers();
     const before = mocks.pty.resize.mock.calls.length;
 
-    // A separator drag fires many observer ticks; refitting on each one resizes
-    // (and clears) the WebGL canvas every frame, which reads as blinking. They
-    // must collapse to a single fit once the drag settles.
+    // Many observer ticks during a drag must collapse to a single fit at the end.
     mocks.terminalInstances[0].cols = 90;
     triggerResize();
     triggerResize();

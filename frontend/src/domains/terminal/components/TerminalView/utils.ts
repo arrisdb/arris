@@ -153,9 +153,7 @@ function createTerminalSession(
   };
   sessions.set(tabId, session);
 
-  // Fonts load BEFORE open(): the cell grid is measured and the WebGL glyph
-  // atlas rasterized at open, and neither re-reads a font that loads later. The
-  // container is attached to a host by the caller before this microtask runs.
+  // The caller attaches the container to a host before this microtask runs.
   const opened = loadTerminalFonts(options.fontFamily, options.fontSize).then(() => {
     if (session.disposed) return;
     terminal.open(container);
@@ -175,7 +173,6 @@ function createTerminalSession(
         }),
         terminal.onData((data) => pty.write(data)),
       ];
-      // Sync the pty to the grid measured during the async open, now that it exists.
       fitTerminalSession(session);
     })
     .catch((loadError) => {
@@ -192,9 +189,8 @@ function acquireTerminalSession(
   return sessions.get(tabId) ?? createTerminalSession(tabId, config);
 }
 
-// Refit the grid, then resize the pty ONLY when the cell count actually changed.
-// A separator drag fires many sub-cell resizes; sending SIGWINCH on each one
-// makes full-screen TUIs redraw every frame, which is the visible flicker.
+// Refit the grid, then resize the pty ONLY when the cell count changed, so a
+// sub-cell drag does not spam SIGWINCH.
 function fitTerminalSession(session: TerminalSession): void {
   try {
     session.fit.fit();
@@ -224,10 +220,9 @@ function destroyTerminalSession(tabId: string): void {
   sessions.delete(tabId);
 }
 
-// Test-only: tear down every session so module-level state does not leak
-// between test cases.
+// Test-only: tear down every session so module state does not leak between tests.
 function resetTerminalSessions(): void {
-  for (const tabId of [...sessions.keys()]) destroyTerminalSession(tabId);
+  for (const tabId of sessions.keys()) destroyTerminalSession(tabId);
 }
 
 export {
