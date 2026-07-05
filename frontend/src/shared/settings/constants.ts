@@ -1,5 +1,5 @@
-import type { AppPreferences } from "../backendTypes";
-import type { ActionDef, KeymapAction, KeymapCategory } from "./types";
+import type { AppPreferences, KeymapPreset } from "../backendTypes";
+import type { ActionDef, KeymapAction, KeymapCategory, KeyShortcut } from "./types";
 
 export const KEYMAP_STORAGE_KEY = "arris.keymap.shortcuts";
 
@@ -169,6 +169,8 @@ export const preferenceDefaults: AppPreferences = {
   terminalFontFamily: null,
   connectionAutoRefreshMs: 0,
   debugMode: false,
+  keymapPreset: "default",
+  keymapOverrides: { default: {}, vscode: {}, jetbrains: {} },
   // Mirrors the Rust DEFAULT_SKIP_DIRS seed; the loaded backend value wins, this
   // is only the fallback before preferences hydrate.
   fileTreeSkipDirs: [
@@ -226,5 +228,45 @@ export const preferenceDefaults: AppPreferences = {
       listMarker: "dash",
       trimTrailingWhitespace: true,
     },
+  },
+};
+
+export const KEYMAP_PRESETS: KeymapPreset[] = ["default", "vscode", "jetbrains"];
+
+export const PRESET_LABELS: Record<KeymapPreset, string> = {
+  default: "Default",
+  vscode: "VSCode",
+  jetbrains: "JetBrains",
+};
+
+// Diffs layered over ACTIONS defaults. `default` holds null-fills shared by all
+// presets; vscode/jetbrains hold platform rebinds. Collisions are resolved
+// within each preset.
+export const PRESET_OVERRIDES: Record<
+  KeymapPreset,
+  Partial<Record<KeymapAction, KeyShortcut | null>>
+> = {
+  default: {
+    refreshSchema: { key: "F5" },
+    splitRight: { key: "Mod-Alt-ArrowRight" },
+    splitLeft: { key: "Mod-Alt-ArrowLeft" },
+    splitTop: { key: "Mod-Alt-ArrowUp" },
+    splitBottom: { key: "Mod-Alt-ArrowDown" },
+  },
+  vscode: {
+    openTab: { key: "Mod-n" },
+    reformatCode: { key: "Shift-Alt-f" },
+    replaceInEditor: { key: "Mod-Alt-f" },
+    toggleSidebar: { key: "Mod-b" },
+    showDefinition: { key: "F12" },
+    splitRight: { key: "Mod-\\" },
+  },
+  jetbrains: {
+    openTab: { key: "Mod-n" },
+    searchFiles: { key: "Mod-Shift-o" },
+    aiGenerate: { key: "Mod-Alt-k" },
+    gitCommit: { key: "Mod-k" },
+    gitPush: { key: "Mod-Shift-k" },
+    gitPull: { key: "Mod-t" },
   },
 };

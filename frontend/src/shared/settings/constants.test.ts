@@ -1,5 +1,28 @@
 import { describe, it, expect } from "vitest";
-import { ACTIONS, ACTION_ORDER, CATEGORY_LABELS, CATEGORY_ORDER } from "./constants";
+import {
+  ACTIONS,
+  ACTION_ORDER,
+  CATEGORY_LABELS,
+  CATEGORY_ORDER,
+  KEYMAP_PRESETS,
+  PRESET_OVERRIDES,
+} from "./constants";
+import type { KeymapPreset } from "../backendTypes";
+
+function presetBaseMap(preset: KeymapPreset) {
+  const map = new Map<string, string | null>();
+  for (const [action, def] of Object.entries(ACTIONS)) {
+    map.set(action, def.defaultShortcut?.key ?? null);
+  }
+  const layer = (p: KeymapPreset) => {
+    for (const [action, sc] of Object.entries(PRESET_OVERRIDES[p])) {
+      map.set(action, sc?.key ?? null);
+    }
+  };
+  layer("default");
+  if (preset !== "default") layer(preset);
+  return map;
+}
 
 describe("keymap ACTIONS", () => {
   it("binds every dbt action to a default shortcut", () => {
@@ -102,5 +125,43 @@ describe("keymap ACTIONS", () => {
 
   it("binds run-cell-and-insert-below to Shift-Enter", () => {
     expect(ACTIONS.runCellAndInsertBelow.defaultShortcut?.key).toBe("Shift-Enter");
+  });
+});
+
+describe("preset override tables", () => {
+  it("has three presets", () => {
+    expect(KEYMAP_PRESETS).toEqual(["default", "vscode", "jetbrains"]);
+  });
+
+  it("only references real actions", () => {
+    const valid = new Set(Object.keys(ACTIONS));
+    for (const preset of KEYMAP_PRESETS) {
+      for (const action of Object.keys(PRESET_OVERRIDES[preset])) {
+        expect(valid.has(action)).toBe(true);
+      }
+    }
+  });
+
+  it("has no duplicate bindings within any preset", () => {
+    for (const preset of KEYMAP_PRESETS) {
+      const seen = new Map<string, string>();
+      for (const [action, spec] of presetBaseMap(preset)) {
+        if (spec === null) continue;
+        expect(
+          seen.has(spec),
+          `${preset}: ${action} collides with ${seen.get(spec)} on ${spec}`,
+        ).toBe(false);
+        seen.set(spec, action);
+      }
+    }
+  });
+
+  it("applies known preset bindings", () => {
+    expect(presetBaseMap("default").get("refreshSchema")).toBe("F5");
+    expect(presetBaseMap("vscode").get("toggleSidebar")).toBe("Mod-b");
+    expect(presetBaseMap("vscode").get("showDefinition")).toBe("F12");
+    expect(presetBaseMap("vscode").get("refreshSchema")).toBe("F5");
+    expect(presetBaseMap("jetbrains").get("gitCommit")).toBe("Mod-k");
+    expect(presetBaseMap("jetbrains").get("aiGenerate")).toBe("Mod-Alt-k");
   });
 });
