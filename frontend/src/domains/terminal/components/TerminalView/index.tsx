@@ -1,10 +1,11 @@
 import type { RefObject } from "react";
 import "@xterm/xterm/css/xterm.css";
 import { useTerminalView } from "./hooks";
+import type { TerminalViewProps } from "./types";
 import "./index.css";
 
-function TerminalView() {
-  const { error, hostRef } = useTerminalView();
+function TerminalView({ tabId }: TerminalViewProps) {
+  const { error, hostRef } = useTerminalView(tabId);
 
   return (
     <div className="mdbc-terminal" data-testid="terminal-view">

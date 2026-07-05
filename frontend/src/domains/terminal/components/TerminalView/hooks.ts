@@ -1,34 +1,28 @@
 import { useEffect, useRef, useState } from "react";
-import { Terminal } from "@xterm/xterm";
-import { FitAddon } from "@xterm/addon-fit";
-import { spawn } from "tauri-pty/dist/index.es.js";
 import { useSettingsStore } from "@shared/settings";
 import { useProjectStore } from "@shell/hooks/projectStore";
+import { useTabsStore } from "@shell/hooks/tabsStore";
 import { zoomDirectionFromWheel, zoomTerminal } from "@shell/utils";
-import { terminalListShellsIPC } from "./ipc";
-import type {
-  TerminalRefs,
-  PtyData,
-  TerminalViewModel,
-} from "./types";
+import { RESIZE_DEBOUNCE_MS } from "./constants";
+import type { TerminalSession, TerminalViewModel } from "./types";
 import {
-  decodePtyData,
+  acquireTerminalSession,
+  destroyTerminalSession,
+  fitTerminalSession,
   loadTerminalFonts,
-  loadWebglRenderer,
-  ptySpawnOptions,
-  resizePty,
-  resolveTerminalShell,
-  terminalErrorMessage,
   terminalOptions,
 } from "./utils";
 
-function useTerminalView(): TerminalViewModel {
+// A pane split/move keeps the tab in the store and only re-parents its React
+// subtree; a real close removes it. So on unmount we keep the session unless the
+// tab is gone, which is what preserves the scrollback across split/move.
+function isTerminalTabOpen(tabId: string): boolean {
+  return useTabsStore.getState().tabs.some((tab) => tab.id === tabId);
+}
+
+function useTerminalView(tabId: string): TerminalViewModel {
   const hostRef = useRef<HTMLDivElement>(null);
-  const terminalRef = useRef<Terminal | null>(null);
-  const ptyRef = useRef<TerminalRefs["ptyRef"]["current"]>(null);
-  const disposablesRef = useRef<TerminalRefs["disposablesRef"]["current"]>([]);
-  const resizeObserverRef = useRef<ResizeObserver | null>(null);
-  const fitAddonRef = useRef<FitAddon | null>(null);
+  const sessionRef = useRef<TerminalSession | null>(null);
   const terminalShell = useSettingsStore((state) => state.terminalShell);
   const terminalFontSize = useSettingsStore((state) => state.terminalFontSize);
   const terminalFontFamily = useSettingsStore((state) => state.terminalFontFamily);
@@ -36,88 +30,57 @@ function useTerminalView(): TerminalViewModel {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!hostRef.current) return undefined;
-    let disposed = false;
-    const decoder = new TextDecoder();
-    const options = terminalOptions(terminalFontSize, terminalFontFamily);
-    const terminal = new Terminal(options);
-    const fit = new FitAddon();
-    fitAddonRef.current = fit;
-    terminal.loadAddon(fit);
-    terminalRef.current = terminal;
-
-    const fitAndResize = () => {
-      try {
-        fit.fit();
-        resizePty(terminal, ptyRef.current);
-      } catch {
-        // Hidden panels can report zero dimensions during layout.
-      }
-    };
-
-    // Fonts load BEFORE open(): the cell grid is measured and the WebGL glyph
-    // atlas rasterized at open, and neither re-reads a font that loads later.
-    const opened = loadTerminalFonts(options.fontFamily, options.fontSize).then(() => {
-      if (disposed || !hostRef.current) return;
-      terminal.open(hostRef.current);
-      loadWebglRenderer(terminal);
-      terminal.focus();
-      resizeObserverRef.current = new ResizeObserver(fitAndResize);
-      resizeObserverRef.current.observe(hostRef.current);
-      fitAndResize();
+    const host = hostRef.current;
+    if (!host) return undefined;
+    const session = acquireTerminalSession(tabId, {
+      fontSize: terminalFontSize,
+      fontFamily: terminalFontFamily,
+      shell: terminalShell,
+      projectPath: activeProjectPath,
+      onError: setError,
     });
+    sessionRef.current = session;
+    host.appendChild(session.container);
+    session.terminal.focus();
 
-    Promise.all([opened, terminalListShellsIPC()])
-      .then(([, shells]) => {
-        if (disposed) return;
-        const shell = resolveTerminalShell(terminalShell, shells);
-        const pty = spawn(shell, [], ptySpawnOptions(terminal, activeProjectPath));
-        ptyRef.current = pty;
-        disposablesRef.current = [
-          pty.onData((data) => terminal.write(decodePtyData(data as PtyData, decoder))),
-          pty.onExit(({ exitCode }) => {
-            terminal.write(`\r\n[process exited ${exitCode}]\r\n`);
-          }),
-          terminal.onData((data) => pty.write(data)),
-        ];
-        fitAndResize();
-      })
-      .catch((loadError) => {
-        if (!disposed) setError(terminalErrorMessage(loadError));
-      });
+    // Debounced so the grid reflows only once the drag settles (see the constant).
+    let debounceId = 0;
+    const scheduleFit = () => {
+      if (debounceId) clearTimeout(debounceId);
+      debounceId = window.setTimeout(() => {
+        debounceId = 0;
+        fitTerminalSession(session);
+      }, RESIZE_DEBOUNCE_MS);
+    };
+    const observer = new ResizeObserver(scheduleFit);
+    observer.observe(host);
+    fitTerminalSession(session);
 
     return () => {
-      disposed = true;
-      cleanupTerminal({
-        terminalRef,
-        ptyRef,
-        disposablesRef,
-        resizeObserverRef,
-      });
+      observer.disconnect();
+      if (debounceId) clearTimeout(debounceId);
+      session.container.parentNode?.removeChild(session.container);
+      sessionRef.current = null;
+      if (!isTerminalTabOpen(tabId)) destroyTerminalSession(tabId);
     };
-    // Font size/family changes are applied live below; they must NOT recreate
-    // the terminal (which would respawn the pty and wipe the scrollback).
+    // The session captures shell/font/cwd at creation; only its tab identity
+    // decides which session this host attaches to.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeProjectPath, terminalShell]);
+  }, [tabId]);
 
-  // Apply font changes to the running terminal in place, then refit so the
-  // grid + pty match the new cell size. No teardown, no lost output.
+  // Apply font changes to the running terminal in place, then refit so the grid
+  // and pty match the new cell size. No teardown, no lost output.
   useEffect(() => {
-    const terminal = terminalRef.current;
-    if (!terminal) return;
+    const session = sessionRef.current;
+    if (!session) return;
     const { fontFamily, fontSize } = terminalOptions(terminalFontSize, terminalFontFamily);
     // Load the new font first so the re-measure and atlas rebuild triggered by
     // the option change see the real font.
     loadTerminalFonts(fontFamily, fontSize).then(() => {
-      if (terminalRef.current !== terminal) return;
-      terminal.options.fontFamily = fontFamily;
-      terminal.options.fontSize = fontSize;
-      try {
-        fitAddonRef.current?.fit();
-        resizePty(terminal, ptyRef.current);
-      } catch {
-        // Hidden panels can report zero dimensions during layout.
-      }
+      if (sessionRef.current !== session) return;
+      session.terminal.options.fontFamily = fontFamily;
+      session.terminal.options.fontSize = fontSize;
+      fitTerminalSession(session);
     });
   }, [terminalFontSize, terminalFontFamily]);
 
@@ -140,21 +103,6 @@ function useTerminalView(): TerminalViewModel {
     error,
     hostRef,
   };
-}
-
-function cleanupTerminal({
-  terminalRef,
-  ptyRef,
-  disposablesRef,
-  resizeObserverRef,
-}: TerminalRefs): void {
-  resizeObserverRef.current?.disconnect();
-  for (const disposable of disposablesRef.current) disposable.dispose();
-  disposablesRef.current = [];
-  ptyRef.current?.kill();
-  ptyRef.current = null;
-  terminalRef.current?.dispose();
-  terminalRef.current = null;
 }
 
 export {
