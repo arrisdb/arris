@@ -26,8 +26,8 @@ impl JsonSingletonStore for AppPreferencesStore {
 mod tests {
     use super::*;
     use crate::persistence::{
-        CommaPosition, CsvDelimiter, FormatterSettings, IndentStyle, KeywordCase,
-        LogicalOperatorNewline, Theme,
+        CommaPosition, CsvDelimiter, FormatterSettings, IndentStyle, KeyShortcut, KeymapOverrides,
+        KeymapPreset, KeywordCase, LogicalOperatorNewline, Theme,
     };
 
     #[tokio::test]
@@ -44,6 +44,38 @@ mod tests {
         assert_eq!(p.terminal_shell, "");
         assert_eq!(p.terminal_font_size, 13.0);
         assert_eq!(p.terminal_font_family, None);
+    }
+
+    #[test]
+    fn keymap_preset_defaults_and_serde() {
+        let p = AppPreferences::default();
+        assert_eq!(p.keymap_preset, KeymapPreset::Default);
+        assert!(p.keymap_overrides.default.is_empty());
+        assert!(p.keymap_overrides.vscode.is_empty());
+        assert!(p.keymap_overrides.jetbrains.is_empty());
+
+        let json = serde_json::to_string(&KeymapPreset::Vscode).unwrap();
+        assert_eq!(json, "\"vscode\"");
+        let jb: KeymapPreset = serde_json::from_str("\"jetbrains\"").unwrap();
+        assert_eq!(jb, KeymapPreset::Jetbrains);
+    }
+
+    #[test]
+    fn keymap_overrides_roundtrip_and_missing_fields() {
+        let mut prefs = AppPreferences::default();
+        prefs.keymap_preset = KeymapPreset::Jetbrains;
+        prefs
+            .keymap_overrides
+            .jetbrains
+            .insert("gitCommit".into(), Some(KeyShortcut { key: "Mod-k".into() }));
+        prefs.keymap_overrides.jetbrains.insert("aiGenerate".into(), None);
+
+        let json = serde_json::to_string(&prefs).unwrap();
+        let back: AppPreferences = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, prefs);
+
+        let legacy: AppPreferences = serde_json::from_str("{}").unwrap();
+        assert_eq!(legacy.keymap_preset, KeymapPreset::Default);
     }
 
     #[tokio::test]
