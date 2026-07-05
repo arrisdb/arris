@@ -172,6 +172,7 @@ fn main() {
 
             cmd_load_console_tabs,
             cmd_save_console_tabs,
+            cmd_save_pane_layout,
             cmd_move_tab_to_project,
             cmd_move_tab_to_scratch,
             cmd_app_preferences_load,

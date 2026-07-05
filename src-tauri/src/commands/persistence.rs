@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use arris_engines::{
     AppEnvironment, AppPreferences, IpcError, JsonCollectionStore, JsonSingletonStore,
-    PersistedConsoleTab, PersistedPinnedQuery, PersistedRunHistoryEntry,
+    PersistedConsoleTab, PersistedPaneLayout, PersistedPinnedQuery, PersistedRunHistoryEntry,
 };
 use tauri::State;
 
@@ -25,6 +25,16 @@ pub async fn cmd_save_console_tabs(
     let proj = env.project.read().await;
     let proj = proj.as_ref().ok_or_else(|| ipc_err("no project open"))?;
     proj.tabs_store.save(&tabs).await.map_err(ipc_err)
+}
+
+#[tauri::command]
+pub async fn cmd_save_pane_layout(
+    env: State<'_, Arc<AppEnvironment>>,
+    layout: PersistedPaneLayout,
+) -> Result<(), IpcError> {
+    let proj = env.project.read().await;
+    let proj = proj.as_ref().ok_or_else(|| ipc_err("no project open"))?;
+    proj.pane_layout_store.save(&layout).await.map_err(ipc_err)
 }
 
 #[tauri::command]
