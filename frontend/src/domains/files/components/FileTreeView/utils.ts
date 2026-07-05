@@ -6,6 +6,8 @@ import { useDbtStore } from "@domains/dbt/hooks";
 import { useGitStore } from "@domains/git/hooks";
 import { useSqlMeshStore } from "@domains/sqlmesh/hooks";
 import {
+  FILE_KIND_GITIGNORE_NAMES,
+  FILE_KIND_MAKEFILE_NAMES,
   FILE_TREE_DBT_MARKERS,
   FILE_TREE_SQLMESH_MARKERS,
 } from "./constants";
@@ -140,9 +142,13 @@ function fileGlyphKind(name: string): string {
 function fileKindForName(name: string): string {
   const lower = name.toLowerCase();
   if (lower === "dockerfile" || lower.endsWith(".dockerfile")) return "dockerfile";
-  if (lower === "makefile" || lower.endsWith(".makefile")) return "shell";
+  if (FILE_KIND_MAKEFILE_NAMES.has(lower) || lower.endsWith(".makefile")) return "makefile";
+  if (FILE_KIND_GITIGNORE_NAMES.has(lower)) return "gitignore";
   const ext = name.split(".").pop()?.toLowerCase() ?? "";
   switch (ext) {
+    case "mk":
+    case "make":
+      return "makefile";
     case "sql":
       return "sql";
     case "json":

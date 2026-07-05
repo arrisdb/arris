@@ -38,13 +38,15 @@ describe("resolveDialect", () => {
     expect(resolveDialect({ languageId: "json" }).id).toBe("json");
     expect(resolveDialect({ languageId: "yaml" }).id).toBe("yaml");
     expect(resolveDialect({ languageId: "markdown" }).id).toBe("markdown");
+    expect(resolveDialect({ languageId: "makefile" }).id).toBe("makefile");
+    expect(resolveDialect({ languageId: "gitignore" }).id).toBe("gitignore");
     expect(resolveDialect({ languageId: "brainfuck" }).id).toBe("plaintext");
   });
 });
 
 describe("editorLanguageExtensions", () => {
   it("produces a grammar for known languages", () => {
-    for (const languageId of ["sql", "json", "yaml", "markdown", "python", "mongoshell", "esrest", "rediscli"]) {
+    for (const languageId of ["sql", "json", "yaml", "markdown", "python", "mongoshell", "esrest", "rediscli", "makefile", "gitignore"]) {
       expect(editorLanguageExtensions({ languageId }).length).toBeGreaterThan(0);
     }
   });

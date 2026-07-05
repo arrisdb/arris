@@ -69,8 +69,24 @@ describe("fileKindForName", () => {
     expect(fileKindForName("poetry.lock")).toBe("toml");
   });
 
-  it("maps Makefile to shell and falls back to text for unknown extensions", () => {
-    expect(fileKindForName("Makefile")).toBe("shell");
+  it("maps Makefiles and their variants to the makefile grammar", () => {
+    expect(fileKindForName("Makefile")).toBe("makefile");
+    expect(fileKindForName("makefile")).toBe("makefile");
+    expect(fileKindForName("GNUmakefile")).toBe("makefile");
+    expect(fileKindForName("build.mk")).toBe("makefile");
+    expect(fileKindForName("rules.make")).toBe("makefile");
+    expect(fileKindForName("common.makefile")).toBe("makefile");
+  });
+
+  it("maps ignore-file names to the gitignore grammar", () => {
+    expect(fileKindForName(".gitignore")).toBe("gitignore");
+    expect(fileKindForName(".dockerignore")).toBe("gitignore");
+    expect(fileKindForName(".npmignore")).toBe("gitignore");
+    expect(fileKindForName(".eslintignore")).toBe("gitignore");
+    expect(fileKindForName(".prettierignore")).toBe("gitignore");
+  });
+
+  it("falls back to text for unknown extensions", () => {
     expect(fileKindForName("notes.unknownext")).toBe("text");
   });
 });
