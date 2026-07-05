@@ -7,14 +7,15 @@ import { useProjectStore } from "@shell/hooks/projectStore";
 import { useRecentsStore } from "@shell/hooks/recentsStore";
 import type { DatabaseKind, PersistedTab, QueryLanguage } from "@shared";
 import { useSettingsStore } from "@shared/settings";
-import { PANE_GROUPS_KEY } from "../constants";
-import type { PersistedPaneLayout } from "../types";
 import { openProjectDialogIPC, readTextFileIPC } from "../ipc";
 import { isSelfWrite } from "./selfWrites";
 
 function toPersisted(tabs: EditorTab[]): PersistedTab[] {
   // The "Uncommitted Changes" git-diff tab is transient: never restore it on
   // launch; it's reopened on demand from the Git rail.
+  // NOTE: terminal tabs MUST stay persisted here. The pane layout references
+  // tab ids; dropping terminals would make reconcileLayout prune their leaves
+  // and silently lose the split on restart.
   return tabs
     .filter((t) => t.tabType !== "gitdiff")
     .map(({ id, title, text, kind, connectionId, cursor, tabType, filePath, tableRef, tableEditable, closed, createdAt, chart }) => ({
@@ -32,29 +33,6 @@ function toPersisted(tabs: EditorTab[]): PersistedTab[] {
     createdAt,
     chart,
   }));
-}
-
-function loadPaneLayout(): PersistedPaneLayout | null {
-  try {
-    const raw = localStorage.getItem(PANE_GROUPS_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed.layout === "undefined") return null;
-    return {
-      layout: parsed.layout ?? null,
-      focusedPaneGroupId: parsed.focusedPaneGroupId ?? null,
-    };
-  } catch {
-    return null;
-  }
-}
-
-function savePaneLayout(payload: PersistedPaneLayout): void {
-  try {
-    localStorage.setItem(PANE_GROUPS_KEY, JSON.stringify(payload));
-  } catch {
-    // localStorage may be unavailable in tests / private browsing.
-  }
 }
 
 async function openProjectFromMenu(): Promise<void> {
@@ -104,10 +82,6 @@ async function refreshFileTabFromDisk(tab: EditorTab): Promise<void> {
 
 function hydrateFrontendStores(): void {
   useAgentStore.getState().checkAgent().catch(() => {});
-  const layout = loadPaneLayout();
-  if (layout) {
-    useTabsStore.getState().setLayout(layout.layout, layout.focusedPaneGroupId);
-  }
 }
 
 async function reopenLastProjectIfNeeded(): Promise<void> {
@@ -220,13 +194,11 @@ export {
   hydrateFrontendStores,
   isRunnableQueryKind,
   kindForConnection,
-  loadPaneLayout,
   nextFontSize,
   openProjectFromMenu,
   queryLanguageForEditorKind,
   refreshOnAppFocus,
   reopenLastProjectIfNeeded,
-  savePaneLayout,
   toPersisted,
   zoomDirectionFromKey,
   zoomDirectionFromWheel,

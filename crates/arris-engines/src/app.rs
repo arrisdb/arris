@@ -95,17 +95,21 @@ impl AppEnvironment {
         let proj = self.project.read().await;
         let proj_ref = proj.as_ref().expect("project was just set");
         let connections = self.connection.all_connections(Some(proj_ref)).await;
-        let tabs = proj_ref.tabs_store.load().await.unwrap_or_default();
-        let federation_tabs = proj_ref
-            .federation_tabs_store
-            .load()
-            .await
-            .unwrap_or_default();
+        // Independent per-project files: load them concurrently, not one-by-one.
+        let (tabs, federation_tabs, pane_layout) = tokio::join!(
+            proj_ref.tabs_store.load(),
+            proj_ref.federation_tabs_store.load(),
+            proj_ref.pane_layout_store.load(),
+        );
+        let tabs = tabs.unwrap_or_default();
+        let federation_tabs = federation_tabs.unwrap_or_default();
+        let pane_layout = pane_layout.unwrap_or_default();
         Ok(ProjectOpenResult {
             root,
             connections,
             tabs,
             federation_tabs,
+            pane_layout,
         })
     }
 
@@ -138,7 +142,37 @@ mod tests {
         assert_eq!(result.root, project_dir.path().to_str().unwrap());
         assert!(result.tabs.is_empty());
         assert!(result.federation_tabs.is_empty());
+        assert_eq!(result.pane_layout, crate::PersistedPaneLayout::default());
         assert!(env.project.read().await.is_some());
+    }
+
+    #[tokio::test]
+    async fn open_project_returns_saved_pane_layout() {
+        use crate::persistence::JsonSingletonStore;
+
+        let tmp = tempfile::tempdir().unwrap();
+        let env = AppEnvironment::init_at(tmp.path().into()).await.unwrap();
+        let project_dir = tempfile::tempdir().unwrap();
+        let path = project_dir.path().to_str().unwrap().to_string();
+
+        let layout = crate::PersistedPaneLayout {
+            layout: Some(serde_json::json!({ "kind": "leaf", "id": "g1", "tabIds": ["t1"] })),
+            focused_pane_group_id: Some("g1".into()),
+        };
+        env.open_project(path.clone()).await.unwrap();
+        {
+            let proj = env.project.read().await;
+            proj.as_ref()
+                .unwrap()
+                .pane_layout_store
+                .save(&layout)
+                .await
+                .unwrap();
+        }
+
+        // Reopening the same project rehydrates the persisted layout.
+        let result = env.open_project(path).await.unwrap();
+        assert_eq!(result.pane_layout, layout);
     }
 
     #[tokio::test]

@@ -18,6 +18,7 @@ vi.mock("../ipc", () => ({
     connections: [],
     tabs: [],
     federationTabs: [],
+    paneLayout: { layout: null, focusedPaneGroupId: null },
   }),
   readTextFileIPC: vi.fn(),
   saveTabsIPC: vi.fn(),
@@ -280,6 +281,7 @@ describe("handleDroppedPath", () => {
       connections: [],
       tabs: [],
       federationTabs: [],
+    paneLayout: { layout: null, focusedPaneGroupId: null },
     });
     useProjectStore.setState({ activeProjectPath: null, loading: false });
     useFilesStore.getState().clear();
@@ -590,6 +592,7 @@ describe("openProjectFromMenu", () => {
       connections: [],
       tabs: [],
       federationTabs: [],
+    paneLayout: { layout: null, focusedPaneGroupId: null },
     });
     useProjectStore.setState({ activeProjectPath: null, loading: false });
     useFilesStore.getState().clear();

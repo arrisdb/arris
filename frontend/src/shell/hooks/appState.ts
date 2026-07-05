@@ -19,6 +19,7 @@ import {
   getCurrentWebviewIPC,
   listConnectionsIPC,
   listenAppEventIPC,
+  savePaneLayoutIPC,
   saveTabsIPC,
 } from "../ipc";
 import { ACTION_ORDER, useSettingsStore } from "@shared/settings";
@@ -33,7 +34,6 @@ import {
   refreshOnAppFocus,
   reopenLastProjectIfNeeded,
   runCommand,
-  savePaneLayout,
   toPersisted,
   useGlobalCommands,
 } from "../utils";
@@ -129,11 +129,7 @@ function useAppTabPersistence(hydrated: MutableRefObject<boolean>): void {
       if (state.layout !== prev.layout || state.focusedPaneGroupId !== prev.focusedPaneGroupId) {
         if (layoutTimer) clearTimeout(layoutTimer);
         layoutTimer = setTimeout(
-          () =>
-            savePaneLayout({
-              layout: state.layout,
-              focusedPaneGroupId: state.focusedPaneGroupId,
-            }),
+          () => savePaneLayoutIfProjectOpen(state.layout, state.focusedPaneGroupId),
           PANE_LAYOUT_SAVE_DEBOUNCE_MS,
         );
       }
@@ -141,10 +137,10 @@ function useAppTabPersistence(hydrated: MutableRefObject<boolean>): void {
     const onBeforeUnload = () => {
       if (timer) clearTimeout(timer);
       saveTabsIfProjectOpen(useTabsStore.getState().tabs);
-      savePaneLayout({
-        layout: useTabsStore.getState().layout,
-        focusedPaneGroupId: useTabsStore.getState().focusedPaneGroupId,
-      });
+      savePaneLayoutIfProjectOpen(
+        useTabsStore.getState().layout,
+        useTabsStore.getState().focusedPaneGroupId,
+      );
     };
     window.addEventListener("beforeunload", onBeforeUnload);
 
@@ -344,6 +340,14 @@ function syncBackgroundTask(id: string, label: string, isLoading: boolean): void
 function saveTabsIfProjectOpen(tabs: ReturnType<typeof useTabsStore.getState>["tabs"]): void {
   if (!useProjectStore.getState().activeProjectPath) return;
   saveTabsIPC(toPersisted(tabs)).catch(() => {});
+}
+
+function savePaneLayoutIfProjectOpen(
+  layout: ReturnType<typeof useTabsStore.getState>["layout"],
+  focusedPaneGroupId: string | null,
+): void {
+  if (!useProjectStore.getState().activeProjectPath) return;
+  savePaneLayoutIPC(layout, focusedPaneGroupId).catch(() => {});
 }
 
 function onMenuOpenSettings(): void {

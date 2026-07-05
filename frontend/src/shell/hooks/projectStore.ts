@@ -19,6 +19,7 @@ import { useGitStore } from "@domains/git/hooks";
 import { useDbtStore } from "@domains/dbt/hooks";
 import { useSqlMeshStore } from "@domains/sqlmesh/hooks";
 import { useRecentsStore } from "./recentsStore";
+import type { PaneNode } from "@shell/types";
 
 interface ProjectState {
   activeProjectPath: string | null;
@@ -44,6 +45,14 @@ const useProjectStore = create<ProjectState>((set) => ({
       useTabsStore
         .getState()
         .setTabs(result.tabs.map((t) => ({ ...t })));
+      // Restore the split-pane layout AFTER tabs so it reconciles against the
+      // freshly-loaded tab set (project-scoped, single source of truth).
+      useTabsStore
+        .getState()
+        .setLayout(
+          result.paneLayout.layout as PaneNode | null,
+          result.paneLayout.focusedPaneGroupId,
+        );
       useFederationStore.getState().setTabs(result.federationTabs);
       usePinnedQueriesStore.getState().hydrate().catch(() => {});
       useRunHistoryStore.getState().hydrate().catch(() => {});

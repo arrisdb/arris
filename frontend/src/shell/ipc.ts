@@ -9,6 +9,7 @@ import type {
   ProjectOpenResult,
   ScopedConnection,
 } from "@shared";
+import type { PaneNode } from "./types";
 
 function appPreferencesLoadIPC(): Promise<AppPreferences> {
   return invoke("cmd_app_preferences_load");
@@ -46,6 +47,13 @@ function saveTabsIPC(tabs: PersistedTab[]): Promise<void> {
   return invoke("cmd_save_console_tabs", { tabs });
 }
 
+function savePaneLayoutIPC(
+  layout: PaneNode | null,
+  focusedPaneGroupId: string | null,
+): Promise<void> {
+  return invoke("cmd_save_pane_layout", { layout: { layout, focusedPaneGroupId } });
+}
+
 // Move a virtual console/notebook's sidecar file out of `.arris/files/` to the
 // project root, returning the new absolute path. The tab then becomes a normal
 // file-backed tab.
@@ -78,5 +86,6 @@ export {
   openProjectDialogIPC,
   openProjectIPC,
   readTextFileIPC,
+  savePaneLayoutIPC,
   saveTabsIPC,
 };

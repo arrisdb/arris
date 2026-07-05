@@ -53,8 +53,9 @@ pub use drivers::{DatabaseDriver, PaginationStrategy, driver_for_kind};
 pub use persistence::{
     AppPreferences, AppPreferencesStore,
     ConnectionsStore, ConsoleTabsStore, FederationTabsStore, JsonCollectionStore,
-    JsonSingletonStore, Keychain, KeychainError, SecretStore,
-    PersistedConsoleTab, PersistedFederationTab, PersistedPinnedQuery, PersistedRunHistoryEntry,
+    JsonSingletonStore, Keychain, KeychainError, PaneLayoutStore, SecretStore,
+    PersistedConsoleTab, PersistedFederationTab, PersistedPaneLayout, PersistedPinnedQuery,
+    PersistedRunHistoryEntry,
     PinnedQueriesStore, ProjectError, ProjectOpenResult, ProjectState, RunHistoryStore, StoreError,
     DataPaths,
 };

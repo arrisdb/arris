@@ -1,7 +1,8 @@
 use std::path::PathBuf;
 
 use crate::{
-    ConnectionsStore, ConsoleTabsStore, FederationTabsStore, PinnedQueriesStore, RunHistoryStore,
+    ConnectionsStore, ConsoleTabsStore, FederationTabsStore, PaneLayoutStore, PinnedQueriesStore,
+    RunHistoryStore,
 };
 use crate::connection::types::ConnectionConfig;
 use crate::persistence::{DataPaths, JsonCollectionStore, ProjectError};
@@ -14,6 +15,7 @@ pub struct ProjectState {
     pub federation_tabs_store: FederationTabsStore,
     pub pinned_queries_store: PinnedQueriesStore,
     pub run_history_store: RunHistoryStore,
+    pub pane_layout_store: PaneLayoutStore,
     pub connections: Vec<ConnectionConfig>,
 }
 
@@ -25,6 +27,7 @@ impl ProjectState {
         let federation_tabs_store = FederationTabsStore::new(arris_dir.clone());
         let pinned_queries_store = PinnedQueriesStore::new(arris_dir.clone());
         let run_history_store = RunHistoryStore::new(arris_dir.clone());
+        let pane_layout_store = PaneLayoutStore::new(arris_dir.clone());
         let connections = connections_store.load().await.unwrap_or_default();
         Ok(Self {
             root,
@@ -34,6 +37,7 @@ impl ProjectState {
             federation_tabs_store,
             pinned_queries_store,
             run_history_store,
+            pane_layout_store,
             connections,
         })
     }

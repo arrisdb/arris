@@ -368,6 +368,16 @@ pub struct PersistedRunHistoryEntry {
     pub log_kind: Option<String>,
 }
 
+/// Per-project split-pane layout. The `layout` tree is opaque to the backend
+/// (the frontend `PaneNode`); we persist it verbatim so tabs and their pane
+/// placement restore atomically from the same project.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct PersistedPaneLayout {
+    pub layout: Option<serde_json::Value>,
+    pub focused_pane_group_id: Option<String>,
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ProjectOpenResult {
@@ -375,4 +385,5 @@ pub struct ProjectOpenResult {
     pub connections: Vec<ScopedConnection>,
     pub tabs: Vec<PersistedConsoleTab>,
     pub federation_tabs: Vec<PersistedFederationTab>,
+    pub pane_layout: PersistedPaneLayout,
 }
