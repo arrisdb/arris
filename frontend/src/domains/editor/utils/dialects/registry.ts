@@ -22,6 +22,8 @@ import { RedisCliDialect, RedisDialect } from "./connections/redis";
 import { MongoDbDialect, MongoshellDialect } from "./connections/mongodb";
 import { DbtYamlDialect } from "./files/dbtYaml";
 import { SqlMeshYamlDialect } from "./files/sqlmeshYaml";
+import { MakefileDialect } from "./files/makefile";
+import { GitignoreDialect } from "./files/gitignore";
 import {
   DockerfileDialect,
   HtmlDialect,
@@ -91,6 +93,8 @@ const DIALECTS: readonly Dialect[] = [
   new ShellDialect(),
   new DockerfileDialect(),
   new TomlDialect(),
+  new MakefileDialect(),
+  new GitignoreDialect(),
   new PlainTextDialect(),
 ];
 

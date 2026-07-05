@@ -70,6 +70,7 @@ import {
   zoomTerminal,
 } from "./app";
 import { listFolderTreeIPC, openProjectDialogIPC, openProjectIPC, readTextFileIPC } from "../ipc";
+import { clearSelfWrites, recordSelfWrite } from "./selfWrites";
 import { dbtProjectPaneScanProjectIPC } from "@domains/dbt/components/DbtProjectPane/ipc";
 import { scanSqlMeshProjectIPC } from "@domains/sqlmesh/components/SqlMeshProjectPane/ipc";
 import type { FileTreeEntry } from "@shared";
@@ -409,6 +410,7 @@ describe("toPersisted", () => {
 describe("refreshOnAppFocus", () => {
   beforeEach(() => {
     vi.mocked(readTextFileIPC).mockReset();
+    clearSelfWrites();
     useTabsStore.setState({ tabs: [], layout: null, activeId: null, focusedPaneGroupId: null });
     useGitStore.setState({ repoPath: null });
     useProjectStore.setState({ activeProjectPath: "/proj/active", loading: false });
@@ -453,6 +455,52 @@ describe("refreshOnAppFocus", () => {
 
     const updated = useTabsStore.getState().tabs.find((t) => t.id === "f1");
     expect(updated?.text).toBe("SELECT 2;");
+    expect(updated?.refreshToken).toBe(1);
+  });
+
+  it("does not clobber live edits when the disk change is the app's own autosave echo", async () => {
+    // User saved "SELECT 1;" (recorded as a self-write), then kept typing so the
+    // live buffer is "SELECT 12;". The watcher echo re-reads the just-saved,
+    // now-stale "SELECT 1;". It must NOT overwrite the buffer or remount.
+    const fileTab: EditorTab = {
+      id: "f1",
+      title: "main.sql",
+      text: "SELECT 12;",
+      kind: "sql",
+      cursor: 0,
+      tabType: "file",
+      filePath: "/repo/main.sql",
+    };
+    useTabsStore.setState({ tabs: [fileTab], layout: null, activeId: "f1", focusedPaneGroupId: null });
+    recordSelfWrite("/repo/main.sql", "SELECT 1;");
+    vi.mocked(readTextFileIPC).mockResolvedValue("SELECT 1;");
+
+    await refreshOnAppFocus();
+
+    const updated = useTabsStore.getState().tabs.find((t) => t.id === "f1");
+    expect(updated?.text).toBe("SELECT 12;");
+    expect(updated?.refreshToken).toBeUndefined();
+  });
+
+  it("still reconciles a genuine external edit that is not the app's own write", async () => {
+    const fileTab: EditorTab = {
+      id: "f1",
+      title: "main.sql",
+      text: "SELECT 12;",
+      kind: "sql",
+      cursor: 0,
+      tabType: "file",
+      filePath: "/repo/main.sql",
+    };
+    useTabsStore.setState({ tabs: [fileTab], layout: null, activeId: "f1", focusedPaneGroupId: null });
+    recordSelfWrite("/repo/main.sql", "SELECT 1;");
+    // An external editor wrote something we never saved.
+    vi.mocked(readTextFileIPC).mockResolvedValue("EXTERNAL EDIT");
+
+    await refreshOnAppFocus();
+
+    const updated = useTabsStore.getState().tabs.find((t) => t.id === "f1");
+    expect(updated?.text).toBe("EXTERNAL EDIT");
     expect(updated?.refreshToken).toBe(1);
   });
 
