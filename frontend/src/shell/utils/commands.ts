@@ -33,7 +33,7 @@ import { useChartEditorStore } from "@domains/chart/hooks";
 import { useCommandRegistryStore } from "../hooks/commandRegistryStore";
 import { useFileSearchStore } from "@domains/files/hooks";
 import { useTabsStore } from "../hooks/tabsStore";
-import { openProjectFromMenu } from "./app";
+import { openProjectFromMenu, pickAndOpenFolderInNewWindow } from "./app";
 
 interface CommandSpec {
   run: () => void;
@@ -223,6 +223,7 @@ function useGlobalCommands(): void {
     searchFiles: { run: () => useFileSearchStore.getState().show("file") },
     searchContent: { run: () => useFileSearchStore.getState().show("content") },
     openProject: { run: () => { openProjectFromMenu().catch(() => {}); } },
+    openProjectNewWindow: { run: () => { pickAndOpenFolderInNewWindow().catch(() => {}); } },
     toggleSidebar: { run: () => useSettingsStore.getState().toggleSidebarLeftVisible() },
     showProjectPane: { run: () => useSettingsStore.getState().setSidebarLeftTab("files") },
     showGitPane: {

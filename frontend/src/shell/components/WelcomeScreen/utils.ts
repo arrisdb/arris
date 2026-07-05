@@ -2,6 +2,7 @@ import { useConnectionsStore } from "@domains/connection/hooks";
 import type { ScopedConnection } from "@domains/connection";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { useProjectStore } from "@shell/hooks/projectStore";
+import { openProjectInNewWindow } from "@shell/utils/app";
 import { useTabsStore } from "../../hooks/tabsStore";
 import {
   DBT_EXAMPLE_MODEL_SQL,
@@ -100,9 +101,16 @@ async function pickAndOpenFolder(): Promise<void> {
   useProjectStore.getState().openProject(selected);
 }
 
+async function pickAndOpenFolderInNewWindow(): Promise<void> {
+  const selected = await openDialog({ directory: true, title: "Open folder in new window" });
+  if (typeof selected !== "string") return;
+  await openProjectInNewWindow(selected);
+}
+
 export {
   doScaffoldAndOpen,
   joinProjectPath,
   pickAndOpenFolder,
+  pickAndOpenFolderInNewWindow,
   timeAgo,
 };

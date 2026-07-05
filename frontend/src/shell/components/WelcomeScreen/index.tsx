@@ -1,7 +1,12 @@
 import { Icon } from "@shared/ui/Icon";
+import { ContextMenu, useContextMenu } from "@shared/ui/ContextMenu";
 import { CloneDialog } from "./components/CloneDialog";
 import { ConfirmDialog } from "./components/ConfirmDialog";
 import { NewProjectDialog } from "./components/NewProjectDialog";
+import {
+  RECENT_MENU_OPEN_NEW_WINDOW_ID,
+  RECENT_MENU_OPEN_NEW_WINDOW_LABEL,
+} from "./constants";
 import { useWelcomeScreen } from "./hooks";
 import { timeAgo } from "./utils";
 import "./index.css";
@@ -15,16 +20,21 @@ export function WelcomeScreen() {
     onCancelScaffold,
     onClickNewProject,
     onClickOpenFolder,
+    onClickOpenFolderNewWindow,
     onClickRecentProject,
     onClickShowCloneDialog,
     onCloneSubmit,
     onConfirmScaffold,
     onCreateNewProject,
+    onOpenRecentProjectNewWindow,
     pendingNewProject,
     pendingScaffold,
     recents,
     showCloneDialog,
   } = useWelcomeScreen();
+
+  const recentMenu = useContextMenu<string>();
+  const recentMenuPath = recentMenu.state?.context;
 
   return (
     <div className="mdbc welcome-screen" data-testid="welcome-screen">
@@ -99,6 +109,16 @@ export function WelcomeScreen() {
             <button
               type="button"
               className="mdbc-btn welcome-action-btn"
+              data-testid="welcome-open-folder-new-window"
+              onClick={onClickOpenFolderNewWindow}
+            >
+              <Icon name="folder" size={14} />
+              Open in new window
+            </button>
+
+            <button
+              type="button"
+              className="mdbc-btn welcome-action-btn"
               data-testid="welcome-clone"
               onClick={onClickShowCloneDialog}
             >
@@ -119,7 +139,12 @@ export function WelcomeScreen() {
                   className="welcome-recent-card"
                   data-testid={`welcome-recent-${recent.path}`}
                   title={recent.path}
-                  onClick={() => onClickRecentProject(recent.path)}
+                  onClick={(event) =>
+                    event.metaKey || event.ctrlKey
+                      ? onOpenRecentProjectNewWindow(recent.path)
+                      : onClickRecentProject(recent.path)
+                  }
+                  onContextMenu={(event) => recentMenu.open(event, recent.path)}
                 >
                   <span className="welcome-recent-icon" aria-hidden="true">
                     <Icon name="folder" size={16} />
@@ -166,6 +191,23 @@ export function WelcomeScreen() {
           message="This folder already contains files. Scaffold files may overwrite existing content. Continue anyway?"
           onConfirm={onConfirmScaffold}
           onCancel={onCancelScaffold}
+        />
+      )}
+
+      {recentMenu.state && recentMenuPath && (
+        <ContextMenu
+          x={recentMenu.state.x}
+          y={recentMenu.state.y}
+          items={[
+            {
+              id: RECENT_MENU_OPEN_NEW_WINDOW_ID,
+              label: RECENT_MENU_OPEN_NEW_WINDOW_LABEL,
+              testId: "welcome-recent-open-new-window",
+              action: () => onOpenRecentProjectNewWindow(recentMenuPath),
+            },
+          ]}
+          onClose={recentMenu.close}
+          data-testid="welcome-recent-context-menu"
         />
       )}
     </div>

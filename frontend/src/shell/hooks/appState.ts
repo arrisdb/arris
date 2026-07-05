@@ -30,9 +30,10 @@ import {
   isBareKeySpec,
   isTypingTarget,
   matchesShortcut,
+  openPendingLaunchOrReopenLast,
   openProjectFromMenu,
+  pickAndOpenFolderInNewWindow,
   refreshOnAppFocus,
-  reopenLastProjectIfNeeded,
   runCommand,
   toPersisted,
   useGlobalCommands,
@@ -106,7 +107,7 @@ function useAppBootstrap(
         useConnectionsStore.getState().hydrateConnectedSchemas();
         if (preferences) useSettingsStore.getState().hydrate(preferences);
         hydrated.current = true;
-        await reopenLastProjectIfNeeded();
+        await openPendingLaunchOrReopenLast();
         setBootstrapping(false);
       })
       .catch((error) => {
@@ -226,6 +227,7 @@ function useAppDragDrop(): void {
 function useAppMenuEvents(): void {
   useAppMenuEvent("menu:open-settings", onMenuOpenSettings);
   useAppMenuEvent("menu:open-project", onMenuOpenProject);
+  useAppMenuEvent("menu:open-project-new-window", onMenuOpenProjectNewWindow);
   useAppMenuEvent("menu:save-file", onMenuSaveFile);
   useAppMenuEvent("menu:new-project", onMenuNewProject);
   useAppMenuEvent("menu:close-editor", onMenuCloseEditor);
@@ -356,6 +358,10 @@ function onMenuOpenSettings(): void {
 
 function onMenuOpenProject(): void {
   openProjectFromMenu().catch(() => {});
+}
+
+function onMenuOpenProjectNewWindow(): void {
+  pickAndOpenFolderInNewWindow().catch(() => {});
 }
 
 function onMenuSaveFile(): void {

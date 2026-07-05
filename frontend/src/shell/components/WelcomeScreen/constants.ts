@@ -47,10 +47,16 @@ SELECT * FROM (VALUES
   (5, 'USB-C Hub', 59.95, DATE '2024-03-01')
 ) AS t(id, product, amount, order_date)`;
 
+// Recent-project right-click menu: open that project in a separate window.
+const RECENT_MENU_OPEN_NEW_WINDOW_ID = "open-new-window";
+const RECENT_MENU_OPEN_NEW_WINDOW_LABEL = "Open in New Window";
+
 export {
   DBT_EXAMPLE_MODEL_SQL,
   DBT_PROFILES_YML,
   DBT_PROJECT_YML,
+  RECENT_MENU_OPEN_NEW_WINDOW_ID,
+  RECENT_MENU_OPEN_NEW_WINDOW_LABEL,
   SAMPLE_CONNECTION_NAME,
   SAMPLE_DUCKDB_FILE,
   SAMPLE_ORDERS_SQL,

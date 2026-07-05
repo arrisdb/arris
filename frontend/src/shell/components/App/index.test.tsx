@@ -62,8 +62,10 @@ vi.mock("@shell/ipc", () => ({
   openFileIndexIPC: vi.fn().mockResolvedValue(undefined),
   openProjectDialogIPC: vi.fn(),
   openProjectIPC: vi.fn().mockResolvedValue({ root: "", connections: [], tabs: [], federationTabs: [], paneLayout: { layout: null, focusedPaneGroupId: null } }),
+  openProjectInNewWindowIPC: vi.fn().mockResolvedValue(undefined),
   readTextFileIPC: vi.fn(),
   saveTabsIPC: vi.fn(),
+  takePendingLaunchIPC: vi.fn().mockResolvedValue(null),
 }));
 vi.mock("@domains/results/components/ResultsTableView/utils", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@domains/results/components/ResultsTableView/utils")>()),

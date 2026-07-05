@@ -20,8 +20,10 @@ vi.mock("../ipc", () => ({
     federationTabs: [],
     paneLayout: { layout: null, focusedPaneGroupId: null },
   }),
+  openProjectInNewWindowIPC: vi.fn().mockResolvedValue(undefined),
   readTextFileIPC: vi.fn(),
   saveTabsIPC: vi.fn(),
+  takePendingLaunchIPC: vi.fn().mockResolvedValue(null),
 }));
 
 vi.mock("@shared/ui/utils/theme", () => ({
@@ -67,10 +69,20 @@ import {
   zoomDirectionFromKey,
   zoomDirectionFromWheel,
   zoomEditor,
+  openPendingLaunchOrReopenLast,
+  openProjectInNewWindow,
+  pickAndOpenFolderInNewWindow,
   zoomFocusedPane,
   zoomTerminal,
 } from "./app";
-import { listFolderTreeIPC, openProjectDialogIPC, openProjectIPC, readTextFileIPC } from "../ipc";
+import {
+  listFolderTreeIPC,
+  openProjectDialogIPC,
+  openProjectIPC,
+  openProjectInNewWindowIPC,
+  readTextFileIPC,
+  takePendingLaunchIPC,
+} from "../ipc";
 import { clearSelfWrites, recordSelfWrite } from "./selfWrites";
 import { dbtProjectPaneScanProjectIPC } from "@domains/dbt/components/DbtProjectPane/ipc";
 import { scanSqlMeshProjectIPC } from "@domains/sqlmesh/components/SqlMeshProjectPane/ipc";
@@ -621,5 +633,65 @@ describe("openProjectFromMenu", () => {
     vi.mocked(openProjectDialogIPC).mockResolvedValue(["/a", "/b"] as any);
     await openProjectFromMenu();
     expect(listFolderTreeIPC).not.toHaveBeenCalled();
+  });
+});
+
+describe("openProjectInNewWindow", () => {
+  beforeEach(() => {
+    vi.mocked(openProjectInNewWindowIPC).mockClear();
+  });
+
+  it("spawns a new window for the given path", async () => {
+    await openProjectInNewWindow("/proj/two");
+    expect(openProjectInNewWindowIPC).toHaveBeenCalledWith("/proj/two");
+  });
+});
+
+describe("pickAndOpenFolderInNewWindow", () => {
+  beforeEach(() => {
+    vi.mocked(openProjectDialogIPC).mockReset();
+    vi.mocked(openProjectInNewWindowIPC).mockClear();
+  });
+
+  it("opens the picked folder in a new window", async () => {
+    vi.mocked(openProjectDialogIPC).mockResolvedValue("/proj/pick");
+    await pickAndOpenFolderInNewWindow();
+    expect(openProjectInNewWindowIPC).toHaveBeenCalledWith("/proj/pick");
+  });
+
+  it("noops when the dialog is cancelled", async () => {
+    vi.mocked(openProjectDialogIPC).mockResolvedValue(null);
+    await pickAndOpenFolderInNewWindow();
+    expect(openProjectInNewWindowIPC).not.toHaveBeenCalled();
+  });
+});
+
+describe("openPendingLaunchOrReopenLast", () => {
+  beforeEach(() => {
+    vi.mocked(takePendingLaunchIPC).mockReset();
+    vi.mocked(openProjectIPC).mockClear();
+    vi.mocked(openProjectIPC).mockResolvedValue({
+      root: "",
+      connections: [],
+      tabs: [],
+      federationTabs: [],
+      paneLayout: { layout: null, focusedPaneGroupId: null },
+    });
+    useProjectStore.setState({ activeProjectPath: null, loading: false });
+    useFilesStore.getState().clear();
+  });
+
+  it("opens the launch path in this window, winning over reopen-last", async () => {
+    vi.mocked(takePendingLaunchIPC).mockResolvedValue("/proj/launched");
+    useSettingsStore.setState({ reopenLastProject: true });
+    await openPendingLaunchOrReopenLast();
+    expect(openProjectIPC).toHaveBeenCalledWith("/proj/launched");
+  });
+
+  it("falls back to reopen-last when there is no launch path", async () => {
+    vi.mocked(takePendingLaunchIPC).mockResolvedValue(null);
+    useSettingsStore.setState({ reopenLastProject: false });
+    await openPendingLaunchOrReopenLast();
+    expect(openProjectIPC).not.toHaveBeenCalled();
   });
 });

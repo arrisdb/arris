@@ -39,6 +39,16 @@ function openProjectIPC(root: string): Promise<ProjectOpenResult> {
   return invoke("cmd_open_project", { root });
 }
 
+function openProjectInNewWindowIPC(path: string): Promise<void> {
+  return invoke("cmd_open_project_in_new_window", { path });
+}
+
+// This process's launch project path (set by "open in new window"), returned
+// once then cleared so a later reload does not reopen it.
+function takePendingLaunchIPC(): Promise<string | null> {
+  return invoke("cmd_take_pending_launch");
+}
+
 function readTextFileIPC(path: string): Promise<string> {
   return invoke("cmd_read_text_file", { path });
 }
@@ -85,7 +95,9 @@ export {
   openFileIndexIPC,
   openProjectDialogIPC,
   openProjectIPC,
+  openProjectInNewWindowIPC,
   readTextFileIPC,
+  takePendingLaunchIPC,
   savePaneLayoutIPC,
   saveTabsIPC,
 };
