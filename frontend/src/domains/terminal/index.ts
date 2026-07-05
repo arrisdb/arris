@@ -8,7 +8,7 @@ function registerTerminalSection(): void {
     id: "terminals",
     side: "left",
     kind: "section",
-    priority: 25,
+    priority: 1,
     useActive: () => true,
     Component: TerminalSection,
   });
