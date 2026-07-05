@@ -15,6 +15,7 @@ import {
 } from "@dnd-kit/core";
 import "./index.css";
 import { findLeaf, findLeafWithTab, planTabDrop } from "@shell/utils/paneTree";
+import { recordSelfWrite } from "@shell/utils/selfWrites";
 import { useEditorHandleStore } from "../../hooks/editorHandleStore";
 import { useTabsStore } from "@shell/hooks/tabsStore";
 import { useTransactionStore } from "../../hooks/transactionStore";
@@ -1149,7 +1150,10 @@ function PaneGroupView({ groupId }: { groupId: string }) {
       if (!next || !before || next.text === before.text) return;
       if (timer) clearTimeout(timer);
       timer = setTimeout(() => {
-        writeTextFileIPC(filePath, next.text)
+        // Mark the write so its watcher echo isn't mistaken for an external edit.
+        const content = next.text;
+        recordSelfWrite(filePath, content);
+        writeTextFileIPC(filePath, content)
           .then(async () => {
             await useGitStore.getState().refreshFileStatuses().catch(() => {});
             const repo = gitRepoPath ?? useFilesStore.getState().rootPath;

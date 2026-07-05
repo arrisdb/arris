@@ -10,6 +10,7 @@ import { useSettingsStore } from "@shared/settings";
 import { PANE_GROUPS_KEY } from "../constants";
 import type { PersistedPaneLayout } from "../types";
 import { openProjectDialogIPC, readTextFileIPC } from "../ipc";
+import { isSelfWrite } from "./selfWrites";
 
 function toPersisted(tabs: EditorTab[]): PersistedTab[] {
   // The "Uncommitted Changes" git-diff tab is transient: never restore it on
@@ -86,6 +87,9 @@ async function refreshFileTabFromDisk(tab: EditorTab): Promise<void> {
   if (!tab.filePath) return;
   try {
     const diskText = await readTextFileIPC(tab.filePath);
+    // Skip our own autosave echo; overwriting would revert keystrokes typed since
+    // the save and remount-jump the scroll. Only external edits reconcile.
+    if (isSelfWrite(tab.filePath, diskText)) return;
     const current = useTabsStore.getState().tabs.find((candidate) => candidate.id === tab.id);
     if (current && current.text !== diskText) {
       useTabsStore.getState().updateTab(tab.id, {
