@@ -65,6 +65,10 @@ describe("editorCompletionExtensions", () => {
   it("contributes completion for sql buffers", () => {
     expect(editorCompletionExtensions({ languageId: "sql" }).length).toBeGreaterThan(0);
   });
+
+  it("contributes completion for makefile buffers", () => {
+    expect(editorCompletionExtensions({ languageId: "makefile" }).length).toBeGreaterThan(0);
+  });
 });
 
 describe("sqlLike / statementHighlight", () => {
