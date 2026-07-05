@@ -94,7 +94,13 @@ function useAppBootstrap(
   setBootstrapping: (bootstrapping: boolean) => void,
   hydrated: MutableRefObject<boolean>,
 ): void {
+  // Bootstrap must run exactly once per process. StrictMode double-invokes
+  // effects in dev; without this guard the second run sees the consume-once
+  // launch path already taken and wrongly reopens the last project.
+  const bootstrapped = useRef(false);
   useEffect(() => {
+    if (bootstrapped.current) return;
+    bootstrapped.current = true;
     useSettingsStore.getState().hydrate();
     hydrateFrontendStores();
 
