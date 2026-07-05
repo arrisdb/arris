@@ -56,11 +56,13 @@ const mocks = vi.hoisted(() => {
   }
 
   class MockWebglAddon {
+    preserveDrawingBuffer: boolean;
     onContextLoss = vi.fn(() => ({ dispose: vi.fn() }));
     dispose = vi.fn();
 
-    constructor() {
+    constructor(preserveDrawingBuffer?: boolean) {
       if (state.webglThrows) throw new Error("webgl unavailable");
+      this.preserveDrawingBuffer = !!preserveDrawingBuffer;
       webglInstances.push(this);
     }
   }
@@ -162,6 +164,8 @@ describe("TerminalView", () => {
     expect(mocks.webglInstances).toHaveLength(1);
     expect(mocks.terminalInstances[0].loadAddon).toHaveBeenCalledWith(mocks.webglInstances[0]);
     expect(mocks.webglInstances[0].onContextLoss).toHaveBeenCalled();
+    // Preserve the drawing buffer so the canvas does not blank between composites.
+    expect(mocks.webglInstances[0].preserveDrawingBuffer).toBe(true);
   });
 
   it("falls back to the DOM renderer when WebGL is unavailable", async () => {

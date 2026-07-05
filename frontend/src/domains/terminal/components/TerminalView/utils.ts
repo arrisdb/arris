@@ -80,7 +80,10 @@ function terminalOptions(fontSize: number, fontFamily?: string | null) {
 // each glyph inside its exact cell, so the grid can never overflow.
 function loadWebglRenderer(terminal: Terminal): void {
   try {
-    const webgl = new WebglAddon();
+    // preserveDrawingBuffer keeps the last frame in the canvas between composites.
+    // Without it WebKit shows a cleared (blank) buffer while the pane relayouts
+    // during a separator drag, which reads as the terminal text blinking.
+    const webgl = new WebglAddon(true);
     webgl.onContextLoss(() => webgl.dispose());
     terminal.loadAddon(webgl);
   } catch {

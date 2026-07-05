@@ -15,6 +15,11 @@
   height: 100%;
   min-height: 0;
 }
+/* The persistent per-tab element xterm is opened into. It sits between the host
+   and .xterm, so it must fill the host to keep the .xterm height:100% chain. */
+.mdbc-terminal-session {
+  height: 100%;
+}
 /* xterm paints the viewport's background black inline from its theme; the strip
    below the last full row would show through as a black bar. Force the editor
    background so leftover space blends with the terminal. */
