@@ -1950,7 +1950,7 @@ function PaneGroupView({ groupId }: { groupId: string }) {
       />
       {groupTabs.filter(t => t.tabType === "terminal").map(t => (
         <div key={t.id} className={`mdbc-tab-content${t.id === activeId ? "" : " hidden"}`}>
-          <TerminalView />
+          <TerminalView tabId={t.id} />
         </div>
       ))}
       <EditorTabRouter

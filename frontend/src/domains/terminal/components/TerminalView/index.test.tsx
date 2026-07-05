@@ -3,14 +3,18 @@ import { act, render, waitFor } from "@testing-library/react";
 import { TerminalView } from "./index";
 import {
   decodePtyData,
+  resetTerminalSessions,
   resolveTerminalShell,
   terminalFontFamily,
   terminalOptions,
 } from "./utils";
 import { useSettingsStore } from "@shared/settings";
 import { useProjectStore } from "@shell/hooks/projectStore";
+import { useTabsStore } from "@shell/hooks/tabsStore";
 import { terminalListShellsIPC } from "./ipc";
 import { spawn } from "tauri-pty/dist/index.es.js";
+
+const TAB_ID = "t1";
 
 const mocks = vi.hoisted(() => {
   const terminalInstances: any[] = [];
@@ -72,13 +76,36 @@ vi.mock("./ipc", () => ({
   terminalListShellsIPC: vi.fn().mockResolvedValue(["/bin/zsh", "/bin/bash"]),
 }));
 
+// requestAnimationFrame is stubbed to queue callbacks so a test can prove that a
+// burst of ResizeObserver ticks coalesces into a single fit per flush.
+const rafCallbacks: FrameRequestCallback[] = [];
+const resizeObservers: { cb: ResizeObserverCallback; observe: any; disconnect: any }[] = [];
+
 class MockResizeObserver {
+  cb: ResizeObserverCallback;
   observe = vi.fn();
   disconnect = vi.fn();
+
+  constructor(cb: ResizeObserverCallback) {
+    this.cb = cb;
+    resizeObservers.push(this);
+  }
+}
+
+function triggerResize() {
+  resizeObservers.at(-1)?.cb([], {} as ResizeObserver);
+}
+
+function flushRaf() {
+  const queued = rafCallbacks.splice(0);
+  for (const cb of queued) cb(0);
 }
 
 describe("TerminalView", () => {
   beforeEach(() => {
+    resetTerminalSessions();
+    rafCallbacks.length = 0;
+    resizeObservers.length = 0;
     vi.clearAllMocks();
     mocks.terminalInstances.length = 0;
     mocks.webglInstances.length = 0;
@@ -86,9 +113,10 @@ describe("TerminalView", () => {
     mocks.state.webglThrows = false;
     vi.stubGlobal("ResizeObserver", MockResizeObserver);
     vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
-      cb(0);
-      return 1;
+      rafCallbacks.push(cb);
+      return rafCallbacks.length;
     });
+    vi.stubGlobal("cancelAnimationFrame", vi.fn());
     Object.defineProperty(document, "fonts", {
       configurable: true,
       value: {
@@ -100,6 +128,7 @@ describe("TerminalView", () => {
     });
     useSettingsStore.setState({ terminalShell: "" });
     useProjectStore.setState({ activeProjectPath: "/tmp/project", loading: false });
+    useTabsStore.setState({ tabs: [{ id: TAB_ID, tabType: "terminal" }] as never });
   });
 
   afterEach(() => {
@@ -129,7 +158,7 @@ describe("TerminalView", () => {
   });
 
   it("loads fonts before opening so the grid and atlas measure the real font", async () => {
-    render(<TerminalView />);
+    render(<TerminalView tabId={TAB_ID} />);
 
     await waitFor(() => expect(spawn).toHaveBeenCalled());
     expect(mocks.callOrder.indexOf("fonts")).toBeGreaterThanOrEqual(0);
@@ -137,7 +166,7 @@ describe("TerminalView", () => {
   });
 
   it("loads the WebGL renderer addon", async () => {
-    render(<TerminalView />);
+    render(<TerminalView tabId={TAB_ID} />);
 
     await waitFor(() => expect(spawn).toHaveBeenCalled());
     expect(mocks.webglInstances).toHaveLength(1);
@@ -148,7 +177,7 @@ describe("TerminalView", () => {
   it("falls back to the DOM renderer when WebGL is unavailable", async () => {
     mocks.state.webglThrows = true;
 
-    render(<TerminalView />);
+    render(<TerminalView tabId={TAB_ID} />);
 
     await waitFor(() => expect(spawn).toHaveBeenCalled());
     expect(mocks.webglInstances).toHaveLength(0);
@@ -158,7 +187,7 @@ describe("TerminalView", () => {
   it("loads the configured font up front so the grid measures the real font", async () => {
     useSettingsStore.setState({ terminalFontFamily: "JetBrains Mono", terminalFontSize: 13 });
 
-    render(<TerminalView />);
+    render(<TerminalView tabId={TAB_ID} />);
 
     await waitFor(() => expect(spawn).toHaveBeenCalled());
     await waitFor(() =>
@@ -174,7 +203,7 @@ describe("TerminalView", () => {
   it("does not use the editor font family preference", async () => {
     useSettingsStore.setState({ editorFontFamily: "Berkeley Mono", terminalFontFamily: null });
 
-    render(<TerminalView />);
+    render(<TerminalView tabId={TAB_ID} />);
 
     await waitFor(() => expect(spawn).toHaveBeenCalled());
     expect(mocks.terminalInstances[0].options.fontFamily).toBe(terminalFontFamily());
@@ -184,7 +213,7 @@ describe("TerminalView", () => {
   it("applies the terminal font size preference", async () => {
     useSettingsStore.setState({ terminalFontSize: 18 });
 
-    render(<TerminalView />);
+    render(<TerminalView tabId={TAB_ID} />);
 
     await waitFor(() => expect(spawn).toHaveBeenCalled());
     expect(mocks.terminalInstances[0].options.fontSize).toBe(18);
@@ -193,7 +222,7 @@ describe("TerminalView", () => {
   it("applies the terminal font family preference", async () => {
     useSettingsStore.setState({ terminalFontFamily: "Fira Code" });
 
-    render(<TerminalView />);
+    render(<TerminalView tabId={TAB_ID} />);
 
     await waitFor(() => expect(spawn).toHaveBeenCalled());
     expect(mocks.terminalInstances[0].options.fontFamily).toBe("Fira Code");
@@ -202,7 +231,7 @@ describe("TerminalView", () => {
   it("applies a font change to the existing terminal without respawning the pty", async () => {
     useSettingsStore.setState({ terminalFontSize: 13, terminalFontFamily: null });
 
-    render(<TerminalView />);
+    render(<TerminalView tabId={TAB_ID} />);
 
     await waitFor(() => expect(spawn).toHaveBeenCalled());
     expect(mocks.terminalInstances).toHaveLength(1);
@@ -223,8 +252,8 @@ describe("TerminalView", () => {
     expect(mocks.pty.kill).not.toHaveBeenCalled();
   });
 
-  it("spawns a pty in the active project and kills it on unmount", async () => {
-    const { unmount } = render(<TerminalView />);
+  it("spawns a pty in the active project", async () => {
+    render(<TerminalView tabId={TAB_ID} />);
 
     await waitFor(() => expect(spawn).toHaveBeenCalled());
     expect(terminalListShellsIPC).toHaveBeenCalled();
@@ -238,15 +267,71 @@ describe("TerminalView", () => {
     expect(mocks.terminalInstances[0].options.fontFamily).not.toContain("var(");
     expect(mocks.terminalInstances[0].options.letterSpacing).toBe(0);
     expect(mocks.terminalInstances[0].options.lineHeight).toBe(1.0);
+  });
+
+  it("keeps the pty alive and reuses the session across an unmount while the tab stays open", async () => {
+    // A pane split/move unmounts then remounts TerminalView; the tab stays in the
+    // store, so the session (pty + scrollback) must survive and be reattached.
+    const { unmount } = render(<TerminalView tabId={TAB_ID} />);
+    await waitFor(() => expect(spawn).toHaveBeenCalled());
+    const spawnCount = vi.mocked(spawn).mock.calls.length;
 
     unmount();
+    expect(mocks.pty.kill).not.toHaveBeenCalled();
+
+    render(<TerminalView tabId={TAB_ID} />);
+    // Reattached to the same session: no second Terminal, no second spawn.
+    expect(mocks.terminalInstances).toHaveLength(1);
+    expect(vi.mocked(spawn).mock.calls.length).toBe(spawnCount);
+  });
+
+  it("kills the pty when the terminal tab is closed", async () => {
+    const { unmount } = render(<TerminalView tabId={TAB_ID} />);
+    await waitFor(() => expect(spawn).toHaveBeenCalled());
+
+    // Closing the tab removes it from the store; the following unmount tears down.
+    act(() => useTabsStore.setState({ tabs: [] as never }));
+    unmount();
+
     expect(mocks.pty.kill).toHaveBeenCalled();
+  });
+
+  it("coalesces a burst of resize ticks into a single animation frame", async () => {
+    render(<TerminalView tabId={TAB_ID} />);
+    await waitFor(() => expect(spawn).toHaveBeenCalled());
+
+    // A separator drag fires many observer ticks per frame; they must schedule
+    // only one fit, otherwise the grid thrashes and flickers.
+    triggerResize();
+    triggerResize();
+    triggerResize();
+    expect(rafCallbacks).toHaveLength(1);
+  });
+
+  it("resizes the pty only when the cell grid actually changes", async () => {
+    render(<TerminalView tabId={TAB_ID} />);
+    await waitFor(() => expect(spawn).toHaveBeenCalled());
+    // The post-spawn sync sizes the pty once to the measured grid.
+    expect(mocks.pty.resize).toHaveBeenCalledTimes(1);
+    expect(mocks.pty.resize).toHaveBeenLastCalledWith(80, 24);
+
+    // A resize that does not cross a cell boundary sends no SIGWINCH.
+    triggerResize();
+    flushRaf();
+    expect(mocks.pty.resize).toHaveBeenCalledTimes(1);
+
+    // A real grid change forwards exactly one resize.
+    mocks.terminalInstances[0].cols = 100;
+    triggerResize();
+    flushRaf();
+    expect(mocks.pty.resize).toHaveBeenCalledTimes(2);
+    expect(mocks.pty.resize).toHaveBeenLastCalledWith(100, 24);
   });
 
   it("uses the persisted shell preference when present", async () => {
     useSettingsStore.setState({ terminalShell: "/usr/local/bin/fish" });
 
-    render(<TerminalView />);
+    render(<TerminalView tabId={TAB_ID} />);
 
     await waitFor(() => expect(spawn).toHaveBeenCalled());
     expect(spawn).toHaveBeenCalledWith(
@@ -257,7 +342,7 @@ describe("TerminalView", () => {
   });
 
   it("writes pty output when tauri returns number arrays", async () => {
-    render(<TerminalView />);
+    render(<TerminalView tabId={TAB_ID} />);
 
     await waitFor(() => expect(spawn).toHaveBeenCalled());
     mocks.pty.dataListener?.([36, 32]);
@@ -269,7 +354,7 @@ describe("TerminalView", () => {
     document.documentElement.style.setProperty("--m-bg-editor", "#1c1b24");
     document.documentElement.style.setProperty("--m-fg", "#f5f5f7");
 
-    render(<TerminalView />);
+    render(<TerminalView tabId={TAB_ID} />);
 
     await waitFor(() => expect(spawn).toHaveBeenCalled());
     const theme = mocks.terminalInstances[0].options.theme;
@@ -285,7 +370,7 @@ describe("TerminalView", () => {
     document.documentElement.style.removeProperty("--m-bg-editor");
     document.documentElement.style.removeProperty("--m-fg");
 
-    render(<TerminalView />);
+    render(<TerminalView tabId={TAB_ID} />);
 
     await waitFor(() => expect(spawn).toHaveBeenCalled());
     const theme = mocks.terminalInstances[0].options.theme;
