@@ -1,9 +1,5 @@
-// Syntax highlighting for GNU Makefiles. Line-oriented: a line beginning with a
-// tab is a recipe (shell body, kept plain apart from make variables); other lines
-// are directives, rules (`target: prereqs`), or variable assignments. Highlights
-// targets/assigned names as definitions, `$(...)`/`$@` as variables, known make
-// functions as keywords, directives/special targets as keywords, assignment
-// operators as operators, and `#` comments to end of line.
+// Syntax highlighting for GNU Makefiles. Line-oriented: a tab-indented line is a
+// recipe (shell body); other lines are directives, rules, or variable assignments.
 
 import type { StreamParser } from "@codemirror/language";
 

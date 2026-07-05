@@ -1,9 +1,6 @@
-// Autocomplete for GNU Makefiles (`makefile` language). Context-sensitive:
-//   - Inside `$(` / `${` : built-in make functions plus variables assigned
-//     anywhere in the buffer.
-//   - At the start of a non-recipe line: conditional/include directives and the
-//     built-in `.UPPER` special targets.
-// Everything else (prerequisite lists, recipe shell text) gets no completion.
+// Autocomplete for GNU Makefiles. Inside `$(`/`${`: make functions + buffer
+// variables. At a non-recipe line start: directives + `.UPPER` special targets.
+// Elsewhere (prerequisites, recipe shell text): nothing.
 
 import {
   type Completion,
@@ -19,7 +16,6 @@ import { CompletionProvider, type CompletionAnalysis } from "../core/provider";
 
 // Cursor sits right after `$(`/`${` with an optional partial function/var name.
 const VAR_OPEN_RE = /[$][({]([\w-]*)$/;
-// Leading whitespace of the current line.
 const LEADING_WS_RE = /^\s*/;
 // The line's first token is still being typed (directive / special target).
 const FIRST_TOKEN_RE = /^[-.\w]*$/;

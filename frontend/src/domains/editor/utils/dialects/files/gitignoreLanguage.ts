@@ -1,8 +1,5 @@
 // Syntax highlighting for `.gitignore`-style ignore files (also `.dockerignore`,
-// `.npmignore`, …). Line-oriented: a line whose first non-blank char is `#` is a
-// comment; a leading `!` negates the pattern; the rest is a glob where `*`, `**`,
-// `?`, and `[...]` classes are metacharacters and a trailing `/` marks a
-// directory-only match. Plain path text stays uncolored.
+// `.npmignore`, ...): `#` comments, leading `!` negation, glob metacharacters.
 
 import type { StreamParser } from "@codemirror/language";
 
