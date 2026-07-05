@@ -26,8 +26,8 @@ impl JsonSingletonStore for AppPreferencesStore {
 mod tests {
     use super::*;
     use crate::persistence::{
-        CommaPosition, CsvDelimiter, FormatterSettings, IndentStyle, KeyShortcut, KeymapOverrides,
-        KeymapPreset, KeywordCase, LogicalOperatorNewline, Theme,
+        CommaPosition, CsvDelimiter, FormatterSettings, IndentStyle, KeyShortcut, KeymapPreset,
+        KeywordCase, LogicalOperatorNewline, Theme,
     };
 
     #[tokio::test]
