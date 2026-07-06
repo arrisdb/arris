@@ -78,6 +78,21 @@ describe("mountEditor scroll restore", () => {
     expect(unmount.getScrollAnchor()).toEqual({ line: line40, offset: -6 });
   });
 
+  it("keeps the settled anchor when the viewport height changes before the read", () => {
+    // Tab switch away from a markdown tab removes the mode bar in the same
+    // commit that unmounts the editor; the host resize clamps scrollTop before
+    // the cleanup reads. A height mismatch must return the settled anchor.
+    unmount = mountEditor({
+      host,
+      initialDoc: longDoc,
+      languageId: "sql",
+      initialScrollAnchor: { line: 100, offset: -3 },
+    });
+    const scroller = host.querySelector(".cm-scroller") as HTMLElement;
+    Object.defineProperty(scroller, "clientHeight", { value: 30, configurable: true });
+    expect(unmount.getScrollAnchor()).toEqual({ line: 100, offset: -3 });
+  });
+
   it("reports the anchor to onScroll (debounced) when the viewport scrolls", () => {
     let reported: { line: number; offset: number } | null = null;
     unmount = mountEditor({

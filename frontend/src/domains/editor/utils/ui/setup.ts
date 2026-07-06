@@ -578,7 +578,7 @@ function mountEditor(opts: MountOptions): EditorHandle {
   // CodeMirror's own scroll snapshot: anchor row `line` plus `offset` = row top
   // minus scrollTop, computed from internal geometry (immune to surrounding
   // layout like the markdown mode bar, unlike client-coords sampling).
-  const readScrollAnchor = (): ScrollAnchor => {
+  const readLiveAnchor = (): ScrollAnchor => {
     // A dispatched restore CodeMirror has not applied yet (unmount races the
     // next measure, e.g. an editor remount from an effect-deps change) must
     // round-trip unchanged instead of reading back as top-of-doc.
@@ -590,6 +590,20 @@ function mountEditor(opts: MountOptions): EditorHandle {
     if (pending?.isSnapshot) return { line: pending.range.head, offset: pending.yMargin };
     const target = view.scrollSnapshot().value;
     return { line: target.range.head, offset: target.yMargin };
+  };
+
+  // Last anchor observed at the current viewport height. A tab switch away
+  // from a markdown tab removes the Raw/Preview/Split bar in the same React
+  // commit that unmounts the editor; the host grows and, near the bottom of
+  // the document, the browser clamps scrollTop BEFORE the effect cleanup reads
+  // the anchor. When the viewport height no longer matches, return the last
+  // settled anchor instead of the clamped live read.
+  let settledAnchor = opts.initialScrollAnchor ?? null;
+  let settledHeight = view.scrollDOM.clientHeight;
+
+  const readScrollAnchor = (): ScrollAnchor => {
+    if (settledAnchor && view.scrollDOM.clientHeight !== settledHeight) return settledAnchor;
+    return readLiveAnchor();
   };
 
   // A restored anchor (tab switch) wins over the cursor reveal; else reveal the
@@ -613,15 +627,36 @@ function mountEditor(opts: MountOptions): EditorHandle {
   // relying on unmount/quit hooks, which don't fire reliably in the webview.
   let scrollTimer: ReturnType<typeof setTimeout> | null = null;
   const onScrollDom = () => {
+    // Same-height scrolls are genuine; a height change means a resize-induced
+    // clamp, whose scroll must not overwrite the settled anchor.
+    if (view.scrollDOM.clientHeight === settledHeight) settledAnchor = readLiveAnchor();
     if (!opts.onScroll) return;
     if (scrollTimer) clearTimeout(scrollTimer);
     scrollTimer = setTimeout(() => opts.onScroll?.(readScrollAnchor()), SCROLL_ANCHOR_DEBOUNCE_MS);
   };
   view.scrollDOM.addEventListener("scroll", onScrollDom, { passive: true });
 
+  // A genuine live resize (pane drag, window resize) re-baselines the anchor a
+  // frame later; a tab-switch unmount destroys the editor first, so the
+  // pre-resize anchor survives for the cleanup read.
+  let resizeRaf = 0;
+  const resizeObserver =
+    typeof ResizeObserver === "undefined"
+      ? null
+      : new ResizeObserver(() => {
+          cancelAnimationFrame(resizeRaf);
+          resizeRaf = requestAnimationFrame(() => {
+            settledHeight = view.scrollDOM.clientHeight;
+            settledAnchor = readLiveAnchor();
+          });
+        });
+  resizeObserver?.observe(view.scrollDOM);
+
   return {
     destroy: () => {
       if (scrollTimer) clearTimeout(scrollTimer);
+      cancelAnimationFrame(resizeRaf);
+      resizeObserver?.disconnect();
       view.scrollDOM.removeEventListener("scroll", onScrollDom);
       view.destroy();
     },
