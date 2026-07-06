@@ -275,7 +275,24 @@
 .mdbc-git-changes-actions .mdbc-btn,
 .mdbc-git-commit-row .mdbc-btn,
 .mdbc-git-commit-row .mdbc-splitbtn-primary {
-  font-size: var(--m-fs-xs);
+  font-size: var(--m-fs-xxs);
+}
+
+/* Current branch row: branch glyph + name only (repo name omitted to save
+   space). */
+.mdbc-git-branch-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+.mdbc-git-branch-label svg {
+  flex-shrink: 0;
+}
+.mdbc-git-branch-label span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Footer row under the Commit button: latest commit message (truncated) on
@@ -294,7 +311,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--m-fg-4);
-  font-size: var(--m-fs-xs);
+  font-size: var(--m-fs-xxs);
 }
 
 .mdbc-git-conflict-banner {

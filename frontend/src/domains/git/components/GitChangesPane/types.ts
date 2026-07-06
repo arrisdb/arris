@@ -103,17 +103,12 @@ interface GitChangesPaneViewModel {
   onSelectFile: (path: string) => void;
   onToggleStage: (path: string, currentlyStaged: boolean) => void;
   movedRemoteUrl: string | null;
-  projectName: string;
   pushDisabled: boolean;
-  pushError: string | null;
   pushLabel: string;
-  pushMessage: string | null;
   hasUpstream: boolean;
   defaultRemote: string;
   isFetching: boolean;
   isPulling: boolean;
-  syncMessage: string | null;
-  syncError: string | null;
   mergeInProgress: boolean;
   mergeKind: string;
   conflictedCount: number;

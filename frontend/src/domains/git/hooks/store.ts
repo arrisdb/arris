@@ -2,6 +2,14 @@ import { create } from "zustand";
 import { ipcErrorMessage } from "@shared";
 import { readTextFileIPC } from "@shell/ipc";
 import { useTabsStore } from "@shell/hooks/tabsStore";
+import { runNotifiedTask } from "@shell/utils/notifiedTask";
+import {
+  GIT_FETCH_DONE_MESSAGE,
+  GIT_FORCE_PUSHED_MESSAGE,
+  GIT_PULL_UP_TO_DATE_MESSAGE,
+  GIT_PUSHED_MESSAGE,
+  GIT_TASK_LABELS,
+} from "../constants";
 import {
   gitChangesPaneAheadBehindIPC,
   gitChangesPaneCommitIPC,
@@ -56,15 +64,15 @@ interface GitState {
   isPushing: boolean;
   loadError: string | null;
   commitError: string | null;
-  pushError: string | null;
-  pushMessage: string | null;
+  /// Raw output of the last push attempt (success or failure), kept only so
+  /// the moved-remote banner can parse a new GitHub URL out of it; user-facing
+  /// results surface through the app-level notification service.
+  lastPushOutput: string | null;
   hasRemote: boolean;
   hasUpstream: boolean;
   remotes: RemoteInfo[];
   isFetching: boolean;
   isPulling: boolean;
-  syncMessage: string | null;
-  syncError: string | null;
   mergeInProgress: boolean;
   mergeKind: string;
   conflictedFiles: string[];
@@ -117,16 +125,12 @@ const useGitStore = create<GitState>((set, get) => ({
   isPushing: false,
   loadError: null,
   commitError: null,
-  pushError: null,
-  pushMessage: null,
+  lastPushOutput: null,
   hasRemote: false,
   hasUpstream: false,
   remotes: [],
   isFetching: false,
   isPulling: false,
-  pullMode: "merge",
-  syncMessage: null,
-  syncError: null,
   mergeInProgress: false,
   mergeKind: "none",
   conflictedFiles: [],
@@ -150,15 +154,12 @@ const useGitStore = create<GitState>((set, get) => ({
       isPushing: false,
       loadError: null,
       commitError: null,
-      pushError: null,
-      pushMessage: null,
+      lastPushOutput: null,
       hasRemote: false,
       hasUpstream: false,
       remotes: [],
       isFetching: false,
       isPulling: false,
-      syncMessage: null,
-      syncError: null,
       mergeInProgress: false,
       mergeKind: "none",
       conflictedFiles: [],
@@ -309,102 +310,94 @@ const useGitStore = create<GitState>((set, get) => ({
   push: async () => {
     const { repoPath } = get();
     if (!repoPath) return;
-    set({ isPushing: true, pushError: null, pushMessage: null });
-    try {
+    set({ isPushing: true });
+    const result = await runNotifiedTask(GIT_TASK_LABELS.push, async () => {
       const message = await gitChangesPanePushIPC(repoPath);
-      set({ isPushing: false, pushMessage: message.trim() || "Pushed." });
-      const [ab, pushState] = await Promise.all([
-        gitChangesPaneAheadBehindIPC(repoPath).catch((): [number, number] => [0, 0]),
-        gitChangesPanePushStateIPC(repoPath).catch(() => NO_PUSH_STATE),
-      ]);
-      set({ aheadBehind: ab, hasRemote: pushState.hasRemote, hasUpstream: pushState.hasUpstream });
-    } catch (e) {
-      set({ isPushing: false, pushError: ipcErrorMessage(e) });
-    }
+      return message.trim() || GIT_PUSHED_MESSAGE;
+    });
+    set({ isPushing: false, lastPushOutput: result.message });
+    const [ab, pushState] = await Promise.all([
+      gitChangesPaneAheadBehindIPC(repoPath).catch((): [number, number] => [0, 0]),
+      gitChangesPanePushStateIPC(repoPath).catch(() => NO_PUSH_STATE),
+    ]);
+    set({ aheadBehind: ab, hasRemote: pushState.hasRemote, hasUpstream: pushState.hasUpstream });
   },
   pushTo: async (remote, branch) => {
     const { repoPath } = get();
     if (!repoPath) return;
-    set({ isPushing: true, pushError: null, pushMessage: null });
-    try {
+    set({ isPushing: true });
+    const result = await runNotifiedTask(GIT_TASK_LABELS.push, async () => {
       const message = await gitChangesPanePushToIPC(repoPath, remote, branch);
-      set({ isPushing: false, pushMessage: message.trim() || "Pushed." });
-      const [ab, pushState] = await Promise.all([
-        gitChangesPaneAheadBehindIPC(repoPath).catch((): [number, number] => [0, 0]),
-        gitChangesPanePushStateIPC(repoPath).catch(() => NO_PUSH_STATE),
-      ]);
-      set({ aheadBehind: ab, hasRemote: pushState.hasRemote, hasUpstream: pushState.hasUpstream });
-    } catch (e) {
-      set({ isPushing: false, pushError: ipcErrorMessage(e) });
-    }
+      return message.trim() || GIT_PUSHED_MESSAGE;
+    });
+    set({ isPushing: false, lastPushOutput: result.message });
+    const [ab, pushState] = await Promise.all([
+      gitChangesPaneAheadBehindIPC(repoPath).catch((): [number, number] => [0, 0]),
+      gitChangesPanePushStateIPC(repoPath).catch(() => NO_PUSH_STATE),
+    ]);
+    set({ aheadBehind: ab, hasRemote: pushState.hasRemote, hasUpstream: pushState.hasUpstream });
   },
   forcePush: async () => {
     const { repoPath } = get();
     if (!repoPath) return;
-    set({ isPushing: true, pushError: null, pushMessage: null });
-    try {
+    set({ isPushing: true });
+    const result = await runNotifiedTask(GIT_TASK_LABELS.forcePush, async () => {
       const message = await gitChangesPaneForcePushIPC(repoPath);
-      set({ isPushing: false, pushMessage: message.trim() || "Force-pushed." });
-      const [ab, pushState] = await Promise.all([
-        gitChangesPaneAheadBehindIPC(repoPath).catch((): [number, number] => [0, 0]),
-        gitChangesPanePushStateIPC(repoPath).catch(() => NO_PUSH_STATE),
-      ]);
-      set({ aheadBehind: ab, hasRemote: pushState.hasRemote, hasUpstream: pushState.hasUpstream });
-    } catch (e) {
-      set({ isPushing: false, pushError: ipcErrorMessage(e) });
-    }
+      return message.trim() || GIT_FORCE_PUSHED_MESSAGE;
+    });
+    set({ isPushing: false, lastPushOutput: result.message });
+    const [ab, pushState] = await Promise.all([
+      gitChangesPaneAheadBehindIPC(repoPath).catch((): [number, number] => [0, 0]),
+      gitChangesPanePushStateIPC(repoPath).catch(() => NO_PUSH_STATE),
+    ]);
+    set({ aheadBehind: ab, hasRemote: pushState.hasRemote, hasUpstream: pushState.hasUpstream });
   },
   fetch: async () => {
     const { repoPath } = get();
     if (!repoPath) return;
-    set({ isFetching: true, syncError: null, syncMessage: null });
-    try {
+    set({ isFetching: true });
+    const result = await runNotifiedTask(GIT_TASK_LABELS.fetch, async () => {
       const message = await gitChangesPaneFetchIPC(repoPath);
-      set({ isFetching: false, syncMessage: message });
-      await get().refreshFileStatuses();
-    } catch (e) {
-      set({ isFetching: false, syncError: ipcErrorMessage(e) });
-    }
+      return message.trim() || GIT_FETCH_DONE_MESSAGE;
+    });
+    set({ isFetching: false });
+    if (result.ok) await get().refreshFileStatuses();
   },
   pull: async () => {
     const { repoPath } = get();
     if (!repoPath) return;
-    set({ isPulling: true, syncError: null, syncMessage: null });
-    try {
-      const result = await gitChangesPanePullIPC(repoPath, "merge");
-      set({
-        isPulling: false,
-        syncMessage: result.message || "Already up to date.",
-        conflictedFiles: result.conflicted,
-      });
-      await get().refreshFileStatuses();
-      await get().refreshMergeState();
-      // Conflicts halt the pull: surface the resolver immediately.
-      if (result.conflicted.length > 0) {
-        useTabsStore.getState().openGitConflictTab();
-      }
-    } catch (e) {
-      set({ isPulling: false, syncError: ipcErrorMessage(e) });
+    set({ isPulling: true });
+    let conflicted: string[] = [];
+    const result = await runNotifiedTask(GIT_TASK_LABELS.pull, async () => {
+      const pullResult = await gitChangesPanePullIPC(repoPath, "merge");
+      conflicted = pullResult.conflicted;
+      return pullResult.message || GIT_PULL_UP_TO_DATE_MESSAGE;
+    });
+    set({ isPulling: false, conflictedFiles: conflicted });
+    if (!result.ok) return;
+    await get().refreshFileStatuses();
+    await get().refreshMergeState();
+    // Conflicts halt the pull: surface the resolver immediately.
+    if (conflicted.length > 0) {
+      useTabsStore.getState().openGitConflictTab();
     }
   },
   pullFrom: async (remote, branch) => {
     const { repoPath } = get();
     if (!repoPath) return;
-    set({ isPulling: true, syncError: null, syncMessage: null });
-    try {
-      const result = await gitChangesPanePullFromIPC(repoPath, remote, branch, "merge");
-      set({
-        isPulling: false,
-        syncMessage: result.message || "Already up to date.",
-        conflictedFiles: result.conflicted,
-      });
-      await get().refreshFileStatuses();
-      await get().refreshMergeState();
-      if (result.conflicted.length > 0) {
-        useTabsStore.getState().openGitConflictTab();
-      }
-    } catch (e) {
-      set({ isPulling: false, syncError: ipcErrorMessage(e) });
+    set({ isPulling: true });
+    let conflicted: string[] = [];
+    const result = await runNotifiedTask(GIT_TASK_LABELS.pull, async () => {
+      const pullResult = await gitChangesPanePullFromIPC(repoPath, remote, branch, "merge");
+      conflicted = pullResult.conflicted;
+      return pullResult.message || GIT_PULL_UP_TO_DATE_MESSAGE;
+    });
+    set({ isPulling: false, conflictedFiles: conflicted });
+    if (!result.ok) return;
+    await get().refreshFileStatuses();
+    await get().refreshMergeState();
+    if (conflicted.length > 0) {
+      useTabsStore.getState().openGitConflictTab();
     }
   },
   refreshMergeState: async () => {
@@ -427,8 +420,8 @@ const useGitStore = create<GitState>((set, get) => ({
     const { repoPath } = get();
     if (!repoPath || !url.trim()) return;
     await gitChangesPaneSetRemoteUrlIPC(repoPath, name, url.trim());
-    // The stale-remote push error no longer applies once the URL is fixed.
-    set({ pushError: null });
+    // The stale-remote push output no longer applies once the URL is fixed.
+    set({ lastPushOutput: null });
     const [remotes, pushState] = await Promise.all([
       gitChangesPaneListRemotesIPC(repoPath).catch((): RemoteInfo[] => []),
       gitChangesPanePushStateIPC(repoPath).catch(() => NO_PUSH_STATE),

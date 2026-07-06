@@ -29,8 +29,7 @@ function useGitChangesPane(): GitChangesPaneViewModel {
   const aheadBehind = useGitStore((state) => state.aheadBehind);
   const hasRemote = useGitStore((state) => state.hasRemote);
   const hasUpstream = useGitStore((state) => state.hasUpstream);
-  const pushError = useGitStore((state) => state.pushError);
-  const pushMessage = useGitStore((state) => state.pushMessage);
+  const lastPushOutput = useGitStore((state) => state.lastPushOutput);
   const remotes = useGitStore((state) => state.remotes);
   const setRemoteUrl = useGitStore((state) => state.setRemoteUrl);
   const currentBranch = useGitStore((state) => state.currentBranch);
@@ -40,13 +39,10 @@ function useGitChangesPane(): GitChangesPaneViewModel {
   const pullFrom = useGitStore((state) => state.pullFrom);
   const isFetching = useGitStore((state) => state.isFetching);
   const isPulling = useGitStore((state) => state.isPulling);
-  const syncMessage = useGitStore((state) => state.syncMessage);
-  const syncError = useGitStore((state) => state.syncError);
   const mergeInProgress = useGitStore((state) => state.mergeInProgress);
   const mergeKind = useGitStore((state) => state.mergeKind);
   const conflictedFiles = useGitStore((state) => state.conflictedFiles);
   const repoPath = useFilesStore((state) => state.rootPath) ?? "";
-  const projectName = repoPath.split("/").filter(Boolean).pop() ?? "repo";
 
   const tree = useMemo(
     () => buildTree(fileStatuses, repoPath),
@@ -67,7 +63,7 @@ function useGitChangesPane(): GitChangesPaneViewModel {
 
   // GitHub returns the new URL when a repo was renamed/moved; the default remote
   // (origin if present) is the one to repoint.
-  const movedRemoteUrl = parseMovedRemoteUrl(pushError ?? pushMessage);
+  const movedRemoteUrl = parseMovedRemoteUrl(lastPushOutput);
   const defaultRemoteName =
     remotes.find((remote) => remote.name === "origin")?.name ?? remotes[0]?.name ?? "origin";
 
@@ -217,17 +213,12 @@ function useGitChangesPane(): GitChangesPaneViewModel {
     onSelectFile,
     onToggleStage,
     movedRemoteUrl,
-    projectName,
     pushDisabled,
-    pushError,
     pushLabel,
-    pushMessage,
     hasUpstream,
     defaultRemote: defaultRemoteName,
     isFetching,
     isPulling,
-    syncMessage,
-    syncError,
     mergeInProgress,
     mergeKind,
     conflictedCount: conflictedFiles.length,

@@ -144,6 +144,18 @@ describe("GitChangesPane", () => {
     expect(screen.getByTestId("git-ctx-stage").textContent).toBe("Stage File");
   });
 
+  it("shows only the branch name with the branch icon in the meta row", () => {
+    useGitStore.setState({ fileStatuses: [], currentBranch: "main" });
+
+    render(<GitChangesPane />);
+
+    const label = screen.getByTestId("git-branch-label");
+    expect(label.textContent).toBe("main");
+    // Repo name is intentionally omitted to save space.
+    expect(label.textContent).not.toContain("repo");
+    expect(label.querySelector("svg")).toBeTruthy();
+  });
+
   it("shows the repository-moved prompt with the new URL on a moved push error", () => {
     useGitStore.setState({
       fileStatuses: [],
@@ -151,7 +163,7 @@ describe("GitChangesPane", () => {
       hasUpstream: true,
       aheadBehind: [1, 0],
       remotes: [{ name: "origin", url: "https://github.com/x/old.git" }],
-      pushError:
+      lastPushOutput:
         "git push failed: remote: This repository moved. Please use the new location:\n" +
         "remote:   https://github.com/x/new.git",
     });

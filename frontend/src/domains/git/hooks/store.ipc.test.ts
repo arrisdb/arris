@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { useGitStore } from "./store";
+import { useSnackbarStore } from "@shell/hooks/snackbarStore";
 
 const mockInvoke = vi.hoisted(() => vi.fn());
 
@@ -27,12 +28,12 @@ describe("git store IPC wiring", () => {
       isPushing: false,
       loadError: null,
       commitError: null,
-      pushError: null,
-      pushMessage: null,
+      lastPushOutput: null,
       hasRemote: false,
       hasUpstream: false,
       remotes: [],
     });
+    useSnackbarStore.setState({ snackbars: [] });
     mockInvoke.mockReset();
   });
 
@@ -141,7 +142,7 @@ describe("git store IPC wiring", () => {
     expect(state.hasUpstream).toBe(false);
   });
 
-  it("push records the push output as pushMessage and refreshes push state", async () => {
+  it("push records the push output and refreshes push state", async () => {
     useGitStore.setState({ repoPath: "/repo" });
     mockInvoke.mockImplementation((command: string) => {
       switch (command) {
@@ -161,12 +162,15 @@ describe("git store IPC wiring", () => {
     const state = useGitStore.getState();
     expect(mockInvoke).toHaveBeenCalledWith("cmd_git_push", { repo: "/repo" });
     expect(state.isPushing).toBe(false);
-    expect(state.pushError).toBeNull();
-    expect(state.pushMessage).toContain("set up to track");
+    expect(state.lastPushOutput).toContain("set up to track");
     expect(state.hasUpstream).toBe(true);
+    const { snackbars } = useSnackbarStore.getState();
+    expect(snackbars).toHaveLength(1);
+    expect(snackbars[0].kind).toBe("success");
+    expect(snackbars[0].message).toContain("set up to track");
   });
 
-  it("push records pushError when the push fails", async () => {
+  it("push surfaces an error snackbar when the push fails", async () => {
     useGitStore.setState({ repoPath: "/repo" });
     mockInvoke.mockImplementation((command: string) => {
       if (command === "cmd_git_push") {
@@ -179,14 +183,17 @@ describe("git store IPC wiring", () => {
 
     const state = useGitStore.getState();
     expect(state.isPushing).toBe(false);
-    expect(state.pushError).toContain("no remote configured");
-    expect(state.pushMessage).toBeNull();
+    expect(state.lastPushOutput).toContain("no remote configured");
+    const { snackbars } = useSnackbarStore.getState();
+    expect(snackbars).toHaveLength(1);
+    expect(snackbars[0].kind).toBe("error");
+    expect(snackbars[0].message).toContain("no remote configured");
   });
 
-  it("setRemoteUrl writes the new URL, clears the push error, and reloads remotes", async () => {
+  it("setRemoteUrl writes the new URL, clears the push output, and reloads remotes", async () => {
     useGitStore.setState({
       repoPath: "/repo",
-      pushError: "git push failed: This repository moved.",
+      lastPushOutput: "git push failed: This repository moved.",
       remotes: [{ name: "origin", url: "https://github.com/x/old.git" }],
     });
     mockInvoke.mockImplementation((command: string) => {
@@ -210,7 +217,7 @@ describe("git store IPC wiring", () => {
       name: "origin",
       url: "https://github.com/x/new.git",
     });
-    expect(state.pushError).toBeNull();
+    expect(state.lastPushOutput).toBeNull();
     expect(state.remotes).toEqual([{ name: "origin", url: "https://github.com/x/new.git" }]);
     expect(state.hasUpstream).toBe(true);
   });

@@ -10,6 +10,7 @@ vi.mock("@domains/git/components/GitChangesPane/ipc", () => ({
   gitChangesPaneMergeStateIPC: vi
     .fn()
     .mockResolvedValue({ inProgress: false, kind: "none", conflicted: [] }),
+  gitChangesPaneFetchIPC: vi.fn().mockResolvedValue("Fetched."),
   gitChangesPanePushIPC: vi.fn().mockResolvedValue("Pushed."),
   gitChangesPanePushToIPC: vi.fn().mockResolvedValue("Pushed to."),
   gitChangesPaneForcePushIPC: vi.fn().mockResolvedValue("Force-pushed."),
@@ -25,6 +26,7 @@ vi.mock("@shell/ipc", () => ({
 
 import { useGitStore } from "./store";
 import { useTabsStore } from "@shell/hooks/tabsStore";
+import { useSnackbarStore } from "@shell/hooks/snackbarStore";
 import {
   gitChangesPaneForcePushIPC,
   gitChangesPanePullFromIPC,
@@ -102,13 +104,24 @@ describe("git store", () => {
     useGitStore.setState({ repoPath: "/repo" });
     await useGitStore.getState().pushTo("origin", "feature");
     expect(gitChangesPanePushToIPC).toHaveBeenCalledWith("/repo", "origin", "feature");
-    expect(useGitStore.getState().pushMessage).toBe("Pushed to.");
+    expect(useGitStore.getState().lastPushOutput).toBe("Pushed to.");
   });
 
   it("forcePush force-pushes the current branch and reports the result", async () => {
     useGitStore.setState({ repoPath: "/repo" });
     await useGitStore.getState().forcePush();
     expect(gitChangesPaneForcePushIPC).toHaveBeenCalledWith("/repo");
-    expect(useGitStore.getState().pushMessage).toBe("Force-pushed.");
+    expect(useGitStore.getState().lastPushOutput).toBe("Force-pushed.");
+  });
+
+  it("fetch routes through the notification service", async () => {
+    useGitStore.setState({ repoPath: "/repo" });
+    useSnackbarStore.setState({ snackbars: [] });
+    await useGitStore.getState().fetch();
+    const { snackbars } = useSnackbarStore.getState();
+    expect(snackbars).toHaveLength(1);
+    expect(snackbars[0].kind).toBe("success");
+    expect(snackbars[0].message).toBe("Fetch: Fetched.");
+    expect(useGitStore.getState().isFetching).toBe(false);
   });
 });
