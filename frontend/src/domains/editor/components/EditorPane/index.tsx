@@ -854,6 +854,7 @@ function PaneGroupView({ groupId }: { groupId: string }) {
         }
         if (currentSqlMeshModel) markRenderedStale(currentSqlMeshModel.name);
       },
+      onScroll: (anchor) => updateTab(activeTab.id, { scrollAnchor: anchor }),
       languageId: activeTab.kind,
       fileName: activeTab.filePath,
       connectionKind: tabConnection?.kind,

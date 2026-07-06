@@ -1,6 +1,7 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
 import { mountEditor, type EditorHandle } from "./setup";
+import { SCROLL_ANCHOR_DEBOUNCE_MS } from "./constants";
 import { SCHEMA_NODE_DRAG_MIME } from "./schemaDrag";
 import { useSettingsStore } from "@shared/settings";
 
@@ -72,6 +73,21 @@ describe("mountEditor scroll restore", () => {
     });
     expect(host.querySelector(".cm-editor")).toBeTruthy();
     expect(unmount.getScrollAnchor()).toBeTypeOf("number");
+  });
+
+  it("reports the anchor to onScroll (debounced) when the viewport scrolls", () => {
+    let reported: number | null = null;
+    unmount = mountEditor({
+      host,
+      initialDoc: longDoc,
+      languageId: "sql",
+      onScroll: (a) => { reported = a; },
+    });
+    vi.useFakeTimers();
+    (host.querySelector(".cm-scroller") as HTMLElement).dispatchEvent(new Event("scroll"));
+    vi.advanceTimersByTime(SCROLL_ANCHOR_DEBOUNCE_MS + 10);
+    vi.useRealTimers();
+    expect(reported).toBeTypeOf("number");
   });
 });
 

@@ -1,6 +1,7 @@
 // CodeMirror 6 mount / unmount helper. Wraps the per-tab editor lifecycle so
 // the React component can stay declarative.
 
+import { SCROLL_ANCHOR_DEBOUNCE_MS } from "./constants";
 import { Compartment, EditorState, Prec } from "@codemirror/state";
 import {
   EditorView,
@@ -74,6 +75,9 @@ interface MountOptions {
   /// are present only when the selection changed; `selection.from`/`to` are
   /// equal for a collapsed caret, a non-empty range means text is highlighted.
   onEdit?: (patch: EditorEditPatch) => void;
+  /// Fired (debounced) when the user scrolls, with the char offset of the line
+  /// now at the top of the viewport, so the owner can persist it for restore.
+  onScroll?: (anchor: number) => void;
   languageId: string;
   /// DatabaseKind of the tab's connection; picks the SQL dialect when `languageId === "sql"`.
   connectionKind?: DatabaseKind;
@@ -591,11 +595,33 @@ function mountEditor(opts: MountOptions): EditorHandle {
     view.dispatch({ effects: EditorView.scrollIntoView(pos, { y: "start" }) });
   }
 
+  // Char offset of the line at the top of the viewport. Resolved from real
+  // rendered geometry (the pixel at the viewport's top edge) rather than mapping
+  // scrollTop through block heights, which mixes coordinate spaces and drifts by
+  // the content's top padding.
+  const readScrollAnchor = (): number => {
+    const rect = view.scrollDOM.getBoundingClientRect();
+    const pos = view.posAtCoords({ x: rect.left + 1, y: rect.top + 1 });
+    return pos == null ? 0 : view.state.doc.lineAt(pos).from;
+  };
+
+  // Persist the anchor as the user scrolls (debounced) so restore works without
+  // relying on unmount/quit hooks, which don't fire reliably in the webview.
+  let scrollTimer: ReturnType<typeof setTimeout> | null = null;
+  const onScrollDom = () => {
+    if (!opts.onScroll) return;
+    if (scrollTimer) clearTimeout(scrollTimer);
+    scrollTimer = setTimeout(() => opts.onScroll?.(readScrollAnchor()), SCROLL_ANCHOR_DEBOUNCE_MS);
+  };
+  view.scrollDOM.addEventListener("scroll", onScrollDom, { passive: true });
+
   return {
-    destroy: () => view.destroy(),
-    // Char offset of the line at the top of the viewport, for line-anchored
-    // scroll restore across a remount.
-    getScrollAnchor: () => view.lineBlockAtHeight(view.scrollDOM.scrollTop).from,
+    destroy: () => {
+      if (scrollTimer) clearTimeout(scrollTimer);
+      view.scrollDOM.removeEventListener("scroll", onScrollDom);
+      view.destroy();
+    },
+    getScrollAnchor: readScrollAnchor,
     updateCompletionSchema: (updateOpts: CompletionUpdateOpts) => {
       const newExt = editorCompletionExtensions({
         languageId: opts.languageId,

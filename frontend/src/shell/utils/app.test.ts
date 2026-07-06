@@ -90,7 +90,6 @@ import { useSettingsStore } from "@shared/settings";
 import { useTabsStore } from "../hooks/tabsStore";
 import type { EditorTab } from "../types";
 import { useDbtStore } from "@domains/dbt/hooks";
-import { useEditorHandleStore } from "@domains/editor/hooks";
 import { useFilesStore } from "@domains/files/hooks";
 import { useGitStore } from "@domains/git/hooks";
 import { useSqlMeshStore } from "@domains/sqlmesh/hooks";
@@ -420,27 +419,13 @@ describe("toPersisted", () => {
     expect(result.find((t) => t.id === "open")?.closed).toBeUndefined();
   });
 
-  it("persists a tab's stored scroll anchor", () => {
-    useEditorHandleStore.setState({ handle: null, activeTabId: null });
-    const result = toPersisted([{ ...base, scrollAnchor: 42 }]);
-    expect(result[0].scrollAnchor).toBe(42);
-  });
-
-  it("captures the active tab's live scroll anchor from the editor handle", () => {
-    // The mounted editor's live anchor is fresher than the store's (which only
-    // updates on unmount), so it must win for the active tab at save time.
-    useEditorHandleStore.setState({
-      handle: { getScrollAnchor: () => 128 } as never,
-      activeTabId: "1",
-    });
+  it("persists each tab's stored scroll anchor", () => {
     const result = toPersisted([
       { ...base, id: "1", scrollAnchor: 42 },
       { ...base, id: "2", scrollAnchor: 7 },
     ]);
-    expect(result.find((t) => t.id === "1")?.scrollAnchor).toBe(128);
-    // Inactive tabs keep their stored anchor.
+    expect(result.find((t) => t.id === "1")?.scrollAnchor).toBe(42);
     expect(result.find((t) => t.id === "2")?.scrollAnchor).toBe(7);
-    useEditorHandleStore.setState({ handle: null, activeTabId: null });
   });
 });
 
