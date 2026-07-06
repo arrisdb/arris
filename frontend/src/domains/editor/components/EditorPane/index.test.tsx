@@ -1326,6 +1326,37 @@ describe("statement highlight box", () => {
   });
 });
 
+// The pane keeps text stale in render (volatile-field equality), so the mount
+// effect must seed the editor from the LIVE store on remount. Otherwise a tab
+// switch remounts with pre-edit text and discards unsaved keystrokes.
+describe("tab-switch edit persistence", () => {
+  function cmDocText(): string {
+    const content = document.querySelector(".cm-content") as HTMLElement | null;
+    return content?.textContent ?? "";
+  }
+
+  it("preserves unsaved edits when switching away from a tab and back", () => {
+    const t1 = { ...tabFor("c1"), id: "t1", title: "A", text: "aaa" } as EditorTab;
+    const t2 = { ...tabFor("c1"), id: "t2", title: "B", text: "bbb" } as EditorTab;
+    useTabsStore.setState({ tabs: [], layout: null, focusedPaneGroupId: null, activeId: null });
+    useTabsStore.getState().setTabs([t1, t2]);
+    useTabsStore.getState().focusTab("t1");
+    render(<EditorPane />);
+    expect(cmDocText()).toContain("aaa");
+
+    // Simulate per-keystroke store writes for the active tab (volatile fields).
+    act(() => {
+      useTabsStore.getState().updateTab("t1", { text: "aaa edited", cursor: 10 });
+    });
+
+    act(() => { useTabsStore.getState().focusTab("t2"); });
+    expect(cmDocText()).toContain("bbb");
+
+    act(() => { useTabsStore.getState().focusTab("t1"); });
+    expect(cmDocText()).toContain("aaa edited");
+  });
+});
+
 // Typing writes text/cursor/selection to the tabs store on every keystroke.
 // The pane subscribes with an equality fn that ignores those fields, so pure
 // typing churn must produce ZERO React commits in the editor pane; structural

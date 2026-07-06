@@ -833,10 +833,14 @@ function PaneGroupView({ groupId }: { groupId: string }) {
 
   useEffect(() => {
     if (!editorHostRef.current || !activeTab) return;
+    // Seed from the live store, not the render-scope activeTab: text/cursor are
+    // volatile fields kept stale in render, so a tab switch would otherwise
+    // remount with pre-edit text and discard unsaved keystrokes.
+    const seed = freshActiveTab() ?? activeTab;
     const handle = mountEditor({
       host: editorHostRef.current,
-      initialDoc: activeTab.text,
-      initialCursor: activeTab.cursor,
+      initialDoc: seed.text,
+      initialCursor: seed.cursor,
       // One patch per editor update: a keystroke changes doc AND selection, so
       // separate callbacks meant three store writes (and three re-render waves
       // through every tab subscriber) per key. Single write instead.
