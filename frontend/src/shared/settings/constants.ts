@@ -262,6 +262,8 @@ export const PRESET_OVERRIDES: Record<
   jetbrains: {
     openTab: { key: "Mod-n" },
     searchFiles: { key: "Mod-Shift-o" },
+    // Shift+Cmd+O is Go to File in JetBrains, so free it from the niche open-in-new-window action.
+    openProjectNewWindow: null,
     aiGenerate: { key: "Mod-Alt-k" },
     gitCommit: { key: "Mod-k" },
     gitPush: { key: "Mod-Shift-k" },
