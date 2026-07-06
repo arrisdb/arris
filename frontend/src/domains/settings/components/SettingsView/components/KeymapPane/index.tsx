@@ -42,7 +42,7 @@ function KeymapPane() {
           Choose a base binding set. Custom shortcuts are kept per preset.
         </div>
       </div>
-      <div className="mdbc-settings-pane-actions">
+      <div className="mdbc-settings-keymap-preset-row">
         <Select
           value={keymapPreset}
           options={keymapPresets.map((preset) => ({ value: preset, label: presetLabels[preset] }))}

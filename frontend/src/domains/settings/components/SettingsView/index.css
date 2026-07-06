@@ -187,6 +187,12 @@
   justify-content: flex-end;
   margin-bottom: 12px;
 }
+.mdbc-settings-keymap-preset-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
 .mdbc-settings-keymap-category {
   display: flex;
   flex-direction: column;
