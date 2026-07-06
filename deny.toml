@@ -22,27 +22,16 @@ ignore = [
     "RUSTSEC-2023-0071",
     # paste 1.0.15: unmaintained. Deep transitive (proc-macro helper). No fix.
     "RUSTSEC-2024-0436",
-    # gix-features 0.38 (SHA-1 collision) — pinned by gix 0.66 (direct dep).
-    # Needs a gix semver-major bump; tracked as follow-up.
-    "RUSTSEC-2025-0021",
     # serde_yml 0.0.12: unmaintained serde_yaml fork (direct dep). No safe
     # upgrade; replace with a maintained YAML crate. Tracked as follow-up.
     "RUSTSEC-2025-0068",
     # rustls-pemfile: advisory on a version pinned by an older TLS dep. Constrained.
     "RUSTSEC-2025-0134",
-    # gix-date 0.9 (non-utf8 string) — pinned by gix 0.66. Same gix bump as above.
-    "RUSTSEC-2025-0140",
     # rustls-webpki 0.101.7 — old version pinned transitively. Constrained until
     # the pinning dep updates.
     "RUSTSEC-2026-0098",
     "RUSTSEC-2026-0099",
     "RUSTSEC-2026-0104",
-    # hickory-proto 0.25 (DNS DoS / unbounded loop) — pinned by mongodb 3.6's
-    # resolver. 0118 has no released fix; 0119 needs a mongodb bump. Follow-up.
-    "RUSTSEC-2026-0118",
-    "RUSTSEC-2026-0119",
-    # proc-macro-error2: unmaintained. Deep transitive. No fix.
-    "RUSTSEC-2026-0173",
 ]
 
 [licenses]

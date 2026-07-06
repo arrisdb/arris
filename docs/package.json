@@ -22,5 +22,8 @@
     "@types/mixpanel-browser": "^2.66.0",
     "@types/node": "^25.8.0",
     "vitest": "^4.1.6"
+  },
+  "overrides": {
+    "esbuild": "^0.28.1"
   }
 }

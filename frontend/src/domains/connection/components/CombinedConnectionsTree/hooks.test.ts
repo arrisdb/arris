@@ -83,11 +83,11 @@ describe("openObjectDefinition", () => {
 });
 
 describe("useCombinedConnectionsTree onConnectionSaved", () => {
-  let refreshSchema: ReturnType<typeof vi.fn>;
+  let refreshSchema: ReturnType<typeof vi.fn<(id: string) => void>>;
 
   beforeEach(() => {
     reset();
-    refreshSchema = vi.fn();
+    refreshSchema = vi.fn<(id: string) => void>();
     useConnectionsStore.setState({
       connections: [],
       selectedId: null,
@@ -125,13 +125,13 @@ describe("useCombinedConnectionsTree onConnectionSaved", () => {
 });
 
 describe("useCombinedConnectionsTree new-connection selection", () => {
-  let refreshSchema: ReturnType<typeof vi.fn>;
-  let selectConnection: ReturnType<typeof vi.fn>;
+  let refreshSchema: ReturnType<typeof vi.fn<(id: string) => void>>;
+  let selectConnection: ReturnType<typeof vi.fn<(id: string | null) => void>>;
 
   beforeEach(() => {
     reset();
-    refreshSchema = vi.fn();
-    selectConnection = vi.fn();
+    refreshSchema = vi.fn<(id: string) => void>();
+    selectConnection = vi.fn<(id: string | null) => void>();
     useConnectionsStore.setState({
       connections: [],
       selectedId: null,
