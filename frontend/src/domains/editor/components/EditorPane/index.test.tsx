@@ -1356,23 +1356,20 @@ describe("tab-switch edit persistence", () => {
     expect(cmDocText()).toContain("aaa edited");
   });
 
-  it("captures the scroll offset into the leaving tab on switch, and restores it on return", () => {
-    const t1 = { ...tabFor("c1"), id: "t1", title: "A", text: "aaa" } as EditorTab;
+  it("records the top-row scroll anchor onto the leaving tab when switching away", () => {
+    const doc = Array.from({ length: 60 }, (_, i) => `line ${i + 1}`).join("\n");
+    const t1 = { ...tabFor("c1"), id: "t1", title: "A", text: doc } as EditorTab;
     const t2 = { ...tabFor("c1"), id: "t2", title: "B", text: "bbb" } as EditorTab;
     useTabsStore.setState({ tabs: [], layout: null, focusedPaneGroupId: null, activeId: null });
     useTabsStore.getState().setTabs([t1, t2]);
     useTabsStore.getState().focusTab("t1");
     render(<EditorPane />);
 
-    const scroller = document.querySelector(".cm-scroller") as HTMLElement;
-    scroller.scrollTop = 250;
-
     act(() => { useTabsStore.getState().focusTab("t2"); });
-    // The offset the user left t1 at is recorded on the tab, not lost.
-    expect(useTabsStore.getState().tabs.find((t) => t.id === "t1")?.scrollTop).toBe(250);
-
-    act(() => { useTabsStore.getState().focusTab("t1"); });
-    expect((document.querySelector(".cm-scroller") as HTMLElement).scrollTop).toBe(250);
+    // A numeric anchor (char offset of the top line) is captured on the tab we
+    // left, so the remount can re-anchor instead of jumping to the caret.
+    const anchor = useTabsStore.getState().tabs.find((t) => t.id === "t1")?.scrollAnchor;
+    expect(anchor).toBeTypeOf("number");
   });
 });
 

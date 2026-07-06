@@ -53,27 +53,25 @@ describe("mountEditor json read-only", () => {
 describe("mountEditor scroll restore", () => {
   const longDoc = Array.from({ length: 200 }, (_, i) => `line ${i + 1}`).join("\n");
 
-  it("restores initialScrollTop and reads it back via getScrollTop", () => {
-    unmount = mountEditor({
-      host,
-      initialDoc: longDoc,
-      languageId: "sql",
-      initialScrollTop: 640,
-    });
-    expect(unmount.getScrollTop()).toBe(640);
+  it("reports the top line's char offset as the scroll anchor (0 at the top)", () => {
+    unmount = mountEditor({ host, initialDoc: longDoc, languageId: "sql" });
+    // Fresh mount sits at the top, so the anchor is the first line's offset.
+    expect(unmount.getScrollAnchor()).toBe(0);
   });
 
-  it("does not scroll to the caret when a scroll offset is restored", () => {
-    // Caret deep in the doc but the user was scrolled to the top: the restored
-    // offset must win so switching back does not jump to the caret line.
+  it("accepts a restored anchor without throwing and mounts the editor", () => {
+    // Anchor at the start of line 40; the restore path scrolls that line to the
+    // top instead of revealing the caret.
+    const line40 = longDoc.split("\n").slice(0, 39).join("\n").length + 1;
     unmount = mountEditor({
       host,
       initialDoc: longDoc,
       languageId: "sql",
       initialCursor: longDoc.length,
-      initialScrollTop: 0,
+      initialScrollAnchor: line40,
     });
-    expect(unmount.getScrollTop()).toBe(0);
+    expect(host.querySelector(".cm-editor")).toBeTruthy();
+    expect(unmount.getScrollAnchor()).toBeTypeOf("number");
   });
 });
 

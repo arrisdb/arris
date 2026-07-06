@@ -60,10 +60,12 @@ interface MountOptions {
   host: HTMLElement;
   initialDoc: string;
   initialCursor?: number;
-  /// Prior scroll offset to restore on mount (runtime only). When set, it wins
-  /// over the cursor-reveal below so a tab switch returns to where the user was
-  /// scrolled, not to the caret line.
-  initialScrollTop?: number;
+  /// Char offset of the line that was at the top of the viewport, to restore on
+  /// mount (runtime only). Anchoring by line (not pixels) survives CodeMirror's
+  /// post-mount height measurement, which reflows an estimated layout and would
+  /// otherwise drift a raw pixel offset onto the wrong row. Wins over the
+  /// cursor-reveal below so a tab switch returns to the row the user was on.
+  initialScrollAnchor?: number;
   /// Fired ONCE per editor update that changes the document and/or selection,
   /// carrying every changed field together so the owner can commit a single
   /// store write per keystroke (a keystroke changes doc AND selection; separate
@@ -148,7 +150,7 @@ interface CompletionUpdateOpts {
 
 interface EditorHandle {
   destroy: () => void;
-  getScrollTop: () => number;
+  getScrollAnchor: () => number;
   updateDiffHunks: (hunks: DiffHunk[]) => void;
   updateShortcuts: () => void;
   updateCompletionSchema: (opts: CompletionUpdateOpts) => void;
@@ -574,20 +576,26 @@ function mountEditor(opts: MountOptions): EditorHandle {
   view.dom.dataset.arrisLang = opts.languageId;
   if (opts.connectionKind) view.dom.dataset.arrisConnectionKind = opts.connectionKind;
 
-  // A restored scroll offset (tab switch) wins over the cursor reveal so we
-  // return to where the user was, not to the caret. EditorState.create only
+  // A restored scroll anchor (tab switch) wins over the cursor reveal so we
+  // return to the row the user was on, not the caret. EditorState.create only
   // seeds the selection; otherwise, when opened at a specific offset (e.g.
   // clicking a SQLMesh test in the side pane), scroll that line to the top.
-  if (typeof opts.initialScrollTop === "number") {
-    view.scrollDOM.scrollTop = opts.initialScrollTop;
-  } else if (typeof opts.initialCursor === "number" && opts.initialCursor > 0) {
-    const pos = clampCursor(opts.initialDoc, opts.initialCursor);
+  const scrollTarget =
+    typeof opts.initialScrollAnchor === "number"
+      ? opts.initialScrollAnchor
+      : typeof opts.initialCursor === "number" && opts.initialCursor > 0
+        ? opts.initialCursor
+        : null;
+  if (scrollTarget !== null) {
+    const pos = clampCursor(opts.initialDoc, scrollTarget);
     view.dispatch({ effects: EditorView.scrollIntoView(pos, { y: "start" }) });
   }
 
   return {
     destroy: () => view.destroy(),
-    getScrollTop: () => view.scrollDOM.scrollTop,
+    // Char offset of the line at the top of the viewport, for line-anchored
+    // scroll restore across a remount.
+    getScrollAnchor: () => view.lineBlockAtHeight(view.scrollDOM.scrollTop).from,
     updateCompletionSchema: (updateOpts: CompletionUpdateOpts) => {
       const newExt = editorCompletionExtensions({
         languageId: opts.languageId,
