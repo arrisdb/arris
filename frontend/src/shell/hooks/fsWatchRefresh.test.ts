@@ -20,7 +20,7 @@ vi.mock("../utils", async (orig) => ({
 describe("useFsWatchRefresh", () => {
   const listenMock = vi.mocked(listenAppEventIPC);
   const refreshMock = vi.mocked(refreshOnAppFocus);
-  let unlisten: ReturnType<typeof vi.fn>;
+  let unlisten: ReturnType<typeof vi.fn<() => void>>;
   let handler: (() => void) | null;
 
   // Resolve the listener registration so React's effect can store the unlisten fn.
