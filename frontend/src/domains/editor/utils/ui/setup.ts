@@ -579,6 +579,15 @@ function mountEditor(opts: MountOptions): EditorHandle {
   // minus scrollTop, computed from internal geometry (immune to surrounding
   // layout like the markdown mode bar, unlike client-coords sampling).
   const readScrollAnchor = (): ScrollAnchor => {
+    // A dispatched restore CodeMirror has not applied yet (unmount races the
+    // next measure, e.g. an editor remount from an effect-deps change) must
+    // round-trip unchanged instead of reading back as top-of-doc.
+    const pending = (
+      view as unknown as {
+        viewState: { scrollTarget: { range: { head: number }; yMargin: number; isSnapshot?: boolean } | null };
+      }
+    ).viewState.scrollTarget;
+    if (pending?.isSnapshot) return { line: pending.range.head, offset: pending.yMargin };
     const target = view.scrollSnapshot().value;
     return { line: target.range.head, offset: target.yMargin };
   };

@@ -60,9 +60,12 @@ describe("mountEditor scroll restore", () => {
     expect(unmount.getScrollAnchor()).toEqual({ line: 0, offset: 0 });
   });
 
-  it("accepts a restored anchor without throwing and mounts the editor", () => {
+  it("round-trips a restored anchor read back before CodeMirror applies it", () => {
     // Anchor at the start of line 40; the restore path scrolls that row to the
-    // top instead of revealing the caret.
+    // top instead of revealing the caret. Reading the anchor back BEFORE the
+    // next measure (the app remounts the editor when effect deps settle right
+    // after a tab switch) must return the pending anchor unchanged, not the
+    // still-unscrolled top of the document.
     const line40 = longDoc.split("\n").slice(0, 39).join("\n").length + 1;
     unmount = mountEditor({
       host,
@@ -72,7 +75,7 @@ describe("mountEditor scroll restore", () => {
       initialScrollAnchor: { line: line40, offset: -6 },
     });
     expect(host.querySelector(".cm-editor")).toBeTruthy();
-    expect(unmount.getScrollAnchor().line).toBeTypeOf("number");
+    expect(unmount.getScrollAnchor()).toEqual({ line: line40, offset: -6 });
   });
 
   it("reports the anchor to onScroll (debounced) when the viewport scrolls", () => {
