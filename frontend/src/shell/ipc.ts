@@ -71,8 +71,8 @@ function moveTabToProjectIPC(id: string): Promise<string> {
   return invoke("cmd_move_tab_to_project", { id });
 }
 
-function openProjectDialogIPC() {
-  return openDialog({ directory: true, multiple: false });
+function openProjectDialogIPC(title?: string) {
+  return openDialog({ directory: true, multiple: false, title });
 }
 
 function listenAppEventIPC(event: string, handler: () => void) {

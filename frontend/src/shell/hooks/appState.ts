@@ -21,6 +21,7 @@ import {
   listenAppEventIPC,
   savePaneLayoutIPC,
   saveTabsIPC,
+  takePendingLaunchIPC,
 } from "../ipc";
 import { ACTION_ORDER, useSettingsStore } from "@shared/settings";
 import type { AppViewModel } from "../types";
@@ -104,8 +105,12 @@ function useAppBootstrap(
     useSettingsStore.getState().hydrate();
     hydrateFrontendStores();
 
-    Promise.all([listConnectionsIPC(), appPreferencesLoadIPC().catch(() => null)])
-      .then(async ([connections, preferences]) => {
+    Promise.all([
+      listConnectionsIPC(),
+      appPreferencesLoadIPC().catch(() => null),
+      takePendingLaunchIPC().catch(() => null),
+    ])
+      .then(async ([connections, preferences, pendingLaunch]) => {
         setConnections(connections);
         // Restore only carries the connected-status snapshot, not a schema fetch,
         // so eagerly load schemas for already-connected connections; otherwise the
@@ -113,7 +118,7 @@ function useAppBootstrap(
         useConnectionsStore.getState().hydrateConnectedSchemas();
         if (preferences) useSettingsStore.getState().hydrate(preferences);
         hydrated.current = true;
-        await openPendingLaunchOrReopenLast();
+        await openPendingLaunchOrReopenLast(pendingLaunch);
         setBootstrapping(false);
       })
       .catch((error) => {

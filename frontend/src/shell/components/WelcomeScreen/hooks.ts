@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { useProjectStore } from "@shell/hooks/projectStore";
 import { useRecentsStore } from "@shell/hooks/recentsStore";
-import { openProjectInNewWindow } from "@shell/utils/app";
+import { openProjectInNewWindow, pickAndOpenFolderInNewWindow } from "@shell/utils/app";
+import { OPEN_FOLDER_NEW_WINDOW_DIALOG_TITLE } from "./constants";
 import {
   doScaffoldAndOpen,
   joinProjectPath,
   pickAndOpenFolder,
-  pickAndOpenFolderInNewWindow,
 } from "./utils";
 import {
   welcomeGitCloneIPC,
@@ -86,7 +86,7 @@ function useWelcomeScreen(): WelcomeScreenViewModel {
   }
 
   function onClickOpenFolderNewWindow() {
-    pickAndOpenFolderInNewWindow().catch(() => {});
+    pickAndOpenFolderInNewWindow(OPEN_FOLDER_NEW_WINDOW_DIALOG_TITLE).catch(() => {});
   }
 
   function onClickRecentProject(path: string) {

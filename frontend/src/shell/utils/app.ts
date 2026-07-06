@@ -11,7 +11,6 @@ import {
   openProjectDialogIPC,
   openProjectInNewWindowIPC,
   readTextFileIPC,
-  takePendingLaunchIPC,
 } from "../ipc";
 import { isSelfWrite } from "./selfWrites";
 
@@ -57,17 +56,17 @@ async function openProjectInNewWindow(path: string): Promise<void> {
   await openProjectInNewWindowIPC(path);
 }
 
-async function pickAndOpenFolderInNewWindow(): Promise<void> {
-  const selected = await openProjectDialogIPC();
+async function pickAndOpenFolderInNewWindow(title?: string): Promise<void> {
+  const selected = await openProjectDialogIPC(title);
   if (typeof selected === "string") {
     await openProjectInNewWindow(selected);
   }
 }
 
-// On launch, a path handed to this process by "open in new window" wins over the
-// auto-reopen-last-project setting; a plain launch falls back to reopen-last.
-async function openPendingLaunchOrReopenLast(): Promise<void> {
-  const pending = await takePendingLaunchIPC().catch(() => null);
+// On launch, a path handed to this process by "open in new window" (read once in
+// bootstrap) wins over the auto-reopen-last-project setting; a plain launch (null)
+// falls back to reopen-last.
+async function openPendingLaunchOrReopenLast(pending: string | null): Promise<void> {
   if (typeof pending === "string" && pending.length > 0) {
     await useProjectStore.getState().openProject(pending).catch(() => {});
     return;

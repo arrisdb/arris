@@ -81,7 +81,6 @@ import {
   openProjectIPC,
   openProjectInNewWindowIPC,
   readTextFileIPC,
-  takePendingLaunchIPC,
 } from "../ipc";
 import { clearSelfWrites, recordSelfWrite } from "./selfWrites";
 import { dbtProjectPaneScanProjectIPC } from "@domains/dbt/components/DbtProjectPane/ipc";
@@ -668,7 +667,6 @@ describe("pickAndOpenFolderInNewWindow", () => {
 
 describe("openPendingLaunchOrReopenLast", () => {
   beforeEach(() => {
-    vi.mocked(takePendingLaunchIPC).mockReset();
     vi.mocked(openProjectIPC).mockClear();
     vi.mocked(openProjectIPC).mockResolvedValue({
       root: "",
@@ -682,16 +680,14 @@ describe("openPendingLaunchOrReopenLast", () => {
   });
 
   it("opens the launch path in this window, winning over reopen-last", async () => {
-    vi.mocked(takePendingLaunchIPC).mockResolvedValue("/proj/launched");
     useSettingsStore.setState({ reopenLastProject: true });
-    await openPendingLaunchOrReopenLast();
+    await openPendingLaunchOrReopenLast("/proj/launched");
     expect(openProjectIPC).toHaveBeenCalledWith("/proj/launched");
   });
 
   it("falls back to reopen-last when there is no launch path", async () => {
-    vi.mocked(takePendingLaunchIPC).mockResolvedValue(null);
     useSettingsStore.setState({ reopenLastProject: false });
-    await openPendingLaunchOrReopenLast();
+    await openPendingLaunchOrReopenLast(null);
     expect(openProjectIPC).not.toHaveBeenCalled();
   });
 });

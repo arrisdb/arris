@@ -17,6 +17,7 @@ vi.mock("@shell/ipc", () => ({
     children: [],
   }),
   openFileIndexIPC: vi.fn().mockResolvedValue(undefined),
+  openProjectDialogIPC: vi.fn(),
   openProjectIPC: vi.fn().mockResolvedValue({
     root: "",
     connections: [],
@@ -31,7 +32,7 @@ import { useConnectionsStore } from "@domains/connection/hooks";
 
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
-import { openProjectIPC, openProjectInNewWindowIPC } from "@shell/ipc";
+import { openProjectDialogIPC, openProjectIPC, openProjectInNewWindowIPC } from "@shell/ipc";
 import { useRecentsStore } from "@shell/hooks/recentsStore";
 import { useProjectStore } from "@shell/hooks/projectStore";
 import { useTabsStore } from "../../hooks/tabsStore";
@@ -347,7 +348,7 @@ describe("WelcomeScreen", () => {
   });
 
   it("opens the picked folder in a new window from the toolbar button", async () => {
-    vi.mocked(openDialog).mockResolvedValue("/proj/nw");
+    vi.mocked(openProjectDialogIPC).mockResolvedValue("/proj/nw");
     render(<WelcomeScreen />);
     await act(async () => {
       fireEvent.click(screen.getByTestId("welcome-open-folder-new-window"));

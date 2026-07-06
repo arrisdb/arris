@@ -51,10 +51,14 @@ SELECT * FROM (VALUES
 const RECENT_MENU_OPEN_NEW_WINDOW_ID = "open-new-window";
 const RECENT_MENU_OPEN_NEW_WINDOW_LABEL = "Open in New Window";
 
+// Folder-picker title for the "Open in new window" button.
+const OPEN_FOLDER_NEW_WINDOW_DIALOG_TITLE = "Open folder in new window";
+
 export {
   DBT_EXAMPLE_MODEL_SQL,
   DBT_PROFILES_YML,
   DBT_PROJECT_YML,
+  OPEN_FOLDER_NEW_WINDOW_DIALOG_TITLE,
   RECENT_MENU_OPEN_NEW_WINDOW_ID,
   RECENT_MENU_OPEN_NEW_WINDOW_LABEL,
   SAMPLE_CONNECTION_NAME,
