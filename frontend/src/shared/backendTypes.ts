@@ -285,6 +285,8 @@ interface PersistedTab {
   kind: string;
   connectionId?: string;
   cursor: number;
+  /** Char offset of the line to re-anchor at the viewport top on reopen. */
+  scrollAnchor?: number;
   tabType?: TabType;
   filePath?: string;
   tableRef?: TableRef;

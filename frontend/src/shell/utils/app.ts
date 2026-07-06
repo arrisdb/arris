@@ -1,5 +1,6 @@
 import type { EditorTab } from "../types";
 import { useAgentStore } from "@domains/agent/hooks";
+import { useEditorHandleStore } from "@domains/editor/hooks";
 import { useTabsStore } from "../hooks/tabsStore";
 import { useFilesStore } from "@domains/files/hooks";
 import { useGitStore } from "@domains/git/hooks";
@@ -20,15 +21,21 @@ function toPersisted(tabs: EditorTab[]): PersistedTab[] {
   // NOTE: terminal tabs MUST stay persisted here. The pane layout references
   // tab ids; dropping terminals would make reconcileLayout prune their leaves
   // and silently lose the split on restart.
+  const { handle, activeTabId } = useEditorHandleStore.getState();
+  // The active tab's editor is still mounted at save time, so its live scroll
+  // anchor hasn't been written to the store yet (that only happens on unmount);
+  // read it straight off the handle.
+  const liveAnchor = handle ? handle.getScrollAnchor() : undefined;
   return tabs
     .filter((t) => t.tabType !== "gitdiff")
-    .map(({ id, title, text, kind, connectionId, cursor, tabType, filePath, tableRef, tableEditable, closed, createdAt, chart }) => ({
+    .map(({ id, title, text, kind, connectionId, cursor, scrollAnchor, tabType, filePath, tableRef, tableEditable, closed, createdAt, chart }) => ({
     id,
     title,
     text,
     kind,
     connectionId,
     cursor,
+    scrollAnchor: id === activeTabId ? liveAnchor ?? scrollAnchor : scrollAnchor,
     tabType,
     filePath,
     tableRef,

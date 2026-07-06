@@ -325,6 +325,11 @@ pub struct PersistedConsoleTab {
     pub connection_id: Option<String>,
     #[serde(default)]
     pub cursor: usize,
+    /// Char offset of the line to re-anchor at the top of the viewport on
+    /// reopen, so the editor restores the row the user was viewing instead of
+    /// jumping to the caret line.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scroll_anchor: Option<usize>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub closed: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
