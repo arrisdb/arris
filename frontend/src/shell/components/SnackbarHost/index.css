@@ -26,12 +26,18 @@
   pointer-events: auto;
 }
 
-.mdbc-snackbar.success svg:first-child {
+/* Direct child only: the kind icon. The close button's svg is also a
+   :first-child of its parent, so an unscoped selector would tint it too. */
+.mdbc-snackbar.success > svg:first-child {
   color: var(--m-green);
 }
 
-.mdbc-snackbar.error svg:first-child {
+.mdbc-snackbar.error > svg:first-child {
   color: var(--m-red);
+}
+
+.mdbc-snackbar .mdbc-icon-btn {
+  color: var(--m-fg);
 }
 
 .mdbc-snackbar-msg {
