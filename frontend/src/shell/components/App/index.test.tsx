@@ -255,16 +255,15 @@ describe("App bootstrapping — no welcome screen flash", () => {
     expect(useSettingsStore.getState().sidebarLeftTab).toBe("files");
   });
 
-  it("honors remapped sidebar shortcuts from stored keymap diffs", async () => {
-    localStorage.setItem(
-      "arris.keymap.shortcuts",
-      JSON.stringify({ showProjectPane: { key: "Mod-Shift-1" } }),
-    );
+  it("honors remapped sidebar shortcuts from per-preset overrides", async () => {
     useSettingsStore.setState({ sidebarLeftTab: "git", sidebarLeftVisible: true });
     render(<App />);
 
     await waitFor(() => {
       expect(screen.getByTestId("welcome-screen")).toBeTruthy();
+    });
+    act(() => {
+      useSettingsStore.getState().setShortcut("showProjectPane", "Mod-Shift-1");
     });
     act(() => {
       window.dispatchEvent(new KeyboardEvent("keydown", { key: "1", ctrlKey: true }));

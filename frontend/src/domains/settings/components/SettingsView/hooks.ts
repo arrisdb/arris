@@ -3,13 +3,15 @@ import type { KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent
 import {
   ACTION_ORDER,
   CATEGORY_ORDER,
+  KEYMAP_PRESETS,
+  PRESET_LABELS,
+  presetBaseShortcut,
   useSettingsStore,
   type KeymapAction,
 } from "@shared/settings";
 import {
   captureShortcut,
   categoryOf,
-  defaultShortcutFor,
   shortcutDisplay,
 } from "@shell/utils";
 import { DEFAULT_EDITOR_FONT_VALUE } from "@shared/ui/utils/editorFont";
@@ -174,6 +176,8 @@ function useKeymapPane() {
   const shortcuts = useSettingsStore((state) => state.shortcuts);
   const setShortcut = useSettingsStore((state) => state.setShortcut);
   const reset = useSettingsStore((state) => state.reset);
+  const keymapPreset = useSettingsStore((state) => state.keymapPreset);
+  const setPreset = useSettingsStore((state) => state.setPreset);
   const [recording, setRecording] = useState<KeymapAction | null>(null);
   const [conflict, setConflict] = useState<KeymapConflict | null>(null);
 
@@ -191,7 +195,7 @@ function useKeymapPane() {
   }
 
   function differsFromDefault(action: KeymapAction): boolean {
-    return shortcutKey(action) !== (defaultShortcutFor(action)?.key ?? null);
+    return shortcutKey(action) !== (presetBaseShortcut(keymapPreset, action)?.key ?? null);
   }
 
   function recordShortcut(
@@ -247,7 +251,7 @@ function useKeymapPane() {
   }
 
   function onResetShortcut(action: KeymapAction) {
-    setShortcut(action, defaultShortcutFor(action));
+    setShortcut(action, presetBaseShortcut(keymapPreset, action));
   }
 
   useEffect(() => {
@@ -267,14 +271,18 @@ function useKeymapPane() {
     actionsByCategory,
     conflict,
     differsFromDefault,
+    keymapPreset,
+    keymapPresets: KEYMAP_PRESETS,
     onCancelConflict,
     onCaptureKey,
     onClearShortcut,
     onReassignConflict,
     onRecordShortcut,
     onResetShortcut,
+    presetLabels: PRESET_LABELS,
     recording,
     reset,
+    setPreset,
     shortcutDisplay,
     shortcuts,
   };

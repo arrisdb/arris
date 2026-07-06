@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { ACTIONS, ACTION_ORDER, CATEGORY_ORDER, useSettingsStore } from "@shared/settings";
+import type { AppPreferences } from "@shared/backendTypes";
 import {
   captureShortcut,
   categoryOf,
@@ -62,8 +63,7 @@ describe("matchesShortcut", () => {
 
 describe("ACTIONS registry", () => {
   beforeEach(() => {
-    localStorage.clear();
-    useSettingsStore.getState().reset();
+    useSettingsStore.getState().hydrate();
   });
 
   it("derives every action from the registry", () => {
@@ -105,21 +105,24 @@ describe("ACTIONS registry", () => {
     expect(useSettingsStore.getState().shortcuts.exportCsv).toBeNull();
   });
 
-  it("persists only the diff from defaults", () => {
+  it("records rebinds into the active preset's override diff", () => {
     useSettingsStore.getState().setShortcut("searchFiles", "Mod-Shift-p");
     useSettingsStore.getState().setShortcut("exportCsv", "Mod-Shift-c");
-    expect(JSON.parse(localStorage.getItem("arris.keymap.shortcuts")!)).toEqual({
+    expect(useSettingsStore.getState().keymapOverrides.default).toEqual({
       searchFiles: { key: "Mod-Shift-p" },
       exportCsv: { key: "Mod-Shift-c" },
     });
   });
 
-  it("hydrates defaults plus stored overrides and drops removed actions", () => {
-    localStorage.setItem(
-      "arris.keymap.shortcuts",
-      JSON.stringify({ searchFiles: { key: "Mod-Shift-p" }, removedAction: { key: "Mod-x" } }),
-    );
-    useSettingsStore.getState().hydrate();
+  it("hydrates preset base plus stored overrides and ignores unknown actions", () => {
+    useSettingsStore.getState().hydrate({
+      keymapPreset: "default",
+      keymapOverrides: {
+        default: { searchFiles: { key: "Mod-Shift-p" }, removedAction: { key: "Mod-x" } },
+        vscode: {},
+        jetbrains: {},
+      },
+    } as unknown as AppPreferences);
     expect(useSettingsStore.getState().shortcuts.searchFiles).toEqual({ key: "Mod-Shift-p" });
     expect(useSettingsStore.getState().shortcuts.searchContent).toEqual({ key: "Mod-Shift-f" });
     expect((useSettingsStore.getState().shortcuts as Record<string, unknown>).removedAction).toBeUndefined();

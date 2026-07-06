@@ -1,9 +1,10 @@
 import {
   CATEGORY_DESCRIPTIONS,
   CATEGORY_LABELS,
+  type KeymapPreset,
 } from "@shared/settings";
 import { labelFor } from "@shell/utils";
-import { Btn } from "@shared/ui";
+import { Btn, Select } from "@shared/ui";
 import { Icon } from "@shared/ui/Icon";
 import { useKeymapPane } from "../../hooks";
 import {
@@ -17,22 +18,40 @@ function KeymapPane() {
     actionsByCategory,
     conflict,
     differsFromDefault,
+    keymapPreset,
+    keymapPresets,
     onCancelConflict,
     onCaptureKey,
     onClearShortcut,
     onReassignConflict,
     onRecordShortcut,
     onResetShortcut,
+    presetLabels,
     recording,
     reset,
+    setPreset,
     shortcutDisplay,
     shortcuts,
   } = useKeymapPane();
 
   return (
     <div className="mdbc-pane-form mdbc-settings-form-reset">
-      <div className="mdbc-settings-pane-actions">
-        <Btn onClick={reset}>Reset to Default</Btn>
+      <div className="mdbc-settings-keymap-category-header">
+        <div className="mdbc-settings-keymap-category-title">Keymap preset</div>
+        <div className="mdbc-settings-keymap-category-description">
+          Choose a base binding set. Custom shortcuts are kept per preset.
+        </div>
+      </div>
+      <div className="mdbc-settings-keymap-preset-row">
+        <Select
+          value={keymapPreset}
+          options={keymapPresets.map((preset) => ({ value: preset, label: presetLabels[preset] }))}
+          onChange={(value) => setPreset(value as KeymapPreset)}
+          maxWidth={200}
+          title="Keymap preset"
+          data-testid="keymap-preset-select"
+        />
+        <Btn onClick={reset}>Reset to Preset</Btn>
       </div>
       {actionsByCategory.map(({ category, actions }) => (
         <section className="mdbc-settings-keymap-category" key={category}>

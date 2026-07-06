@@ -336,12 +336,12 @@ describe("SettingsView per-category reset", () => {
     expect(useSettingsStore.getState().formatter.sql.keywordCase).toBe("upper");
   });
 
-  it("Keymap pane Reset to Default uses standard button styling", () => {
+  it("Keymap pane Reset to Preset uses standard button styling", () => {
     useSettingsStore.setState({ isOpen: true, activePane: "keymap" });
 
     render(<SettingsView />);
 
-    const button = screen.getByText("Reset to Default");
+    const button = screen.getByText("Reset to Preset");
     expect(button.classList.contains("mdbc-btn")).toBe(true);
     expect(button.classList.contains("ghost")).toBe(false);
   });

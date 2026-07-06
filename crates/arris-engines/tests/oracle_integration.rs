@@ -189,6 +189,7 @@ fn col_type<'a>(result: &'a QueryResult, name: &str) -> &'a str {
 // ── CRUD ────────────────────────────────────────────────────────────────────
 
 #[tokio::test]
+#[ignore = "requires a local Oracle testcontainer; slow to pull and can hang, run with --ignored"]
 async fn crud_insert_update_delete_select_join_dual() {
     let (_c, driver, _h, _p) = start_oracle().await;
     let d = driver.as_ref();
@@ -280,6 +281,7 @@ async fn crud_insert_update_delete_select_join_dual() {
 // ── Window / analytic functions ─────────────────────────────────────────────
 
 #[tokio::test]
+#[ignore = "requires a local Oracle testcontainer; slow to pull and can hang, run with --ignored"]
 async fn window_functions() {
     let (_c, driver, _h, _p) = start_oracle().await;
     let d = driver.as_ref();
@@ -338,6 +340,7 @@ async fn window_functions() {
 // ── Oracle-specific dialect ─────────────────────────────────────────────────
 
 #[tokio::test]
+#[ignore = "requires a local Oracle testcontainer; slow to pull and can hang, run with --ignored"]
 async fn oracle_specific_syntax() {
     let (_c, driver, _h, _p) = start_oracle().await;
     let d = driver.as_ref();
@@ -449,6 +452,7 @@ async fn oracle_specific_syntax() {
 // ── Schema-object lifecycle (all object kinds) ──────────────────────────────
 
 #[tokio::test]
+#[ignore = "requires a local Oracle testcontainer; slow to pull and can hang, run with --ignored"]
 async fn schema_object_lifecycle() {
     let (_c, driver, _h, _p) = start_oracle().await;
     let d = driver.as_ref();
@@ -638,6 +642,7 @@ async fn schema_object_lifecycle() {
 // ── Access control: users, roles, privileges ────────────────────────────────
 
 #[tokio::test]
+#[ignore = "requires a local Oracle testcontainer; slow to pull and can hang, run with --ignored"]
 async fn access_control_users_roles() {
     let (_c, driver, host, port) = start_oracle().await;
     let d = driver.as_ref();
@@ -749,6 +754,7 @@ async fn access_control_users_roles() {
 // observes what is actually committed.
 
 #[tokio::test]
+#[ignore = "requires a local Oracle testcontainer; slow to pull and can hang, run with --ignored"]
 async fn auto_mode_commits_each_statement() {
     // Outside a manual transaction the driver emulates autocommit, so a second
     // session sees each statement's effect without an explicit commit.
@@ -763,6 +769,7 @@ async fn auto_mode_commits_each_statement() {
 }
 
 #[tokio::test]
+#[ignore = "requires a local Oracle testcontainer; slow to pull and can hang, run with --ignored"]
 async fn manual_commit_makes_rows_visible_to_other_sessions() {
     let (container, tx, host, port) = start_oracle().await;
     let other = connect_as(&host, port, "appuser", "test").await;
@@ -789,6 +796,7 @@ async fn manual_commit_makes_rows_visible_to_other_sessions() {
 }
 
 #[tokio::test]
+#[ignore = "requires a local Oracle testcontainer; slow to pull and can hang, run with --ignored"]
 async fn manual_rollback_discards_changes() {
     let (container, tx, host, port) = start_oracle().await;
     let other = connect_as(&host, port, "appuser", "test").await;
@@ -808,6 +816,7 @@ async fn manual_rollback_discards_changes() {
 }
 
 #[tokio::test]
+#[ignore = "requires a local Oracle testcontainer; slow to pull and can hang, run with --ignored"]
 async fn failed_statement_breaks_manual_transaction() {
     // Per-engine behaviour: the oracle-rs thin driver leaves the connection
     // unusable ("connection not ready") after a statement error, so — unlike
@@ -845,6 +854,7 @@ async fn failed_statement_breaks_manual_transaction() {
 }
 
 #[tokio::test]
+#[ignore = "requires a local Oracle testcontainer; slow to pull and can hang, run with --ignored"]
 async fn serializable_isolation_round_trips() {
     // Oracle does not expose the current isolation level in a queryable view, so
     // this smoke-accepts that SET TRANSACTION ISOLATION LEVEL SERIALIZABLE is
@@ -886,6 +896,7 @@ fn appuser_object(kind: SchemaNodeKind, name: &str) -> ObjectRef {
 }
 
 #[tokio::test]
+#[ignore = "requires a local Oracle testcontainer; slow to pull and can hang, run with --ignored"]
 async fn object_definition_table() {
     let (_c, driver, _h, _p) = start_oracle().await;
     let d = driver.as_ref();
@@ -920,6 +931,7 @@ async fn object_definition_table() {
 }
 
 #[tokio::test]
+#[ignore = "requires a local Oracle testcontainer; slow to pull and can hang, run with --ignored"]
 async fn object_definition_view() {
     let (_c, driver, _h, _p) = start_oracle().await;
     let d = driver.as_ref();
@@ -943,6 +955,7 @@ async fn object_definition_view() {
 }
 
 #[tokio::test]
+#[ignore = "requires a local Oracle testcontainer; slow to pull and can hang, run with --ignored"]
 async fn object_definition_materialized_view() {
     let (_c, driver, _h, _p) = start_oracle().await;
     let d = driver.as_ref();
@@ -966,6 +979,7 @@ async fn object_definition_materialized_view() {
 }
 
 #[tokio::test]
+#[ignore = "requires a local Oracle testcontainer; slow to pull and can hang, run with --ignored"]
 async fn object_definition_sequence() {
     let (_c, driver, _h, _p) = start_oracle().await;
     let d = driver.as_ref();
@@ -983,6 +997,7 @@ async fn object_definition_sequence() {
 }
 
 #[tokio::test]
+#[ignore = "requires a local Oracle testcontainer; slow to pull and can hang, run with --ignored"]
 async fn object_definition_index() {
     let (_c, driver, _h, _p) = start_oracle().await;
     let d = driver.as_ref();
@@ -1002,6 +1017,7 @@ async fn object_definition_index() {
 }
 
 #[tokio::test]
+#[ignore = "requires a local Oracle testcontainer; slow to pull and can hang, run with --ignored"]
 async fn object_definition_function() {
     let (_c, driver, _h, _p) = start_oracle().await;
     let d = driver.as_ref();
@@ -1024,6 +1040,7 @@ async fn object_definition_function() {
 }
 
 #[tokio::test]
+#[ignore = "requires a local Oracle testcontainer; slow to pull and can hang, run with --ignored"]
 async fn object_definition_procedure() {
     let (_c, driver, _h, _p) = start_oracle().await;
     let d = driver.as_ref();
@@ -1047,6 +1064,7 @@ async fn object_definition_procedure() {
 }
 
 #[tokio::test]
+#[ignore = "requires a local Oracle testcontainer; slow to pull and can hang, run with --ignored"]
 async fn object_definition_trigger() {
     let (_c, driver, _h, _p) = start_oracle().await;
     let d = driver.as_ref();
@@ -1079,6 +1097,7 @@ async fn object_definition_trigger() {
 // the unit tests in `drivers/oracle/definition.rs`.
 
 #[tokio::test]
+#[ignore = "requires a local Oracle testcontainer; slow to pull and can hang, run with --ignored"]
 async fn object_definition_missing_object_errors() {
     let (_c, driver, _h, _p) = start_oracle().await;
     let d = driver.as_ref();
@@ -1097,6 +1116,7 @@ mod dbt_diff_scenario;
 /// end-to-end against a real Oracle instance. Identifiers are created quoted so
 /// they keep the lowercase casing the diff SQL emits. See `dbt_diff_scenario`.
 #[tokio::test]
+#[ignore = "requires a local Oracle testcontainer; slow to pull and can hang, run with --ignored"]
 async fn slim_diff_keyless_and_keyed() {
     use arris_engines::dbt::DiffDialect;
 

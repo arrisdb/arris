@@ -14,6 +14,32 @@ pub enum Theme {
     Light,
 }
 
+#[derive(Copy, Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum KeymapPreset {
+    #[default]
+    Default,
+    Vscode,
+    Jetbrains,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct KeyShortcut {
+    pub key: String,
+}
+
+/// Per-preset user overrides layered over each preset's base map. A key present
+/// with `Some` rebinds the action; present with `None` means user-cleared
+/// (unbound); absent means inherit the preset base.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct KeymapOverrides {
+    pub default: HashMap<String, Option<KeyShortcut>>,
+    pub vscode: HashMap<String, Option<KeyShortcut>>,
+    pub jetbrains: HashMap<String, Option<KeyShortcut>>,
+}
+
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum SidebarMetaTab {
@@ -245,6 +271,8 @@ pub struct AppPreferences {
     /// from [`crate::DEFAULT_SKIP_DIRS`]); the user's list replaces the default.
     pub file_tree_skip_dirs: Vec<String>,
     pub formatter: FormatterSettings,
+    pub keymap_preset: KeymapPreset,
+    pub keymap_overrides: KeymapOverrides,
 }
 
 impl Default for AppPreferences {
@@ -277,6 +305,8 @@ impl Default for AppPreferences {
                 .map(|s| s.to_string())
                 .collect(),
             formatter: FormatterSettings::default(),
+            keymap_preset: KeymapPreset::default(),
+            keymap_overrides: KeymapOverrides::default(),
         }
     }
 }

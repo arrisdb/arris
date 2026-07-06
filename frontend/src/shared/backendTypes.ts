@@ -372,6 +372,8 @@ interface ChartSpec {
 
 type Theme = "neon" | "classicDark" | "light";
 type SidebarMetaTab = "files" | "git";
+type KeymapPreset = "default" | "vscode" | "jetbrains";
+type KeymapOverrides = Record<KeymapPreset, Record<string, { key: string } | null>>;
 
 type KeywordCase = "preserve" | "upper" | "lower";
 type IndentStyle = "standard" | "tabularLeft" | "tabularRight";
@@ -457,6 +459,8 @@ interface AppPreferences {
   debugMode: boolean;
   fileTreeSkipDirs: string[];
   formatter: FormatterSettings;
+  keymapPreset: KeymapPreset;
+  keymapOverrides: KeymapOverrides;
 }
 
 // === git ===
@@ -660,6 +664,8 @@ export type {
   ChartSpec,
   Theme,
   SidebarMetaTab,
+  KeymapPreset,
+  KeymapOverrides,
   KeywordCase,
   IndentStyle,
   LogicalOperatorNewline,

@@ -2,69 +2,17 @@ import { create } from "zustand";
 import type { AppPreferences, FormatterSettings } from "../backendTypes";
 import { appPreferencesSaveIPC } from "./ipc";
 import { applyColorScheme, applySyntaxOverrides, applyTheme } from "../ui/utils/theme";
-import { ACTIONS, ACTION_ORDER, KEYMAP_STORAGE_KEY, preferenceDefaults } from "./constants";
-import type { KeyShortcut, SettingsState, ShortcutMap } from "./types";
+import { preferenceDefaults } from "./constants";
+import type { SettingsState } from "./types";
+import {
+  emptyOverrides,
+  liveShortcuts,
+  normalizeShortcut,
+  presetBaseMap,
+  sameShortcut,
+} from "./utils";
 
 let savePreferencesPromise: Promise<void> = Promise.resolve();
-
-function loadJson<T>(key: string, fallback: T): T {
-  try {
-    const raw = typeof localStorage !== "undefined" ? localStorage.getItem(key) : null;
-    if (!raw) return fallback;
-    return JSON.parse(raw) as T;
-  } catch {
-    return fallback;
-  }
-}
-
-function saveJson<T>(key: string, value: T): void {
-  try {
-    if (typeof localStorage === "undefined") return;
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    // localStorage may be disabled.
-  }
-}
-
-function sameShortcut(a: KeyShortcut | null, b: KeyShortcut | null): boolean {
-  return (a?.key ?? null) === (b?.key ?? null);
-}
-
-function cloneShortcut(shortcut: KeyShortcut | null): KeyShortcut | null {
-  return shortcut ? { key: shortcut.key } : null;
-}
-
-function defaultShortcuts(): ShortcutMap {
-  return Object.fromEntries(
-    ACTION_ORDER.map((action) => [action, cloneShortcut(ACTIONS[action].defaultShortcut)]),
-  ) as ShortcutMap;
-}
-
-function normalizeShortcut(shortcut: KeyShortcut | string | null): KeyShortcut | null {
-  if (shortcut == null) return null;
-  if (typeof shortcut === "string") return { key: shortcut };
-  return { key: shortcut.key };
-}
-
-function diffFromDefaults(shortcuts: ShortcutMap): Partial<ShortcutMap> {
-  const diff: Partial<ShortcutMap> = {};
-  for (const action of ACTION_ORDER) {
-    const current = shortcuts[action] ?? null;
-    const fallback = ACTIONS[action].defaultShortcut;
-    if (!sameShortcut(current, fallback)) diff[action] = cloneShortcut(current);
-  }
-  return diff;
-}
-
-function mergeStoredOverrides(stored: Partial<ShortcutMap>): ShortcutMap {
-  const merged = defaultShortcuts();
-  for (const action of ACTION_ORDER) {
-    if (Object.prototype.hasOwnProperty.call(stored, action)) {
-      merged[action] = normalizeShortcut(stored[action] ?? null);
-    }
-  }
-  return merged;
-}
 
 function preferencesSnapshot(state: SettingsState): AppPreferences {
   return {
@@ -92,6 +40,8 @@ function preferencesSnapshot(state: SettingsState): AppPreferences {
     debugMode: state.debugMode,
     fileTreeSkipDirs: state.fileTreeSkipDirs,
     formatter: state.formatter,
+    keymapPreset: state.keymapPreset,
+    keymapOverrides: state.keymapOverrides,
   };
 }
 
@@ -99,10 +49,6 @@ function persistPreferences(snapshot: AppPreferences) {
   savePreferencesPromise = savePreferencesPromise
     .then(() => appPreferencesSaveIPC(snapshot))
     .catch(() => {});
-}
-
-function persistShortcuts(shortcuts: ShortcutMap) {
-  saveJson(KEYMAP_STORAGE_KEY, diffFromDefaults(shortcuts));
 }
 
 // Deep clone of the default formatter so a category reset never shares the
@@ -156,7 +102,7 @@ function hydratePreferences(preferences: AppPreferences) {
 const useSettingsStore = create<SettingsState>((set, get) => ({
   isOpen: false,
   activePane: "appearance",
-  shortcuts: defaultShortcuts(),
+  shortcuts: liveShortcuts(preferenceDefaults.keymapPreset, emptyOverrides()),
   // In-memory only (deliberately absent from preferencesSnapshot): which Files
   // subview the left rail shows. Reset to "project" by the rail when the
   // dbt/SQLMesh project it pointed at is no longer detected.
@@ -292,12 +238,22 @@ const useSettingsStore = create<SettingsState>((set, get) => ({
     }));
     persistPreferences(preferencesSnapshot(get()));
   },
-  setShortcut: (action, shortcut) =>
-    set((state) => {
-      const shortcuts = { ...state.shortcuts, [action]: normalizeShortcut(shortcut) };
-      persistShortcuts(shortcuts);
-      return { shortcuts };
-    }),
+  setPreset: (preset) => {
+    const overrides = get().keymapOverrides;
+    set({ keymapPreset: preset, shortcuts: liveShortcuts(preset, overrides) });
+    persistPreferences(preferencesSnapshot(get()));
+  },
+  setShortcut: (action, shortcut) => {
+    const preset = get().keymapPreset;
+    const base = presetBaseMap(preset);
+    const next = normalizeShortcut(shortcut);
+    const presetOverrides = { ...get().keymapOverrides[preset] };
+    if (sameShortcut(base[action] ?? null, next)) delete presetOverrides[action];
+    else presetOverrides[action] = next;
+    const overrides = { ...get().keymapOverrides, [preset]: presetOverrides };
+    set({ keymapOverrides: overrides, shortcuts: liveShortcuts(preset, overrides) });
+    persistPreferences(preferencesSnapshot(get()));
+  },
   resetGeneral: () => {
     set({
       reopenLastProject: preferenceDefaults.reopenLastProject,
@@ -342,16 +298,20 @@ const useSettingsStore = create<SettingsState>((set, get) => ({
     persistPreferences(preferencesSnapshot(get()));
   },
   reset: () => {
-    const shortcuts = defaultShortcuts();
-    saveJson(KEYMAP_STORAGE_KEY, {});
-    set({ shortcuts });
+    const preset = get().keymapPreset;
+    const overrides = { ...get().keymapOverrides, [preset]: {} };
+    set({ keymapOverrides: overrides, shortcuts: liveShortcuts(preset, overrides) });
+    persistPreferences(preferencesSnapshot(get()));
   },
   hydrate: (preferences) => {
-    const storedShortcuts = loadJson<Partial<ShortcutMap>>(KEYMAP_STORAGE_KEY, {});
     const hydrated = preferences ? hydratePreferences(preferences) : {};
+    const preset = preferences?.keymapPreset ?? preferenceDefaults.keymapPreset;
+    const overrides = preferences?.keymapOverrides ?? emptyOverrides();
     set({
       ...hydrated,
-      shortcuts: mergeStoredOverrides(storedShortcuts),
+      keymapPreset: preset,
+      keymapOverrides: overrides,
+      shortcuts: liveShortcuts(preset, overrides),
     });
     applyTheme(preferences?.theme ?? preferenceDefaults.theme);
     applyColorScheme(preferences?.editorColorScheme ?? preferenceDefaults.editorColorScheme);
