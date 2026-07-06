@@ -19,18 +19,8 @@ const SEMANTIC_PARSE_BUDGET_MS = 50;
 // the rapid scroll-event stream into one store write once scrolling settles.
 const SCROLL_ANCHOR_DEBOUNCE_MS = 150;
 
-// Pixel inset from the scroller's top-left corner when sampling the top row, to
-// clear the border edge.
-const ANCHOR_SAMPLE_INSET_PX = 1;
-
-// No margin when re-scrolling the anchor row to the top; the pixel remainder is
-// reapplied separately, so a margin would double-count.
-const ANCHOR_SCROLL_Y_MARGIN_PX = 0;
-
 export {
   SEMANTIC_CONTEXT_CHARS,
   SEMANTIC_PARSE_BUDGET_MS,
   SCROLL_ANCHOR_DEBOUNCE_MS,
-  ANCHOR_SAMPLE_INSET_PX,
-  ANCHOR_SCROLL_Y_MARGIN_PX,
 };

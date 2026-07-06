@@ -1,12 +1,8 @@
 // CodeMirror 6 mount / unmount helper. Wraps the per-tab editor lifecycle so
 // the React component can stay declarative.
 
-import {
-  SCROLL_ANCHOR_DEBOUNCE_MS,
-  ANCHOR_SAMPLE_INSET_PX,
-  ANCHOR_SCROLL_Y_MARGIN_PX,
-} from "./constants";
-import { Compartment, EditorState, Prec } from "@codemirror/state";
+import { SCROLL_ANCHOR_DEBOUNCE_MS } from "./constants";
+import { Compartment, EditorSelection, EditorState, Prec } from "@codemirror/state";
 import {
   EditorView,
   lineNumbers,
@@ -579,31 +575,26 @@ function mountEditor(opts: MountOptions): EditorHandle {
   view.dom.dataset.arrisLang = opts.languageId;
   if (opts.connectionKind) view.dom.dataset.arrisConnectionKind = opts.connectionKind;
 
-  // Top-of-viewport row plus how far it is scrolled above the fold, read from
-  // real geometry so restore reproduces the exact pixel, not just the row start.
+  // CodeMirror's own scroll snapshot: anchor row `line` plus `offset` = row top
+  // minus scrollTop, computed from internal geometry (immune to surrounding
+  // layout like the markdown mode bar, unlike client-coords sampling).
   const readScrollAnchor = (): ScrollAnchor => {
-    const rect = view.scrollDOM.getBoundingClientRect();
-    const pos = view.posAtCoords({
-      x: rect.left + ANCHOR_SAMPLE_INSET_PX,
-      y: rect.top + ANCHOR_SAMPLE_INSET_PX,
-    });
-    if (pos == null) return { line: 0, offset: 0 };
-    const line = view.state.doc.lineAt(pos).from;
-    const coords = view.coordsAtPos(line);
-    const offset = coords ? Math.max(0, rect.top - coords.top) : 0;
-    return { line, offset };
+    const target = view.scrollSnapshot().value;
+    return { line: target.range.head, offset: target.yMargin };
   };
 
   // A restored anchor (tab switch) wins over the cursor reveal; else reveal the
   // opened offset (e.g. clicking a SQLMesh test in the side pane).
   if (opts.initialScrollAnchor) {
     const pos = clampCursor(opts.initialDoc, opts.initialScrollAnchor.line);
-    const px = opts.initialScrollAnchor.offset;
-    view.dispatch({
-      effects: EditorView.scrollIntoView(pos, { y: "start", yMargin: ANCHOR_SCROLL_Y_MARGIN_PX }),
-    });
-    // Reapply the sub-line remainder after CodeMirror has scrolled and measured.
-    if (px > 0) view.requestMeasure({ read: () => {}, write: () => { view.scrollDOM.scrollTop += px; } });
+    // Rebuild a snapshot target for the saved anchor (the ScrollTarget class is
+    // not exported, so retarget a fresh snapshot). CodeMirror applies snapshot
+    // targets after its measure loop settles, making the restore pixel-exact.
+    const snapshot = view.scrollSnapshot();
+    const target = snapshot.value as { range: unknown; yMargin: number };
+    target.range = EditorSelection.cursor(pos);
+    target.yMargin = opts.initialScrollAnchor.offset;
+    view.dispatch({ effects: snapshot });
   } else if (typeof opts.initialCursor === "number" && opts.initialCursor > 0) {
     const pos = clampCursor(opts.initialDoc, opts.initialCursor);
     view.dispatch({ effects: EditorView.scrollIntoView(pos, { y: "start" }) });

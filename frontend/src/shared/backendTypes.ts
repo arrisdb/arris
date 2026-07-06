@@ -278,8 +278,8 @@ interface ObjectIdentity {
   name: string;
 }
 
-/** Top-of-viewport row (`line`, char offset) plus its sub-line pixel remainder
- * (`offset`); anchoring by row survives CM6's post-mount height re-measurement. */
+/** CodeMirror scroll snapshot: anchor row `line` (char offset) plus `offset` =
+ * row top minus scrollTop in pixels (<= 0), for pixel-exact restore. */
 interface ScrollAnchor {
   line: number;
   offset: number;

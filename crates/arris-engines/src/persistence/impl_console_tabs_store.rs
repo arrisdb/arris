@@ -396,10 +396,10 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let store = store_in(tmp.path());
         let mut tab = sample_tab();
-        tab.scroll_anchor = Some(ScrollAnchor { line: 123, offset: 4.5 });
+        tab.scroll_anchor = Some(ScrollAnchor { line: 123, offset: -4.5 });
         store.save(&[tab.clone()]).await.unwrap();
         let loaded = store.load().await.unwrap();
-        assert_eq!(loaded[0].scroll_anchor, Some(ScrollAnchor { line: 123, offset: 4.5 }));
+        assert_eq!(loaded[0].scroll_anchor, Some(ScrollAnchor { line: 123, offset: -4.5 }));
     }
 
     #[tokio::test]

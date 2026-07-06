@@ -311,11 +311,8 @@ impl Default for AppPreferences {
     }
 }
 
-/// Runtime / IPC shape of a persisted console or notebook tab. Carries the live
-/// `text` (SQL body or full nbformat `.ipynb` JSON). On disk the text lives in a
-/// sidecar file, never inline in the index (see `ConsoleTabsStore`).
-/// Top-of-viewport row (`line`, char offset) plus its sub-line pixel remainder
-/// (`offset`), so the editor restores the exact scroll position on reopen.
+/// CodeMirror scroll snapshot: anchor row `line` (char offset) plus `offset` =
+/// row top minus scrollTop in pixels (<= 0), for pixel-exact restore.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ScrollAnchor {
@@ -323,6 +320,9 @@ pub struct ScrollAnchor {
     pub offset: f64,
 }
 
+/// Runtime / IPC shape of a persisted console or notebook tab. Carries the live
+/// `text` (SQL body or full nbformat `.ipynb` JSON). On disk the text lives in a
+/// sidecar file, never inline in the index (see `ConsoleTabsStore`).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PersistedConsoleTab {

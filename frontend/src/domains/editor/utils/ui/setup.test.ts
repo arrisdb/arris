@@ -69,7 +69,7 @@ describe("mountEditor scroll restore", () => {
       initialDoc: longDoc,
       languageId: "sql",
       initialCursor: longDoc.length,
-      initialScrollAnchor: { line: line40, offset: 6 },
+      initialScrollAnchor: { line: line40, offset: -6 },
     });
     expect(host.querySelector(".cm-editor")).toBeTruthy();
     expect(unmount.getScrollAnchor().line).toBeTypeOf("number");
