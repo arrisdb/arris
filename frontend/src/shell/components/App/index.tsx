@@ -1,6 +1,7 @@
 import { ContentView } from "@shell/components/ContentView";
 import { FileSearchPopover } from "@domains/files/components/FileSearchPopover";
 import { ProjectLoadingScreen } from "@shell/components/ProjectLoadingScreen";
+import { SnackbarHost } from "@shell/components/SnackbarHost";
 import { WelcomeScreen } from "@shell/components/WelcomeScreen";
 import { useAppState } from "@shell/hooks";
 
@@ -35,6 +36,7 @@ function App() {
     <>
       <ContentView />
       <FileSearchPopover />
+      <SnackbarHost />
     </>
   );
 }

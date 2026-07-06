@@ -19,6 +19,19 @@ interface BackgroundTask {
   label: string;
 }
 
+type SnackbarKind = "success" | "error";
+
+interface Snackbar {
+  id: string;
+  message: string;
+  kind: SnackbarKind;
+}
+
+interface NotifiedTaskResult {
+  ok: boolean;
+  message: string;
+}
+
 type ResultPane = "results" | "plan";
 
 interface EditorTab extends PersistedTab {
@@ -78,6 +91,9 @@ export type {
   AppViewModel,
   BackgroundTask,
   EditorTab,
+  NotifiedTaskResult,
+  Snackbar,
+  SnackbarKind,
   PaneGroup,
   PaneNode,
   PaneSplit,

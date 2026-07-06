@@ -1,0 +1,42 @@
+.mdbc-snackbar-host {
+  position: fixed;
+  bottom: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  z-index: 1000;
+  pointer-events: none;
+}
+
+.mdbc-snackbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: var(--m-r-sm);
+  background: var(--m-bg-surface-2);
+  border: 1px solid var(--m-sep-strong);
+  color: var(--m-fg-2);
+  font-family: var(--m-font);
+  font-size: var(--m-fs-xs);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  pointer-events: auto;
+}
+
+.mdbc-snackbar.success svg:first-child {
+  color: var(--m-green);
+}
+
+.mdbc-snackbar.error svg:first-child {
+  color: var(--m-red);
+}
+
+.mdbc-snackbar-msg {
+  max-width: 420px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
