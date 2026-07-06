@@ -476,9 +476,16 @@ shop:
         }
         let runner = DbtCliRunner::new(dir.path().to_path_buf())
             .with_executable(script.to_string_lossy().to_string());
-        let result = runner
-            .compile_model("orders", "my_proj")
-            .expect("should return Ok");
+        // Executing a just-written script can transiently fail with ETXTBSY when
+        // another test thread forks while its write fd is still open, so retry.
+        let result = loop {
+            match runner.compile_model("orders", "my_proj") {
+                Err(DbtCliError::Io(e)) if e.kind() == std::io::ErrorKind::ExecutableFileBusy => {
+                    std::thread::sleep(std::time::Duration::from_millis(20));
+                }
+                other => break other.expect("should return Ok"),
+            }
+        };
         assert_eq!(result.exit_code, 2);
         assert!(result.compiled_sql.is_none());
         assert!(result.stdout.contains("Database Error"));
