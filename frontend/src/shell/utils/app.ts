@@ -7,7 +7,11 @@ import { useProjectStore } from "@shell/hooks/projectStore";
 import { useRecentsStore } from "@shell/hooks/recentsStore";
 import type { DatabaseKind, PersistedTab, QueryLanguage } from "@shared";
 import { useSettingsStore } from "@shared/settings";
-import { openProjectDialogIPC, readTextFileIPC } from "../ipc";
+import {
+  openProjectDialogIPC,
+  openProjectInNewWindowIPC,
+  readTextFileIPC,
+} from "../ipc";
 import { isSelfWrite } from "./selfWrites";
 
 function toPersisted(tabs: EditorTab[]): PersistedTab[] {
@@ -44,6 +48,30 @@ async function openProjectFromMenu(): Promise<void> {
 
 async function handleDroppedPath(path: string): Promise<void> {
   await useProjectStore.getState().openProject(path);
+}
+
+// Open a project in a new window (a fresh app process), leaving this window's
+// project untouched. Caller supplies the path (recent card, drop, menu dialog).
+async function openProjectInNewWindow(path: string): Promise<void> {
+  await openProjectInNewWindowIPC(path);
+}
+
+async function pickAndOpenFolderInNewWindow(title?: string): Promise<void> {
+  const selected = await openProjectDialogIPC(title);
+  if (typeof selected === "string") {
+    await openProjectInNewWindow(selected);
+  }
+}
+
+// On launch, a path handed to this process by "open in new window" (read once in
+// bootstrap) wins over the auto-reopen-last-project setting; a plain launch (null)
+// falls back to reopen-last.
+async function openPendingLaunchOrReopenLast(pending: string | null): Promise<void> {
+  if (typeof pending === "string" && pending.length > 0) {
+    await useProjectStore.getState().openProject(pending).catch(() => {});
+    return;
+  }
+  await reopenLastProjectIfNeeded();
 }
 
 async function refreshOnAppFocus(): Promise<void> {
@@ -195,7 +223,10 @@ export {
   isRunnableQueryKind,
   kindForConnection,
   nextFontSize,
+  openPendingLaunchOrReopenLast,
   openProjectFromMenu,
+  openProjectInNewWindow,
+  pickAndOpenFolderInNewWindow,
   queryLanguageForEditorKind,
   refreshOnAppFocus,
   reopenLastProjectIfNeeded,

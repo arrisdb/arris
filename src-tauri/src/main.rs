@@ -33,6 +33,7 @@ fn main() {
             app.manage(env);
             app.manage(AgentRuns::default());
             app.manage(watcher::ProjectWatcher::default());
+            app.manage(PendingLaunch::from_args(std::env::args()));
 
             let about = AboutMetadataBuilder::new()
                 .name(Some("Arris".to_string()))
@@ -60,6 +61,12 @@ fn main() {
             let open_project_item = MenuItemBuilder::with_id("menu_open_project", "Open...")
                 .accelerator("CmdOrCtrl+O")
                 .build(app)?;
+            let open_project_new_window_item = MenuItemBuilder::with_id(
+                "menu_open_project_new_window",
+                "Open in New Window...",
+            )
+            .accelerator("CmdOrCtrl+Shift+O")
+            .build(app)?;
             let save_file_item = MenuItemBuilder::with_id("menu_save_file", "Save")
                 .accelerator("CmdOrCtrl+S")
                 .build(app)?;
@@ -70,6 +77,7 @@ fn main() {
             let file_submenu = SubmenuBuilder::new(app, "File")
                 .item(&new_project_item)
                 .item(&open_project_item)
+                .item(&open_project_new_window_item)
                 .separator()
                 .item(&save_file_item)
                 .separator()
@@ -118,6 +126,8 @@ fn main() {
                     let _ = handle.emit("menu:new-project", ());
                 } else if id == "menu_open_project" {
                     let _ = handle.emit("menu:open-project", ());
+                } else if id == "menu_open_project_new_window" {
+                    let _ = handle.emit("menu:open-project-new-window", ());
                 } else if id == "menu_save_file" {
                     let _ = handle.emit("menu:save-file", ());
                 } else if id == "menu_close_editor" {
@@ -179,6 +189,8 @@ fn main() {
             cmd_app_preferences_save,
             cmd_list_editor_fonts,
             cmd_open_project,
+            cmd_open_project_in_new_window,
+            cmd_take_pending_launch,
             cmd_close_project,
             cmd_scan_dbt_project,
             cmd_dbt_check_cli,

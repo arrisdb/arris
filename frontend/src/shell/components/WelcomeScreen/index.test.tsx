@@ -17,6 +17,7 @@ vi.mock("@shell/ipc", () => ({
     children: [],
   }),
   openFileIndexIPC: vi.fn().mockResolvedValue(undefined),
+  openProjectDialogIPC: vi.fn(),
   openProjectIPC: vi.fn().mockResolvedValue({
     root: "",
     connections: [],
@@ -25,11 +26,13 @@ vi.mock("@shell/ipc", () => ({
     federationTabs: [],
     paneLayout: { layout: null, focusedPaneGroupId: null },
   }),
+  openProjectInNewWindowIPC: vi.fn().mockResolvedValue(undefined),
 }));
 import { useConnectionsStore } from "@domains/connection/hooks";
 
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
+import { openProjectDialogIPC, openProjectIPC, openProjectInNewWindowIPC } from "@shell/ipc";
 import { useRecentsStore } from "@shell/hooks/recentsStore";
 import { useProjectStore } from "@shell/hooks/projectStore";
 import { useTabsStore } from "../../hooks/tabsStore";
@@ -342,6 +345,49 @@ describe("WelcomeScreen", () => {
     expect(screen.queryByTestId("welcome-confirm-dialog")).toBeNull();
     expect(invoke).toHaveBeenCalledWith("cmd_create_folder", { path: "/tmp/scratch" });
     expect(useTabsStore.getState().tabs.length).toBe(1);
+  });
+
+  it("opens the picked folder in a new window from the toolbar button", async () => {
+    vi.mocked(openProjectDialogIPC).mockResolvedValue("/proj/nw");
+    render(<WelcomeScreen />);
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("welcome-open-folder-new-window"));
+    });
+    expect(openProjectInNewWindowIPC).toHaveBeenCalledWith("/proj/nw");
+    expect(openProjectIPC).not.toHaveBeenCalled();
+  });
+
+  it("plain-clicking a recent opens it in the current window", () => {
+    useRecentsStore.setState({
+      recents: [{ path: "/proj/demo", name: "demo", kind: "folder", openedAt: Date.now() }],
+    });
+    render(<WelcomeScreen />);
+    fireEvent.click(screen.getByTestId("welcome-recent-/proj/demo"));
+    expect(openProjectIPC).toHaveBeenCalledWith("/proj/demo");
+    expect(openProjectInNewWindowIPC).not.toHaveBeenCalled();
+  });
+
+  it("cmd/ctrl-clicking a recent opens it in a new window", () => {
+    useRecentsStore.setState({
+      recents: [{ path: "/proj/demo", name: "demo", kind: "folder", openedAt: Date.now() }],
+    });
+    render(<WelcomeScreen />);
+    fireEvent.click(screen.getByTestId("welcome-recent-/proj/demo"), { metaKey: true });
+    expect(openProjectInNewWindowIPC).toHaveBeenCalledWith("/proj/demo");
+    expect(openProjectIPC).not.toHaveBeenCalled();
+  });
+
+  it("right-clicking a recent offers Open in New Window", async () => {
+    useRecentsStore.setState({
+      recents: [{ path: "/proj/demo", name: "demo", kind: "folder", openedAt: Date.now() }],
+    });
+    render(<WelcomeScreen />);
+    fireEvent.contextMenu(screen.getByTestId("welcome-recent-/proj/demo"));
+    const item = screen.getByTestId("welcome-recent-open-new-window");
+    expect(item.textContent).toContain("Open in New Window");
+    await act(async () => { fireEvent.click(item); });
+    expect(openProjectInNewWindowIPC).toHaveBeenCalledWith("/proj/demo");
+    expect(openProjectIPC).not.toHaveBeenCalled();
   });
 });
 

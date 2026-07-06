@@ -47,6 +47,7 @@ export const ACTIONS = {
   searchFiles: { label: "Search Files", category: "navigation", defaultShortcut: { key: "Mod-p" } },
   searchContent: { label: "Search Content", category: "navigation", defaultShortcut: { key: "Mod-Shift-f" } },
   openProject: { label: "Open Project", category: "navigation", defaultShortcut: { key: "Mod-o" } },
+  openProjectNewWindow: { label: "Open Project in New Window", category: "navigation", defaultShortcut: { key: "Mod-Shift-o" } },
 
   toggleSidebar: { label: "Toggle Sidebar", category: "sidebar", defaultShortcut: { key: "Mod-Shift-s" } },
   showDefinition: { label: "Show Definition", category: "sidebar", defaultShortcut: { key: "Mod-b" } },

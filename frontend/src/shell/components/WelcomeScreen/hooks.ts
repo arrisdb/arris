@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useProjectStore } from "@shell/hooks/projectStore";
 import { useRecentsStore } from "@shell/hooks/recentsStore";
+import { openProjectInNewWindow, pickAndOpenFolderInNewWindow } from "@shell/utils/app";
+import { OPEN_FOLDER_NEW_WINDOW_DIALOG_TITLE } from "./constants";
 import {
   doScaffoldAndOpen,
   joinProjectPath,
@@ -83,8 +85,16 @@ function useWelcomeScreen(): WelcomeScreenViewModel {
     pickAndOpenFolder().catch(() => {});
   }
 
+  function onClickOpenFolderNewWindow() {
+    pickAndOpenFolderInNewWindow(OPEN_FOLDER_NEW_WINDOW_DIALOG_TITLE).catch(() => {});
+  }
+
   function onClickRecentProject(path: string) {
     useProjectStore.getState().openProject(path);
+  }
+
+  function onOpenRecentProjectNewWindow(path: string) {
+    openProjectInNewWindow(path).catch(() => {});
   }
 
   function onClickShowCloneDialog() {
@@ -110,11 +120,13 @@ function useWelcomeScreen(): WelcomeScreenViewModel {
     onCancelScaffold,
     onClickNewProject,
     onClickOpenFolder,
+    onClickOpenFolderNewWindow,
     onClickRecentProject,
     onClickShowCloneDialog,
     onCloneSubmit,
     onConfirmScaffold,
     onCreateNewProject,
+    onOpenRecentProjectNewWindow,
     pendingNewProject,
     pendingScaffold,
     recents,

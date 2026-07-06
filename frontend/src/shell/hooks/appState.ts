@@ -21,6 +21,7 @@ import {
   listenAppEventIPC,
   savePaneLayoutIPC,
   saveTabsIPC,
+  takePendingLaunchIPC,
 } from "../ipc";
 import { ACTION_ORDER, useSettingsStore } from "@shared/settings";
 import type { AppViewModel } from "../types";
@@ -30,9 +31,10 @@ import {
   isBareKeySpec,
   isTypingTarget,
   matchesShortcut,
+  openPendingLaunchOrReopenLast,
   openProjectFromMenu,
+  pickAndOpenFolderInNewWindow,
   refreshOnAppFocus,
-  reopenLastProjectIfNeeded,
   runCommand,
   toPersisted,
   useGlobalCommands,
@@ -93,12 +95,22 @@ function useAppBootstrap(
   setBootstrapping: (bootstrapping: boolean) => void,
   hydrated: MutableRefObject<boolean>,
 ): void {
+  // Bootstrap must run exactly once per process. StrictMode double-invokes
+  // effects in dev; without this guard the second run sees the consume-once
+  // launch path already taken and wrongly reopens the last project.
+  const bootstrapped = useRef(false);
   useEffect(() => {
+    if (bootstrapped.current) return;
+    bootstrapped.current = true;
     useSettingsStore.getState().hydrate();
     hydrateFrontendStores();
 
-    Promise.all([listConnectionsIPC(), appPreferencesLoadIPC().catch(() => null)])
-      .then(async ([connections, preferences]) => {
+    Promise.all([
+      listConnectionsIPC(),
+      appPreferencesLoadIPC().catch(() => null),
+      takePendingLaunchIPC().catch(() => null),
+    ])
+      .then(async ([connections, preferences, pendingLaunch]) => {
         setConnections(connections);
         // Restore only carries the connected-status snapshot, not a schema fetch,
         // so eagerly load schemas for already-connected connections; otherwise the
@@ -106,7 +118,7 @@ function useAppBootstrap(
         useConnectionsStore.getState().hydrateConnectedSchemas();
         if (preferences) useSettingsStore.getState().hydrate(preferences);
         hydrated.current = true;
-        await reopenLastProjectIfNeeded();
+        await openPendingLaunchOrReopenLast(pendingLaunch);
         setBootstrapping(false);
       })
       .catch((error) => {
@@ -226,6 +238,7 @@ function useAppDragDrop(): void {
 function useAppMenuEvents(): void {
   useAppMenuEvent("menu:open-settings", onMenuOpenSettings);
   useAppMenuEvent("menu:open-project", onMenuOpenProject);
+  useAppMenuEvent("menu:open-project-new-window", onMenuOpenProjectNewWindow);
   useAppMenuEvent("menu:save-file", onMenuSaveFile);
   useAppMenuEvent("menu:new-project", onMenuNewProject);
   useAppMenuEvent("menu:close-editor", onMenuCloseEditor);
@@ -356,6 +369,10 @@ function onMenuOpenSettings(): void {
 
 function onMenuOpenProject(): void {
   openProjectFromMenu().catch(() => {});
+}
+
+function onMenuOpenProjectNewWindow(): void {
+  pickAndOpenFolderInNewWindow().catch(() => {});
 }
 
 function onMenuSaveFile(): void {

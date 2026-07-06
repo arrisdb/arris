@@ -39,11 +39,13 @@ interface WelcomeScreenViewModel {
   onCancelScaffold: () => void;
   onClickNewProject: (kind: ProjectKind) => void;
   onClickOpenFolder: () => void;
+  onClickOpenFolderNewWindow: () => void;
   onClickRecentProject: (path: string) => void;
   onClickShowCloneDialog: () => void;
   onCloneSubmit: (url: string, dest: string) => void;
   onConfirmScaffold: () => void;
   onCreateNewProject: (name: string, location: string) => void;
+  onOpenRecentProjectNewWindow: (path: string) => void;
   pendingNewProject: PendingNewProject | null;
   pendingScaffold: PendingScaffold | null;
   recents: RecentEntry[];

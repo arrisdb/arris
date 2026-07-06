@@ -62,8 +62,10 @@ vi.mock("@shell/ipc", () => ({
   openFileIndexIPC: vi.fn().mockResolvedValue(undefined),
   openProjectDialogIPC: vi.fn(),
   openProjectIPC: vi.fn().mockResolvedValue({ root: "", connections: [], tabs: [], federationTabs: [], paneLayout: { layout: null, focusedPaneGroupId: null } }),
+  openProjectInNewWindowIPC: vi.fn().mockResolvedValue(undefined),
   readTextFileIPC: vi.fn(),
   saveTabsIPC: vi.fn(),
+  takePendingLaunchIPC: vi.fn().mockResolvedValue(null),
 }));
 vi.mock("@domains/results/components/ResultsTableView/utils", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@domains/results/components/ResultsTableView/utils")>()),
@@ -88,7 +90,8 @@ import { useChartEditorStore } from "@domains/chart/hooks";
 import { useBackgroundTasksStore } from "../../hooks/backgroundTasksStore";
 import { useDbtStore } from "@domains/dbt/hooks";
 import { useSqlMeshStore } from "@domains/sqlmesh/hooks";
-import { closeProjectIPC } from "@shell/ipc";
+import { StrictMode } from "react";
+import { closeProjectIPC, openProjectIPC, takePendingLaunchIPC } from "@shell/ipc";
 
 const realUseAppState = (await vi.importActual<typeof import("@shell/hooks")>("@shell/hooks")).useAppState;
 
@@ -196,6 +199,32 @@ describe("App bootstrapping — no welcome screen flash", () => {
       expect(screen.getByTestId("content-view")).toBeTruthy();
     });
     expect(screen.queryByTestId("welcome-screen")).toBeNull();
+  });
+
+  it("opens the launch path once under StrictMode, never falling back to reopen-last", async () => {
+    // Regression: StrictMode double-invokes the bootstrap effect. The launch
+    // path is consume-once, so a second run would see null and wrongly reopen
+    // the last project. The bootstrap must run exactly once.
+    useRecentsStore.setState({
+      recents: [{ path: "/proj/old", name: "old", kind: "folder", openedAt: Date.now() }],
+    });
+    vi.mocked(openProjectIPC).mockClear();
+    vi.mocked(takePendingLaunchIPC).mockReset();
+    vi.mocked(takePendingLaunchIPC).mockResolvedValueOnce("/proj/launched").mockResolvedValue(null);
+
+    render(
+      <StrictMode>
+        <App />
+      </StrictMode>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("content-view")).toBeTruthy();
+    });
+    const openedRoots = vi.mocked(openProjectIPC).mock.calls.map((call) => call[0]);
+    expect(openedRoots).toContain("/proj/launched");
+    expect(openedRoots).not.toContain("/proj/old");
+    vi.mocked(takePendingLaunchIPC).mockResolvedValue(null);
   });
 
   it("shows welcome screen when reopenLastProject preference is disabled", async () => {

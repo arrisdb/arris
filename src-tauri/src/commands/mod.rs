@@ -1,6 +1,7 @@
 mod agent;
 mod canvas;
 mod connection;
+mod constants;
 mod dbt;
 mod federation;
 mod file;
