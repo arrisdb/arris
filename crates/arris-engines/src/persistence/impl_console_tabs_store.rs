@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use tokio::fs;
 
 use super::impl_json_store::JsonFile;
-use super::{PersistedConsoleTab, StoreError};
+use super::{PersistedConsoleTab, ScrollAnchor, StoreError};
 
 /// On-disk index entry: every field of [`PersistedConsoleTab`] except `text`.
 /// `console_tabs.json` is a flat array of these; the body of each console /
@@ -22,7 +22,7 @@ struct ConsoleTabIndexEntry {
     #[serde(default)]
     cursor: usize,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    scroll_anchor: Option<usize>,
+    scroll_anchor: Option<ScrollAnchor>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     closed: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -396,10 +396,10 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let store = store_in(tmp.path());
         let mut tab = sample_tab();
-        tab.scroll_anchor = Some(123);
+        tab.scroll_anchor = Some(ScrollAnchor { line: 123, offset: 4.5 });
         store.save(&[tab.clone()]).await.unwrap();
         let loaded = store.load().await.unwrap();
-        assert_eq!(loaded[0].scroll_anchor, Some(123));
+        assert_eq!(loaded[0].scroll_anchor, Some(ScrollAnchor { line: 123, offset: 4.5 }));
     }
 
     #[tokio::test]

@@ -1366,10 +1366,11 @@ describe("tab-switch edit persistence", () => {
     render(<EditorPane />);
 
     act(() => { useTabsStore.getState().focusTab("t2"); });
-    // A numeric anchor (char offset of the top line) is captured on the tab we
-    // left, so the remount can re-anchor instead of jumping to the caret.
+    // A row + pixel anchor is captured on the tab we left, so the remount can
+    // re-anchor instead of jumping to the caret.
     const anchor = useTabsStore.getState().tabs.find((t) => t.id === "t1")?.scrollAnchor;
-    expect(anchor).toBeTypeOf("number");
+    expect(anchor?.line).toBeTypeOf("number");
+    expect(anchor?.offset).toBeTypeOf("number");
   });
 });
 

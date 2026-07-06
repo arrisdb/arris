@@ -54,14 +54,14 @@ describe("mountEditor json read-only", () => {
 describe("mountEditor scroll restore", () => {
   const longDoc = Array.from({ length: 200 }, (_, i) => `line ${i + 1}`).join("\n");
 
-  it("reports the top line's char offset as the scroll anchor (0 at the top)", () => {
+  it("reports the top row and zero pixel offset as the anchor at the top", () => {
     unmount = mountEditor({ host, initialDoc: longDoc, languageId: "sql" });
-    // Fresh mount sits at the top, so the anchor is the first line's offset.
-    expect(unmount.getScrollAnchor()).toBe(0);
+    // Fresh mount sits at the top: first row, no sub-line remainder.
+    expect(unmount.getScrollAnchor()).toEqual({ line: 0, offset: 0 });
   });
 
   it("accepts a restored anchor without throwing and mounts the editor", () => {
-    // Anchor at the start of line 40; the restore path scrolls that line to the
+    // Anchor at the start of line 40; the restore path scrolls that row to the
     // top instead of revealing the caret.
     const line40 = longDoc.split("\n").slice(0, 39).join("\n").length + 1;
     unmount = mountEditor({
@@ -69,14 +69,14 @@ describe("mountEditor scroll restore", () => {
       initialDoc: longDoc,
       languageId: "sql",
       initialCursor: longDoc.length,
-      initialScrollAnchor: line40,
+      initialScrollAnchor: { line: line40, offset: 6 },
     });
     expect(host.querySelector(".cm-editor")).toBeTruthy();
-    expect(unmount.getScrollAnchor()).toBeTypeOf("number");
+    expect(unmount.getScrollAnchor().line).toBeTypeOf("number");
   });
 
   it("reports the anchor to onScroll (debounced) when the viewport scrolls", () => {
-    let reported: number | null = null;
+    let reported: { line: number; offset: number } | null = null;
     unmount = mountEditor({
       host,
       initialDoc: longDoc,
@@ -87,7 +87,8 @@ describe("mountEditor scroll restore", () => {
     (host.querySelector(".cm-scroller") as HTMLElement).dispatchEvent(new Event("scroll"));
     vi.advanceTimersByTime(SCROLL_ANCHOR_DEBOUNCE_MS + 10);
     vi.useRealTimers();
-    expect(reported).toBeTypeOf("number");
+    expect(reported).not.toBeNull();
+    expect(reported!.line).toBeTypeOf("number");
   });
 });
 

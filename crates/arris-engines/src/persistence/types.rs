@@ -314,6 +314,15 @@ impl Default for AppPreferences {
 /// Runtime / IPC shape of a persisted console or notebook tab. Carries the live
 /// `text` (SQL body or full nbformat `.ipynb` JSON). On disk the text lives in a
 /// sidecar file, never inline in the index (see `ConsoleTabsStore`).
+/// Top-of-viewport row (`line`, char offset) plus its sub-line pixel remainder
+/// (`offset`), so the editor restores the exact scroll position on reopen.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ScrollAnchor {
+    pub line: usize,
+    pub offset: f64,
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PersistedConsoleTab {
@@ -325,11 +334,8 @@ pub struct PersistedConsoleTab {
     pub connection_id: Option<String>,
     #[serde(default)]
     pub cursor: usize,
-    /// Char offset of the line to re-anchor at the top of the viewport on
-    /// reopen, so the editor restores the row the user was viewing instead of
-    /// jumping to the caret line.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub scroll_anchor: Option<usize>,
+    pub scroll_anchor: Option<ScrollAnchor>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub closed: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]

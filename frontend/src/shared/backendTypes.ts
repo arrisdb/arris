@@ -278,6 +278,13 @@ interface ObjectIdentity {
   name: string;
 }
 
+/** Top-of-viewport row (`line`, char offset) plus its sub-line pixel remainder
+ * (`offset`); anchoring by row survives CM6's post-mount height re-measurement. */
+interface ScrollAnchor {
+  line: number;
+  offset: number;
+}
+
 interface PersistedTab {
   id: string;
   title: string;
@@ -285,8 +292,7 @@ interface PersistedTab {
   kind: string;
   connectionId?: string;
   cursor: number;
-  /** Char offset of the line to re-anchor at the viewport top on reopen. */
-  scrollAnchor?: number;
+  scrollAnchor?: ScrollAnchor;
   tabType?: TabType;
   filePath?: string;
   tableRef?: TableRef;
@@ -652,6 +658,7 @@ export type {
   SchemaNode,
   TabType,
   ObjectIdentity,
+  ScrollAnchor,
   PersistedTab,
   ChartKind,
   LineStyle,

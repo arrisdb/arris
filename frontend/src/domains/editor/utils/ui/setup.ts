@@ -1,7 +1,11 @@
 // CodeMirror 6 mount / unmount helper. Wraps the per-tab editor lifecycle so
 // the React component can stay declarative.
 
-import { SCROLL_ANCHOR_DEBOUNCE_MS } from "./constants";
+import {
+  SCROLL_ANCHOR_DEBOUNCE_MS,
+  ANCHOR_SAMPLE_INSET_PX,
+  ANCHOR_SCROLL_Y_MARGIN_PX,
+} from "./constants";
 import { Compartment, EditorState, Prec } from "@codemirror/state";
 import {
   EditorView,
@@ -31,7 +35,7 @@ import { arrisHighlight } from "@shared/ui/utils/codeHighlight";
 import { lineCommentKeymap } from "./lineCommentToggler";
 import { jinjaAutoCloseKeymap } from "./jinjaAutoClose";
 import { indentContinuationExtension } from "./indentContinuation";
-import type { DatabaseKind, DiffHunk, KeywordCase } from "@shared";
+import type { DatabaseKind, DiffHunk, KeywordCase, ScrollAnchor } from "@shared";
 import type { SqlSchemaDict } from "../autocomplete/sqlSchema";
 import { gitGutterExtension, type GitHunkActions } from "./gitGutter";
 import { editorSearchExtension, openEditorSearch } from "./search";
@@ -61,12 +65,8 @@ interface MountOptions {
   host: HTMLElement;
   initialDoc: string;
   initialCursor?: number;
-  /// Char offset of the line that was at the top of the viewport, to restore on
-  /// mount (runtime only). Anchoring by line (not pixels) survives CodeMirror's
-  /// post-mount height measurement, which reflows an estimated layout and would
-  /// otherwise drift a raw pixel offset onto the wrong row. Wins over the
-  /// cursor-reveal below so a tab switch returns to the row the user was on.
-  initialScrollAnchor?: number;
+  /// Viewport position to restore on mount; wins over the cursor-reveal below.
+  initialScrollAnchor?: ScrollAnchor;
   /// Fired ONCE per editor update that changes the document and/or selection,
   /// carrying every changed field together so the owner can commit a single
   /// store write per keystroke (a keystroke changes doc AND selection; separate
@@ -75,9 +75,8 @@ interface MountOptions {
   /// are present only when the selection changed; `selection.from`/`to` are
   /// equal for a collapsed caret, a non-empty range means text is highlighted.
   onEdit?: (patch: EditorEditPatch) => void;
-  /// Fired (debounced) when the user scrolls, with the char offset of the line
-  /// now at the top of the viewport, so the owner can persist it for restore.
-  onScroll?: (anchor: number) => void;
+  /// Fired (debounced) on scroll with the current top-of-viewport anchor.
+  onScroll?: (anchor: ScrollAnchor) => void;
   languageId: string;
   /// DatabaseKind of the tab's connection; picks the SQL dialect when `languageId === "sql"`.
   connectionKind?: DatabaseKind;
@@ -154,7 +153,7 @@ interface CompletionUpdateOpts {
 
 interface EditorHandle {
   destroy: () => void;
-  getScrollAnchor: () => number;
+  getScrollAnchor: () => ScrollAnchor;
   updateDiffHunks: (hunks: DiffHunk[]) => void;
   updateShortcuts: () => void;
   updateCompletionSchema: (opts: CompletionUpdateOpts) => void;
@@ -580,30 +579,35 @@ function mountEditor(opts: MountOptions): EditorHandle {
   view.dom.dataset.arrisLang = opts.languageId;
   if (opts.connectionKind) view.dom.dataset.arrisConnectionKind = opts.connectionKind;
 
-  // A restored scroll anchor (tab switch) wins over the cursor reveal so we
-  // return to the row the user was on, not the caret. EditorState.create only
-  // seeds the selection; otherwise, when opened at a specific offset (e.g.
-  // clicking a SQLMesh test in the side pane), scroll that line to the top.
-  const scrollTarget =
-    typeof opts.initialScrollAnchor === "number"
-      ? opts.initialScrollAnchor
-      : typeof opts.initialCursor === "number" && opts.initialCursor > 0
-        ? opts.initialCursor
-        : null;
-  if (scrollTarget !== null) {
-    const pos = clampCursor(opts.initialDoc, scrollTarget);
+  // Top-of-viewport row plus how far it is scrolled above the fold, read from
+  // real geometry so restore reproduces the exact pixel, not just the row start.
+  const readScrollAnchor = (): ScrollAnchor => {
+    const rect = view.scrollDOM.getBoundingClientRect();
+    const pos = view.posAtCoords({
+      x: rect.left + ANCHOR_SAMPLE_INSET_PX,
+      y: rect.top + ANCHOR_SAMPLE_INSET_PX,
+    });
+    if (pos == null) return { line: 0, offset: 0 };
+    const line = view.state.doc.lineAt(pos).from;
+    const coords = view.coordsAtPos(line);
+    const offset = coords ? Math.max(0, rect.top - coords.top) : 0;
+    return { line, offset };
+  };
+
+  // A restored anchor (tab switch) wins over the cursor reveal; else reveal the
+  // opened offset (e.g. clicking a SQLMesh test in the side pane).
+  if (opts.initialScrollAnchor) {
+    const pos = clampCursor(opts.initialDoc, opts.initialScrollAnchor.line);
+    const px = opts.initialScrollAnchor.offset;
+    view.dispatch({
+      effects: EditorView.scrollIntoView(pos, { y: "start", yMargin: ANCHOR_SCROLL_Y_MARGIN_PX }),
+    });
+    // Reapply the sub-line remainder after CodeMirror has scrolled and measured.
+    if (px > 0) view.requestMeasure({ read: () => {}, write: () => { view.scrollDOM.scrollTop += px; } });
+  } else if (typeof opts.initialCursor === "number" && opts.initialCursor > 0) {
+    const pos = clampCursor(opts.initialDoc, opts.initialCursor);
     view.dispatch({ effects: EditorView.scrollIntoView(pos, { y: "start" }) });
   }
-
-  // Char offset of the line at the top of the viewport. Resolved from real
-  // rendered geometry (the pixel at the viewport's top edge) rather than mapping
-  // scrollTop through block heights, which mixes coordinate spaces and drifts by
-  // the content's top padding.
-  const readScrollAnchor = (): number => {
-    const rect = view.scrollDOM.getBoundingClientRect();
-    const pos = view.posAtCoords({ x: rect.left + 1, y: rect.top + 1 });
-    return pos == null ? 0 : view.state.doc.lineAt(pos).from;
-  };
 
   // Persist the anchor as the user scrolls (debounced) so restore works without
   // relying on unmount/quit hooks, which don't fire reliably in the webview.
