@@ -841,6 +841,7 @@ function PaneGroupView({ groupId }: { groupId: string }) {
       host: editorHostRef.current,
       initialDoc: seed.text,
       initialCursor: seed.cursor,
+      initialScrollTop: seed.scrollTop,
       // One patch per editor update: a keystroke changes doc AND selection, so
       // separate callbacks meant three store writes (and three re-render waves
       // through every tab subscriber) per key. Single write instead.
@@ -921,6 +922,9 @@ function PaneGroupView({ groupId }: { groupId: string }) {
     editorHandleRef.current = handle;
     useEditorHandleStore.getState().setHandle(handle, activeTab?.id ?? null);
     return () => {
+      // Remember where this tab was scrolled so switching back restores it
+      // instead of jumping to the caret line on remount.
+      updateTab(activeTab.id, { scrollTop: handle.getScrollTop() });
       editorHandleRef.current = null;
       useEditorHandleStore.getState().clearHandle();
       handle.destroy();

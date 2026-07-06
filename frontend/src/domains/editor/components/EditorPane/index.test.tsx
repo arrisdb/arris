@@ -1355,6 +1355,25 @@ describe("tab-switch edit persistence", () => {
     act(() => { useTabsStore.getState().focusTab("t1"); });
     expect(cmDocText()).toContain("aaa edited");
   });
+
+  it("captures the scroll offset into the leaving tab on switch, and restores it on return", () => {
+    const t1 = { ...tabFor("c1"), id: "t1", title: "A", text: "aaa" } as EditorTab;
+    const t2 = { ...tabFor("c1"), id: "t2", title: "B", text: "bbb" } as EditorTab;
+    useTabsStore.setState({ tabs: [], layout: null, focusedPaneGroupId: null, activeId: null });
+    useTabsStore.getState().setTabs([t1, t2]);
+    useTabsStore.getState().focusTab("t1");
+    render(<EditorPane />);
+
+    const scroller = document.querySelector(".cm-scroller") as HTMLElement;
+    scroller.scrollTop = 250;
+
+    act(() => { useTabsStore.getState().focusTab("t2"); });
+    // The offset the user left t1 at is recorded on the tab, not lost.
+    expect(useTabsStore.getState().tabs.find((t) => t.id === "t1")?.scrollTop).toBe(250);
+
+    act(() => { useTabsStore.getState().focusTab("t1"); });
+    expect((document.querySelector(".cm-scroller") as HTMLElement).scrollTop).toBe(250);
+  });
 });
 
 // Typing writes text/cursor/selection to the tabs store on every keystroke.

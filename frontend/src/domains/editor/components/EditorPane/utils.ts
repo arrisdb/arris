@@ -331,7 +331,7 @@ function exportActiveResults(format: ExportFormat): boolean {
 // need structural tab state (id/kind/title/result/isRunning/...) compare with
 // these ignored so typing does not re-render the whole pane group; handlers
 // that need the live buffer read it from the store at invocation time.
-const VOLATILE_TAB_FIELDS = new Set(["text", "cursor", "selection"]);
+const VOLATILE_TAB_FIELDS = new Set(["text", "cursor", "selection", "scrollTop"]);
 
 function tabEqualIgnoringVolatile(
   a: EditorTab | null | undefined,

@@ -37,6 +37,10 @@ interface EditorTab extends PersistedTab {
   /// Anchors the editor's run-status indicator (spinner / check / X) to the
   /// statement's first line; persists until the next run replaces it.
   runRange?: { from: number; to: number };
+  /// Last editor scroll offset (runtime only). Captured when the editor
+  /// unmounts (tab switch) and restored on remount so the view returns to
+  /// where the user was scrolled rather than jumping to the caret line.
+  scrollTop?: number;
 }
 
 /// A leaf in the pane layout tree: one editor pane owning a subset of tabs.

@@ -60,6 +60,10 @@ interface MountOptions {
   host: HTMLElement;
   initialDoc: string;
   initialCursor?: number;
+  /// Prior scroll offset to restore on mount (runtime only). When set, it wins
+  /// over the cursor-reveal below so a tab switch returns to where the user was
+  /// scrolled, not to the caret line.
+  initialScrollTop?: number;
   /// Fired ONCE per editor update that changes the document and/or selection,
   /// carrying every changed field together so the owner can commit a single
   /// store write per keystroke (a keystroke changes doc AND selection; separate
@@ -144,6 +148,7 @@ interface CompletionUpdateOpts {
 
 interface EditorHandle {
   destroy: () => void;
+  getScrollTop: () => number;
   updateDiffHunks: (hunks: DiffHunk[]) => void;
   updateShortcuts: () => void;
   updateCompletionSchema: (opts: CompletionUpdateOpts) => void;
@@ -569,16 +574,20 @@ function mountEditor(opts: MountOptions): EditorHandle {
   view.dom.dataset.arrisLang = opts.languageId;
   if (opts.connectionKind) view.dom.dataset.arrisConnectionKind = opts.connectionKind;
 
-  // EditorState.create only seeds the selection; the viewport still renders at
-  // the top. When opened at a specific offset (e.g. clicking a SQLMesh test in
-  // the side pane), scroll that line to the top so it's actually in view.
-  if (typeof opts.initialCursor === "number" && opts.initialCursor > 0) {
+  // A restored scroll offset (tab switch) wins over the cursor reveal so we
+  // return to where the user was, not to the caret. EditorState.create only
+  // seeds the selection; otherwise, when opened at a specific offset (e.g.
+  // clicking a SQLMesh test in the side pane), scroll that line to the top.
+  if (typeof opts.initialScrollTop === "number") {
+    view.scrollDOM.scrollTop = opts.initialScrollTop;
+  } else if (typeof opts.initialCursor === "number" && opts.initialCursor > 0) {
     const pos = clampCursor(opts.initialDoc, opts.initialCursor);
     view.dispatch({ effects: EditorView.scrollIntoView(pos, { y: "start" }) });
   }
 
   return {
     destroy: () => view.destroy(),
+    getScrollTop: () => view.scrollDOM.scrollTop,
     updateCompletionSchema: (updateOpts: CompletionUpdateOpts) => {
       const newExt = editorCompletionExtensions({
         languageId: opts.languageId,

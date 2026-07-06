@@ -50,6 +50,33 @@ describe("mountEditor json read-only", () => {
   });
 });
 
+describe("mountEditor scroll restore", () => {
+  const longDoc = Array.from({ length: 200 }, (_, i) => `line ${i + 1}`).join("\n");
+
+  it("restores initialScrollTop and reads it back via getScrollTop", () => {
+    unmount = mountEditor({
+      host,
+      initialDoc: longDoc,
+      languageId: "sql",
+      initialScrollTop: 640,
+    });
+    expect(unmount.getScrollTop()).toBe(640);
+  });
+
+  it("does not scroll to the caret when a scroll offset is restored", () => {
+    // Caret deep in the doc but the user was scrolled to the top: the restored
+    // offset must win so switching back does not jump to the caret line.
+    unmount = mountEditor({
+      host,
+      initialDoc: longDoc,
+      languageId: "sql",
+      initialCursor: longDoc.length,
+      initialScrollTop: 0,
+    });
+    expect(unmount.getScrollTop()).toBe(0);
+  });
+});
+
 describe("mountEditor gutter strip", () => {
   // the run-status icon must sit INSIDE the same strip as the line
   // number (JetBrains-style), universally. The whole gutter band shares the
