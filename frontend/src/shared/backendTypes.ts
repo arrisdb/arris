@@ -278,6 +278,13 @@ interface ObjectIdentity {
   name: string;
 }
 
+/** CodeMirror scroll snapshot: anchor row `line` (char offset) plus `offset` =
+ * row top minus scrollTop in pixels (<= 0), for pixel-exact restore. */
+interface ScrollAnchor {
+  line: number;
+  offset: number;
+}
+
 interface PersistedTab {
   id: string;
   title: string;
@@ -285,6 +292,7 @@ interface PersistedTab {
   kind: string;
   connectionId?: string;
   cursor: number;
+  scrollAnchor?: ScrollAnchor;
   tabType?: TabType;
   filePath?: string;
   tableRef?: TableRef;
@@ -650,6 +658,7 @@ export type {
   SchemaNode,
   TabType,
   ObjectIdentity,
+  ScrollAnchor,
   PersistedTab,
   ChartKind,
   LineStyle,

@@ -22,13 +22,14 @@ function toPersisted(tabs: EditorTab[]): PersistedTab[] {
   // and silently lose the split on restart.
   return tabs
     .filter((t) => t.tabType !== "gitdiff")
-    .map(({ id, title, text, kind, connectionId, cursor, tabType, filePath, tableRef, tableEditable, closed, createdAt, chart }) => ({
+    .map(({ id, title, text, kind, connectionId, cursor, scrollAnchor, tabType, filePath, tableRef, tableEditable, closed, createdAt, chart }) => ({
     id,
     title,
     text,
     kind,
     connectionId,
     cursor,
+    scrollAnchor,
     tabType,
     filePath,
     tableRef,

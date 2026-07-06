@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use tokio::fs;
 
 use super::impl_json_store::JsonFile;
-use super::{PersistedConsoleTab, StoreError};
+use super::{PersistedConsoleTab, ScrollAnchor, StoreError};
 
 /// On-disk index entry: every field of [`PersistedConsoleTab`] except `text`.
 /// `console_tabs.json` is a flat array of these; the body of each console /
@@ -21,6 +21,8 @@ struct ConsoleTabIndexEntry {
     connection_id: Option<String>,
     #[serde(default)]
     cursor: usize,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    scroll_anchor: Option<ScrollAnchor>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     closed: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -45,6 +47,7 @@ impl ConsoleTabIndexEntry {
             kind: t.kind.clone(),
             connection_id: t.connection_id.clone(),
             cursor: t.cursor,
+            scroll_anchor: t.scroll_anchor,
             closed: t.closed,
             is_federation: t.is_federation,
             tab_type: t.tab_type.clone(),
@@ -65,6 +68,7 @@ impl ConsoleTabIndexEntry {
             kind: self.kind,
             connection_id: self.connection_id,
             cursor: self.cursor,
+            scroll_anchor: self.scroll_anchor,
             closed: self.closed,
             is_federation: self.is_federation,
             tab_type: self.tab_type,
@@ -302,6 +306,7 @@ mod tests {
             kind: "sql".into(),
             connection_id: None,
             cursor: 0,
+            scroll_anchor: None,
             closed: None,
             is_federation: None,
             tab_type: None,
@@ -384,6 +389,17 @@ mod tests {
         store.save(&[tab.clone()]).await.unwrap();
         let loaded = store.load().await.unwrap();
         assert_eq!(loaded[0].tab_type.as_deref(), Some("console"));
+    }
+
+    #[tokio::test]
+    async fn round_trip_persists_scroll_anchor() {
+        let tmp = tempfile::tempdir().unwrap();
+        let store = store_in(tmp.path());
+        let mut tab = sample_tab();
+        tab.scroll_anchor = Some(ScrollAnchor { line: 123, offset: -4.5 });
+        store.save(&[tab.clone()]).await.unwrap();
+        let loaded = store.load().await.unwrap();
+        assert_eq!(loaded[0].scroll_anchor, Some(ScrollAnchor { line: 123, offset: -4.5 }));
     }
 
     #[tokio::test]

@@ -1,7 +1,8 @@
 // CodeMirror 6 mount / unmount helper. Wraps the per-tab editor lifecycle so
 // the React component can stay declarative.
 
-import { Compartment, EditorState, Prec } from "@codemirror/state";
+import { SCROLL_ANCHOR_DEBOUNCE_MS } from "./constants";
+import { Compartment, EditorSelection, EditorState, Prec } from "@codemirror/state";
 import {
   EditorView,
   lineNumbers,
@@ -30,7 +31,7 @@ import { arrisHighlight } from "@shared/ui/utils/codeHighlight";
 import { lineCommentKeymap } from "./lineCommentToggler";
 import { jinjaAutoCloseKeymap } from "./jinjaAutoClose";
 import { indentContinuationExtension } from "./indentContinuation";
-import type { DatabaseKind, DiffHunk, KeywordCase } from "@shared";
+import type { DatabaseKind, DiffHunk, KeywordCase, ScrollAnchor } from "@shared";
 import type { SqlSchemaDict } from "../autocomplete/sqlSchema";
 import { gitGutterExtension, type GitHunkActions } from "./gitGutter";
 import { editorSearchExtension, openEditorSearch } from "./search";
@@ -60,6 +61,8 @@ interface MountOptions {
   host: HTMLElement;
   initialDoc: string;
   initialCursor?: number;
+  /// Viewport position to restore on mount; wins over the cursor-reveal below.
+  initialScrollAnchor?: ScrollAnchor;
   /// Fired ONCE per editor update that changes the document and/or selection,
   /// carrying every changed field together so the owner can commit a single
   /// store write per keystroke (a keystroke changes doc AND selection; separate
@@ -68,6 +71,8 @@ interface MountOptions {
   /// are present only when the selection changed; `selection.from`/`to` are
   /// equal for a collapsed caret, a non-empty range means text is highlighted.
   onEdit?: (patch: EditorEditPatch) => void;
+  /// Fired (debounced) on scroll with the current top-of-viewport anchor.
+  onScroll?: (anchor: ScrollAnchor) => void;
   languageId: string;
   /// DatabaseKind of the tab's connection; picks the SQL dialect when `languageId === "sql"`.
   connectionKind?: DatabaseKind;
@@ -144,6 +149,7 @@ interface CompletionUpdateOpts {
 
 interface EditorHandle {
   destroy: () => void;
+  getScrollAnchor: () => ScrollAnchor;
   updateDiffHunks: (hunks: DiffHunk[]) => void;
   updateShortcuts: () => void;
   updateCompletionSchema: (opts: CompletionUpdateOpts) => void;
@@ -569,16 +575,92 @@ function mountEditor(opts: MountOptions): EditorHandle {
   view.dom.dataset.arrisLang = opts.languageId;
   if (opts.connectionKind) view.dom.dataset.arrisConnectionKind = opts.connectionKind;
 
-  // EditorState.create only seeds the selection; the viewport still renders at
-  // the top. When opened at a specific offset (e.g. clicking a SQLMesh test in
-  // the side pane), scroll that line to the top so it's actually in view.
-  if (typeof opts.initialCursor === "number" && opts.initialCursor > 0) {
+  // CodeMirror's own scroll snapshot: anchor row `line` plus `offset` = row top
+  // minus scrollTop, computed from internal geometry (immune to surrounding
+  // layout like the markdown mode bar, unlike client-coords sampling).
+  const readLiveAnchor = (): ScrollAnchor => {
+    // A dispatched restore CodeMirror has not applied yet (unmount races the
+    // next measure, e.g. an editor remount from an effect-deps change) must
+    // round-trip unchanged instead of reading back as top-of-doc.
+    const pending = (
+      view as unknown as {
+        viewState: { scrollTarget: { range: { head: number }; yMargin: number; isSnapshot?: boolean } | null };
+      }
+    ).viewState.scrollTarget;
+    if (pending?.isSnapshot) return { line: pending.range.head, offset: pending.yMargin };
+    const target = view.scrollSnapshot().value;
+    return { line: target.range.head, offset: target.yMargin };
+  };
+
+  // Last anchor observed at the current viewport height. A tab switch away
+  // from a markdown tab removes the Raw/Preview/Split bar in the same React
+  // commit that unmounts the editor; the host grows and, near the bottom of
+  // the document, the browser clamps scrollTop BEFORE the effect cleanup reads
+  // the anchor. When the viewport height no longer matches, return the last
+  // settled anchor instead of the clamped live read.
+  let settledAnchor = opts.initialScrollAnchor ?? null;
+  let settledHeight = view.scrollDOM.clientHeight;
+
+  const readScrollAnchor = (): ScrollAnchor => {
+    if (settledAnchor && view.scrollDOM.clientHeight !== settledHeight) return settledAnchor;
+    return readLiveAnchor();
+  };
+
+  // A restored anchor (tab switch) wins over the cursor reveal; else reveal the
+  // opened offset (e.g. clicking a SQLMesh test in the side pane).
+  if (opts.initialScrollAnchor) {
+    const pos = clampCursor(opts.initialDoc, opts.initialScrollAnchor.line);
+    // Rebuild a snapshot target for the saved anchor (the ScrollTarget class is
+    // not exported, so retarget a fresh snapshot). CodeMirror applies snapshot
+    // targets after its measure loop settles, making the restore pixel-exact.
+    const snapshot = view.scrollSnapshot();
+    const target = snapshot.value as { range: unknown; yMargin: number };
+    target.range = EditorSelection.cursor(pos);
+    target.yMargin = opts.initialScrollAnchor.offset;
+    view.dispatch({ effects: snapshot });
+  } else if (typeof opts.initialCursor === "number" && opts.initialCursor > 0) {
     const pos = clampCursor(opts.initialDoc, opts.initialCursor);
     view.dispatch({ effects: EditorView.scrollIntoView(pos, { y: "start" }) });
   }
 
+  // Persist the anchor as the user scrolls (debounced) so restore works without
+  // relying on unmount/quit hooks, which don't fire reliably in the webview.
+  let scrollTimer: ReturnType<typeof setTimeout> | null = null;
+  const onScrollDom = () => {
+    // Same-height scrolls are genuine; a height change means a resize-induced
+    // clamp, whose scroll must not overwrite the settled anchor.
+    if (view.scrollDOM.clientHeight === settledHeight) settledAnchor = readLiveAnchor();
+    if (!opts.onScroll) return;
+    if (scrollTimer) clearTimeout(scrollTimer);
+    scrollTimer = setTimeout(() => opts.onScroll?.(readScrollAnchor()), SCROLL_ANCHOR_DEBOUNCE_MS);
+  };
+  view.scrollDOM.addEventListener("scroll", onScrollDom, { passive: true });
+
+  // A genuine live resize (pane drag, window resize) re-baselines the anchor a
+  // frame later; a tab-switch unmount destroys the editor first, so the
+  // pre-resize anchor survives for the cleanup read.
+  let resizeRaf = 0;
+  const resizeObserver =
+    typeof ResizeObserver === "undefined"
+      ? null
+      : new ResizeObserver(() => {
+          cancelAnimationFrame(resizeRaf);
+          resizeRaf = requestAnimationFrame(() => {
+            settledHeight = view.scrollDOM.clientHeight;
+            settledAnchor = readLiveAnchor();
+          });
+        });
+  resizeObserver?.observe(view.scrollDOM);
+
   return {
-    destroy: () => view.destroy(),
+    destroy: () => {
+      if (scrollTimer) clearTimeout(scrollTimer);
+      cancelAnimationFrame(resizeRaf);
+      resizeObserver?.disconnect();
+      view.scrollDOM.removeEventListener("scroll", onScrollDom);
+      view.destroy();
+    },
+    getScrollAnchor: readScrollAnchor,
     updateCompletionSchema: (updateOpts: CompletionUpdateOpts) => {
       const newExt = editorCompletionExtensions({
         languageId: opts.languageId,

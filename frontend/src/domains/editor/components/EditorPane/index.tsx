@@ -833,10 +833,15 @@ function PaneGroupView({ groupId }: { groupId: string }) {
 
   useEffect(() => {
     if (!editorHostRef.current || !activeTab) return;
+    // Seed from the live store, not the render-scope activeTab: text/cursor are
+    // volatile fields kept stale in render, so a tab switch would otherwise
+    // remount with pre-edit text and discard unsaved keystrokes.
+    const seed = freshActiveTab() ?? activeTab;
     const handle = mountEditor({
       host: editorHostRef.current,
-      initialDoc: activeTab.text,
-      initialCursor: activeTab.cursor,
+      initialDoc: seed.text,
+      initialCursor: seed.cursor,
+      initialScrollAnchor: seed.scrollAnchor,
       // One patch per editor update: a keystroke changes doc AND selection, so
       // separate callbacks meant three store writes (and three re-render waves
       // through every tab subscriber) per key. Single write instead.
@@ -849,6 +854,7 @@ function PaneGroupView({ groupId }: { groupId: string }) {
         }
         if (currentSqlMeshModel) markRenderedStale(currentSqlMeshModel.name);
       },
+      onScroll: (anchor) => updateTab(activeTab.id, { scrollAnchor: anchor }),
       languageId: activeTab.kind,
       fileName: activeTab.filePath,
       connectionKind: tabConnection?.kind,
@@ -917,6 +923,9 @@ function PaneGroupView({ groupId }: { groupId: string }) {
     editorHandleRef.current = handle;
     useEditorHandleStore.getState().setHandle(handle, activeTab?.id ?? null);
     return () => {
+      // Remember the top row so switching back restores it instead of jumping
+      // to the caret line on remount.
+      updateTab(activeTab.id, { scrollAnchor: handle.getScrollAnchor() });
       editorHandleRef.current = null;
       useEditorHandleStore.getState().clearHandle();
       handle.destroy();

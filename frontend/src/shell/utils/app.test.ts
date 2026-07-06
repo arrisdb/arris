@@ -418,6 +418,15 @@ describe("toPersisted", () => {
     expect(result.find((t) => t.id === "closed")?.closed).toBe(true);
     expect(result.find((t) => t.id === "open")?.closed).toBeUndefined();
   });
+
+  it("persists each tab's stored scroll anchor", () => {
+    const result = toPersisted([
+      { ...base, id: "1", scrollAnchor: { line: 42, offset: -3 } },
+      { ...base, id: "2", scrollAnchor: { line: 7, offset: 0 } },
+    ]);
+    expect(result.find((t) => t.id === "1")?.scrollAnchor).toEqual({ line: 42, offset: -3 });
+    expect(result.find((t) => t.id === "2")?.scrollAnchor).toEqual({ line: 7, offset: 0 });
+  });
 });
 
 describe("refreshOnAppFocus", () => {

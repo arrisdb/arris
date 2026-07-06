@@ -1,6 +1,7 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
 import { mountEditor, type EditorHandle } from "./setup";
+import { SCROLL_ANCHOR_DEBOUNCE_MS } from "./constants";
 import { SCHEMA_NODE_DRAG_MIME } from "./schemaDrag";
 import { useSettingsStore } from "@shared/settings";
 
@@ -47,6 +48,65 @@ describe("mountEditor json read-only", () => {
       schema: { users: [{ name: "id" }, { name: "name" }] },
     });
     expect(host.querySelector(".cm-editor")).toBeTruthy();
+  });
+});
+
+describe("mountEditor scroll restore", () => {
+  const longDoc = Array.from({ length: 200 }, (_, i) => `line ${i + 1}`).join("\n");
+
+  it("reports the top row and zero pixel offset as the anchor at the top", () => {
+    unmount = mountEditor({ host, initialDoc: longDoc, languageId: "sql" });
+    // Fresh mount sits at the top: first row, no sub-line remainder.
+    expect(unmount.getScrollAnchor()).toEqual({ line: 0, offset: 0 });
+  });
+
+  it("round-trips a restored anchor read back before CodeMirror applies it", () => {
+    // Anchor at the start of line 40; the restore path scrolls that row to the
+    // top instead of revealing the caret. Reading the anchor back BEFORE the
+    // next measure (the app remounts the editor when effect deps settle right
+    // after a tab switch) must return the pending anchor unchanged, not the
+    // still-unscrolled top of the document.
+    const line40 = longDoc.split("\n").slice(0, 39).join("\n").length + 1;
+    unmount = mountEditor({
+      host,
+      initialDoc: longDoc,
+      languageId: "sql",
+      initialCursor: longDoc.length,
+      initialScrollAnchor: { line: line40, offset: -6 },
+    });
+    expect(host.querySelector(".cm-editor")).toBeTruthy();
+    expect(unmount.getScrollAnchor()).toEqual({ line: line40, offset: -6 });
+  });
+
+  it("keeps the settled anchor when the viewport height changes before the read", () => {
+    // Tab switch away from a markdown tab removes the mode bar in the same
+    // commit that unmounts the editor; the host resize clamps scrollTop before
+    // the cleanup reads. A height mismatch must return the settled anchor.
+    unmount = mountEditor({
+      host,
+      initialDoc: longDoc,
+      languageId: "sql",
+      initialScrollAnchor: { line: 100, offset: -3 },
+    });
+    const scroller = host.querySelector(".cm-scroller") as HTMLElement;
+    Object.defineProperty(scroller, "clientHeight", { value: 30, configurable: true });
+    expect(unmount.getScrollAnchor()).toEqual({ line: 100, offset: -3 });
+  });
+
+  it("reports the anchor to onScroll (debounced) when the viewport scrolls", () => {
+    let reported: { line: number; offset: number } | null = null;
+    unmount = mountEditor({
+      host,
+      initialDoc: longDoc,
+      languageId: "sql",
+      onScroll: (a) => { reported = a; },
+    });
+    vi.useFakeTimers();
+    (host.querySelector(".cm-scroller") as HTMLElement).dispatchEvent(new Event("scroll"));
+    vi.advanceTimersByTime(SCROLL_ANCHOR_DEBOUNCE_MS + 10);
+    vi.useRealTimers();
+    expect(reported).not.toBeNull();
+    expect(reported!.line).toBeTypeOf("number");
   });
 });
 

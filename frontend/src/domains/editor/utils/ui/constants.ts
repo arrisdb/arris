@@ -15,4 +15,12 @@ const SEMANTIC_CONTEXT_CHARS = 4000;
 // plugin rebuilds when the background parser finishes (tree identity check).
 const SEMANTIC_PARSE_BUDGET_MS = 50;
 
-export { SEMANTIC_CONTEXT_CHARS, SEMANTIC_PARSE_BUDGET_MS };
+// Debounce for persisting the scroll anchor while the user scrolls. Coalesces
+// the rapid scroll-event stream into one store write once scrolling settles.
+const SCROLL_ANCHOR_DEBOUNCE_MS = 150;
+
+export {
+  SEMANTIC_CONTEXT_CHARS,
+  SEMANTIC_PARSE_BUDGET_MS,
+  SCROLL_ANCHOR_DEBOUNCE_MS,
+};

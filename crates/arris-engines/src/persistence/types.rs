@@ -311,6 +311,15 @@ impl Default for AppPreferences {
     }
 }
 
+/// CodeMirror scroll snapshot: anchor row `line` (char offset) plus `offset` =
+/// row top minus scrollTop in pixels (<= 0), for pixel-exact restore.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ScrollAnchor {
+    pub line: usize,
+    pub offset: f64,
+}
+
 /// Runtime / IPC shape of a persisted console or notebook tab. Carries the live
 /// `text` (SQL body or full nbformat `.ipynb` JSON). On disk the text lives in a
 /// sidecar file, never inline in the index (see `ConsoleTabsStore`).
@@ -325,6 +334,8 @@ pub struct PersistedConsoleTab {
     pub connection_id: Option<String>,
     #[serde(default)]
     pub cursor: usize,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scroll_anchor: Option<ScrollAnchor>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub closed: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
