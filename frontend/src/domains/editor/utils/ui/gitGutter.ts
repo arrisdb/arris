@@ -2,6 +2,7 @@ import {
   RangeSet,
   StateEffect,
   StateField,
+  type Transaction,
   type Extension,
 } from "@codemirror/state";
 import {
@@ -180,10 +181,54 @@ function buildMarkers(
   };
 }
 
+// Re-anchor the hunk data to the edited document so the bands stay glued to
+// their text while typing, instead of drifting until the next diff refresh.
+function mapBuiltMarkers(value: BuiltMarkers, tr: Transaction): BuiltMarkers {
+  const mapLine = (n: number): number | null => {
+    if (n < 1 || n > tr.startState.doc.lines) return null;
+    const pos = tr.changes.mapPos(tr.startState.doc.line(n).from, 1);
+    return tr.newDoc.lineAt(pos).number;
+  };
+  const inlineDiffs = new Map<number, DiffLine[]>();
+  for (const [line, dels] of value.inlineDiffs) {
+    const mapped = mapLine(line);
+    if (mapped != null) inlineDiffs.set(mapped, dels);
+  }
+  const lineTypes = new Map<number, "add" | "mod">();
+  for (const [line, type] of value.lineTypes) {
+    const mapped = mapLine(line);
+    if (mapped != null) lineTypes.set(mapped, type);
+  }
+  const clickAnchor = new Map<number, number>();
+  for (const [line, anchor] of value.clickAnchor) {
+    const mapped = mapLine(line);
+    const mappedAnchor = mapLine(anchor);
+    if (mapped != null && mappedAnchor != null) clickAnchor.set(mapped, mappedAnchor);
+  }
+  const pureDelAnchors = new Set<number>();
+  for (const anchor of value.pureDelAnchors) {
+    const mapped = mapLine(anchor);
+    if (mapped != null) pureDelAnchors.add(mapped);
+  }
+  const anchorHunk = new Map<number, number>();
+  for (const [anchor, hunkIndex] of value.anchorHunk) {
+    const mapped = mapLine(anchor);
+    if (mapped != null) anchorHunk.set(mapped, hunkIndex);
+  }
+  return {
+    markers: value.markers.map(tr.changes),
+    inlineDiffs,
+    lineTypes,
+    clickAnchor,
+    pureDelAnchors,
+    anchorHunk,
+  };
+}
+
 const hunkField = StateField.define<BuiltMarkers>({
   create: () => ({ markers: RangeSet.empty, inlineDiffs: new Map(), lineTypes: new Map(), clickAnchor: new Map(), pureDelAnchors: new Set(), anchorHunk: new Map() }),
-  update(value) {
-    return value;
+  update(value, tr) {
+    return tr.docChanged ? mapBuiltMarkers(value, tr) : value;
   },
 });
 

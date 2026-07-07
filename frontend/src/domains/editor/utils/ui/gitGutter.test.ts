@@ -8,6 +8,7 @@ import {
   DeletedLinesWidget,
   HunkActionsWidget,
   gitGutterExtension,
+  hunkField,
 } from "./gitGutter";
 import type { DiffHunk } from "@shared";
 
@@ -458,6 +459,61 @@ describe("gitGutterExtension", () => {
 
     view.dispatch({ effects: toggleHunkEffect.of(1) });
     expect(view.dom.querySelector(".cm-git-hunk-actions")).toBeFalsy();
+
+    view.destroy();
+    host.remove();
+  });
+});
+
+describe("hunkField mapping through edits", () => {
+  function mountWithAddAtLine3() {
+    const hunk = makeHunk({
+      oldStart: 2, oldCount: 0, newStart: 3, newCount: 1,
+      lines: [{ kind: "add", text: "line3" }],
+    });
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const view = new EditorView({
+      state: EditorState.create({
+        doc: "line1\nline2\nline3\nline4\nline5",
+        extensions: [gitGutterExtension([hunk])],
+      }),
+      parent: host,
+    });
+    return { view, host };
+  }
+
+  function markerPositions(view: EditorView): number[] {
+    const positions: number[] = [];
+    view.state.field(hunkField).markers.between(0, view.state.doc.length, (from) => {
+      positions.push(from);
+    });
+    return positions;
+  }
+
+  it("shifts bands down with their text when a line is inserted above", () => {
+    const { view, host } = mountWithAddAtLine3();
+    view.dispatch({ changes: { from: 0, insert: "line0\n" } });
+
+    const field = view.state.field(hunkField);
+    expect(field.lineTypes.has(3)).toBe(false);
+    expect(field.lineTypes.get(4)).toBe("add");
+    expect(field.clickAnchor.get(4)).toBe(4);
+    expect(field.anchorHunk.get(4)).toBe(0);
+    expect(markerPositions(view)).toEqual([view.state.doc.line(4).from]);
+
+    view.destroy();
+    host.remove();
+  });
+
+  it("keeps bands in place when typing inside an earlier line", () => {
+    const { view, host } = mountWithAddAtLine3();
+    view.dispatch({ changes: { from: 1, insert: "x" } });
+
+    const field = view.state.field(hunkField);
+    expect(field.lineTypes.get(3)).toBe("add");
+    expect(field.clickAnchor.get(3)).toBe(3);
+    expect(markerPositions(view)).toEqual([view.state.doc.line(3).from]);
 
     view.destroy();
     host.remove();
