@@ -1299,6 +1299,21 @@ describe("run-status gutter", () => {
   });
 });
 
+// The bar is a CM block widget as wide as cm-content; without sticky
+// positioning its flex-end buttons sat at the CONTENT right edge, off-screen
+// whenever a long line made the content wider than the pane.
+describe("hunk action bar", () => {
+  it("pins the action bar inside the viewport, right of the gutters", () => {
+    const rule = editorPaneCss.match(/\.cm-git-hunk-actions\s*\{([\s\S]*?)\}/);
+    expect(rule, ".cm-git-hunk-actions rule").not.toBeNull();
+    const body = rule![1];
+    expect(body).toContain("position: sticky");
+    expect(body).toContain("left: var(--editor-gutters-width, 0px)");
+    expect(body).toContain("width: max-content");
+    expect(body).not.toContain("flex-end");
+  });
+});
+
 describe("statement highlight box", () => {
   it("draws the left edge with a 1px border, not a box-shadow", () => {
     const base = editorPaneCss.match(

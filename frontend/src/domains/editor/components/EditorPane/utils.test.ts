@@ -25,8 +25,10 @@ import { useDbtStore } from "@domains/dbt/hooks";
 import {
   buildPreviewSql,
   closeActiveTab,
+  cursorLineNumber,
   DBT_PREVIEW_ROW_LIMIT,
   executeActiveQuery,
+  hunkIndexAtLine,
   NO_CONNECTION_MESSAGE,
   openNewConsoleTab,
   resolveRunRange,
@@ -518,6 +520,43 @@ describe("resolveRunRange", () => {
     const cursor = cli.indexOf("HGETALL") + 3;
     const tab = { text: cli, kind: "rediscli", cursor } as any;
     expect(resolveRunRange(tab)).toEqual({ from: 9, to: cli.length });
+  });
+});
+
+describe("cursorLineNumber", () => {
+  it("returns 1 for offset 0", () => {
+    expect(cursorLineNumber("a\nb\nc", 0)).toBe(1);
+  });
+
+  it("maps an offset after a newline to the next line", () => {
+    expect(cursorLineNumber("a\nb\nc", 2)).toBe(2);
+    expect(cursorLineNumber("a\nb\nc", 4)).toBe(3);
+  });
+
+  it("clamps offsets beyond the text length", () => {
+    expect(cursorLineNumber("a\nb", 99)).toBe(2);
+  });
+});
+
+describe("hunkIndexAtLine", () => {
+  const hunks = [
+    { oldStart: 1, oldCount: 0, newStart: 3, newCount: 2, lines: [] },
+    { oldStart: 10, oldCount: 2, newStart: 12, newCount: 0, lines: [] },
+  ];
+
+  it("finds the hunk containing the line", () => {
+    expect(hunkIndexAtLine(hunks, 3)).toBe(0);
+    expect(hunkIndexAtLine(hunks, 4)).toBe(0);
+  });
+
+  it("treats a deletion-only hunk as occupying its anchor line", () => {
+    expect(hunkIndexAtLine(hunks, 12)).toBe(1);
+  });
+
+  it("returns null outside every hunk", () => {
+    expect(hunkIndexAtLine(hunks, 1)).toBeNull();
+    expect(hunkIndexAtLine(hunks, 8)).toBeNull();
+    expect(hunkIndexAtLine([], 1)).toBeNull();
   });
 });
 

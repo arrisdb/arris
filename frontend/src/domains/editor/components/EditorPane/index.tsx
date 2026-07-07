@@ -77,7 +77,7 @@ import { EditorTabRouter } from "./components/EditorTabRouter";
 import type { MarkdownViewMode } from "../MarkdownPreview/types";
 import { dbtSlimDiffIPC } from "./components/SlimDiff/ipc";
 import type { DbtDiffRunConfig } from "./components/SlimDiff/types";
-import { buildPreviewSql, resolveRunRange, resolveRunSql, resolveTabConnectionId, runErrorMessage, tabEqualIgnoringVolatile, tabsEqualIgnoringVolatile, NO_CONNECTION_MESSAGE } from "./utils";
+import { buildPreviewSql, cursorLineNumber, hunkIndexAtLine, resolveRunRange, resolveRunSql, resolveTabConnectionId, runErrorMessage, tabEqualIgnoringVolatile, tabsEqualIgnoringVolatile, NO_CONNECTION_MESSAGE } from "./utils";
 import { useStoreWithEqualityFn } from "zustand/traditional";
 
 import { Icon } from "@shared/ui/Icon";
@@ -1925,6 +1925,16 @@ function PaneGroupView({ groupId }: { groupId: string }) {
       splitLeft: { run: () => { if (activeTab) handleSplit(activeTab.id, "left"); }, isEnabled: () => !!activeTab },
       splitTop: { run: () => { if (activeTab) handleSplit(activeTab.id, "up"); }, isEnabled: () => !!activeTab },
       splitBottom: { run: () => { if (activeTab) handleSplit(activeTab.id, "down"); }, isEnabled: () => !!activeTab },
+      gitDiscardHunk: {
+        run: () => {
+          const tab = freshActiveTab();
+          if (!tab?.filePath) return;
+          const line = cursorLineNumber(tab.text ?? "", tab.cursor ?? 0);
+          const hunkIndex = hunkIndexAtLine(diffHunks, line);
+          if (hunkIndex !== null) diffHunkActions.onRestore(hunkIndex);
+        },
+        isEnabled: () => !!activeTab?.filePath && diffHunks.length > 0,
+      },
       newTerminalTab: { run: () => newTerminalTab() },
       newNotebookTab: { run: () => newNotebookTab() },
       newCanvasTab: { run: () => newCanvasTab() },

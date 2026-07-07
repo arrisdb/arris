@@ -13,6 +13,7 @@ import {
   gutter,
 } from "@codemirror/view";
 import type { DiffHunk, DiffLine } from "@shared";
+import { GUTTERS_WIDTH_CSS_VAR } from "./constants";
 
 interface GitHunkActions {
   onStage: (hunkIndex: number) => void;
@@ -276,6 +277,13 @@ const gutterOffsetPlugin = ViewPlugin.define((view) => {
       const offset = contentLeft - gutterLeft;
       if (offset > 0) {
         view.dom.style.setProperty("--git-gutter-offset", `${offset}px`);
+      }
+    }
+    const guttersEl = view.dom.querySelector(".cm-gutters");
+    if (guttersEl) {
+      const width = guttersEl.getBoundingClientRect().width;
+      if (width > 0) {
+        view.dom.style.setProperty(GUTTERS_WIDTH_CSS_VAR, `${width}px`);
       }
     }
   }

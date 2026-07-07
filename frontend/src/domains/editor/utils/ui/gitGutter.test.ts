@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import {
@@ -355,6 +355,36 @@ describe("gitGutterExtension", () => {
 
     view.destroy();
     host.remove();
+  });
+
+  it("publishes the measured gutters width for the sticky action bar", () => {
+    const rafQueue: FrameRequestCallback[] = [];
+    const rafSpy = vi
+      .spyOn(globalThis, "requestAnimationFrame")
+      .mockImplementation((cb: FrameRequestCallback) => rafQueue.push(cb));
+    const rectSpy = vi
+      .spyOn(Element.prototype, "getBoundingClientRect")
+      .mockImplementation(function (this: Element) {
+        const width = this.classList.contains("cm-gutters") ? 44 : 0;
+        return { x: 0, y: 0, top: 0, left: 0, right: width, bottom: 0, width, height: 0, toJSON: () => ({}) } as DOMRect;
+      });
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const view = new EditorView({
+      state: EditorState.create({
+        doc: "hello\nworld",
+        extensions: [gitGutterExtension([makeHunk()])],
+      }),
+      parent: host,
+    });
+
+    rafQueue.splice(0).forEach((cb) => cb(0));
+    expect(view.dom.style.getPropertyValue("--editor-gutters-width")).toBe("44px");
+
+    view.destroy();
+    host.remove();
+    rectSpy.mockRestore();
+    rafSpy.mockRestore();
   });
 
   it("omits the action bar when no actions are provided", () => {

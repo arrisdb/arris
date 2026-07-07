@@ -19,8 +19,14 @@ const SEMANTIC_PARSE_BUDGET_MS = 50;
 // the rapid scroll-event stream into one store write once scrolling settles.
 const SCROLL_ANCHOR_DEBOUNCE_MS = 150;
 
+// Measured width of the sticky .cm-gutters strip. The hunk action bar is
+// position: sticky and must pin RIGHT of the gutters, which overlay content
+// during horizontal scroll.
+const GUTTERS_WIDTH_CSS_VAR = "--editor-gutters-width";
+
 export {
   SEMANTIC_CONTEXT_CHARS,
   SEMANTIC_PARSE_BUDGET_MS,
   SCROLL_ANCHOR_DEBOUNCE_MS,
+  GUTTERS_WIDTH_CSS_VAR,
 };

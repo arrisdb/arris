@@ -16,7 +16,7 @@ import { useFilesStore } from "@domains/files/hooks";
 import { useDbtStore } from "@domains/dbt/hooks";
 import { exportResults, type ExportFormat } from "@domains/results";
 import { useSettingsStore } from "@shared/settings";
-import { ipcErrorMessage, type PlanResult } from "@shared";
+import { ipcErrorMessage, type DiffHunk, type PlanResult } from "@shared";
 import {
   cancelQueryIPC,
   explainQueryIPC,
@@ -331,6 +331,28 @@ function exportActiveResults(format: ExportFormat): boolean {
 // need structural tab state (id/kind/title/result/isRunning/...) compare with
 // these ignored so typing does not re-render the whole pane group; handlers
 // that need the live buffer read it from the store at invocation time.
+// 1-based line number of a character offset in the buffer.
+function cursorLineNumber(text: string, cursor: number): number {
+  const bounded = Math.max(0, Math.min(cursor, text.length));
+  let line = 1;
+  for (let i = 0; i < bounded; i++) {
+    if (text.charCodeAt(i) === 10) line++;
+  }
+  return line;
+}
+
+// Index of the hunk whose new-file line span contains `line`, or null. A
+// deletion-only hunk (newCount 0) occupies no new-file lines; treat its anchor
+// row (the line the deleted block sits above) as its span.
+function hunkIndexAtLine(hunks: DiffHunk[], line: number): number | null {
+  for (const [index, hunk] of hunks.entries()) {
+    const start = Math.max(1, hunk.newStart);
+    const end = start + Math.max(hunk.newCount, 1) - 1;
+    if (line >= start && line <= end) return index;
+  }
+  return null;
+}
+
 const VOLATILE_TAB_FIELDS = new Set(["text", "cursor", "selection", "scrollAnchor"]);
 
 function tabEqualIgnoringVolatile(
@@ -372,6 +394,8 @@ export {
   stopActiveQuery,
   saveActiveFile,
   exportActiveResults,
+  cursorLineNumber,
+  hunkIndexAtLine,
   tabEqualIgnoringVolatile,
   tabsEqualIgnoringVolatile,
 };
