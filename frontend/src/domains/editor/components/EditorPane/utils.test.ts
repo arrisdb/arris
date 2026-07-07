@@ -25,8 +25,11 @@ import { useDbtStore } from "@domains/dbt/hooks";
 import {
   buildPreviewSql,
   closeActiveTab,
+  cursorLineNumber,
+  discardLineRange,
   DBT_PREVIEW_ROW_LIMIT,
   executeActiveQuery,
+  hunkInRange,
   NO_CONNECTION_MESSAGE,
   openNewConsoleTab,
   resolveRunRange,
@@ -518,6 +521,69 @@ describe("resolveRunRange", () => {
     const cursor = cli.indexOf("HGETALL") + 3;
     const tab = { text: cli, kind: "rediscli", cursor } as any;
     expect(resolveRunRange(tab)).toEqual({ from: 9, to: cli.length });
+  });
+});
+
+describe("cursorLineNumber", () => {
+  it("returns 1 for offset 0", () => {
+    expect(cursorLineNumber("a\nb\nc", 0)).toBe(1);
+  });
+
+  it("maps an offset after a newline to the next line", () => {
+    expect(cursorLineNumber("a\nb\nc", 2)).toBe(2);
+    expect(cursorLineNumber("a\nb\nc", 4)).toBe(3);
+  });
+
+  it("clamps offsets beyond the text length", () => {
+    expect(cursorLineNumber("a\nb", 99)).toBe(2);
+  });
+});
+
+describe("hunkInRange", () => {
+  const hunks = [
+    { oldStart: 1, oldCount: 0, newStart: 3, newCount: 2, lines: [] },
+    { oldStart: 10, oldCount: 2, newStart: 12, newCount: 0, lines: [] },
+  ];
+
+  it("matches a single-line range inside a hunk", () => {
+    expect(hunkInRange(hunks, 3, 3)).toBe(true);
+    expect(hunkInRange(hunks, 4, 4)).toBe(true);
+  });
+
+  it("matches a multi-line range spanning hunks and gaps", () => {
+    expect(hunkInRange(hunks, 1, 3)).toBe(true);
+    expect(hunkInRange(hunks, 5, 20)).toBe(true);
+  });
+
+  it("treats a deletion-only hunk as occupying its anchor line", () => {
+    expect(hunkInRange(hunks, 12, 12)).toBe(true);
+  });
+
+  it("returns false when the range misses every hunk", () => {
+    expect(hunkInRange(hunks, 1, 2)).toBe(false);
+    expect(hunkInRange(hunks, 5, 11)).toBe(false);
+    expect(hunkInRange([], 1, 99)).toBe(false);
+  });
+});
+
+describe("discardLineRange", () => {
+  const text = "a\nb\nc\nd\n";
+
+  it("uses the cursor line when there is no selection", () => {
+    expect(discardLineRange(text, 2, undefined)).toEqual({ startLine: 2, endLine: 2 });
+  });
+
+  it("uses the cursor line for an empty selection", () => {
+    expect(discardLineRange(text, 4, { from: 4, to: 4 })).toEqual({ startLine: 3, endLine: 3 });
+  });
+
+  it("spans the selection's lines regardless of direction", () => {
+    expect(discardLineRange(text, 0, { from: 1, to: 5 })).toEqual({ startLine: 1, endLine: 3 });
+    expect(discardLineRange(text, 0, { from: 5, to: 1 })).toEqual({ startLine: 1, endLine: 3 });
+  });
+
+  it("excludes a trailing line when the selection ends at column 0", () => {
+    expect(discardLineRange(text, 0, { from: 0, to: 4 })).toEqual({ startLine: 1, endLine: 2 });
   });
 });
 

@@ -47,7 +47,7 @@ import {
   dbtRunIPC,
   dbtTestIPC,
   gitFileDiffHunksIPC,
-  gitRestoreHunkIPC,
+  gitRestoreChangeIPC,
   gitStageHunkIPC,
   listSchemasIPC,
   readTextFileIPC,
@@ -77,7 +77,8 @@ import { EditorTabRouter } from "./components/EditorTabRouter";
 import type { MarkdownViewMode } from "../MarkdownPreview/types";
 import { dbtSlimDiffIPC } from "./components/SlimDiff/ipc";
 import type { DbtDiffRunConfig } from "./components/SlimDiff/types";
-import { buildPreviewSql, resolveRunRange, resolveRunSql, resolveTabConnectionId, runErrorMessage, tabEqualIgnoringVolatile, tabsEqualIgnoringVolatile, NO_CONNECTION_MESSAGE } from "./utils";
+import { buildPreviewSql, discardLineRange, hunkInRange, resolveRunRange, resolveRunSql, resolveTabConnectionId, runErrorMessage, tabEqualIgnoringVolatile, tabsEqualIgnoringVolatile, NO_CONNECTION_MESSAGE } from "./utils";
+import { AUTOSAVE_DEBOUNCE_MS, GIT_GUTTER_REFRESH_PAUSE_MS } from "./constants";
 import { useStoreWithEqualityFn } from "zustand/traditional";
 
 import { Icon } from "@shared/ui/Icon";
@@ -801,10 +802,10 @@ function PaneGroupView({ groupId }: { groupId: string }) {
           .then(() => refreshAfter(repo, filePath))
           .catch((e) => console.error("Stage hunk failed", e));
       },
-      onRestore: (hunkIndex) => {
+      onRestore: (startLine, endLine) => {
         const { repo, filePath, tabId, refreshToken } = gitHunkCtxRef.current;
         if (!repo || !filePath || !tabId) return;
-        gitRestoreHunkIPC(repo, filePath, hunkIndex)
+        gitRestoreChangeIPC(repo, filePath, startLine, endLine)
           .then(async () => {
             // Restore rewrites the working file on disk; reload it into the tab
             // and bump refreshToken so the editor remounts with fresh content.
@@ -1153,11 +1154,14 @@ function PaneGroupView({ groupId }: { groupId: string }) {
     const filePath = activeTab.filePath;
     const tabId = activeTab.id;
     let timer: ReturnType<typeof setTimeout> | null = null;
+    let hunksTimer: ReturnType<typeof setTimeout> | null = null;
     const unsubscribe = useTabsStore.subscribe((state, prev) => {
       const next = state.tabs.find((t) => t.id === tabId);
       const before = prev.tabs.find((t) => t.id === tabId);
       if (!next || !before || next.text === before.text) return;
       if (timer) clearTimeout(timer);
+      // A pending gutter redraw mid-typing is distracting; wait for a real pause.
+      if (hunksTimer) clearTimeout(hunksTimer);
       timer = setTimeout(() => {
         // Mark the write so its watcher echo isn't mistaken for an external edit.
         const content = next.text;
@@ -1167,16 +1171,19 @@ function PaneGroupView({ groupId }: { groupId: string }) {
             await useGitStore.getState().refreshFileStatuses().catch(() => {});
             const repo = gitRepoPath ?? useFilesStore.getState().rootPath;
             if (repo) {
-              gitFileDiffHunksIPC(repo, filePath)
-                .then(setDiffHunks)
-                .catch(() => setDiffHunks([]));
+              hunksTimer = setTimeout(() => {
+                gitFileDiffHunksIPC(repo, filePath)
+                  .then(setDiffHunks)
+                  .catch(() => setDiffHunks([]));
+              }, GIT_GUTTER_REFRESH_PAUSE_MS);
             }
           })
           .catch((e) => console.error("Autosave failed", e));
-      }, 500);
+      }, AUTOSAVE_DEBOUNCE_MS);
     });
     return () => {
       if (timer) clearTimeout(timer);
+      if (hunksTimer) clearTimeout(hunksTimer);
       unsubscribe();
     };
   }, [autosave, activeTab?.id, activeTab?.filePath, activeTab?.tabType, gitRepoPath]);
@@ -1925,6 +1932,15 @@ function PaneGroupView({ groupId }: { groupId: string }) {
       splitLeft: { run: () => { if (activeTab) handleSplit(activeTab.id, "left"); }, isEnabled: () => !!activeTab },
       splitTop: { run: () => { if (activeTab) handleSplit(activeTab.id, "up"); }, isEnabled: () => !!activeTab },
       splitBottom: { run: () => { if (activeTab) handleSplit(activeTab.id, "down"); }, isEnabled: () => !!activeTab },
+      gitDiscardHunk: {
+        run: () => {
+          const tab = freshActiveTab();
+          if (!tab?.filePath) return;
+          const { startLine, endLine } = discardLineRange(tab.text ?? "", tab.cursor ?? 0, tab.selection);
+          if (hunkInRange(diffHunks, startLine, endLine)) diffHunkActions.onRestore(startLine, endLine);
+        },
+        isEnabled: () => !!activeTab?.filePath && diffHunks.length > 0,
+      },
       newTerminalTab: { run: () => newTerminalTab() },
       newNotebookTab: { run: () => newNotebookTab() },
       newCanvasTab: { run: () => newCanvasTab() },

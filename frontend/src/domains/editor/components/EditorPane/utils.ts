@@ -16,7 +16,7 @@ import { useFilesStore } from "@domains/files/hooks";
 import { useDbtStore } from "@domains/dbt/hooks";
 import { exportResults, type ExportFormat } from "@domains/results";
 import { useSettingsStore } from "@shared/settings";
-import { ipcErrorMessage, type PlanResult } from "@shared";
+import { ipcErrorMessage, type DiffHunk, type PlanResult } from "@shared";
 import {
   cancelQueryIPC,
   explainQueryIPC,
@@ -331,6 +331,45 @@ function exportActiveResults(format: ExportFormat): boolean {
 // need structural tab state (id/kind/title/result/isRunning/...) compare with
 // these ignored so typing does not re-render the whole pane group; handlers
 // that need the live buffer read it from the store at invocation time.
+// 1-based line number of a character offset in the buffer.
+function cursorLineNumber(text: string, cursor: number): number {
+  const bounded = Math.max(0, Math.min(cursor, text.length));
+  let line = 1;
+  for (let i = 0; i < bounded; i++) {
+    if (text.charCodeAt(i) === 10) line++;
+  }
+  return line;
+}
+
+// 1-based line span to discard: the selection's lines when non-empty (a
+// selection ending at column 0 excludes that line), else the cursor's line.
+function discardLineRange(
+  text: string,
+  cursor: number,
+  selection: { from: number; to: number } | undefined,
+): { startLine: number; endLine: number } {
+  if (!selection || selection.from === selection.to) {
+    const line = cursorLineNumber(text, cursor);
+    return { startLine: line, endLine: line };
+  }
+  const lo = Math.min(selection.from, selection.to);
+  const hi = Math.max(selection.from, selection.to);
+  const startLine = cursorLineNumber(text, lo);
+  let endLine = cursorLineNumber(text, hi);
+  if (endLine > startLine && text.charCodeAt(hi - 1) === 10) endLine--;
+  return { startLine, endLine };
+}
+
+// Whether any hunk's new-file span intersects lines start..end. A deletion-
+// only hunk (newCount 0) spans its anchor row (the line it sits above).
+function hunkInRange(hunks: DiffHunk[], startLine: number, endLine: number): boolean {
+  return hunks.some((hunk) => {
+    const start = Math.max(1, hunk.newStart);
+    const end = start + Math.max(hunk.newCount, 1) - 1;
+    return start <= endLine && startLine <= end;
+  });
+}
+
 const VOLATILE_TAB_FIELDS = new Set(["text", "cursor", "selection", "scrollAnchor"]);
 
 function tabEqualIgnoringVolatile(
@@ -372,6 +411,9 @@ export {
   stopActiveQuery,
   saveActiveFile,
   exportActiveResults,
+  cursorLineNumber,
+  discardLineRange,
+  hunkInRange,
   tabEqualIgnoringVolatile,
   tabsEqualIgnoringVolatile,
 };

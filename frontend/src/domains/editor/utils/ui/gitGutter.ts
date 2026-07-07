@@ -2,6 +2,7 @@ import {
   RangeSet,
   StateEffect,
   StateField,
+  type Transaction,
   type Extension,
 } from "@codemirror/state";
 import {
@@ -13,10 +14,13 @@ import {
   gutter,
 } from "@codemirror/view";
 import type { DiffHunk, DiffLine } from "@shared";
+import { GUTTERS_WIDTH_CSS_VAR } from "./constants";
 
 interface GitHunkActions {
   onStage: (hunkIndex: number) => void;
-  onRestore: (hunkIndex: number) => void;
+  /// Discards every change BLOCK intersecting this new-file line range, not
+  /// whole git hunks (git merges nearby edits into one hunk).
+  onRestore: (startLine: number, endLine: number) => void;
 }
 
 class GitAddedMarker extends GutterMarker {
@@ -95,6 +99,7 @@ function buildMarkers(
     let newLine = hunk.newStart;
     let pendingDels: DiffLine[] = [];
     let inModZone = false;
+    let inAddRun = false;
     let currentAnchor = -1;
 
     for (let i = 0; i < hunk.lines.length; i++) {
@@ -113,6 +118,7 @@ function buildMarkers(
           pendingDels = [];
         }
         inModZone = false;
+        inAddRun = false;
         currentAnchor = -1;
         newLine++;
       } else if (line.kind === "del") {
@@ -128,8 +134,15 @@ function buildMarkers(
             currentAnchor = newLine;
             pendingDels = [];
             inModZone = true;
+            inAddRun = false;
           } else if (inModZone) {
             entries.push({ from: doc.line(newLine).from, marker: modifiedMarker });
+            lineTypes.set(newLine, "add");
+            clickAnchor.set(newLine, currentAnchor);
+          } else if (inAddRun) {
+            // Consecutive added rows are one change: they share the run's
+            // anchor so a click expands the whole block, not a single row.
+            entries.push({ from: doc.line(newLine).from, marker: addedMarker });
             lineTypes.set(newLine, "add");
             clickAnchor.set(newLine, currentAnchor);
           } else {
@@ -137,6 +150,8 @@ function buildMarkers(
             lineTypes.set(newLine, "add");
             clickAnchor.set(newLine, newLine);
             anchorHunk.set(newLine, hunkIndex);
+            currentAnchor = newLine;
+            inAddRun = true;
           }
         }
         newLine++;
@@ -149,6 +164,7 @@ function buildMarkers(
         entries.push({ from: doc.line(anchor).from, marker: deletedMarker });
         inlineDiffs.set(anchor, [...pendingDels]);
         clickAnchor.set(anchor, anchor);
+        anchorHunk.set(anchor, hunkIndex);
         pureDelAnchors.add(anchor);
       }
     }
@@ -165,10 +181,54 @@ function buildMarkers(
   };
 }
 
+// Re-anchor the hunk data to the edited document so the bands stay glued to
+// their text while typing, instead of drifting until the next diff refresh.
+function mapBuiltMarkers(value: BuiltMarkers, tr: Transaction): BuiltMarkers {
+  const mapLine = (n: number): number | null => {
+    if (n < 1 || n > tr.startState.doc.lines) return null;
+    const pos = tr.changes.mapPos(tr.startState.doc.line(n).from, 1);
+    return tr.newDoc.lineAt(pos).number;
+  };
+  const inlineDiffs = new Map<number, DiffLine[]>();
+  for (const [line, dels] of value.inlineDiffs) {
+    const mapped = mapLine(line);
+    if (mapped != null) inlineDiffs.set(mapped, dels);
+  }
+  const lineTypes = new Map<number, "add" | "mod">();
+  for (const [line, type] of value.lineTypes) {
+    const mapped = mapLine(line);
+    if (mapped != null) lineTypes.set(mapped, type);
+  }
+  const clickAnchor = new Map<number, number>();
+  for (const [line, anchor] of value.clickAnchor) {
+    const mapped = mapLine(line);
+    const mappedAnchor = mapLine(anchor);
+    if (mapped != null && mappedAnchor != null) clickAnchor.set(mapped, mappedAnchor);
+  }
+  const pureDelAnchors = new Set<number>();
+  for (const anchor of value.pureDelAnchors) {
+    const mapped = mapLine(anchor);
+    if (mapped != null) pureDelAnchors.add(mapped);
+  }
+  const anchorHunk = new Map<number, number>();
+  for (const [anchor, hunkIndex] of value.anchorHunk) {
+    const mapped = mapLine(anchor);
+    if (mapped != null) anchorHunk.set(mapped, hunkIndex);
+  }
+  return {
+    markers: value.markers.map(tr.changes),
+    inlineDiffs,
+    lineTypes,
+    clickAnchor,
+    pureDelAnchors,
+    anchorHunk,
+  };
+}
+
 const hunkField = StateField.define<BuiltMarkers>({
   create: () => ({ markers: RangeSet.empty, inlineDiffs: new Map(), lineTypes: new Map(), clickAnchor: new Map(), pureDelAnchors: new Set(), anchorHunk: new Map() }),
-  update(value) {
-    return value;
+  update(value, tr) {
+    return tr.docChanged ? mapBuiltMarkers(value, tr) : value;
   },
 });
 
@@ -223,13 +283,14 @@ class DeletedLinesWidget extends WidgetType {
 class HunkActionsWidget extends WidgetType {
   constructor(
     readonly hunkIndex: number,
+    readonly anchorLine: number,
     readonly actions: GitHunkActions,
   ) {
     super();
   }
 
   eq(other: HunkActionsWidget) {
-    return this.hunkIndex === other.hunkIndex;
+    return this.hunkIndex === other.hunkIndex && this.anchorLine === other.anchorLine;
   }
 
   toDOM() {
@@ -253,7 +314,7 @@ class HunkActionsWidget extends WidgetType {
     restore.onmousedown = (event) => {
       event.preventDefault();
       event.stopPropagation();
-      this.actions.onRestore(this.hunkIndex);
+      this.actions.onRestore(this.anchorLine, this.anchorLine);
     };
 
     bar.append(stage, restore);
@@ -276,6 +337,13 @@ const gutterOffsetPlugin = ViewPlugin.define((view) => {
       const offset = contentLeft - gutterLeft;
       if (offset > 0) {
         view.dom.style.setProperty("--git-gutter-offset", `${offset}px`);
+      }
+    }
+    const guttersEl = view.dom.querySelector(".cm-gutters");
+    if (guttersEl) {
+      const width = guttersEl.getBoundingClientRect().width;
+      if (width > 0) {
+        view.dom.style.setProperty(GUTTERS_WIDTH_CSS_VAR, `${width}px`);
       }
     }
   }
@@ -326,7 +394,7 @@ function gitGutterExtension(hunks: DiffHunk[], actions?: GitHunkActions): Extens
             decos.push({
               pos,
               deco: Decoration.widget({
-                widget: new HunkActionsWidget(hunkIndex, actions),
+                widget: new HunkActionsWidget(hunkIndex, anchor, actions),
                 block: true,
                 side: -1,
               }),

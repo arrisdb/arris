@@ -12,3 +12,4 @@ export { useRecentsStore } from "./recentsStore";
 export { useTabsStore } from "./tabsStore";
 export { useCommandRegistryStore } from "./commandRegistryStore";
 export { useBackgroundTasksStore } from "./backgroundTasksStore";
+export { useSnackbarStore } from "./snackbarStore";

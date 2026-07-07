@@ -46,6 +46,20 @@ pub struct DiffLine {
     pub text: String,
 }
 
+/// One contiguous run of added/deleted lines inside a diff, in zero-context
+/// patch coordinates (a zero count names the line BEFORE the change).
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct ChangeBlock {
+    pub(crate) old_start: u32,
+    pub(crate) old_count: u32,
+    pub(crate) new_start: u32,
+    pub(crate) new_count: u32,
+    /// True when the block ends its diff hunk with no trailing context line.
+    pub(crate) at_eof: bool,
+    /// The block as a standalone `@@ ... @@` hunk body (no file header).
+    pub(crate) hunk: String,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct WorktreeInfo {

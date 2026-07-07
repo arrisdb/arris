@@ -209,25 +209,11 @@ function GitChangesPaneContent({ pane }: GitChangesPaneContentProps) {
         )}
 
         <div className="mdbc-pane-meta">
-          <span>
-            {pane.projectName} / {pane.currentBranch ?? "—"}
+          <span className="mdbc-git-branch-label" data-testid="git-branch-label">
+            <Icon name="gitBranch" size={12} />
+            <span>{pane.currentBranch ?? ""}</span>
           </span>
         </div>
-
-        {/* Every Git action reports its result here, directly under the button —
-            sync (Fetch/Pull) and push share one status region. Errors first. */}
-        {(pane.syncError || pane.pushError) && (
-          <div className="mdbc-git-change-path mdbc-git-error-text">
-            {pane.syncError ?? pane.pushError}
-          </div>
-        )}
-        {!pane.syncError &&
-          !pane.pushError &&
-          (pane.syncMessage || pane.pushMessage) && (
-            <div className="mdbc-git-change-path mdbc-git-success-text">
-              {pane.syncMessage ?? pane.pushMessage}
-            </div>
-          )}
 
         <textarea
           className="mdbc-pane-textarea mdbc-git-commit-box"

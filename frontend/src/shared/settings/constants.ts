@@ -83,6 +83,7 @@ export const ACTIONS = {
   gitPull: { label: "Git: Pull", category: "git", defaultShortcut: null },
   gitShowHistory: { label: "Git: Show History", category: "git", defaultShortcut: null },
   gitResolveConflicts: { label: "Git: Resolve Conflicts", category: "git", defaultShortcut: null },
+  gitDiscardHunk: { label: "Git: Discard Change at Cursor", category: "git", defaultShortcut: null },
 
   dbtRun: { label: "dbt Run", category: "dbt", defaultShortcut: { key: "Mod-Shift-r" } },
   dbtTest: { label: "dbt Test", category: "dbt", defaultShortcut: { key: "Mod-Shift-t" } },

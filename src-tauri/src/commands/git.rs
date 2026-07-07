@@ -137,17 +137,20 @@ pub async fn cmd_git_stage_hunk(
 }
 
 #[tauri::command]
-pub async fn cmd_git_restore_hunk(
+pub async fn cmd_git_restore_change(
     env: State<'_, Arc<AppEnvironment>>,
     repo: PathBuf,
     file_path: String,
-    hunk_index: usize,
+    start_line: u32,
+    end_line: u32,
 ) -> Result<(), IpcError> {
     let env = env.inner().clone();
-    tokio::task::spawn_blocking(move || env.git.restore_hunk(&repo, &file_path, hunk_index))
-        .await
-        .map_err(ipc_err)?
-        .map_err(ipc_err)
+    tokio::task::spawn_blocking(move || {
+        env.git.restore_change_blocks(&repo, &file_path, start_line, end_line)
+    })
+    .await
+    .map_err(ipc_err)?
+    .map_err(ipc_err)
 }
 
 #[tauri::command]

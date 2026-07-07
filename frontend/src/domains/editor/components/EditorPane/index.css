@@ -59,13 +59,18 @@
   white-space: pre;
 }
 
-/* Per-hunk Stage / Restore action bar (Zed-style), shown above an expanded hunk. */
+/* Per-hunk Stage / Restore action bar (Zed-style), shown above an expanded hunk.
+   The widget is as wide as cm-content, which can exceed the visible pane when a
+   long line forces horizontal scroll; sticky keeps the buttons pinned inside the
+   viewport instead of at the content's far right edge. */
 .cm-git-hunk-actions {
+  position: sticky;
+  /* Pin right of the sticky gutters overlay, not the scrollport edge. */
+  left: var(--editor-gutters-width, 0px);
+  width: max-content;
   display: flex;
   gap: 4px;
-  justify-content: flex-end;
-  margin-left: calc(-1 * var(--git-gutter-offset, 0px));
-  padding: 2px 8px 2px 0;
+  padding: 2px 0;
 }
 .cm-git-hunk-btn {
   font-family: var(--m-font);
