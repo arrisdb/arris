@@ -35,9 +35,14 @@ fn main() {
             app.manage(watcher::ProjectWatcher::default());
             app.manage(PendingLaunch::from_args(std::env::args()));
 
-            let about = AboutMetadataBuilder::new()
+            let mut about = AboutMetadataBuilder::new()
                 .name(Some("Arris".to_string()))
-                .build();
+                .short_version(Some(app.package_info().version.to_string()));
+            // Parenthetical build id: SHA-256 of the running binary.
+            if let Ok(hash) = helpers::binary_hash() {
+                about = about.version(Some(hash));
+            }
+            let about = about.build();
             let settings_item = MenuItemBuilder::with_id("menu_open_settings", "Settings...")
                 .accelerator("CmdOrCtrl+,")
                 .build(app)?;
