@@ -49,7 +49,9 @@ import { useSqlMeshStore } from "@domains/sqlmesh/hooks";
 import { runCommand } from "@shell/utils";
 import type { KeymapAction } from "@shared/settings";
 import { useSettingsStore } from "@shared/settings";
-import { connectConnectionIPC, dbtCompileIPC, dbtDocsGenerateIPC, dbtDocsLoadIPC, dbtRunIPC, listSchemasIPC, runQueryIPC, sqlmeshPlanIPC, sqlmeshRenderIPC } from "./ipc";
+import { connectConnectionIPC, dbtCompileIPC, dbtDocsGenerateIPC, dbtDocsLoadIPC, dbtRunIPC, gitFileDiffHunksIPC, listSchemasIPC, runQueryIPC, sqlmeshPlanIPC, sqlmeshRenderIPC, writeTextFileIPC } from "./ipc";
+import { AUTOSAVE_DEBOUNCE_MS, GIT_GUTTER_REFRESH_PAUSE_MS } from "./constants";
+import { useGitStore } from "@domains/git/hooks";
 import { dbtSlimDiffIPC } from "./components/SlimDiff/ipc";
 import { SCHEMA_NODE_POINTER_DROP_EVENT } from "@domains/editor/utils/ui/schemaDrag";
 import { buildPreviewSql, NO_CONNECTION_MESSAGE } from "./utils";
@@ -1419,5 +1421,41 @@ describe("keystroke re-render guard", () => {
       useTabsStore.getState().updateTab("t1", { isRunning: true });
     });
     expect(commits).toBeGreaterThan(before);
+  });
+});
+
+describe("autosave git gutter debounce", () => {
+  it("redraws hunks only after an extra pause; a keystroke cancels the pending redraw", async () => {
+    vi.mocked(writeTextFileIPC).mockResolvedValue(undefined);
+    vi.mocked(gitFileDiffHunksIPC).mockResolvedValue([]);
+    useSettingsStore.setState({ autosave: true } as any);
+    useGitStore.setState({ repoPath: "/repo" } as any);
+    useTabsStore.setState({ tabs: [], layout: null, focusedPaneGroupId: null, activeId: null });
+    useTabsStore.getState().setTabs([{ ...tabFor("c1"), filePath: "/repo/file.sql" }]);
+
+    render(<EditorPane />);
+    await act(async () => {});
+    vi.mocked(gitFileDiffHunksIPC).mockClear();
+    vi.useFakeTimers();
+    try {
+      act(() => { useTabsStore.getState().updateTab("t1", { text: "select 1" }); });
+      await act(async () => { await vi.advanceTimersByTimeAsync(AUTOSAVE_DEBOUNCE_MS); });
+      expect(writeTextFileIPC).toHaveBeenCalledWith("/repo/file.sql", "select 1");
+      expect(gitFileDiffHunksIPC).not.toHaveBeenCalled();
+
+      // Typing again during the pause cancels the pending redraw.
+      act(() => { useTabsStore.getState().updateTab("t1", { text: "select 12" }); });
+      await act(async () => { await vi.advanceTimersByTimeAsync(GIT_GUTTER_REFRESH_PAUSE_MS); });
+      expect(gitFileDiffHunksIPC).not.toHaveBeenCalled();
+
+      // Full pause after the second save: exactly one redraw.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(AUTOSAVE_DEBOUNCE_MS + GIT_GUTTER_REFRESH_PAUSE_MS);
+      });
+      expect(gitFileDiffHunksIPC).toHaveBeenCalledTimes(1);
+      expect(gitFileDiffHunksIPC).toHaveBeenCalledWith("/repo", "/repo/file.sql");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
