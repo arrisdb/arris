@@ -87,8 +87,13 @@ function gitStageHunkIPC(repo: string, filePath: string, hunkIndex: number): Pro
   return invoke("cmd_git_stage_hunk", { repo, filePath, hunkIndex });
 }
 
-function gitRestoreChangeIPC(repo: string, filePath: string, line: number): Promise<void> {
-  return invoke("cmd_git_restore_change", { repo, filePath, line });
+function gitRestoreChangeIPC(
+  repo: string,
+  filePath: string,
+  startLine: number,
+  endLine: number,
+): Promise<void> {
+  return invoke("cmd_git_restore_change", { repo, filePath, startLine, endLine });
 }
 
 function listSchemasIPC(connectionId: string): Promise<SchemaNode[]> {

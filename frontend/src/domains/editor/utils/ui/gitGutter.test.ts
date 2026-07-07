@@ -309,18 +309,18 @@ describe("HunkActionsWidget", () => {
     expect(dom.children[1].textContent).toBe("Discard");
   });
 
-  it("fires onStage / onRestore with the hunk index on mousedown", () => {
+  it("fires onStage with the hunk index and onRestore with the anchor line span", () => {
     let staged = -1;
-    let restored = -1;
+    let restored: number[] = [];
     const widget = new HunkActionsWidget(2, 7, {
       onStage: (i) => { staged = i; },
-      onRestore: (i) => { restored = i; },
+      onRestore: (start, end) => { restored = [start, end]; },
     });
     const dom = widget.toDOM();
     (dom.children[0] as HTMLButtonElement).dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
     (dom.children[1] as HTMLButtonElement).dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
     expect(staged).toBe(2);
-    expect(restored).toBe(7);
+    expect(restored).toEqual([7, 7]);
   });
 
   it("eq compares by hunk index and anchor line", () => {

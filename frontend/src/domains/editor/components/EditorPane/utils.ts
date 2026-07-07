@@ -341,16 +341,33 @@ function cursorLineNumber(text: string, cursor: number): number {
   return line;
 }
 
-// Index of the hunk whose new-file line span contains `line`, or null. A
-// deletion-only hunk (newCount 0) occupies no new-file lines; treat its anchor
-// row (the line the deleted block sits above) as its span.
-function hunkIndexAtLine(hunks: DiffHunk[], line: number): number | null {
-  for (const [index, hunk] of hunks.entries()) {
+// 1-based line span to discard: the selection's lines when non-empty (a
+// selection ending at column 0 excludes that line), else the cursor's line.
+function discardLineRange(
+  text: string,
+  cursor: number,
+  selection: { from: number; to: number } | undefined,
+): { startLine: number; endLine: number } {
+  if (!selection || selection.from === selection.to) {
+    const line = cursorLineNumber(text, cursor);
+    return { startLine: line, endLine: line };
+  }
+  const lo = Math.min(selection.from, selection.to);
+  const hi = Math.max(selection.from, selection.to);
+  const startLine = cursorLineNumber(text, lo);
+  let endLine = cursorLineNumber(text, hi);
+  if (endLine > startLine && text.charCodeAt(hi - 1) === 10) endLine--;
+  return { startLine, endLine };
+}
+
+// Whether any hunk's new-file span intersects lines start..end. A deletion-
+// only hunk (newCount 0) spans its anchor row (the line it sits above).
+function hunkInRange(hunks: DiffHunk[], startLine: number, endLine: number): boolean {
+  return hunks.some((hunk) => {
     const start = Math.max(1, hunk.newStart);
     const end = start + Math.max(hunk.newCount, 1) - 1;
-    if (line >= start && line <= end) return index;
-  }
-  return null;
+    return start <= endLine && startLine <= end;
+  });
 }
 
 const VOLATILE_TAB_FIELDS = new Set(["text", "cursor", "selection", "scrollAnchor"]);
@@ -395,7 +412,8 @@ export {
   saveActiveFile,
   exportActiveResults,
   cursorLineNumber,
-  hunkIndexAtLine,
+  discardLineRange,
+  hunkInRange,
   tabEqualIgnoringVolatile,
   tabsEqualIgnoringVolatile,
 };

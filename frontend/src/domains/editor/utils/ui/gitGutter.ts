@@ -17,9 +17,9 @@ import { GUTTERS_WIDTH_CSS_VAR } from "./constants";
 
 interface GitHunkActions {
   onStage: (hunkIndex: number) => void;
-  /// Discards the change BLOCK at this new-file line, not the whole git hunk
-  /// (git merges nearby edits into one hunk).
-  onRestore: (anchorLine: number) => void;
+  /// Discards every change BLOCK intersecting this new-file line range, not
+  /// whole git hunks (git merges nearby edits into one hunk).
+  onRestore: (startLine: number, endLine: number) => void;
 }
 
 class GitAddedMarker extends GutterMarker {
@@ -269,7 +269,7 @@ class HunkActionsWidget extends WidgetType {
     restore.onmousedown = (event) => {
       event.preventDefault();
       event.stopPropagation();
-      this.actions.onRestore(this.anchorLine);
+      this.actions.onRestore(this.anchorLine, this.anchorLine);
     };
 
     bar.append(stage, restore);

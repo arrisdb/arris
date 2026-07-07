@@ -77,7 +77,7 @@ import { EditorTabRouter } from "./components/EditorTabRouter";
 import type { MarkdownViewMode } from "../MarkdownPreview/types";
 import { dbtSlimDiffIPC } from "./components/SlimDiff/ipc";
 import type { DbtDiffRunConfig } from "./components/SlimDiff/types";
-import { buildPreviewSql, cursorLineNumber, hunkIndexAtLine, resolveRunRange, resolveRunSql, resolveTabConnectionId, runErrorMessage, tabEqualIgnoringVolatile, tabsEqualIgnoringVolatile, NO_CONNECTION_MESSAGE } from "./utils";
+import { buildPreviewSql, discardLineRange, hunkInRange, resolveRunRange, resolveRunSql, resolveTabConnectionId, runErrorMessage, tabEqualIgnoringVolatile, tabsEqualIgnoringVolatile, NO_CONNECTION_MESSAGE } from "./utils";
 import { useStoreWithEqualityFn } from "zustand/traditional";
 
 import { Icon } from "@shared/ui/Icon";
@@ -801,10 +801,10 @@ function PaneGroupView({ groupId }: { groupId: string }) {
           .then(() => refreshAfter(repo, filePath))
           .catch((e) => console.error("Stage hunk failed", e));
       },
-      onRestore: (anchorLine) => {
+      onRestore: (startLine, endLine) => {
         const { repo, filePath, tabId, refreshToken } = gitHunkCtxRef.current;
         if (!repo || !filePath || !tabId) return;
-        gitRestoreChangeIPC(repo, filePath, anchorLine)
+        gitRestoreChangeIPC(repo, filePath, startLine, endLine)
           .then(async () => {
             // Restore rewrites the working file on disk; reload it into the tab
             // and bump refreshToken so the editor remounts with fresh content.
@@ -1929,8 +1929,8 @@ function PaneGroupView({ groupId }: { groupId: string }) {
         run: () => {
           const tab = freshActiveTab();
           if (!tab?.filePath) return;
-          const line = cursorLineNumber(tab.text ?? "", tab.cursor ?? 0);
-          if (hunkIndexAtLine(diffHunks, line) !== null) diffHunkActions.onRestore(line);
+          const { startLine, endLine } = discardLineRange(tab.text ?? "", tab.cursor ?? 0, tab.selection);
+          if (hunkInRange(diffHunks, startLine, endLine)) diffHunkActions.onRestore(startLine, endLine);
         },
         isEnabled: () => !!activeTab?.filePath && diffHunks.length > 0,
       },

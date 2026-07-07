@@ -659,35 +659,40 @@ impl GitEngine {
         self.apply_hunk(repo_path, file_path, hunk_index, &["apply", "--cached"])
     }
 
-    /// Discard only the change block at new-file `line` (git merges nearby
-    /// edits into one hunk), from both the worktree and any staged copy.
-    pub fn restore_change_block(
+    /// Discard every change block intersecting new-file lines
+    /// `start_line..=end_line`, from both the worktree and any staged copy.
+    pub fn restore_change_blocks(
         &self,
         repo_path: &Path,
         file_path: &str,
-        line: u32,
+        start_line: u32,
+        end_line: u32,
     ) -> Result<(), GitError> {
         let root = self.git_toplevel(repo_path)?;
         let abs = std::path::Path::new(file_path);
         let rel = abs.strip_prefix(&root).unwrap_or(abs);
         let rel_str = rel.to_string_lossy();
         let diff_text = Self::diff_output(&root, &["diff", "HEAD", "--", &rel_str])?;
-        let (header, blocks) = Self::change_blocks(&diff_text)
-            .ok_or_else(|| GitError::Gix(format!("no change block at line {line}")))?;
-        let target = blocks
+        let no_block = || GitError::Gix(format!("no change block in lines {start_line}-{end_line}"));
+        let (header, blocks) = Self::change_blocks(&diff_text).ok_or_else(no_block)?;
+        let targets: Vec<&ChangeBlock> = blocks
             .iter()
-            .find(|b| Self::block_matches_new_line(b, line))
-            .ok_or_else(|| GitError::Gix(format!("no change block at line {line}")))?;
-        let patch = format!("{header}{}", target.hunk);
+            .filter(|b| Self::block_matches_new_range(b, start_line, end_line))
+            .collect();
+        if targets.is_empty() {
+            return Err(no_block());
+        }
+        let hunks: String = targets.iter().map(|b| b.hunk.as_str()).collect();
+        let patch = format!("{header}{hunks}");
         Self::apply_patch(&root, &patch, &["apply", "--reverse", "--unidiff-zero"])?;
 
-        // A staged copy of the block would keep the file listed as changed
+        // A staged copy of a block would keep the file listed as changed
         // even though the worktree now matches HEAD; drop it from the index.
         let cached_text = Self::diff_output(&root, &["diff", "--cached", "--", &rel_str])?;
         if let Some((cached_header, cached_blocks)) = Self::change_blocks(&cached_text) {
             let hunks: String = cached_blocks
                 .iter()
-                .filter(|c| Self::old_ranges_overlap(target, c))
+                .filter(|c| targets.iter().any(|t| Self::old_ranges_overlap(t, c)))
                 .map(|c| c.hunk.as_str())
                 .collect();
             if !hunks.is_empty() {
@@ -1537,13 +1542,15 @@ impl GitEngine {
         Some((header, blocks))
     }
 
-    /// Whether the block contains new-file `line`. A deletion-only block
-    /// matches the row it sits above (at EOF the UI clamps to the last line).
-    fn block_matches_new_line(block: &ChangeBlock, line: u32) -> bool {
+    /// Whether the block intersects new-file lines `start..=end`. A deletion-
+    /// only block matches the row it sits above (EOF clamps to the last line).
+    fn block_matches_new_range(block: &ChangeBlock, start: u32, end: u32) -> bool {
         if block.new_count == 0 {
-            line == block.new_start + 1 || (block.at_eof && line == block.new_start)
+            let anchor = block.new_start + 1;
+            (anchor >= start && anchor <= end)
+                || (block.at_eof && block.new_start >= start && block.new_start <= end)
         } else {
-            line >= block.new_start && line < block.new_start + block.new_count
+            block.new_start <= end && start < block.new_start + block.new_count
         }
     }
 
@@ -2726,7 +2733,7 @@ index abc..def 100644
     }
 
     #[test]
-    fn restore_change_block_reverts_only_block_in_merged_hunk() {
+    fn restore_change_blocks_reverts_only_block_in_merged_hunk() {
         let engine = GitEngine::new();
         let tmp = tempfile::tempdir().unwrap();
         if !init_repo(tmp.path()) {
@@ -2745,14 +2752,14 @@ index abc..def 100644
         let abs = canon.join("f.txt").to_string_lossy().to_string();
         assert_eq!(engine.file_diff_hunks(tmp.path(), &abs).unwrap().len(), 1);
 
-        engine.restore_change_block(tmp.path(), &abs, 6).unwrap();
+        engine.restore_change_blocks(tmp.path(), &abs, 6, 6).unwrap();
 
         let content = std::fs::read_to_string(tmp.path().join("f.txt")).unwrap();
         assert_eq!(content, "a\nB\nc\nd\ne\nf\ng\nh\ni\nj\n");
     }
 
     #[test]
-    fn restore_change_block_removes_inserted_run_only() {
+    fn restore_change_blocks_removes_inserted_run_only() {
         let engine = GitEngine::new();
         let tmp = tempfile::tempdir().unwrap();
         if !init_repo(tmp.path()) {
@@ -2771,14 +2778,14 @@ index abc..def 100644
         let abs = canon.join("f.txt").to_string_lossy().to_string();
 
         // Cursor on the second inserted row removes the whole inserted run.
-        engine.restore_change_block(tmp.path(), &abs, 7).unwrap();
+        engine.restore_change_blocks(tmp.path(), &abs, 7, 7).unwrap();
 
         let content = std::fs::read_to_string(tmp.path().join("f.txt")).unwrap();
         assert_eq!(content, "a\nB\nc\nd\ne\nf\ng\nh\ni\nj\n");
     }
 
     #[test]
-    fn restore_change_block_restores_deleted_block_only() {
+    fn restore_change_blocks_restores_deleted_block_only() {
         let engine = GitEngine::new();
         let tmp = tempfile::tempdir().unwrap();
         if !init_repo(tmp.path()) {
@@ -2796,14 +2803,14 @@ index abc..def 100644
         let canon = tmp.path().canonicalize().unwrap();
         let abs = canon.join("f.txt").to_string_lossy().to_string();
 
-        engine.restore_change_block(tmp.path(), &abs, 6).unwrap();
+        engine.restore_change_blocks(tmp.path(), &abs, 6, 6).unwrap();
 
         let content = std::fs::read_to_string(tmp.path().join("f.txt")).unwrap();
         assert_eq!(content, "a\nB\nc\nd\ne\nf\ng\nh\ni\nj\n");
     }
 
     #[test]
-    fn restore_change_block_restores_deletion_at_eof() {
+    fn restore_change_blocks_restores_deletion_at_eof() {
         let engine = GitEngine::new();
         let tmp = tempfile::tempdir().unwrap();
         if !init_repo(tmp.path()) {
@@ -2821,14 +2828,14 @@ index abc..def 100644
         let abs = canon.join("f.txt").to_string_lossy().to_string();
 
         // The UI clamps the trailing-deletion anchor to the last line (9).
-        engine.restore_change_block(tmp.path(), &abs, 9).unwrap();
+        engine.restore_change_blocks(tmp.path(), &abs, 9, 9).unwrap();
 
         let content = std::fs::read_to_string(tmp.path().join("f.txt")).unwrap();
         assert_eq!(content, "a\nb\nc\nd\ne\nf\ng\nh\ni\nj\n");
     }
 
     #[test]
-    fn restore_change_block_rejects_unchanged_line() {
+    fn restore_change_blocks_rejects_unchanged_line() {
         let engine = GitEngine::new();
         let tmp = tempfile::tempdir().unwrap();
         if !init_repo(tmp.path()) {
@@ -2846,11 +2853,36 @@ index abc..def 100644
         let abs = canon.join("f.txt").to_string_lossy().to_string();
 
         // Line 4 sits inside the hunk's context but is not a change block.
-        assert!(engine.restore_change_block(tmp.path(), &abs, 4).is_err());
+        assert!(engine.restore_change_blocks(tmp.path(), &abs, 4, 4).is_err());
     }
 
     #[test]
-    fn restore_change_block_unstages_staged_copy_of_block() {
+    fn restore_change_blocks_reverts_all_blocks_in_selected_range() {
+        let engine = GitEngine::new();
+        let tmp = tempfile::tempdir().unwrap();
+        if !init_repo(tmp.path()) {
+            eprintln!("skipping: system git unavailable");
+            return;
+        }
+        commit_ten_line_file(tmp.path());
+        // Three separate blocks (B at 2, F at 6, J at 10); selecting lines
+        // 2-6 must revert B and F but leave J untouched.
+        std::fs::write(
+            tmp.path().join("f.txt"),
+            "a\nB\nc\nd\ne\nF\ng\nh\ni\nJ\n",
+        )
+        .unwrap();
+
+        let canon = tmp.path().canonicalize().unwrap();
+        let abs = canon.join("f.txt").to_string_lossy().to_string();
+        engine.restore_change_blocks(tmp.path(), &abs, 2, 6).unwrap();
+
+        let content = std::fs::read_to_string(tmp.path().join("f.txt")).unwrap();
+        assert_eq!(content, "a\nb\nc\nd\ne\nf\ng\nh\ni\nJ\n");
+    }
+
+    #[test]
+    fn restore_change_blocks_unstages_staged_copy_of_block() {
         let engine = GitEngine::new();
         let tmp = tempfile::tempdir().unwrap();
         if !init_repo(tmp.path()) {
@@ -2871,7 +2903,7 @@ index abc..def 100644
 
         let canon = tmp.path().canonicalize().unwrap();
         let abs = canon.join("f.txt").to_string_lossy().to_string();
-        engine.restore_change_block(tmp.path(), &abs, 2).unwrap();
+        engine.restore_change_blocks(tmp.path(), &abs, 2, 2).unwrap();
 
         let content = std::fs::read_to_string(tmp.path().join("f.txt")).unwrap();
         assert_eq!(content, "a\nb\nc\nd\ne\nf\ng\nh\ni\nj\n");
@@ -2884,7 +2916,7 @@ index abc..def 100644
     }
 
     #[test]
-    fn restore_change_block_keeps_other_staged_blocks() {
+    fn restore_change_blocks_keeps_other_staged_blocks() {
         let engine = GitEngine::new();
         let tmp = tempfile::tempdir().unwrap();
         if !init_repo(tmp.path()) {
@@ -2906,7 +2938,7 @@ index abc..def 100644
 
         let canon = tmp.path().canonicalize().unwrap();
         let abs = canon.join("f.txt").to_string_lossy().to_string();
-        engine.restore_change_block(tmp.path(), &abs, 6).unwrap();
+        engine.restore_change_blocks(tmp.path(), &abs, 6, 6).unwrap();
 
         let content = std::fs::read_to_string(tmp.path().join("f.txt")).unwrap();
         assert_eq!(content, "a\nB\nc\nd\ne\nf\ng\nh\ni\nj\n");
@@ -2921,7 +2953,7 @@ index abc..def 100644
     }
 
     #[test]
-    fn restore_change_block_discards_staged_and_worktree_versions() {
+    fn restore_change_blocks_discards_staged_and_worktree_versions() {
         let engine = GitEngine::new();
         let tmp = tempfile::tempdir().unwrap();
         if !init_repo(tmp.path()) {
@@ -2949,7 +2981,7 @@ index abc..def 100644
 
         let canon = tmp.path().canonicalize().unwrap();
         let abs = canon.join("f.txt").to_string_lossy().to_string();
-        engine.restore_change_block(tmp.path(), &abs, 2).unwrap();
+        engine.restore_change_blocks(tmp.path(), &abs, 2, 2).unwrap();
 
         let content = std::fs::read_to_string(tmp.path().join("f.txt")).unwrap();
         assert_eq!(content, "a\nb\nc\nd\ne\nf\ng\nh\ni\nj\n");
