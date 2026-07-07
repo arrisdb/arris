@@ -224,7 +224,7 @@ fn main() {
             cmd_git_file_statuses,
             cmd_git_file_diff_hunks,
             cmd_git_stage_hunk,
-            cmd_git_restore_hunk,
+            cmd_git_restore_change,
             cmd_git_stage_files,
             cmd_git_unstage_files,
             cmd_git_discard_files,

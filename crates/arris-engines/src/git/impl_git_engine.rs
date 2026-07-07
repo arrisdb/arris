@@ -659,15 +659,29 @@ impl GitEngine {
         self.apply_hunk(repo_path, file_path, hunk_index, &["apply", "--cached"])
     }
 
-    /// Restore (discard) a single diff hunk in the working tree. Reverse-applies
-    /// the hunk's patch via `git apply --reverse`, reverting that change.
-    pub fn restore_hunk(
+    /// Restore (discard) the single change block containing new-file `line`.
+    /// Git merges edits separated by fewer than 2*context+1 unchanged lines
+    /// into ONE diff hunk, so reverse-applying a whole hunk can revert
+    /// unrelated nearby edits. This rebuilds a zero-context patch for just the
+    /// contiguous run of added/deleted lines at `line` and reverse-applies it.
+    pub fn restore_change_block(
         &self,
         repo_path: &Path,
         file_path: &str,
-        hunk_index: usize,
+        line: u32,
     ) -> Result<(), GitError> {
-        self.apply_hunk(repo_path, file_path, hunk_index, &["apply", "--reverse"])
+        let root = self.git_toplevel(repo_path)?;
+        let abs = std::path::Path::new(file_path);
+        let rel = abs.strip_prefix(&root).unwrap_or(abs);
+        let output = Command::new("git")
+            .args(["diff", "HEAD", "--", &rel.to_string_lossy()])
+            .current_dir(&root)
+            .output()
+            .map_err(|e| GitError::Gix(e.to_string()))?;
+        let diff_text = String::from_utf8_lossy(&output.stdout);
+        let patch = Self::change_block_patch(&diff_text, line)
+            .ok_or_else(|| GitError::Gix(format!("no change block at line {line}")))?;
+        Self::apply_patch(&root, &patch, &["apply", "--reverse", "--unidiff-zero"])
     }
 
     /// Fetch all remotes, pruning deleted remote-tracking refs. Returns the
@@ -1323,10 +1337,14 @@ impl GitEngine {
         let diff_text = String::from_utf8_lossy(&output.stdout);
         let patch = Self::single_hunk_patch(&diff_text, hunk_index)
             .ok_or_else(|| GitError::Gix(format!("diff hunk {hunk_index} not found")))?;
+        Self::apply_patch(&root, &patch, git_args)
+    }
 
+    /// Pipe a patch into `git <git_args>` (an apply variant) run at `root`.
+    fn apply_patch(root: &Path, patch: &str, git_args: &[&str]) -> Result<(), GitError> {
         let mut child = Command::new("git")
             .args(git_args)
-            .current_dir(&root)
+            .current_dir(root)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
@@ -1385,6 +1403,133 @@ impl GitEngine {
         }
         let hunk = hunks.get(hunk_index)?;
         Some(format!("{header}{hunk}"))
+    }
+
+    /// Build a standalone zero-context patch for the change block (one
+    /// contiguous run of `-`/`+` lines between context lines) containing
+    /// new-file `line`. Returns `None` when no block spans that line.
+    fn change_block_patch(diff_text: &str, line: u32) -> Option<String> {
+        let mut header = String::new();
+        for l in diff_text.lines() {
+            if l.starts_with("@@ ") {
+                break;
+            }
+            header.push_str(l);
+            header.push('\n');
+        }
+        if header.is_empty() {
+            return None;
+        }
+
+        let hunks = Self::parse_diff_hunks(diff_text).ok()?;
+        for hunk in &hunks {
+            // Zero-count ranges name the line BEFORE the change; walking
+            // counters must start on the first real line either side.
+            let mut old_line = if hunk.old_count == 0 { hunk.old_start + 1 } else { hunk.old_start };
+            let mut new_line = if hunk.new_count == 0 { hunk.new_start + 1 } else { hunk.new_start };
+            let mut dels: Vec<&str> = Vec::new();
+            let mut adds: Vec<&str> = Vec::new();
+            let mut block_old_start = old_line;
+            let mut block_new_start = new_line;
+
+            let flush = |dels: &mut Vec<&str>,
+                             adds: &mut Vec<&str>,
+                             block_old_start: u32,
+                             block_new_start: u32,
+                             at_line: u32,
+                             at_eof: bool|
+             -> Option<String> {
+                if dels.is_empty() && adds.is_empty() {
+                    return None;
+                }
+                // Added blocks span their new-file rows. A deletion-only block
+                // occupies none, so it matches the row it sits above; at EOF
+                // the UI clamps that anchor to the last existing line.
+                let matched = if adds.is_empty() {
+                    line == at_line || (at_eof && line + 1 == at_line)
+                } else {
+                    line >= block_new_start && line < block_new_start + adds.len() as u32
+                };
+                if !matched {
+                    dels.clear();
+                    adds.clear();
+                    return None;
+                }
+                let old_range = if dels.is_empty() {
+                    format!("{},0", block_old_start.saturating_sub(1))
+                } else {
+                    format!("{},{}", block_old_start, dels.len())
+                };
+                let new_range = if adds.is_empty() {
+                    format!("{},0", block_new_start.saturating_sub(1))
+                } else {
+                    format!("{},{}", block_new_start, adds.len())
+                };
+                let mut body = String::new();
+                for d in dels.iter() {
+                    body.push('-');
+                    body.push_str(d);
+                    body.push('\n');
+                }
+                for a in adds.iter() {
+                    body.push('+');
+                    body.push_str(a);
+                    body.push('\n');
+                }
+                Some(format!("{header}@@ -{old_range} +{new_range} @@\n{body}"))
+            };
+
+            for diff_line in &hunk.lines {
+                match diff_line.kind.as_str() {
+                    "ctx" => {
+                        if let Some(patch) = flush(
+                            &mut dels,
+                            &mut adds,
+                            block_old_start,
+                            block_new_start,
+                            new_line,
+                            false,
+                        ) {
+                            return Some(patch);
+                        }
+                        old_line += 1;
+                        new_line += 1;
+                        block_old_start = old_line;
+                        block_new_start = new_line;
+                    }
+                    "del" => {
+                        if dels.is_empty() && adds.is_empty() {
+                            block_old_start = old_line;
+                            block_new_start = new_line;
+                        }
+                        dels.push(&diff_line.text);
+                        old_line += 1;
+                    }
+                    "add" => {
+                        if dels.is_empty() && adds.is_empty() {
+                            block_old_start = old_line;
+                        }
+                        if adds.is_empty() {
+                            block_new_start = new_line;
+                        }
+                        adds.push(&diff_line.text);
+                        new_line += 1;
+                    }
+                    _ => {}
+                }
+            }
+            if let Some(patch) = flush(
+                &mut dels,
+                &mut adds,
+                block_old_start,
+                block_new_start,
+                new_line,
+                true,
+            ) {
+                return Some(patch);
+            }
+        }
+        None
     }
 
     /// Absolute path of the repo's git directory (`git rev-parse --git-dir`),
@@ -2550,7 +2695,84 @@ index abc..def 100644
     }
 
     #[test]
-    fn restore_hunk_discards_only_selected_hunk() {
+    fn restore_change_block_reverts_only_block_in_merged_hunk() {
+        let engine = GitEngine::new();
+        let tmp = tempfile::tempdir().unwrap();
+        if !init_repo(tmp.path()) {
+            eprintln!("skipping: system git unavailable");
+            return;
+        }
+        commit_ten_line_file(tmp.path());
+        // Two edits 3 unchanged lines apart: git merges them into ONE hunk.
+        std::fs::write(
+            tmp.path().join("f.txt"),
+            "a\nB\nc\nd\ne\nF\ng\nh\ni\nj\n",
+        )
+        .unwrap();
+
+        let canon = tmp.path().canonicalize().unwrap();
+        let abs = canon.join("f.txt").to_string_lossy().to_string();
+        assert_eq!(engine.file_diff_hunks(tmp.path(), &abs).unwrap().len(), 1);
+
+        engine.restore_change_block(tmp.path(), &abs, 6).unwrap();
+
+        let content = std::fs::read_to_string(tmp.path().join("f.txt")).unwrap();
+        assert_eq!(content, "a\nB\nc\nd\ne\nf\ng\nh\ni\nj\n");
+    }
+
+    #[test]
+    fn restore_change_block_removes_inserted_run_only() {
+        let engine = GitEngine::new();
+        let tmp = tempfile::tempdir().unwrap();
+        if !init_repo(tmp.path()) {
+            eprintln!("skipping: system git unavailable");
+            return;
+        }
+        commit_ten_line_file(tmp.path());
+        // Edit line 2 and insert two lines after e; one merged hunk.
+        std::fs::write(
+            tmp.path().join("f.txt"),
+            "a\nB\nc\nd\ne\nX\nY\nf\ng\nh\ni\nj\n",
+        )
+        .unwrap();
+
+        let canon = tmp.path().canonicalize().unwrap();
+        let abs = canon.join("f.txt").to_string_lossy().to_string();
+
+        // Cursor on the second inserted row removes the whole inserted run.
+        engine.restore_change_block(tmp.path(), &abs, 7).unwrap();
+
+        let content = std::fs::read_to_string(tmp.path().join("f.txt")).unwrap();
+        assert_eq!(content, "a\nB\nc\nd\ne\nf\ng\nh\ni\nj\n");
+    }
+
+    #[test]
+    fn restore_change_block_restores_deleted_block_only() {
+        let engine = GitEngine::new();
+        let tmp = tempfile::tempdir().unwrap();
+        if !init_repo(tmp.path()) {
+            eprintln!("skipping: system git unavailable");
+            return;
+        }
+        commit_ten_line_file(tmp.path());
+        // Edit line 2 and delete f/g; deletion anchors on the row below (h).
+        std::fs::write(
+            tmp.path().join("f.txt"),
+            "a\nB\nc\nd\ne\nh\ni\nj\n",
+        )
+        .unwrap();
+
+        let canon = tmp.path().canonicalize().unwrap();
+        let abs = canon.join("f.txt").to_string_lossy().to_string();
+
+        engine.restore_change_block(tmp.path(), &abs, 6).unwrap();
+
+        let content = std::fs::read_to_string(tmp.path().join("f.txt")).unwrap();
+        assert_eq!(content, "a\nB\nc\nd\ne\nf\ng\nh\ni\nj\n");
+    }
+
+    #[test]
+    fn restore_change_block_restores_deletion_at_eof() {
         let engine = GitEngine::new();
         let tmp = tempfile::tempdir().unwrap();
         if !init_repo(tmp.path()) {
@@ -2560,18 +2782,40 @@ index abc..def 100644
         commit_ten_line_file(tmp.path());
         std::fs::write(
             tmp.path().join("f.txt"),
-            "A\nb\nc\nd\ne\nf\ng\nh\ni\nJ\n",
+            "a\nb\nc\nd\ne\nf\ng\nh\ni\n",
         )
         .unwrap();
 
         let canon = tmp.path().canonicalize().unwrap();
         let abs = canon.join("f.txt").to_string_lossy().to_string();
 
-        // Restore the first hunk: line 1 reverts, line 10 stays changed.
-        engine.restore_hunk(tmp.path(), &abs, 0).unwrap();
+        // The UI clamps the trailing-deletion anchor to the last line (9).
+        engine.restore_change_block(tmp.path(), &abs, 9).unwrap();
 
         let content = std::fs::read_to_string(tmp.path().join("f.txt")).unwrap();
-        assert_eq!(content, "a\nb\nc\nd\ne\nf\ng\nh\ni\nJ\n");
+        assert_eq!(content, "a\nb\nc\nd\ne\nf\ng\nh\ni\nj\n");
+    }
+
+    #[test]
+    fn restore_change_block_rejects_unchanged_line() {
+        let engine = GitEngine::new();
+        let tmp = tempfile::tempdir().unwrap();
+        if !init_repo(tmp.path()) {
+            eprintln!("skipping: system git unavailable");
+            return;
+        }
+        commit_ten_line_file(tmp.path());
+        std::fs::write(
+            tmp.path().join("f.txt"),
+            "a\nB\nc\nd\ne\nf\ng\nh\ni\nj\n",
+        )
+        .unwrap();
+
+        let canon = tmp.path().canonicalize().unwrap();
+        let abs = canon.join("f.txt").to_string_lossy().to_string();
+
+        // Line 4 sits inside the hunk's context but is not a change block.
+        assert!(engine.restore_change_block(tmp.path(), &abs, 4).is_err());
     }
 
     #[test]

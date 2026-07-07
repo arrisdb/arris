@@ -47,7 +47,7 @@ import {
   dbtRunIPC,
   dbtTestIPC,
   gitFileDiffHunksIPC,
-  gitRestoreHunkIPC,
+  gitRestoreChangeIPC,
   gitStageHunkIPC,
   listSchemasIPC,
   readTextFileIPC,
@@ -801,10 +801,10 @@ function PaneGroupView({ groupId }: { groupId: string }) {
           .then(() => refreshAfter(repo, filePath))
           .catch((e) => console.error("Stage hunk failed", e));
       },
-      onRestore: (hunkIndex) => {
+      onRestore: (anchorLine) => {
         const { repo, filePath, tabId, refreshToken } = gitHunkCtxRef.current;
         if (!repo || !filePath || !tabId) return;
-        gitRestoreHunkIPC(repo, filePath, hunkIndex)
+        gitRestoreChangeIPC(repo, filePath, anchorLine)
           .then(async () => {
             // Restore rewrites the working file on disk; reload it into the tab
             // and bump refreshToken so the editor remounts with fresh content.
@@ -1930,8 +1930,7 @@ function PaneGroupView({ groupId }: { groupId: string }) {
           const tab = freshActiveTab();
           if (!tab?.filePath) return;
           const line = cursorLineNumber(tab.text ?? "", tab.cursor ?? 0);
-          const hunkIndex = hunkIndexAtLine(diffHunks, line);
-          if (hunkIndex !== null) diffHunkActions.onRestore(hunkIndex);
+          if (hunkIndexAtLine(diffHunks, line) !== null) diffHunkActions.onRestore(line);
         },
         isEnabled: () => !!activeTab?.filePath && diffHunks.length > 0,
       },

@@ -301,7 +301,7 @@ describe("buildMarkers anchorHunk", () => {
 
 describe("HunkActionsWidget", () => {
   it("renders Stage and Discard buttons", () => {
-    const widget = new HunkActionsWidget(0, { onStage: () => {}, onRestore: () => {} });
+    const widget = new HunkActionsWidget(0, 1, { onStage: () => {}, onRestore: () => {} });
     const dom = widget.toDOM();
     expect(dom.className).toBe("cm-git-hunk-actions");
     expect(dom.children.length).toBe(2);
@@ -312,7 +312,7 @@ describe("HunkActionsWidget", () => {
   it("fires onStage / onRestore with the hunk index on mousedown", () => {
     let staged = -1;
     let restored = -1;
-    const widget = new HunkActionsWidget(2, {
+    const widget = new HunkActionsWidget(2, 7, {
       onStage: (i) => { staged = i; },
       onRestore: (i) => { restored = i; },
     });
@@ -320,13 +320,14 @@ describe("HunkActionsWidget", () => {
     (dom.children[0] as HTMLButtonElement).dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
     (dom.children[1] as HTMLButtonElement).dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
     expect(staged).toBe(2);
-    expect(restored).toBe(2);
+    expect(restored).toBe(7);
   });
 
-  it("eq compares by hunk index", () => {
+  it("eq compares by hunk index and anchor line", () => {
     const noop = { onStage: () => {}, onRestore: () => {} };
-    expect(new HunkActionsWidget(1, noop).eq(new HunkActionsWidget(1, noop))).toBe(true);
-    expect(new HunkActionsWidget(1, noop).eq(new HunkActionsWidget(2, noop))).toBe(false);
+    expect(new HunkActionsWidget(1, 5, noop).eq(new HunkActionsWidget(1, 5, noop))).toBe(true);
+    expect(new HunkActionsWidget(1, 5, noop).eq(new HunkActionsWidget(2, 5, noop))).toBe(false);
+    expect(new HunkActionsWidget(1, 5, noop).eq(new HunkActionsWidget(1, 6, noop))).toBe(false);
   });
 });
 
