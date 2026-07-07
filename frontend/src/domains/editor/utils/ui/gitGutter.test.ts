@@ -162,6 +162,43 @@ describe("buildMarkers", () => {
   });
 });
 
+describe("buildMarkers add-run grouping", () => {
+  const doc = EditorState.create({ doc: "l1\nl2\nl3\nl4\nl5" }).doc;
+
+  it("gives consecutive added rows one shared anchor", () => {
+    const hunk = makeHunk({
+      oldStart: 1, oldCount: 0, newStart: 2, newCount: 3,
+      lines: [
+        { kind: "add", text: "a" },
+        { kind: "add", text: "b" },
+        { kind: "add", text: "c" },
+      ],
+    });
+    const { clickAnchor, anchorHunk } = buildMarkers([hunk], doc);
+    expect(clickAnchor.get(2)).toBe(2);
+    expect(clickAnchor.get(3)).toBe(2);
+    expect(clickAnchor.get(4)).toBe(2);
+    expect(anchorHunk.size).toBe(1);
+    expect(anchorHunk.get(2)).toBe(0);
+  });
+
+  it("splits add runs separated by a context line into distinct anchors", () => {
+    const hunk = makeHunk({
+      oldStart: 1, oldCount: 1, newStart: 1, newCount: 3,
+      lines: [
+        { kind: "add", text: "a" },
+        { kind: "ctx", text: "keep" },
+        { kind: "add", text: "b" },
+      ],
+    });
+    const { clickAnchor, anchorHunk } = buildMarkers([hunk], doc);
+    expect(clickAnchor.get(1)).toBe(1);
+    expect(clickAnchor.get(3)).toBe(3);
+    expect(anchorHunk.get(1)).toBe(0);
+    expect(anchorHunk.get(3)).toBe(0);
+  });
+});
+
 describe("expandedHunksField", () => {
   it("toggles hunk expansion on/off via effects", () => {
     const state = EditorState.create({
@@ -234,6 +271,20 @@ describe("buildMarkers anchorHunk", () => {
     const result = buildMarkers(hunks, doc);
     expect(result.anchorHunk.get(1)).toBe(0);
     expect(result.anchorHunk.get(3)).toBe(1);
+  });
+
+  it("maps a hunk-trailing deletion anchor to its hunk index", () => {
+    const doc = EditorState.create({ doc: "l1\nl2\nl3" }).doc;
+    const hunk = makeHunk({
+      oldStart: 2, oldCount: 2, newStart: 2, newCount: 1,
+      lines: [
+        { kind: "ctx", text: "l2" },
+        { kind: "del", text: "gone" },
+      ],
+    });
+    const { anchorHunk, pureDelAnchors } = buildMarkers([hunk], doc);
+    expect(pureDelAnchors.has(3)).toBe(true);
+    expect(anchorHunk.get(3)).toBe(0);
   });
 
   it("maps a modification anchor to its hunk index", () => {

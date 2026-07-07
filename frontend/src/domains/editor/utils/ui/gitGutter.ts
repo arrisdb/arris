@@ -96,6 +96,7 @@ function buildMarkers(
     let newLine = hunk.newStart;
     let pendingDels: DiffLine[] = [];
     let inModZone = false;
+    let inAddRun = false;
     let currentAnchor = -1;
 
     for (let i = 0; i < hunk.lines.length; i++) {
@@ -114,6 +115,7 @@ function buildMarkers(
           pendingDels = [];
         }
         inModZone = false;
+        inAddRun = false;
         currentAnchor = -1;
         newLine++;
       } else if (line.kind === "del") {
@@ -129,8 +131,15 @@ function buildMarkers(
             currentAnchor = newLine;
             pendingDels = [];
             inModZone = true;
+            inAddRun = false;
           } else if (inModZone) {
             entries.push({ from: doc.line(newLine).from, marker: modifiedMarker });
+            lineTypes.set(newLine, "add");
+            clickAnchor.set(newLine, currentAnchor);
+          } else if (inAddRun) {
+            // Consecutive added rows are one change: they share the run's
+            // anchor so a click expands the whole block, not a single row.
+            entries.push({ from: doc.line(newLine).from, marker: addedMarker });
             lineTypes.set(newLine, "add");
             clickAnchor.set(newLine, currentAnchor);
           } else {
@@ -138,6 +147,8 @@ function buildMarkers(
             lineTypes.set(newLine, "add");
             clickAnchor.set(newLine, newLine);
             anchorHunk.set(newLine, hunkIndex);
+            currentAnchor = newLine;
+            inAddRun = true;
           }
         }
         newLine++;
@@ -150,6 +161,7 @@ function buildMarkers(
         entries.push({ from: doc.line(anchor).from, marker: deletedMarker });
         inlineDiffs.set(anchor, [...pendingDels]);
         clickAnchor.set(anchor, anchor);
+        anchorHunk.set(anchor, hunkIndex);
         pureDelAnchors.add(anchor);
       }
     }
