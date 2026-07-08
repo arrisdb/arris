@@ -14,6 +14,13 @@ pub struct CanvasCellSpec {
     pub connection_id: Option<String>,
 }
 
+/// Totals reported by a finished `CellCacheWriter`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct CellWriteStats {
+    pub total_rows: u64,
+    pub total_bytes: usize,
+}
+
 /// The outcome of running one cell during a chained run: either its result or the
 /// error that stopped it (a failed upstream blocks its descendants).
 #[derive(Clone, Debug, Serialize)]

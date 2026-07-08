@@ -1,13 +1,15 @@
 use std::collections::HashMap;
 use std::fs::File;
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 use datafusion::arrow::ipc::reader::FileReader;
 use datafusion::arrow::ipc::writer::FileWriter;
 use datafusion::arrow::record_batch::RecordBatch;
 
+use super::constants::CELL_INGEST_BYTE_BUDGET;
 use super::errors::CanvasError;
+use super::impl_cell_cache_writer::CellCacheWriter;
 
 /// Where one cached cell result physically lives.
 enum Store {
@@ -187,6 +189,53 @@ impl CellResultCache {
         Ok(())
     }
 
+    /// Open an appendable writer for a cell's result so streamed batches land in
+    /// the cache incrementally, capped at `CELL_INGEST_BYTE_BUDGET`.
+    pub fn begin(self: &Arc<Self>, key: &str) -> CellCacheWriter {
+        self.begin_with_budget(key, CELL_INGEST_BYTE_BUDGET)
+    }
+
+    /// `begin` with an explicit byte budget (tests shrink it to force the
+    /// truncated, `complete: false` path).
+    pub fn begin_with_budget(self: &Arc<Self>, key: &str, budget: usize) -> CellCacheWriter {
+        CellCacheWriter::new(self.clone(), key.to_string(), budget)
+    }
+
+    /// The memory-tier budget; a writer past this spills to disk mid-stream.
+    pub(super) fn mem_budget(&self) -> usize {
+        self.mem_budget
+    }
+
+    /// Reserve a fresh spill-file path (creates the spill dir).
+    pub(super) fn next_spill_path(&self) -> Result<PathBuf, CanvasError> {
+        std::fs::create_dir_all(&self.spill_dir).map_err(|e| CanvasError::Io(e.to_string()))?;
+        let mut inner = self.inner.lock().unwrap();
+        inner.seq += 1;
+        Ok(self.spill_dir.join(format!("cell-{}.arrow", inner.seq)))
+    }
+
+    /// Register a result a writer already spilled to `path` as a disk-tier
+    /// entry, then enforce the budgets.
+    pub(super) fn insert_spilled(
+        &self,
+        key: &str,
+        path: PathBuf,
+        bytes: usize,
+    ) -> Result<(), CanvasError> {
+        let mut inner = self.inner.lock().unwrap();
+        Self::remove_locked(&mut inner, key);
+        inner.entries.insert(
+            key.to_string(),
+            Entry {
+                bytes,
+                store: Store::Disk(path),
+            },
+        );
+        inner.disk_bytes += bytes;
+        Self::touch(&mut inner.order, key);
+        Self::enforce(&mut inner, self.mem_budget, self.total_budget, &self.spill_dir)
+    }
+
     /// Fetch a cell's cached result, reading it back from disk if it was spilled.
     /// Marks the entry most-recently-used. `None` if absent (never run, or evicted).
     pub fn get(&self, key: &str) -> Result<Option<Vec<RecordBatch>>, CanvasError> {
@@ -210,7 +259,7 @@ impl CellResultCache {
     }
 
     #[cfg(test)]
-    fn is_on_disk(&self, key: &str) -> bool {
+    pub(super) fn is_on_disk(&self, key: &str) -> bool {
         matches!(
             self.inner.lock().unwrap().entries.get(key).map(|e| &e.store),
             Some(Store::Disk(_))
