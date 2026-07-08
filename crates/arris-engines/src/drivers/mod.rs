@@ -1,5 +1,6 @@
 use async_trait::async_trait;
 
+pub mod constants;
 pub mod errors;
 pub mod types;
 pub mod uri;
@@ -13,6 +14,7 @@ pub mod unimplemented;
 #[cfg(feature = "postgres")]
 pub mod tls;
 
+pub use constants::*;
 pub use errors::*;
 pub use types::*;
 pub use uri::{PostgresUriComponents, parse_postgres_uri};
@@ -105,6 +107,19 @@ pub trait DatabaseDriver: Send + Sync {
         params: &[QueryValue],
         language: QueryLanguage,
     ) -> Result<QueryResult>;
+
+    /// Streamed variant of `run_query`: schema up front, then row (or Arrow)
+    /// chunks. Default materializes via `run_query`; drivers override per PR.
+    async fn run_query_stream(
+        &self,
+        text: &str,
+        params: &[QueryValue],
+        language: QueryLanguage,
+    ) -> Result<QueryStream> {
+        Ok(QueryStream::from_materialized(
+            self.run_query(text, params, language).await?,
+        ))
+    }
 
     async fn supports_explain(&self, _mode: ExplainMode) -> bool {
         true
@@ -340,6 +355,44 @@ mod tests {
         ] {
             assert!(driver_for_kind(kind).is_ok(), "kind {kind:?}");
         }
+    }
+
+    #[tokio::test]
+    async fn from_materialized_emits_one_chunk_with_all_rows() {
+        use futures::StreamExt;
+        let result = QueryResult::new(
+            vec![ColumnSpec::new("n", "int")],
+            vec![vec![QueryValue::Int(1)], vec![QueryValue::Int(2)]],
+        );
+        let QueryStream::Rows(mut rs) = QueryStream::from_materialized(result) else {
+            panic!("expected a row stream");
+        };
+        assert_eq!(rs.columns, vec![ColumnSpec::new("n", "int")]);
+        let chunk = rs.chunks.next().await.unwrap().unwrap();
+        assert_eq!(chunk, vec![vec![QueryValue::Int(1)], vec![QueryValue::Int(2)]]);
+        assert!(rs.chunks.next().await.is_none());
+    }
+
+    #[cfg(feature = "sqlite")]
+    #[tokio::test]
+    async fn default_run_query_stream_falls_back_to_run_query() {
+        use futures::StreamExt;
+        let d = sqlite::SqliteDriver::new();
+        let mut cfg = ConnectionConfig::new("mem", DatabaseKind::Sqlite);
+        cfg.file_path = Some(":memory:".into());
+        d.connect(&cfg).await.unwrap();
+        let stream = d
+            .run_query_stream("SELECT 7 AS n", &[], QueryLanguage::Native)
+            .await
+            .unwrap();
+        let QueryStream::Rows(mut rs) = stream else {
+            panic!("expected a row stream");
+        };
+        assert_eq!(rs.columns.len(), 1);
+        assert_eq!(rs.columns[0].name, "n");
+        let chunk = rs.chunks.next().await.unwrap().unwrap();
+        assert_eq!(chunk, vec![vec![QueryValue::Int(7)]]);
+        assert!(rs.chunks.next().await.is_none());
     }
 
     #[test]
