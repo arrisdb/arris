@@ -393,7 +393,13 @@ const useCanvasStore = create<CanvasStore>((set, get) => ({
       const runs = await runCanvasCellIPC(tabId, id, cells, queryId);
       // Apply each executed cell's outcome (target + its upstream dependencies).
       for (const r of runs) {
-        get().setRun(tabId, r.id, r.error ? { error: r.error } : { result: r.result });
+        get().setRun(
+          tabId,
+          r.id,
+          r.error
+            ? { error: r.error }
+            : { result: r.result, totalRows: r.totalRows, complete: r.complete },
+        );
       }
       const targetOk = runs.some((r) => r.id === id && r.result);
       // The cell the user ran gets a preview table on first success; the

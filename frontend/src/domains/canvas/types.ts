@@ -169,6 +169,10 @@ interface QueryRunState {
   queryId?: string;
   result?: QueryResult;
   error?: string;
+  /// Rows in the FULL cached result; `result` holds only the first page.
+  totalRows?: number;
+  /// False when the ingestion byte budget truncated the run ("N+ rows").
+  complete?: boolean;
 }
 
 // ── agent canvas spec (the `arris-canvas` JSON the agent emits) ───────────────

@@ -11,11 +11,15 @@ interface CanvasCellSpec {
   connectionId: string | null;
 }
 
-/// The outcome of one executed cell: its result, or the error that stopped it.
+/// The outcome of one executed cell: its result page, or the error that stopped
+/// it. `totalRows` counts the FULL cached result (the page may hold fewer);
+/// `complete: false` means the ingestion byte budget truncated the run.
 interface CanvasCellRun {
   id: string;
   result?: QueryResult;
   error?: string;
+  totalRows?: number;
+  complete?: boolean;
 }
 
 /// Run a canvas query cell, auto-running its upstream cells first. `cells` is the

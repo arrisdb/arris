@@ -15,7 +15,7 @@ import {
   editorCompletionExtensions,
   editorLanguageExtensions,
 } from "@domains/editor";
-import type { DatabaseKind, SchemaNode } from "@shared";
+import type { DatabaseKind, QueryResult, SchemaNode } from "@shared";
 
 import { SQL_FONT_SIZE } from "./constants";
 
@@ -133,5 +133,24 @@ function queryEditorExtensions(input: QueryEditorExtensionsInput): Extension[] {
   ];
 }
 
-export { buildCanvasSqlSupport, queryEditorExtensions };
+// One-line status for a finished run. The result holds only the first page;
+// when the full cached result is larger the copy reads "first N of M rows",
+// with a trailing "+" when the ingestion byte budget truncated the run.
+function runResultSummary(
+  result: QueryResult,
+  totalRows?: number,
+  complete?: boolean,
+): string {
+  const rows = result.rows.length;
+  const cols = result.columns.length;
+  const columnsPart = `${cols} column${cols === 1 ? "" : "s"}`;
+  const truncated = complete === false;
+  const total = Math.max(totalRows ?? rows, rows);
+  if (truncated || total > rows) {
+    return `first ${rows} of ${total}${truncated ? "+" : ""} rows · ${columnsPart}`;
+  }
+  return `${rows} row${rows === 1 ? "" : "s"} · ${columnsPart}`;
+}
+
+export { buildCanvasSqlSupport, queryEditorExtensions, runResultSummary };
 export type { CanvasSqlSupportInput };
