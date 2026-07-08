@@ -2,10 +2,8 @@ use std::any::Any;
 use std::fmt;
 use std::sync::Arc;
 
-use datafusion::arrow::array::{
-    ArrayRef, BinaryArray, BooleanArray, Float64Array, Int64Array, StringArray,
-};
-use datafusion::arrow::datatypes::{DataType, Field, Schema, SchemaRef};
+use datafusion::arrow::array::ArrayRef;
+use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::arrow::record_batch::{RecordBatch, RecordBatchOptions};
 use datafusion::catalog::Session;
 use datafusion::common::project_schema;
@@ -23,7 +21,8 @@ use super::impl_filter_translator::FilterTranslator;
 use super::impl_metrics_stream::{MetricsStream, ProgressCallback};
 use super::impl_scan_adapter::{ScanOptions, ScanSql};
 use super::{FederationRef, ScanAdapter};
-use crate::{ColumnSpec, QueryResult, QueryValue};
+use crate::drivers::common::ArrowChunkBuilder;
+use crate::QueryResult;
 
 pub type NodeIdMap = Arc<std::sync::Mutex<std::collections::HashMap<String, usize>>>;
 
@@ -176,53 +175,7 @@ impl FederatedExec {
 
 impl FederatedExec {
     pub(crate) fn infer_schema_from_result(result: &QueryResult) -> SchemaRef {
-        let fields: Vec<Field> = result
-            .columns
-            .iter()
-            .enumerate()
-            .map(|(i, col)| {
-                let dt = Self::infer_arrow_type(col, i, &result.rows);
-                Field::new(&col.name, dt, true)
-            })
-            .collect();
-        Arc::new(Schema::new(fields))
-    }
-
-    fn is_numeric_type_hint(hint: &str) -> bool {
-        matches!(
-            hint.to_lowercase().as_str(),
-            "numeric"
-                | "decimal"
-                | "newdecimal"
-                | "money"
-                | "real"
-                | "double precision"
-                | "float"
-                | "float4"
-                | "float8"
-                | "double"
-                | "dec"
-        )
-    }
-
-    fn infer_arrow_type(col: &ColumnSpec, col_idx: usize, rows: &[Vec<QueryValue>]) -> DataType {
-        if Self::is_numeric_type_hint(&col.type_hint) {
-            return DataType::Float64;
-        }
-        for row in rows {
-            if let Some(val) = row.get(col_idx) {
-                match val {
-                    QueryValue::Null => continue,
-                    QueryValue::Bool(_) => return DataType::Boolean,
-                    QueryValue::Int(_) => return DataType::Int64,
-                    QueryValue::Double(_) => return DataType::Float64,
-                    QueryValue::Decimal(_) => return DataType::Float64,
-                    QueryValue::Text(_) | QueryValue::Json(_) => return DataType::Utf8,
-                    QueryValue::Data(_) => return DataType::Binary,
-                }
-            }
-        }
-        DataType::Utf8
+        ArrowChunkBuilder::infer_schema(&result.columns, &result.rows)
     }
 
     pub(crate) fn query_result_to_record_batch(
@@ -253,84 +206,11 @@ impl FederatedExec {
             .iter()
             .map(|field| {
                 let src_idx = col_map.get(field.name().as_str()).copied();
-                Self::build_array(field.data_type(), src_idx, &result.rows)
+                ArrowChunkBuilder::build_array(field.data_type(), src_idx, &result.rows)
             })
             .collect();
 
         RecordBatch::try_new(schema.clone(), arrays).map_err(|e| e.to_string())
-    }
-
-    fn build_array(dt: &DataType, src_idx: Option<usize>, rows: &[Vec<QueryValue>]) -> ArrayRef {
-        match dt {
-            DataType::Boolean => {
-                let arr: BooleanArray = rows
-                    .iter()
-                    .map(|row| {
-                        src_idx.and_then(|i| row.get(i)).and_then(|v| match v {
-                            QueryValue::Bool(b) => Some(*b),
-                            _ => None,
-                        })
-                    })
-                    .collect();
-                Arc::new(arr) as ArrayRef
-            }
-            DataType::Int64 => {
-                let arr: Int64Array = rows
-                    .iter()
-                    .map(|row| {
-                        src_idx.and_then(|i| row.get(i)).and_then(|v| match v {
-                            QueryValue::Int(n) => Some(*n),
-                            _ => None,
-                        })
-                    })
-                    .collect();
-                Arc::new(arr) as ArrayRef
-            }
-            DataType::Float64 => {
-                let arr: Float64Array = rows
-                    .iter()
-                    .map(|row| {
-                        src_idx.and_then(|i| row.get(i)).and_then(|v| match v {
-                            QueryValue::Double(n) => Some(*n),
-                            QueryValue::Int(n) => Some(*n as f64),
-                            QueryValue::Text(s) | QueryValue::Decimal(s) => s.parse::<f64>().ok(),
-                            _ => None,
-                        })
-                    })
-                    .collect();
-                Arc::new(arr) as ArrayRef
-            }
-            DataType::Binary => {
-                let arr: BinaryArray = rows
-                    .iter()
-                    .map(|row| {
-                        src_idx.and_then(|i| row.get(i)).and_then(|v| match v {
-                            QueryValue::Data(d) => Some(d.as_slice()),
-                            _ => None,
-                        })
-                    })
-                    .collect();
-                Arc::new(arr) as ArrayRef
-            }
-            _ => {
-                let strings: Vec<Option<String>> = rows
-                    .iter()
-                    .map(|row| {
-                        src_idx.and_then(|i| row.get(i)).and_then(|v| match v {
-                            QueryValue::Text(s) => Some(s.clone()),
-                            QueryValue::Json(s) => Some(s.clone()),
-                            QueryValue::Decimal(s) => Some(s.clone()),
-                            QueryValue::Int(n) => Some(n.to_string()),
-                            QueryValue::Double(n) => Some(n.to_string()),
-                            QueryValue::Bool(b) => Some(b.to_string()),
-                            _ => None,
-                        })
-                    })
-                    .collect();
-                let arr: StringArray = strings.iter().map(|s| s.as_deref()).collect();
-                Arc::new(arr) as ArrayRef
-            }
-        }
     }
 }
 
@@ -464,7 +344,10 @@ impl ExecutionPlan for FederatedExec {
 
 #[cfg(test)]
 mod tests {
+    use datafusion::arrow::datatypes::Schema;
+
     use super::*;
+    use crate::{ColumnSpec, QueryValue};
 
     #[test]
     fn zero_column_projection_preserves_row_count() {
