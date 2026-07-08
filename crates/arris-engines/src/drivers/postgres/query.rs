@@ -19,6 +19,10 @@ pub(super) fn pg_err_msg(e: &tokio_postgres::Error) -> String {
     }
 }
 
+pub(super) fn row_values(row: &Row) -> Vec<QueryValue> {
+    (0..row.columns().len()).map(|i| row_value(row, i)).collect()
+}
+
 pub(super) fn rows_to_query_result(rows: Vec<Row>, elapsed: f64) -> QueryResult {
     let columns: Vec<ColumnSpec> = if let Some(first) = rows.first() {
         first
@@ -29,14 +33,7 @@ pub(super) fn rows_to_query_result(rows: Vec<Row>, elapsed: f64) -> QueryResult 
     } else {
         Vec::new()
     };
-    let mut out_rows: Vec<Vec<QueryValue>> = Vec::with_capacity(rows.len());
-    for row in &rows {
-        let mut values = Vec::with_capacity(row.columns().len());
-        for i in 0..row.columns().len() {
-            values.push(row_value(row, i));
-        }
-        out_rows.push(values);
-    }
+    let out_rows: Vec<Vec<QueryValue>> = rows.iter().map(row_values).collect();
     QueryResult {
         columns,
         rows: out_rows,

@@ -29,17 +29,20 @@ use tokio_postgres_rustls::MakeRustlsConnect;
 
 use crate::{
     ColumnSpec, ConnectionConfig, DriverError, ExplainMode, MutationResult, ObjectRef, PlanResult,
-    QueryLanguage, QueryResult, QueryValue, RowDelete, RowInsert, SchemaNode,
-    SchemaNodeKind, TableRef,
+    QueryLanguage, QueryResult, QueryStream, QueryValue, RowChunkStream, RowDelete, RowInsert,
+    SchemaNode, SchemaNodeKind, TableRef,
 };
 use crate::drivers::errors::Result;
 
+use crate::drivers::constants::{STREAM_CHUNK_CHANNEL_CAPACITY, STREAM_CHUNK_ROWS};
 use crate::drivers::DatabaseDriver;
 use crate::drivers::sql_builder::SqlBuilder;
 use crate::drivers::tls::TlsParams;
 
+use futures::StreamExt;
+
 use explain::walk_explain;
-use query::{pg_err_msg, pg_to_sql_refs, rows_to_query_result};
+use query::{pg_err_msg, pg_to_sql_refs, row_values, rows_to_query_result};
 use values::PgValue;
 
 pub struct PostgresDriver {
@@ -443,6 +446,82 @@ impl DatabaseDriver for PostgresDriver {
         };
         let _ = client.batch_execute(cleanup).await;
         result
+    }
+
+    async fn run_query_stream(
+        &self,
+        text: &str,
+        params: &[QueryValue],
+        language: QueryLanguage,
+    ) -> Result<QueryStream> {
+        // Streaming bypasses the savepoint fencing, so non-SELECTs and open
+        // manual transactions keep the materialized path.
+        if !self.looks_like_select(text) || *self.in_tx.lock().await {
+            return Ok(QueryStream::from_materialized(
+                self.run_query(text, params, language).await?,
+            ));
+        }
+        let client = self.client().await?;
+        let stmt = client
+            .prepare(text)
+            .await
+            .map_err(|e| DriverError::QueryFailed(pg_err_msg(&e)))?;
+        let columns: Vec<ColumnSpec> = stmt
+            .columns()
+            .iter()
+            .map(|c| ColumnSpec::new(c.name(), c.type_().name()))
+            .collect();
+
+        // A bounded chunk channel keeps backpressure on the wire read; dropping
+        // the receiver (cancel) ends the task and drops the server cursor.
+        let params = params.to_vec();
+        let (tx, rx) = tokio::sync::mpsc::channel::<
+            std::result::Result<Vec<Vec<QueryValue>>, DriverError>,
+        >(STREAM_CHUNK_CHANNEL_CAPACITY);
+        tokio::spawn(async move {
+            let wrapped: Vec<PgValue<'_>> = params.iter().map(PgValue).collect();
+            let refs = wrapped
+                .iter()
+                .map(|v| v as &dyn tokio_postgres::types::ToSql);
+            let rows = match client.query_raw(&stmt, refs).await {
+                Ok(rows) => rows,
+                Err(e) => {
+                    let _ = tx.send(Err(DriverError::QueryFailed(pg_err_msg(&e)))).await;
+                    return;
+                }
+            };
+            futures::pin_mut!(rows);
+            let mut chunk: Vec<Vec<QueryValue>> = Vec::with_capacity(STREAM_CHUNK_ROWS);
+            while let Some(row) = rows.next().await {
+                match row {
+                    Ok(row) => {
+                        chunk.push(row_values(&row));
+                        if chunk.len() >= STREAM_CHUNK_ROWS {
+                            let full = std::mem::replace(
+                                &mut chunk,
+                                Vec::with_capacity(STREAM_CHUNK_ROWS),
+                            );
+                            if tx.send(Ok(full)).await.is_err() {
+                                return;
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        let _ = tx.send(Err(DriverError::QueryFailed(pg_err_msg(&e)))).await;
+                        return;
+                    }
+                }
+            }
+            if !chunk.is_empty() {
+                let _ = tx.send(Ok(chunk)).await;
+            }
+        });
+
+        let chunks = futures::stream::unfold(rx, |mut rx| async move {
+            rx.recv().await.map(|item| (item, rx))
+        })
+        .boxed();
+        Ok(QueryStream::Rows(RowChunkStream { columns, chunks }))
     }
 
     async fn explain_query(
