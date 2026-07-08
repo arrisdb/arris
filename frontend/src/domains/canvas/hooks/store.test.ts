@@ -1,10 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("../ipc", () => ({ runCanvasCellIPC: vi.fn() }));
+vi.mock("../ipc", () => ({
+  runCanvasCellIPC: vi.fn(),
+  cancelCanvasCellIPC: vi.fn(),
+}));
 
 import type { AgentCanvasSpec } from "../types";
 import { makeComponent } from "../utils";
-import { runCanvasCellIPC } from "../ipc";
+import { cancelCanvasCellIPC, runCanvasCellIPC } from "../ipc";
 import { useCanvasStore } from "./store";
 
 const TAB = "tab-1";
@@ -243,6 +246,57 @@ describe("useCanvasStore", () => {
     await get().runQueryComponent(TAB, "q1");
     expect(get().boards[TAB].runs.q1.result).toBeDefined();
     expect(get().boards[TAB].runs.q1.running).toBeFalsy();
+  });
+
+  it("runQueryComponent passes a cancellation queryId scoped to the cell", async () => {
+    vi.mocked(runCanvasCellIPC).mockResolvedValue([
+      { id: "q1", result: { columns: [], rows: [], elapsed: 1 } },
+    ]);
+    get().ensureBoard(TAB, "");
+    get().addComponent(
+      TAB,
+      makeComponent({ kind: "query", id: "q1", sql: "select 1", connectionId: "conn" }),
+    );
+    const done = get().runQueryComponent(TAB, "q1");
+    // While in flight, the run state carries the cancellation handle.
+    expect(get().boards[TAB].runs.q1).toMatchObject({
+      running: true,
+      queryId: expect.stringContaining("q1"),
+    });
+    const queryId = vi.mocked(runCanvasCellIPC).mock.calls[0][3];
+    expect(queryId).toBe(get().boards[TAB].runs.q1.queryId);
+    await done;
+  });
+
+  it("cancelQueryComponent cancels the in-flight run by its queryId", async () => {
+    let resolveRun: (runs: never[]) => void = () => {};
+    vi.mocked(runCanvasCellIPC).mockReturnValue(
+      new Promise((resolve) => {
+        resolveRun = resolve;
+      }),
+    );
+    vi.mocked(cancelCanvasCellIPC).mockResolvedValue(undefined);
+    get().ensureBoard(TAB, "");
+    get().addComponent(
+      TAB,
+      makeComponent({ kind: "query", id: "q1", sql: "select 1", connectionId: "conn" }),
+    );
+    const done = get().runQueryComponent(TAB, "q1");
+    const queryId = get().boards[TAB].runs.q1.queryId;
+    get().cancelQueryComponent(TAB, "q1");
+    expect(cancelCanvasCellIPC).toHaveBeenCalledWith(queryId);
+    resolveRun([]);
+    await done;
+  });
+
+  it("cancelQueryComponent is a no-op when the cell is not running", () => {
+    get().ensureBoard(TAB, "");
+    get().addComponent(
+      TAB,
+      makeComponent({ kind: "query", id: "q1", sql: "select 1", connectionId: "conn" }),
+    );
+    get().cancelQueryComponent(TAB, "q1");
+    expect(cancelCanvasCellIPC).not.toHaveBeenCalled();
   });
 
   it("runQueryComponent auto-runs upstream cells and applies their results too", async () => {

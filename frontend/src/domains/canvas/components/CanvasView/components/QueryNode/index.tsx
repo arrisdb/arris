@@ -37,6 +37,7 @@ function QueryNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
   );
   const run = useCanvasStore((s) => s.boards[tabId]?.runs[id]);
   const runQueryComponent = useCanvasStore((s) => s.runQueryComponent);
+  const cancelQueryComponent = useCanvasStore((s) => s.cancelQueryComponent);
 
   const hostRef = useRef<HTMLDivElement | null>(null);
   useQueryEditor(hostRef, { tabId, id, connectionId });
@@ -57,16 +58,25 @@ function QueryNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
               </span>
             )}
             <span className="mdbc-canvas-head-sep" />
-            <IconButton
-              icon="play"
-              label="Run"
-              variant="primary"
-              size={14}
-              loading={run?.running}
-              disabled={run?.running}
-              className="mdbc-canvas-run"
-              onClick={() => void runQueryComponent(tabId, id)}
-            />
+            {run?.running ? (
+              <IconButton
+                icon="square"
+                label="Cancel"
+                variant="danger"
+                size={14}
+                className="mdbc-canvas-run"
+                onClick={() => cancelQueryComponent(tabId, id)}
+              />
+            ) : (
+              <IconButton
+                icon="play"
+                label="Run"
+                variant="primary"
+                size={14}
+                className="mdbc-canvas-run"
+                onClick={() => void runQueryComponent(tabId, id)}
+              />
+            )}
           </div>
         </div>
         <div ref={hostRef} className="nodrag nowheel mdbc-canvas-sql" />

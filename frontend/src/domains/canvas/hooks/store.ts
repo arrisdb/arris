@@ -11,7 +11,7 @@ import type {
   QueryRunState,
   ReorderOp,
 } from "../types";
-import { DEFAULT_SIZE, LAYOUT_GAP } from "../constants";
+import { CANVAS_QUERY_ID_PREFIX, DEFAULT_SIZE, LAYOUT_GAP } from "../constants";
 import {
   deriveDataEdges,
   genId,
@@ -20,7 +20,7 @@ import {
   parseDoc,
   planAgentChanges,
 } from "../utils";
-import { runCanvasCellIPC } from "../ipc";
+import { cancelCanvasCellIPC, runCanvasCellIPC } from "../ipc";
 
 interface BoardState {
   doc: CanvasDoc;
@@ -79,6 +79,9 @@ interface CanvasStore {
   setRun: (tabId: string, id: string, run: QueryRunState) => void;
   /// Execute a query object and store its result/error in `runs`.
   runQueryComponent: (tabId: string, id: string) => Promise<void>;
+  /// Ask the backend to cancel a query object's in-flight run. The awaited run
+  /// call resolves with per-cell "cancelled" errors, which clear the spinner.
+  cancelQueryComponent: (tabId: string, id: string) => void;
   /// Run every query object on the board. Only the sink cells (those no other
   /// cell reads) are dispatched; the backend auto-runs each sink's upstream
   /// dependencies, so a shared upstream runs once rather than once per dependent.
@@ -384,9 +387,10 @@ const useCanvasStore = create<CanvasStore>((set, get) => ({
         sql: c.sql,
         connectionId: c.connectionId,
       }));
-    get().setRun(tabId, id, { running: true });
+    const queryId = `${CANVAS_QUERY_ID_PREFIX}:${tabId}:${id}`;
+    get().setRun(tabId, id, { running: true, queryId });
     try {
-      const runs = await runCanvasCellIPC(tabId, id, cells);
+      const runs = await runCanvasCellIPC(tabId, id, cells, queryId);
       // Apply each executed cell's outcome (target + its upstream dependencies).
       for (const r of runs) {
         get().setRun(tabId, r.id, r.error ? { error: r.error } : { result: r.result });
@@ -403,6 +407,14 @@ const useCanvasStore = create<CanvasStore>((set, get) => ({
     } catch (e) {
       get().setRun(tabId, id, { running: false, error: errToString(e) });
     }
+  },
+
+  cancelQueryComponent: (tabId, id) => {
+    const run = get().boards[tabId]?.runs[id];
+    if (!run?.running || !run.queryId) return;
+    // Fire-and-forget: the awaited runQueryComponent call applies the
+    // cancelled outcome; a failed cancel changes nothing.
+    cancelCanvasCellIPC(run.queryId).catch(() => {});
   },
 
   runAllQueries: async (tabId) => {

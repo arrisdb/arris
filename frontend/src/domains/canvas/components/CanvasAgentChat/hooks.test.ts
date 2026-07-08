@@ -222,7 +222,12 @@ describe("useCanvasAgentChat", () => {
 
     const board = useCanvasStore.getState().boards[TAB];
     expect(board.doc.components).toHaveLength(3);
-    expect(vi.mocked(runCanvasCellIPC)).toHaveBeenCalledWith(TAB, "q1", expect.any(Array));
+    expect(vi.mocked(runCanvasCellIPC)).toHaveBeenCalledWith(
+      TAB,
+      "q1",
+      expect.any(Array),
+      expect.stringContaining("q1"),
+    );
     expect(result.current.streaming).toBe(false);
     // The prose reply and the action it took are separate fields: the bubble keeps
     // the prose; the explicit, object-naming summary rides on `action`.

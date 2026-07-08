@@ -22,14 +22,21 @@ interface CanvasCellRun {
 /// board's full set of query cells (so the backend can resolve title references);
 /// `targetId` is the cell the user clicked Run on. Returns one entry per executed
 /// cell (the target and its transitive dependencies), so the board can refresh
-/// every affected grid in one round-trip.
+/// every affected grid in one round-trip. `queryId` names the run so
+/// `cancelCanvasCellIPC` can stop it.
 function runCanvasCellIPC(
   boardId: string,
   targetId: string,
   cells: CanvasCellSpec[],
+  queryId: string,
 ): Promise<CanvasCellRun[]> {
-  return invoke("cmd_run_canvas_cell", { boardId, targetId, cells });
+  return invoke("cmd_run_canvas_cell", { boardId, targetId, cells, queryId });
 }
 
-export { runCanvasCellIPC };
+/// Cancel an in-flight canvas cell run started with the same `queryId`.
+function cancelCanvasCellIPC(queryId: string): Promise<void> {
+  return invoke("cmd_cancel_query", { queryId });
+}
+
+export { cancelCanvasCellIPC, runCanvasCellIPC };
 export type { CanvasCellRun, CanvasCellSpec };
