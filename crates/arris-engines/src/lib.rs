@@ -22,7 +22,10 @@ pub trait Engine: Send + Sync {
 }
 
 pub use agent::AgentEngine;
-pub use canvas::{CanvasCellRun, CanvasCellSpec, CanvasEngine, CanvasError, CellResultCache};
+pub use canvas::{
+    CanvasCellRun, CanvasCellSpec, CanvasEngine, CanvasError, CellCacheWriter, CellResultCache,
+    CellWriteStats, IngestedCell, CELL_RESULT_PAGE_ROWS,
+};
 pub use connection::{ConnectionEngine, ScopedConnection};
 pub use dbt::DbtEngine;
 pub use federation::FederationEngine;

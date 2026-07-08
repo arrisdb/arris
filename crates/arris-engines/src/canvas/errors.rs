@@ -10,4 +10,6 @@ pub enum CanvasError {
     Conversion(String),
     #[error("query engine error: {0}")]
     Engine(String),
+    #[error("query cancelled")]
+    Cancelled,
 }

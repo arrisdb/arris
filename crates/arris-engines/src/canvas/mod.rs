@@ -13,4 +13,4 @@ pub use errors::CanvasError;
 pub use impl_canvas_engine::CanvasEngine;
 pub use impl_cell_cache_writer::CellCacheWriter;
 pub use impl_cell_result_cache::CellResultCache;
-pub use types::{CanvasCellRun, CanvasCellSpec, CellWriteStats};
+pub use types::{CanvasCellRun, CanvasCellSpec, CellWriteStats, IngestedCell};
