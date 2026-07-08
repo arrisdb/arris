@@ -8,10 +8,12 @@
 //! Each test owns its own container, so they are independent and parallel-safe.
 
 use arris_engines::{
-    ConnectionConfig, ConnectionEngine, DatabaseDriver, DatabaseKind, ExplainMode, IsolationLevel,
-    ObjectRef, PlanNode, QueryEngine, QueryLanguage, QueryResult, QueryValue, SchemaNode,
-    SchemaNodeKind, SslMode, TransactionConfig, TransactionMode, driver_for_kind,
+    CanvasEngine, CanvasError, CellResultCache, ConnectionConfig, ConnectionEngine,
+    DatabaseDriver, DatabaseKind, ExplainMode, IsolationLevel, ObjectRef, PlanNode, QueryEngine,
+    QueryLanguage, QueryResult, QueryValue, SchemaNode, SchemaNodeKind, SslMode,
+    TransactionConfig, TransactionMode, driver_for_kind, CELL_RESULT_PAGE_ROWS,
 };
+use tokio_util::sync::CancellationToken;
 use testcontainers_modules::postgres::Postgres;
 use testcontainers_modules::testcontainers::runners::AsyncRunner;
 use testcontainers_modules::testcontainers::{ContainerAsync, ImageExt};
@@ -1450,4 +1452,124 @@ async fn object_definition_schema_is_faithful_and_replayable() {
         "reporting",
         SchemaNodeKind::Schema
     ));
+}
+
+// ── streaming ingestion (canvas path) ───────────────────────────────────────
+
+static STREAM_DIR_SEQ: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+/// A canvas engine over a throwaway cell cache (1 GiB memory / 10 GiB total).
+fn canvas_engine() -> CanvasEngine {
+    let n = STREAM_DIR_SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let dir =
+        std::env::temp_dir().join(format!("arris-pg-stream-{}-{}", std::process::id(), n));
+    let cache = CellResultCache::new(dir, 1 << 30, 10 * (1 << 30));
+    CanvasEngine::new(std::sync::Arc::new(cache))
+}
+
+const BOARD: &str = "board-stream";
+
+#[tokio::test]
+async fn streaming_ingests_100k_rows_with_exact_totals_and_page() {
+    let (_container, driver) = start_pg().await;
+    let engine = canvas_engine();
+
+    let stream = driver
+        .run_query_stream(
+            "SELECT n, 'row-' || n AS label FROM generate_series(1, 100000) AS n",
+            &[],
+            QueryLanguage::Native,
+        )
+        .await
+        .expect("open stream");
+    let out = engine
+        .ingest_cell_stream(BOARD, "big", stream, None)
+        .await
+        .expect("ingest stream");
+
+    assert_eq!(out.total_rows, 100_000);
+    assert!(out.complete);
+    assert_eq!(out.result.rows.len(), CELL_RESULT_PAGE_ROWS);
+    let names: Vec<&str> = out.result.columns.iter().map(|c| c.name.as_str()).collect();
+    assert_eq!(names, vec!["n", "label"]);
+    assert_eq!(out.result.columns[0].type_hint, "int4");
+    assert_eq!(out.result.columns[1].type_hint, "text");
+    assert_eq!(out.result.rows[0][0], QueryValue::Int(1));
+    assert_eq!(out.result.rows[0][1], QueryValue::Text("row-1".into()));
+    assert_eq!(out.result.rows[499][0], QueryValue::Int(500));
+
+    // A chained cell aggregates the FULL cached result, not the 500-row page.
+    let agg = engine
+        .run_cell(BOARD, "sums", "SELECT COUNT(*) AS c, SUM(n) AS s FROM big")
+        .await
+        .expect("chained aggregate");
+    assert_eq!(agg.result.rows[0][0], QueryValue::Int(100_000));
+    assert_eq!(agg.result.rows[0][1], QueryValue::Int(5_000_050_000));
+}
+
+#[tokio::test]
+async fn streaming_cancel_mid_stream_registers_no_cache_entry() {
+    let (_container, driver) = start_pg().await;
+    let engine = canvas_engine();
+
+    // Large enough that the stream is still running when the cancel fires.
+    let stream = driver
+        .run_query_stream(
+            "SELECT n FROM generate_series(1, 100000000) AS n",
+            &[],
+            QueryLanguage::Native,
+        )
+        .await
+        .expect("open stream");
+
+    let token = CancellationToken::new();
+    let canceller = token.clone();
+    tokio::spawn(async move {
+        tokio::time::sleep(std::time::Duration::from_millis(150)).await;
+        canceller.cancel();
+    });
+
+    let err = engine
+        .ingest_cell_stream(BOARD, "huge", stream, Some(&token))
+        .await
+        .expect_err("cancel must fail the ingest");
+    assert!(matches!(err, CanvasError::Cancelled), "got {err:?}");
+    // Mirror the app's cancel path: the driver-level kill also fires.
+    driver.cancel_running_query().await.expect("pg cancel request");
+
+    // The aborted cell was never registered, so downstream cannot read it.
+    let chained = engine.run_cell(BOARD, "agg", "SELECT COUNT(*) FROM huge").await;
+    assert!(chained.is_err(), "cancelled cell must not be queryable");
+}
+
+#[tokio::test]
+async fn streaming_byte_budget_truncates_and_reports_incomplete() {
+    let (_container, driver) = start_pg().await;
+    let engine = canvas_engine();
+
+    let stream = driver
+        .run_query_stream(
+            "SELECT n FROM generate_series(1, 1000000) AS n",
+            &[],
+            QueryLanguage::Native,
+        )
+        .await
+        .expect("open stream");
+    // A ~1 MiB budget admits a handful of 8k-row chunks, then stops.
+    let out = engine
+        .ingest_cell_stream_with_budget(BOARD, "capped", stream, None, 1 << 20)
+        .await
+        .expect("ingest stream");
+
+    assert!(!out.complete, "budget stop must be surfaced, never silent");
+    assert!(out.total_rows >= CELL_RESULT_PAGE_ROWS as u64);
+    assert!(out.total_rows < 1_000_000, "budget must truncate the run");
+    assert_eq!(out.result.rows.len(), CELL_RESULT_PAGE_ROWS);
+
+    // The cached prefix stays queryable and matches the reported total.
+    let agg = engine
+        .run_cell(BOARD, "agg", "SELECT COUNT(*) AS c FROM capped")
+        .await
+        .expect("chained count");
+    assert_eq!(agg.result.rows[0][0], QueryValue::Int(out.total_rows as i64));
 }
