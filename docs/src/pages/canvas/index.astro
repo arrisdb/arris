@@ -258,6 +258,8 @@ import Screenshot from "../../components/docs/Screenshot/Screenshot.astro";
           A SQL statement in the same dialect-aware, schema-completing editor as the main SQL editor,
           with a <strong>Run</strong> button in its header and a one-line status below ("Running...",
           "<em>N</em> rows &middot; <em>N</em> columns", an error, or "Run the query to preview data").
+          While a run is in flight the Run button becomes a <strong>Cancel</strong> button that stops
+          the query.
           The cell shows no grid itself: on its first successful run a preview <strong>table</strong> is
           auto-placed beside it and joined with an arrow, unless a table or chart is already bound to it.
           Reference another cell by title with <code>FROM &lt;cell title&gt;</code> to build on its
@@ -314,7 +316,7 @@ import Screenshot from "../../components/docs/Screenshot/Screenshot.astro";
     <li><strong>Copy, paste, lock, delete.</strong> <kbd>&#8984;C</kbd> copies the selected object to an in-app clipboard and <kbd>&#8984;V</kbd> pastes a clone nearby; <strong>Lock</strong> freezes an object (still selectable, but not movable or resizable until unlocked); <kbd>Delete</kbd> or <kbd>Backspace</kbd> removes it. All are also in the right-click menu.</li>
     <li><strong>Pan and zoom.</strong> Pan with the Hand tool or by dragging an empty part of the board; zoom with the scroll wheel or the controls in the corner (0.2x to 2x). Scrolling inside a table, chart, or query cell scrolls that object, not the board.</li>
     <li><strong>Dependency arrows are automatic.</strong> Arrows are drawn when a chart or table binds to its source query, and when one query reads another with <code>FROM &lt;cell title&gt;</code>. They anchor to both objects' borders and re-route as you move them. You cannot draw them by hand, but you can delete one from its right-click menu.</li>
-    <li><strong>Run.</strong> Run a single query with its Run button (or the editor's run shortcut). <strong>Run all</strong> on the toolbar runs every query, resolving upstream cells first.</li>
+    <li><strong>Run.</strong> Run a single query with its Run button (or the editor's run shortcut); while it runs the button becomes <strong>Cancel</strong> and stops the query. <strong>Run all</strong> on the toolbar runs every query, resolving upstream cells first.</li>
     <li><strong>Fit on open.</strong> Reopening a board frames its existing content, so you land on your work rather than empty space.</li>
   </ul>
 

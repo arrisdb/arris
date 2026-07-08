@@ -42,9 +42,14 @@ const LAYOUT_ORIGIN = { x: 80, y: 80 };
 /// Debounce before serializing the live board back into the tab's text.
 const CANVAS_SAVE_DEBOUNCE_MS = 400;
 
+/// Prefix of the backend cancellation id for a cell run
+/// (`<prefix>:<tabId>:<cellId>`), passed to run and cancel IPC alike.
+const CANVAS_QUERY_ID_PREFIX = "canvas-cell";
+
 export {
   CANVAS_ASK_FENCE,
   CANVAS_DOC_VERSION,
+  CANVAS_QUERY_ID_PREFIX,
   CANVAS_SAVE_DEBOUNCE_MS,
   CANVAS_SPEC_FENCE,
   DEFAULT_SIZE,
