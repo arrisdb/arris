@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import type { ChartSpec } from "@shared";
 
 import { buildChartQuery } from "./chartQuery";
-import { CHART_MAX_GROUPS, CHART_RAW_SAMPLE_CAP } from "../constants";
 
 describe("buildChartQuery", () => {
   it("groups an aggregating bar chart over the full result", () => {
@@ -14,9 +13,7 @@ describe("buildChartQuery", () => {
     };
     const q = buildChartQuery(spec, "sales");
     expect(q).toEqual({
-      sql:
-        `SELECT "event_type", COUNT("amount") AS "amount" FROM sales ` +
-        `GROUP BY "event_type" ORDER BY COUNT("amount") DESC LIMIT ${CHART_MAX_GROUPS}`,
+      sql: 'SELECT "event_type", COUNT("amount") AS "amount" FROM sales GROUP BY "event_type"',
       aggregated: true,
     });
   });
@@ -43,15 +40,15 @@ describe("buildChartQuery", () => {
     expect(q?.sql).toContain('SUM("amount") AS "amount"');
   });
 
-  it("samples the raw result when aggregation is off", () => {
+  it("reads the raw result when aggregation is off", () => {
     const spec: ChartSpec = { kind: "line", xColumn: "ts", yColumns: ["v"], aggregation: "none" };
     expect(buildChartQuery(spec, "t")).toEqual({
-      sql: `SELECT "ts", "v" FROM t LIMIT ${CHART_RAW_SAMPLE_CAP}`,
+      sql: 'SELECT "ts", "v" FROM t',
       aggregated: false,
     });
   });
 
-  it("always samples raw for scatter, even with an aggregation set", () => {
+  it("always reads raw for scatter, even with an aggregation set", () => {
     const spec: ChartSpec = {
       kind: "scatter",
       xColumn: "x",
@@ -61,7 +58,7 @@ describe("buildChartQuery", () => {
     };
     const q = buildChartQuery(spec, "t");
     expect(q?.aggregated).toBe(false);
-    expect(q?.sql).toBe(`SELECT "x", "y", "z" FROM t LIMIT ${CHART_RAW_SAMPLE_CAP}`);
+    expect(q?.sql).toBe('SELECT "x", "y", "z" FROM t');
   });
 
   it("reduces a KPI to a single aggregate value", () => {

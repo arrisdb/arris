@@ -1,5 +1,4 @@
 import type { AggFn, ChartKind, ChartSpec } from "@shared";
-import { CHART_MAX_GROUPS, CHART_RAW_SAMPLE_CAP } from "../constants";
 
 /// The SQL a chart runs over its source cell's FULL cached result, plus whether
 /// that SQL already aggregated. When `aggregated`, the chart feeds the result to
@@ -64,13 +63,13 @@ function buildChartQuery(spec: ChartSpec, sourceTitle: string): ChartQuery | nul
     return { sql: `SELECT ${quoteCol(y)} FROM ${sourceTitle} LIMIT 1`, aggregated: false };
   }
 
-  // Raw point/distribution kinds, or any chart with aggregation off: sample the
-  // full result. The client maps/bins the sample as it does today.
+  // Raw point/distribution kinds, or any chart with aggregation off: read the
+  // full result. The client maps/bins it as it does today.
   if (!agg || RAW_KINDS.has(kind)) {
     const cols = rawColumns(spec);
     if (cols.length === 0) return null;
     return {
-      sql: `SELECT ${cols.map(quoteCol).join(", ")} FROM ${sourceTitle} LIMIT ${CHART_RAW_SAMPLE_CAP}`,
+      sql: `SELECT ${cols.map(quoteCol).join(", ")} FROM ${sourceTitle}`,
       aggregated: false,
     };
   }
@@ -85,12 +84,9 @@ function buildChartQuery(spec: ChartSpec, sourceTitle: string): ChartQuery | nul
     ...groupCols.map(quoteCol),
     ...measures.map((m) => `${AGG_SQL[agg]}(${quoteCol(m)}) AS ${quoteCol(m)}`),
   ].join(", ");
-  // Order by the first measure DESC so the group cap keeps the biggest groups;
-  // ChartView re-sorts for display per the spec's sortOrder.
-  const orderBy = ` ORDER BY ${AGG_SQL[agg]}(${quoteCol(measures[0])}) DESC`;
   const groupBy = groupCols.map(quoteCol).join(", ");
   return {
-    sql: `SELECT ${select} FROM ${sourceTitle} GROUP BY ${groupBy}${orderBy} LIMIT ${CHART_MAX_GROUPS}`,
+    sql: `SELECT ${select} FROM ${sourceTitle} GROUP BY ${groupBy}`,
     aggregated: true,
   };
 }
