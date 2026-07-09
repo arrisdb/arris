@@ -2,9 +2,10 @@ import { describe, expect, it } from "vitest";
 import type { ChartSpec } from "@shared";
 
 import { buildChartQuery } from "./chartQuery";
+import { DEFAULT_CHART_MAX_ROWS } from "../constants";
 
 describe("buildChartQuery", () => {
-  it("groups an aggregating bar chart over the full result", () => {
+  it("groups an aggregating bar chart, keeping the biggest groups under the default cap", () => {
     const spec: ChartSpec = {
       kind: "bar",
       xColumn: "event_type",
@@ -13,9 +14,34 @@ describe("buildChartQuery", () => {
     };
     const q = buildChartQuery(spec, "sales");
     expect(q).toEqual({
-      sql: 'SELECT "event_type", COUNT("amount") AS "amount" FROM sales GROUP BY "event_type"',
+      sql:
+        'SELECT "event_type", COUNT("amount") AS "amount" FROM sales ' +
+        `GROUP BY "event_type" ORDER BY 2 DESC LIMIT ${DEFAULT_CHART_MAX_ROWS}`,
       aggregated: true,
     });
+  });
+
+  it("applies a per-chart maxRows override", () => {
+    const spec: ChartSpec = { kind: "bar", xColumn: "x", yColumns: ["y"], aggregation: "sum" };
+    expect(buildChartQuery(spec, "t", 50)?.sql).toBe(
+      'SELECT "x", SUM("y") AS "y" FROM t GROUP BY "x" ORDER BY 2 DESC LIMIT 50',
+    );
+    // A raw chart caps the point count too.
+    expect(buildChartQuery({ kind: "scatter", xColumn: "x", yColumns: ["y"] }, "t", 25)?.sql).toBe(
+      'SELECT "x", "y" FROM t LIMIT 25',
+    );
+  });
+
+  it("orders by the measure position after the group columns for a series pivot", () => {
+    const spec: ChartSpec = {
+      kind: "bar",
+      xColumn: "month",
+      yColumns: ["amount"],
+      seriesColumn: "region",
+      aggregation: "sum",
+    };
+    // groupCols = [month, region] -> measure is column 3.
+    expect(buildChartQuery(spec, "sales")?.sql).toContain("ORDER BY 3 DESC");
   });
 
   it("maps each aggregation function to its SQL form", () => {
@@ -43,7 +69,7 @@ describe("buildChartQuery", () => {
   it("reads the raw result when aggregation is off", () => {
     const spec: ChartSpec = { kind: "line", xColumn: "ts", yColumns: ["v"], aggregation: "none" };
     expect(buildChartQuery(spec, "t")).toEqual({
-      sql: 'SELECT "ts", "v" FROM t',
+      sql: `SELECT "ts", "v" FROM t LIMIT ${DEFAULT_CHART_MAX_ROWS}`,
       aggregated: false,
     });
   });
@@ -58,7 +84,7 @@ describe("buildChartQuery", () => {
     };
     const q = buildChartQuery(spec, "t");
     expect(q?.aggregated).toBe(false);
-    expect(q?.sql).toBe('SELECT "x", "y", "z" FROM t');
+    expect(q?.sql).toBe(`SELECT "x", "y", "z" FROM t LIMIT ${DEFAULT_CHART_MAX_ROWS}`);
   });
 
   it("reduces a KPI to a single aggregate value", () => {

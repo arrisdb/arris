@@ -1,4 +1,5 @@
 import type { AggFn, ChartKind, ChartSpec } from "@shared";
+import { DEFAULT_CHART_MAX_ROWS } from "../constants";
 
 /// The SQL a chart runs over its source cell's FULL cached result, plus whether
 /// that SQL already aggregated. When `aggregated`, the chart feeds the result to
@@ -44,11 +45,18 @@ function activeAgg(spec: ChartSpec): Exclude<AggFn, "none"> | null {
 
 /// Build the SQL a chart uses to read its source cell over the full cached result.
 /// `sourceTitle` must already be sanitized (it is the bare table identifier the
-/// backend resolves to the cached cell). Returns `null` when the spec has nothing
-/// to plot yet (no measure, or no columns at all).
-function buildChartQuery(spec: ChartSpec, sourceTitle: string): ChartQuery | null {
+/// backend resolves to the cached cell). `maxRows` caps how many rows the chart
+/// draws (the top groups for an aggregation, the first points for a raw chart);
+/// unset falls back to `DEFAULT_CHART_MAX_ROWS`. Returns `null` when the spec has
+/// nothing to plot yet (no measure, or no columns at all).
+function buildChartQuery(
+  spec: ChartSpec,
+  sourceTitle: string,
+  maxRows?: number,
+): ChartQuery | null {
   const kind = spec.kind ?? "bar";
   const agg = activeAgg(spec);
+  const limit = maxRows && maxRows > 0 ? maxRows : DEFAULT_CHART_MAX_ROWS;
 
   // KPI: a single aggregate value, or the first row's measure when ungrouped.
   if (kind === "kpi") {
@@ -69,7 +77,7 @@ function buildChartQuery(spec: ChartSpec, sourceTitle: string): ChartQuery | nul
     const cols = rawColumns(spec);
     if (cols.length === 0) return null;
     return {
-      sql: `SELECT ${cols.map(quoteCol).join(", ")} FROM ${sourceTitle}`,
+      sql: `SELECT ${cols.map(quoteCol).join(", ")} FROM ${sourceTitle} LIMIT ${limit}`,
       aggregated: false,
     };
   }
@@ -85,8 +93,12 @@ function buildChartQuery(spec: ChartSpec, sourceTitle: string): ChartQuery | nul
     ...measures.map((m) => `${AGG_SQL[agg]}(${quoteCol(m)}) AS ${quoteCol(m)}`),
   ].join(", ");
   const groupBy = groupCols.map(quoteCol).join(", ");
+  // Order by the first measure's column POSITION (not the aggregate expression,
+  // which would collide with its own alias as a duplicate field) so the cap keeps
+  // the biggest groups; ChartView re-sorts for display per sortOrder.
+  const orderBy = ` ORDER BY ${groupCols.length + 1} DESC`;
   return {
-    sql: `SELECT ${select} FROM ${sourceTitle} GROUP BY ${groupBy}`,
+    sql: `SELECT ${select} FROM ${sourceTitle} GROUP BY ${groupBy}${orderBy} LIMIT ${limit}`,
     aggregated: true,
   };
 }

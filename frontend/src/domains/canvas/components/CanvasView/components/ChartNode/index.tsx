@@ -38,10 +38,11 @@ function ChartNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
   const sourceTitle =
     source?.kind === "query" && source.title ? sanitizeCellTitle(source.title) : undefined;
   const spec = component?.kind === "chart" ? component.spec : undefined;
+  const maxRows = component?.kind === "chart" ? component.maxRows : undefined;
 
   const query = useMemo(
-    () => (spec && sourceTitle ? buildChartQuery(spec, sourceTitle) : null),
-    [spec, sourceTitle],
+    () => (spec && sourceTitle ? buildChartQuery(spec, sourceTitle, maxRows) : null),
+    [spec, sourceTitle, maxRows],
   );
 
   const [agg, setAgg] = useState<ChartData>({ loading: false });

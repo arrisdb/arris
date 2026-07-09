@@ -77,6 +77,10 @@ interface ChartComponent extends BaseComponent {
   sourceQueryId: string | null;
   spec: ChartSpec;
   title?: string;
+  /// Max rows the chart draws: the aggregation keeps the top `maxRows` groups
+  /// (biggest first), a raw chart the first `maxRows` points. Absent = the
+  /// default cap. Bounds render cost and the IPC payload.
+  maxRows?: number;
 }
 
 /// A data table bound to a query object's data by `sourceQueryId`. Renders the

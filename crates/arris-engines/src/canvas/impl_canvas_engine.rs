@@ -823,6 +823,28 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn query_cache_orders_by_position_and_limits_without_duplicate_field() {
+        let engine = engine();
+        engine
+            .ingest_cell_stream(BOARD, "a", synthetic_stream(3, 300), None)
+            .await
+            .unwrap();
+        // Reproduces the chart shape: the aggregate is aliased to the same name as
+        // an input column and the query orders by that column's POSITION (not the
+        // aggregate expression, which would trip "duplicate unqualified field
+        // name"), then caps the group count.
+        let agg = engine
+            .query_cache(
+                BOARD,
+                "SELECT n % 2 AS bucket, COUNT(s) AS s FROM a GROUP BY n % 2 ORDER BY 2 DESC LIMIT 1",
+            )
+            .await
+            .unwrap();
+        assert_eq!(agg.rows.len(), 1);
+        assert_eq!(int_at(&agg, 0, 1), 450);
+    }
+
+    #[tokio::test]
     async fn fetch_page_slices_across_batch_boundaries() {
         let engine = engine();
         // Two 400-row batches cached under "a" (rows 0..800).

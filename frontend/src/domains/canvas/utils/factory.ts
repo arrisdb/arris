@@ -30,6 +30,8 @@ interface ComponentInput {
   // chart + table
   sourceQueryId?: string | null;
   spec?: ChartSpec;
+  // chart
+  maxRows?: number;
   // table
   previewRows?: number;
   // shape
@@ -100,6 +102,7 @@ function makeComponent(input: ComponentInput): CanvasComponent {
         ...geom,
         sourceQueryId: input.sourceQueryId ?? null,
         spec: input.spec ?? fallbackChartSpec(),
+        maxRows: input.maxRows,
         title: input.title,
       };
     case "table":

@@ -76,6 +76,25 @@ describe("ChartSection", () => {
     expect(lastCall.spec.title).toBeUndefined();
   });
 
+  it("edits the per-chart max rows", () => {
+    const onChange = vi.fn();
+    const { getByTestId } = render(
+      <ChartSection tabId={TAB} component={chart} onChange={onChange} />,
+    );
+    fireEvent.change(getByTestId("chart-max-rows"), { target: { value: "250" } });
+    expect(onChange).toHaveBeenCalledWith({ maxRows: 250 });
+  });
+
+  it("clears max rows back to the default when emptied", () => {
+    const onChange = vi.fn();
+    const withMax = makeComponent({ kind: "chart", id: "ch", sourceQueryId: "q1", maxRows: 250 });
+    const { getByTestId } = render(
+      <ChartSection tabId={TAB} component={withMax} onChange={onChange} />,
+    );
+    fireEvent.change(getByTestId("chart-max-rows"), { target: { value: "" } });
+    expect(onChange).toHaveBeenCalledWith({ maxRows: undefined });
+  });
+
   it("renders nothing for a non-chart object", () => {
     const other = makeComponent({ kind: "shape", id: "s", shape: "rect" });
     const { container } = render(
