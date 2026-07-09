@@ -53,9 +53,13 @@ impl AppEnvironment {
         let connection = crate::connection::ConnectionEngine::new(dir.clone()).await;
         let logs_dir = dir.join(DEBUG_LOGS_DIR_NAME);
         // Canvas cell-chaining keeps each cell's result as Arrow; the cache spills
-        // to this directory past its memory tier and is hard-capped on disk.
+        // to this directory past its memory tier and is hard-capped on disk. Spill
+        // files are encrypted under a per-session key; purge any left by a prior
+        // run (a crash could orphan some) so cached query data never crosses runs.
+        let cache_dir = dir.join(crate::canvas::CANVAS_CELL_CACHE_DIR_NAME);
+        let _ = std::fs::remove_dir_all(&cache_dir);
         let cell_cache = Arc::new(crate::canvas::CellResultCache::new(
-            dir.join("canvas-cell-cache"),
+            cache_dir,
             crate::canvas::CELL_CACHE_MEMORY_BUDGET,
             crate::canvas::CELL_CACHE_TOTAL_BUDGET,
         ));

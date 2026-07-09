@@ -1,12 +1,11 @@
-use std::fs::File;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use datafusion::arrow::ipc::writer::FileWriter;
 use datafusion::arrow::record_batch::RecordBatch;
 
 use super::errors::CanvasError;
 use super::impl_cell_result_cache::CellResultCache;
+use super::impl_spill_writer::SpillWriter;
 use super::types::CellWriteStats;
 
 /// An appendable writer for one cell's streamed result. Batches accumulate in
@@ -19,7 +18,7 @@ pub struct CellCacheWriter {
     key: String,
     budget: usize,
     mem: Vec<RecordBatch>,
-    file: Option<(PathBuf, FileWriter<File>)>,
+    file: Option<(PathBuf, SpillWriter)>,
     bytes: usize,
     rows: u64,
 }
@@ -40,17 +39,13 @@ impl CellCacheWriter {
     /// Move the buffered in-memory batches into a fresh IPC spill file; later
     /// appends stream straight to it.
     fn spill(&mut self) -> Result<(), CanvasError> {
-        let Some(first) = self.mem.first() else {
+        if self.mem.is_empty() {
             return Ok(());
-        };
+        }
         let path = self.cache.next_spill_path()?;
-        let file = File::create(&path).map_err(|e| CanvasError::Io(e.to_string()))?;
-        let mut writer = FileWriter::try_new(file, &first.schema())
-            .map_err(|e| CanvasError::Arrow(e.to_string()))?;
+        let mut writer = self.cache.spill_writer(&path)?;
         for batch in self.mem.drain(..) {
-            writer
-                .write(&batch)
-                .map_err(|e| CanvasError::Arrow(e.to_string()))?;
+            writer.write(&batch)?;
         }
         self.file = Some((path, writer));
         Ok(())
@@ -69,9 +64,7 @@ impl CellCacheWriter {
         self.bytes += batch_bytes;
         self.rows += batch.num_rows() as u64;
         match &mut self.file {
-            Some((_, writer)) => writer
-                .write(&batch)
-                .map_err(|e| CanvasError::Arrow(e.to_string()))?,
+            Some((_, writer)) => writer.write(&batch)?,
             None => {
                 self.mem.push(batch);
                 if self.bytes > self.cache.mem_budget() {
@@ -90,10 +83,8 @@ impl CellCacheWriter {
             total_bytes: self.bytes,
         };
         match self.file {
-            Some((path, mut writer)) => {
-                writer
-                    .finish()
-                    .map_err(|e| CanvasError::Arrow(e.to_string()))?;
+            Some((path, writer)) => {
+                writer.finish()?;
                 self.cache.insert_spilled(&self.key, path, self.bytes)?;
             }
             None => {

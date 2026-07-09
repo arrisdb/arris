@@ -1,15 +1,14 @@
 use std::collections::HashMap;
-use std::fs::File;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
-use datafusion::arrow::ipc::reader::FileReader;
-use datafusion::arrow::ipc::writer::FileWriter;
 use datafusion::arrow::record_batch::RecordBatch;
 
 use super::constants::CELL_INGEST_BYTE_BUDGET;
 use super::errors::CanvasError;
 use super::impl_cell_cache_writer::CellCacheWriter;
+use super::impl_spill_cipher::SpillCipher;
+use super::impl_spill_writer::SpillWriter;
 
 /// Where one cached cell result physically lives.
 enum Store {
@@ -46,6 +45,9 @@ pub struct CellResultCache {
     mem_budget: usize,
     total_budget: usize,
     spill_dir: PathBuf,
+    /// Per-session cipher: spill files are encrypted at rest under a random key
+    /// held only in memory for this process.
+    cipher: SpillCipher,
 }
 
 impl CellResultCache {
@@ -61,6 +63,7 @@ impl CellResultCache {
             mem_budget,
             total_budget,
             spill_dir,
+            cipher: SpillCipher::new().expect("spill cipher key generation"),
         }
     }
 
@@ -74,33 +77,6 @@ impl CellResultCache {
             order.remove(pos);
         }
         order.push(key.to_string());
-    }
-
-    fn write_ipc(path: &Path, batches: &[RecordBatch]) -> Result<(), CanvasError> {
-        let file = File::create(path).map_err(|e| CanvasError::Io(e.to_string()))?;
-        let schema = batches[0].schema();
-        let mut writer =
-            FileWriter::try_new(file, &schema).map_err(|e| CanvasError::Arrow(e.to_string()))?;
-        for batch in batches {
-            writer
-                .write(batch)
-                .map_err(|e| CanvasError::Arrow(e.to_string()))?;
-        }
-        writer
-            .finish()
-            .map_err(|e| CanvasError::Arrow(e.to_string()))?;
-        Ok(())
-    }
-
-    fn read_ipc(path: &Path) -> Result<Vec<RecordBatch>, CanvasError> {
-        let file = File::open(path).map_err(|e| CanvasError::Io(e.to_string()))?;
-        let reader =
-            FileReader::try_new(file, None).map_err(|e| CanvasError::Arrow(e.to_string()))?;
-        let mut out = Vec::new();
-        for batch in reader {
-            out.push(batch.map_err(|e| CanvasError::Arrow(e.to_string()))?);
-        }
-        Ok(out)
     }
 
     /// Drop an entry, releasing its memory/disk accounting and deleting its spill
@@ -122,7 +98,12 @@ impl CellResultCache {
 
     /// Spill one in-memory entry to an Arrow IPC file, moving its bytes from the
     /// memory tier to the disk tier. No-op if the entry is already on disk.
-    fn spill_locked(inner: &mut Inner, key: &str, spill_dir: &Path) -> Result<(), CanvasError> {
+    fn spill_locked(
+        inner: &mut Inner,
+        key: &str,
+        spill_dir: &Path,
+        cipher: &SpillCipher,
+    ) -> Result<(), CanvasError> {
         let batches = match inner.entries.get(key).map(|e| &e.store) {
             Some(Store::Mem(b)) => b.clone(),
             _ => return Ok(()),
@@ -130,7 +111,7 @@ impl CellResultCache {
         std::fs::create_dir_all(spill_dir).map_err(|e| CanvasError::Io(e.to_string()))?;
         inner.seq += 1;
         let path = spill_dir.join(format!("cell-{}.arrow", inner.seq));
-        Self::write_ipc(&path, &batches)?;
+        cipher.encrypt_to_file(&path, &batches)?;
         if let Some(entry) = inner.entries.get_mut(key) {
             inner.mem_bytes -= entry.bytes;
             inner.disk_bytes += entry.bytes;
@@ -147,6 +128,7 @@ impl CellResultCache {
         mem_budget: usize,
         total_budget: usize,
         spill_dir: &Path,
+        cipher: &SpillCipher,
     ) -> Result<(), CanvasError> {
         while inner.mem_bytes > mem_budget {
             let coldest_mem = inner
@@ -155,7 +137,7 @@ impl CellResultCache {
                 .find(|k| matches!(inner.entries.get(*k).map(|e| &e.store), Some(Store::Mem(_))))
                 .cloned();
             let Some(key) = coldest_mem else { break };
-            Self::spill_locked(inner, &key, spill_dir)?;
+            Self::spill_locked(inner, &key, spill_dir, cipher)?;
         }
         while inner.mem_bytes + inner.disk_bytes > total_budget && inner.order.len() > 1 {
             let Some(victim) = inner.order.first().cloned() else {
@@ -185,7 +167,7 @@ impl CellResultCache {
         );
         inner.mem_bytes += bytes;
         Self::touch(&mut inner.order, key);
-        Self::enforce(&mut inner, self.mem_budget, self.total_budget, &self.spill_dir)?;
+        Self::enforce(&mut inner, self.mem_budget, self.total_budget, &self.spill_dir, &self.cipher)?;
         Ok(())
     }
 
@@ -214,6 +196,23 @@ impl CellResultCache {
         Ok(self.spill_dir.join(format!("cell-{}.arrow", inner.seq)))
     }
 
+    /// A streaming encrypted writer for a reserved spill path (used by
+    /// `CellCacheWriter` for mid-stream spills).
+    pub(super) fn spill_writer(&self, path: &Path) -> Result<SpillWriter, CanvasError> {
+        self.cipher.writer(path)
+    }
+
+    /// Drop every cached entry and delete the whole spill directory. Called on a
+    /// clean shutdown so no cached query data lingers on disk between runs.
+    pub fn purge(&self) {
+        let mut inner = self.inner.lock().unwrap();
+        inner.entries.clear();
+        inner.order.clear();
+        inner.mem_bytes = 0;
+        inner.disk_bytes = 0;
+        let _ = std::fs::remove_dir_all(&self.spill_dir);
+    }
+
     /// Register a result a writer already spilled to `path` as a disk-tier
     /// entry, then enforce the budgets.
     pub(super) fn insert_spilled(
@@ -233,7 +232,7 @@ impl CellResultCache {
         );
         inner.disk_bytes += bytes;
         Self::touch(&mut inner.order, key);
-        Self::enforce(&mut inner, self.mem_budget, self.total_budget, &self.spill_dir)
+        Self::enforce(&mut inner, self.mem_budget, self.total_budget, &self.spill_dir, &self.cipher)
     }
 
     /// Fetch a cell's cached result, reading it back from disk if it was spilled.
@@ -243,7 +242,7 @@ impl CellResultCache {
         let batches = match inner.entries.get(key).map(|e| &e.store) {
             None => return Ok(None),
             Some(Store::Mem(b)) => b.clone(),
-            Some(Store::Disk(path)) => Self::read_ipc(&path.clone())?,
+            Some(Store::Disk(path)) => self.cipher.decrypt_from_file(&path.clone())?,
         };
         Self::touch(&mut inner.order, key);
         Ok(Some(batches))
@@ -354,6 +353,20 @@ mod tests {
         assert!(!cache.contains("a"), "coldest entry should be evicted");
         assert!(cache.contains("b"), "newest entry is always kept");
         assert!(cache.get("a").unwrap().is_none());
+    }
+
+    #[test]
+    fn purge_clears_entries_and_deletes_the_spill_directory() {
+        // A 1-byte memory budget forces the entry onto disk.
+        let dir = temp_dir();
+        let cache = CellResultCache::new(dir.clone(), 1, BIG);
+        cache.put("a", vec![batch(&[1, 2])]).unwrap();
+        assert!(cache.is_on_disk("a"));
+        assert!(dir.exists());
+        cache.purge();
+        assert!(!cache.contains("a"));
+        assert!(cache.get("a").unwrap().is_none());
+        assert!(!dir.exists(), "spill directory must be removed on purge");
     }
 
     #[test]

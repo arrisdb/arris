@@ -301,6 +301,17 @@ fn main() {
             cmd_python_shutdown,
             cmd_notebook_run_sql,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while running tauri application")
+        .run(|app_handle, event| {
+            // On a clean exit, wipe the encrypted cell-cache spill directory so no
+            // cached query data lingers on disk between runs.
+            if let tauri::RunEvent::Exit = event {
+                if let Some(env) =
+                    app_handle.try_state::<std::sync::Arc<arris_engines::AppEnvironment>>()
+                {
+                    env.canvas.cache().purge();
+                }
+            }
+        });
 }
