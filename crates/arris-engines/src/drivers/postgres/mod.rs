@@ -29,12 +29,12 @@ use tokio_postgres_rustls::MakeRustlsConnect;
 
 use crate::{
     ColumnSpec, ConnectionConfig, DriverError, ExplainMode, MutationResult, ObjectRef, PlanResult,
-    QueryLanguage, QueryResult, QueryStream, QueryValue, RowChunkStream, RowDelete, RowInsert,
-    SchemaNode, SchemaNodeKind, TableRef,
+    QueryLanguage, QueryResult, QueryStream, QueryValue, RowDelete, RowInsert, SchemaNode,
+    SchemaNodeKind, TableRef,
 };
 use crate::drivers::errors::Result;
 
-use crate::drivers::constants::{STREAM_CHUNK_CHANNEL_CAPACITY, STREAM_CHUNK_ROWS};
+use crate::drivers::common::RowChunkPump;
 use crate::drivers::DatabaseDriver;
 use crate::drivers::sql_builder::SqlBuilder;
 use crate::drivers::tls::TlsParams;
@@ -472,56 +472,28 @@ impl DatabaseDriver for PostgresDriver {
             .map(|c| ColumnSpec::new(c.name(), c.type_().name()))
             .collect();
 
-        // A bounded chunk channel keeps backpressure on the wire read; dropping
-        // the receiver (cancel) ends the task and drops the server cursor.
+        // The shared pump owns the client + statement for the stream's life
+        // (dropping its receiver cancels and drops the server cursor); this driver
+        // supplies only how to open the row stream and how to map one row.
         let params = params.to_vec();
-        let (tx, rx) = tokio::sync::mpsc::channel::<
-            std::result::Result<Vec<Vec<QueryValue>>, DriverError>,
-        >(STREAM_CHUNK_CHANNEL_CAPACITY);
-        tokio::spawn(async move {
-            let wrapped: Vec<PgValue<'_>> = params.iter().map(PgValue).collect();
-            let refs = wrapped
-                .iter()
-                .map(|v| v as &dyn tokio_postgres::types::ToSql);
-            let rows = match client.query_raw(&stmt, refs).await {
-                Ok(rows) => rows,
-                Err(e) => {
-                    let _ = tx.send(Err(DriverError::QueryFailed(pg_err_msg(&e)))).await;
-                    return;
-                }
-            };
-            futures::pin_mut!(rows);
-            let mut chunk: Vec<Vec<QueryValue>> = Vec::with_capacity(STREAM_CHUNK_ROWS);
-            while let Some(row) = rows.next().await {
-                match row {
-                    Ok(row) => {
-                        chunk.push(row_values(&row));
-                        if chunk.len() >= STREAM_CHUNK_ROWS {
-                            let full = std::mem::replace(
-                                &mut chunk,
-                                Vec::with_capacity(STREAM_CHUNK_ROWS),
-                            );
-                            if tx.send(Ok(full)).await.is_err() {
-                                return;
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        let _ = tx.send(Err(DriverError::QueryFailed(pg_err_msg(&e)))).await;
-                        return;
-                    }
-                }
-            }
-            if !chunk.is_empty() {
-                let _ = tx.send(Ok(chunk)).await;
-            }
-        });
-
-        let chunks = futures::stream::unfold(rx, |mut rx| async move {
-            rx.recv().await.map(|item| (item, rx))
-        })
-        .boxed();
-        Ok(QueryStream::Rows(RowChunkStream { columns, chunks }))
+        let stream = RowChunkPump::spawn(
+            columns,
+            move || async move {
+                let wrapped: Vec<PgValue<'_>> = params.iter().map(PgValue).collect();
+                let refs = wrapped
+                    .iter()
+                    .map(|v| v as &dyn tokio_postgres::types::ToSql);
+                let rows = client
+                    .query_raw(&stmt, refs)
+                    .await
+                    .map_err(|e| DriverError::QueryFailed(pg_err_msg(&e)))?;
+                Ok(rows
+                    .map(|r| r.map_err(|e| DriverError::QueryFailed(pg_err_msg(&e))))
+                    .boxed())
+            },
+            |row| row_values(row),
+        );
+        Ok(QueryStream::Rows(stream))
     }
 
     async fn explain_query(
