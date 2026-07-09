@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use arris_engines::{
     AppEnvironment, CanvasCellRun, CanvasCellSpec, CanvasEngine, CanvasError, ErrorCode,
-    IngestedCell, IpcError, QueryEngine, QueryValue,
+    IngestedCell, IpcError, QueryEngine, QueryResult, QueryValue,
 };
 use tauri::State;
 use uuid::Uuid;
@@ -201,4 +201,38 @@ pub async fn cmd_run_canvas_cell(
     }
 
     Ok(runs)
+}
+
+/// Aggregate (or sample) a chart's data over the FULL cached result of a source
+/// cell. The frontend builds `sql` from the chart spec: a `GROUP BY` over the
+/// source cell for reducing charts, or a `LIMIT` sample for raw kinds, so the
+/// returned result stays small no matter how many rows the source holds. The
+/// result is ephemeral (never cached back).
+#[tauri::command]
+pub async fn cmd_query_canvas_cache(
+    env: State<'_, Arc<AppEnvironment>>,
+    board_id: String,
+    sql: String,
+) -> Result<QueryResult, IpcError> {
+    env.canvas
+        .query_cache(&board_id, &sql)
+        .await
+        .map_err(ipc_err)
+}
+
+/// One page of a cell's full cached result: rows `[offset, offset + limit)`. The
+/// table object pages through large results with this instead of holding them in
+/// the webview. Returns `None` when the cell has no cached result (never run or
+/// evicted).
+#[tauri::command]
+pub async fn cmd_fetch_canvas_cell_page(
+    env: State<'_, Arc<AppEnvironment>>,
+    board_id: String,
+    title: String,
+    offset: usize,
+    limit: usize,
+) -> Result<Option<QueryResult>, IpcError> {
+    env.canvas
+        .fetch_page(&board_id, &title, offset, limit)
+        .map_err(ipc_err)
 }

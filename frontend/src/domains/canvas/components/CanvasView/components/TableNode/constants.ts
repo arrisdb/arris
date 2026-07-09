@@ -1,5 +1,6 @@
-// Rows rendered in a table object's result preview grid. Higher than the old
-// inline query preview, since this object exists to show the data.
-const PREVIEW_ROWS = 200;
+// Rows per page in a table object's result grid. The table pages through the
+// source cell's FULL cached result (fetched a page at a time from the backend),
+// so this bounds only what is rendered/shipped at once, not the total.
+const TABLE_PAGE_ROWS = 200;
 
-export { PREVIEW_ROWS };
+export { TABLE_PAGE_ROWS };

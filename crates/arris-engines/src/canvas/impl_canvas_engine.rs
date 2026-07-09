@@ -193,10 +193,31 @@ impl CanvasEngine {
         title: &str,
         sql: &str,
     ) -> Result<IngestedCell, CanvasError> {
-        let sql = sql.trim().trim_end_matches(';').trim();
         let start = Instant::now();
-        let ctx = Self::session_context()?;
+        let batches = self.execute_over_cache(board, sql).await?;
+        let total_rows: u64 = batches.iter().map(|b| b.num_rows() as u64).sum();
+        let page = Self::page_batches(&batches, CELL_RESULT_PAGE_ROWS);
+        let result =
+            FederationEngine::batches_to_query_result(&page, start.elapsed().as_secs_f64());
+        self.cache.put(&Self::key(board, title), batches)?;
+        Ok(IngestedCell {
+            result,
+            total_rows,
+            complete: true,
+        })
+    }
 
+    /// Run `sql` against this board's cached cells (each referenced cell registered
+    /// as a `MemTable`) and collect the whole result. Shared by `run_cell` (pages +
+    /// caches the output) and `query_cache` (returns it uncached). A trailing
+    /// semicolon is stripped (DataFusion rejects it).
+    async fn execute_over_cache(
+        &self,
+        board: &str,
+        sql: &str,
+    ) -> Result<Vec<RecordBatch>, CanvasError> {
+        let sql = sql.trim().trim_end_matches(';').trim();
+        let ctx = Self::session_context()?;
         for name in Self::table_refs(sql) {
             if let Some(batches) = self.cache.get(&Self::key(board, &name))? {
                 let schema = batches[0].schema();
@@ -206,7 +227,6 @@ impl CanvasEngine {
                     .map_err(|e| CanvasError::Engine(e.to_string()))?;
             }
         }
-
         let df = ctx
             .sql(sql)
             .await
@@ -219,17 +239,39 @@ impl CanvasEngine {
         if batches.is_empty() {
             batches.push(RecordBatch::new_empty(schema));
         }
+        Ok(batches)
+    }
 
-        let total_rows: u64 = batches.iter().map(|b| b.num_rows() as u64).sum();
-        let page = Self::page_batches(&batches, CELL_RESULT_PAGE_ROWS);
-        let result =
-            FederationEngine::batches_to_query_result(&page, start.elapsed().as_secs_f64());
-        self.cache.put(&Self::key(board, title), batches)?;
-        Ok(IngestedCell {
-            result,
-            total_rows,
-            complete: true,
-        })
+    /// Run an ephemeral read-only query over this board's cached cells and return
+    /// the WHOLE result, not paged and not cached. A chart uses this to aggregate
+    /// over its source cell's full cached result: the chart's `GROUP BY` (or a
+    /// `LIMIT` sample for raw kinds) keeps the output small regardless of how many
+    /// rows the source holds, so it never floods the IPC bridge.
+    pub async fn query_cache(&self, board: &str, sql: &str) -> Result<QueryResult, CanvasError> {
+        let start = Instant::now();
+        let batches = self.execute_over_cache(board, sql).await?;
+        Ok(FederationEngine::batches_to_query_result(
+            &batches,
+            start.elapsed().as_secs_f64(),
+        ))
+    }
+
+    /// A slice of a cached cell's full result: rows `[offset, offset + limit)` as a
+    /// `QueryResult`. `None` when the cell has no cached result (never run, or
+    /// evicted). The table object pages through the full result with this, never
+    /// shipping more than one page across the IPC bridge at a time.
+    pub fn fetch_page(
+        &self,
+        board: &str,
+        title: &str,
+        offset: usize,
+        limit: usize,
+    ) -> Result<Option<QueryResult>, CanvasError> {
+        let Some(batches) = self.cache.get(&Self::key(board, title))? else {
+            return Ok(None);
+        };
+        let page = Self::slice_batches(&batches, offset, limit);
+        Ok(Some(FederationEngine::batches_to_query_result(&page, 0.0)))
     }
 
     /// The first `limit` rows of `batches` (whole batches plus one final slice),
@@ -247,6 +289,34 @@ impl CanvasEngine {
             } else {
                 out.push(batch.slice(0, remaining));
                 remaining = 0;
+            }
+        }
+        out
+    }
+
+    /// Rows `[offset, offset + limit)` across batch boundaries. Keeps at least one
+    /// (empty) batch so the columns survive an out-of-range offset.
+    fn slice_batches(batches: &[RecordBatch], offset: usize, limit: usize) -> Vec<RecordBatch> {
+        let mut out: Vec<RecordBatch> = Vec::new();
+        let mut skip = offset;
+        let mut remaining = limit;
+        for batch in batches {
+            if remaining == 0 {
+                break;
+            }
+            let rows = batch.num_rows();
+            if skip >= rows {
+                skip -= rows;
+                continue;
+            }
+            let take = (rows - skip).min(remaining);
+            out.push(batch.slice(skip, take));
+            remaining -= take;
+            skip = 0;
+        }
+        if out.is_empty() {
+            if let Some(first) = batches.first() {
+                out.push(first.slice(0, 0));
             }
         }
         out
@@ -730,6 +800,59 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(int_at(&agg.result, 0, 0), 800);
+    }
+
+    #[tokio::test]
+    async fn query_cache_aggregates_over_the_full_cached_result() {
+        let engine = engine();
+        // 900 rows cached under "a"; the page only ever held 500.
+        engine
+            .ingest_cell_stream(BOARD, "a", synthetic_stream(3, 300), None)
+            .await
+            .unwrap();
+        // A GROUP BY over the full result: one row per parity, counts sum to 900.
+        let agg = engine
+            .query_cache(BOARD, "SELECT n % 2 AS bucket, COUNT(*) AS c FROM a GROUP BY n % 2 ORDER BY bucket")
+            .await
+            .unwrap();
+        assert_eq!(agg.rows.len(), 2);
+        assert_eq!(int_at(&agg, 0, 1), 450);
+        assert_eq!(int_at(&agg, 1, 1), 450);
+        // The query result is NOT cached back (ephemeral): no "cell" entry appears.
+        assert!(!engine.cache().contains(&CanvasEngine::key(BOARD, "bucket")));
+    }
+
+    #[tokio::test]
+    async fn fetch_page_slices_across_batch_boundaries() {
+        let engine = engine();
+        // Two 400-row batches cached under "a" (rows 0..800).
+        engine
+            .ingest_cell_stream(BOARD, "a", synthetic_stream(2, 400), None)
+            .await
+            .unwrap();
+        // A page straddling the 400-row batch boundary.
+        let page = engine.fetch_page(BOARD, "a", 350, 100).unwrap().unwrap();
+        assert_eq!(page.rows.len(), 100);
+        assert_eq!(int_at(&page, 0, 0), 350);
+        assert_eq!(int_at(&page, 99, 0), 449);
+    }
+
+    #[tokio::test]
+    async fn fetch_page_past_the_end_returns_zero_rows_with_columns() {
+        let engine = engine();
+        engine
+            .ingest_cell_stream(BOARD, "a", synthetic_stream(1, 100), None)
+            .await
+            .unwrap();
+        let page = engine.fetch_page(BOARD, "a", 500, 100).unwrap().unwrap();
+        assert_eq!(page.rows.len(), 0);
+        assert_eq!(page.columns.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn fetch_page_missing_cell_returns_none() {
+        let engine = engine();
+        assert!(engine.fetch_page(BOARD, "nope", 0, 100).unwrap().is_none());
     }
 
     #[tokio::test]

@@ -1,13 +1,13 @@
 import { Select } from "@shared/ui";
 
 import { useCanvasStore } from "../../../../../../hooks";
-import { PREVIEW_ROWS } from "../../../TableNode/constants";
+import { TABLE_PAGE_ROWS } from "../../../TableNode/constants";
 import type { SectionProps } from "../../types";
 
 /// Table-specific controls. The "Source query" picker binds the table to one of
-/// the board's query objects (unbound by default); "Preview rows" caps how many
-/// rows the grid shows (blank = the default cap). The table renders that query's
-/// last run as a grid, so it refreshes whenever the query re-runs.
+/// the board's query objects (unbound by default); "Rows per page" sets how many
+/// rows each page shows (blank = the default). The table pages through the query's
+/// full cached result, so it refreshes whenever the query re-runs.
 function TableSection({ tabId, component, onChange }: SectionProps) {
   const components = useCanvasStore((s) => s.boards[tabId]?.doc.components);
   if (component.kind !== "table") return null;
@@ -26,13 +26,13 @@ function TableSection({ tabId, component, onChange }: SectionProps) {
         onChange={(v) => onChange({ sourceQueryId: v })}
         data-testid="table-source-select"
       />
-      <span className="mdbc-pane-label">Preview rows</span>
+      <span className="mdbc-pane-label">Rows per page</span>
       <input
         type="number"
         min={1}
         className="mdbc-pane-input"
         value={component.previewRows ?? ""}
-        placeholder={`Default (${PREVIEW_ROWS})`}
+        placeholder={`Default (${TABLE_PAGE_ROWS})`}
         onChange={(e) => {
           const n = Number(e.target.value);
           onChange({ previewRows: e.target.value === "" || n <= 0 ? undefined : n });

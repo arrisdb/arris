@@ -46,12 +46,24 @@ const CANVAS_SAVE_DEBOUNCE_MS = 400;
 /// (`<prefix>:<tabId>:<cellId>`), passed to run and cancel IPC alike.
 const CANVAS_QUERY_ID_PREFIX = "canvas-cell";
 
+/// Rows a raw (non-aggregating) chart samples from its source cell's full cached
+/// result. Scatter/bubble/histogram and ungrouped charts can't plot millions of
+/// points in the webview, so they visualize a bounded sample of the full data.
+const CHART_RAW_SAMPLE_CAP = 10000;
+
+/// Guardrail on an aggregating chart's grouped output: at most this many groups
+/// cross the IPC bridge (the biggest by the first measure). A chart with more
+/// categories than this is unreadable anyway.
+const CHART_MAX_GROUPS = 5000;
+
 export {
   CANVAS_ASK_FENCE,
   CANVAS_DOC_VERSION,
   CANVAS_QUERY_ID_PREFIX,
   CANVAS_SAVE_DEBOUNCE_MS,
   CANVAS_SPEC_FENCE,
+  CHART_MAX_GROUPS,
+  CHART_RAW_SAMPLE_CAP,
   DEFAULT_SIZE,
   KNOWN_KINDS,
   LAYOUT_GAP,

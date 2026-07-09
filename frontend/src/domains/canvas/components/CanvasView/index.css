@@ -434,9 +434,28 @@
 /* ── table object ─────────────────────────────────────────────────────────── */
 
 /* The table object reuses the shared .mdbc-canvas-result* grid; the result area
-   fills the node frame below the optional title. */
+   fills the node frame below the optional title, above the pager. */
 .mdbc-canvas-table .mdbc-canvas-result {
-  height: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* Pager footer: page range on the left, prev/next on the right. Matches the
+   10px sidebar inset used elsewhere. */
+.mdbc-canvas-result-pager {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 10px;
+  border-top: 1px solid var(--m-sep);
+  font-size: var(--m-fs-xs);
+  color: var(--m-fg-3);
+}
+
+.mdbc-canvas-result-pager .mdbc-btn {
+  padding: 1px 8px;
 }
 
 /* ── chart object ─────────────────────────────────────────────────────────── */

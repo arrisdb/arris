@@ -172,6 +172,8 @@ fn main() {
             cmd_cancel_query,
             cmd_run_federation_query,
             cmd_run_canvas_cell,
+            cmd_query_canvas_cache,
+            cmd_fetch_canvas_cell_page,
             cmd_explain_query,
             cmd_primary_key,
             cmd_object_definition,
