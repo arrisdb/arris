@@ -1,29 +1,61 @@
-import { memo } from "react";
+import { memo, useCallback, useEffect, useState } from "react";
 import type { NodeProps } from "reactflow";
-import type { QueryValue } from "@shared";
+import type { QueryResult } from "@shared";
 
 import { useCanvasStore } from "../../../../hooks";
+import { sanitizeCellTitle } from "../../../../utils";
+import { fetchCanvasCellPageIPC } from "../../../../ipc";
 import type { CanvasNodeData } from "../../types";
 import { CanvasResizer } from "../CanvasResizer";
-import { PREVIEW_ROWS } from "./constants";
+import { TABLE_PAGE_ROWS } from "./constants";
+import { cellText, pageRangeLabel } from "./utils";
 
-/// Render one cell value for the result grid.
-function cellText(value: QueryValue): string {
-  if (!value || value.kind === "null" || value.value == null) return "NULL";
-  return String(value.value);
-}
-
-/// A data table bound to a query object by `sourceQueryId`. Renders the upstream
-/// query's run result as a scrollable grid, so it updates whenever that query
-/// re-runs. The query object itself shows no inline rows; this is where the data
-/// is previewed. `nowheel` lets the grid scroll without panning the board.
+/// A data table bound to a query object by `sourceQueryId`. It pages through the
+/// source cell's FULL cached result: the first page is the source run's own page,
+/// and Prev/Next fetch further pages a page at a time from the backend cache, so a
+/// table over a million-row query can scroll the whole result without ever holding
+/// it all in the webview. `nowheel` lets the grid scroll without panning.
 function TableNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
   const { tabId } = data;
   const board = useCanvasStore((s) => s.boards[tabId]);
   const component = board?.doc.components.find((c) => c.id === id);
+  const sourceId = component?.kind === "table" ? component.sourceQueryId : null;
+  const source = sourceId ? board?.doc.components.find((c) => c.id === sourceId) : undefined;
+  const sourceRun = sourceId ? board?.runs[sourceId] : undefined;
+  const sourceTitle =
+    source?.kind === "query" && source.title ? sanitizeCellTitle(source.title) : undefined;
+  const pageSize = (component?.kind === "table" && component.previewRows) || TABLE_PAGE_ROWS;
+
+  const sourceResult = sourceRun?.result;
+  const total = sourceRun?.totalRows ?? sourceResult?.rows.length ?? 0;
+  const [offset, setOffset] = useState(0);
+  const [page, setPage] = useState<QueryResult | undefined>(sourceResult);
+
+  // Reset to the first page whenever the source produces a new result.
+  useEffect(() => {
+    setOffset(0);
+    setPage(sourceResult);
+  }, [sourceResult]);
+
+  const goto = useCallback(
+    (next: number) => {
+      if (!sourceTitle) return;
+      fetchCanvasCellPageIPC(tabId, sourceTitle, next, pageSize)
+        .then((result) => {
+          setOffset(next);
+          if (result) setPage(result);
+        })
+        .catch(() => {});
+    },
+    [tabId, sourceTitle, pageSize],
+  );
+
   if (!component || component.kind !== "table") return null;
-  const run = component.sourceQueryId ? board?.runs[component.sourceQueryId] : undefined;
-  const limit = component.previewRows ?? PREVIEW_ROWS;
+
+  const rows = page?.rows.slice(0, pageSize) ?? [];
+  const canPrev = offset > 0;
+  const canNext = offset + pageSize < total;
+  const showPager = !!page && total > pageSize;
 
   return (
     <>
@@ -35,21 +67,21 @@ function TableNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
           </div>
         ) : null}
         <div className="nowheel mdbc-canvas-result">
-          {run?.error ? (
-            <div className="mdbc-canvas-result-error">{run.error}</div>
-          ) : run?.running ? (
+          {sourceRun?.error ? (
+            <div className="mdbc-canvas-result-error">{sourceRun.error}</div>
+          ) : sourceRun?.running ? (
             <div className="mdbc-canvas-result-empty">Running…</div>
-          ) : run?.result ? (
+          ) : page ? (
             <table className="mdbc-canvas-result-table">
               <thead>
                 <tr>
-                  {run.result.columns.map((col) => (
+                  {page.columns.map((col) => (
                     <th key={col.name}>{col.name}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {run.result.rows.slice(0, limit).map((row, ri) => (
+                {rows.map((row, ri) => (
                   <tr key={ri}>
                     {row.map((value, ci) => (
                       <td key={ci}>{cellText(value)}</td>
@@ -60,12 +92,33 @@ function TableNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
             </table>
           ) : (
             <div className="mdbc-canvas-result-empty">
-              {component.sourceQueryId
-                ? "Run the source query to see results"
-                : "Pick a source query"}
+              {sourceId ? "Run the source query to see results" : "Pick a source query"}
             </div>
           )}
         </div>
+        {showPager ? (
+          <div className="mdbc-canvas-result-pager">
+            <span>{pageRangeLabel(offset, rows.length, total)}</span>
+            <span>
+              <button
+                type="button"
+                className="mdbc-btn"
+                disabled={!canPrev}
+                onClick={() => goto(offset - pageSize)}
+              >
+                Prev
+              </button>{" "}
+              <button
+                type="button"
+                className="mdbc-btn"
+                disabled={!canNext}
+                onClick={() => goto(offset + pageSize)}
+              >
+                Next
+              </button>
+            </span>
+          </div>
+        ) : null}
       </div>
     </>
   );

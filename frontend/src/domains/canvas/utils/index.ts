@@ -6,6 +6,8 @@ export { buildQuestionAnswer } from "./questionAnswer";
 export type { QuestionFollowUp, ShareableQuery } from "./questionAnswer";
 export { describeBoard } from "./boardContext";
 export { sanitizeChartSpec } from "./chartSpec";
+export { buildChartQuery } from "./chartQuery";
+export type { ChartQuery } from "./chartQuery";
 export { deriveDataEdges, sanitizeCellTitle } from "./dependencies";
 export { genId, makeComponent, makeEdge } from "./factory";
 export type { ComponentInput } from "./factory";

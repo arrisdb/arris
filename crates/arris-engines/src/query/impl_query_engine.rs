@@ -8,7 +8,7 @@ use crate::persistence::ProjectState;
 use crate::{DatabaseDriver, PaginationStrategy};
 use crate::{
     DatabaseKind, DriverError, ExplainMode, MutationResult, ObjectRef, PlanResult, QueryLanguage,
-    QueryResult, QueryValue, SchemaNode, StatementType, TableMutationBatch, TableRef,
+    QueryResult, QueryStream, QueryValue, SchemaNode, StatementType, TableMutationBatch, TableRef,
 };
 
 use crate::Engine;
@@ -93,6 +93,72 @@ impl QueryEngine {
         }
 
         result
+    }
+
+    /// Open a streamed query for canvas ingestion. Handles the same manual-tx
+    /// bootstrap as `run_query` and registers `query_id` (token + driver kill)
+    /// for `cancel_query`; the CALLER must `unregister_query` once the stream
+    /// is fully consumed, since the query outlives this call.
+    pub async fn run_query_stream(
+        &self,
+        connection_id: Uuid,
+        connection: &ConnectionEngine,
+        project: Option<&ProjectState>,
+        sql: String,
+        language: Option<QueryLanguage>,
+        query_id: Option<String>,
+    ) -> Result<(QueryStream, Option<CancellationToken>), QueryError> {
+        let driver = connection.driver_for(connection_id, project).await?;
+        let lang = language.unwrap_or_default();
+        let sql = Self::trim_trailing_sql_semicolon(&sql);
+
+        let txcfg = connection.transaction_config(connection_id).await;
+        if matches!(txcfg.mode, crate::TransactionMode::Manual)
+            && driver.supports_transactions()
+            && !driver.in_transaction().await
+        {
+            driver.begin_transaction(txcfg.isolation).await?;
+        }
+
+        let cancel_token = query_id.as_ref().map(|qid| {
+            let token = CancellationToken::new();
+            self.running_queries.insert(
+                qid.clone(),
+                RunningQuery {
+                    cancel_token: token.clone(),
+                    driver: Some(driver.clone()),
+                },
+            );
+            token
+        });
+
+        let opened = match cancel_token.as_ref() {
+            Some(token) => {
+                tokio::select! {
+                    r = driver.run_query_stream(sql, &[], lang) => r,
+                    _ = token.cancelled() => {
+                        let _ = driver.cancel_running_query().await;
+                        Err(DriverError::Cancelled)
+                    }
+                }
+            }
+            None => driver.run_query_stream(sql, &[], lang).await,
+        };
+        match opened {
+            Ok(stream) => Ok((stream, cancel_token)),
+            Err(e) => {
+                if let Some(qid) = &query_id {
+                    self.running_queries.remove(qid);
+                }
+                Err(e.into())
+            }
+        }
+    }
+
+    /// Whether `sql` is a SELECT-shaped statement the canvas can ingest as a
+    /// stream; everything else goes through `run_query`.
+    pub fn is_streamable_select(sql: &str) -> bool {
+        Self::is_select_query(sql)
     }
 
     pub async fn cancel_query(&self, query_id: String) -> Result<(), QueryError> {

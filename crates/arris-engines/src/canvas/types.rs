@@ -14,6 +14,23 @@ pub struct CanvasCellSpec {
     pub connection_id: Option<String>,
 }
 
+/// Totals reported by a finished `CellCacheWriter`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct CellWriteStats {
+    pub total_rows: u64,
+    pub total_bytes: usize,
+}
+
+/// One cell's ingested run: the UI page plus the full-result totals. The full
+/// data lives only in the cell cache; `complete: false` means the byte budget
+/// stopped ingestion early ("N+ rows").
+#[derive(Clone, Debug)]
+pub struct IngestedCell {
+    pub result: QueryResult,
+    pub total_rows: u64,
+    pub complete: bool,
+}
+
 /// The outcome of running one cell during a chained run: either its result or the
 /// error that stopped it (a failed upstream blocks its descendants).
 #[derive(Clone, Debug, Serialize)]
@@ -24,6 +41,12 @@ pub struct CanvasCellRun {
     pub result: Option<QueryResult>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
+    /// Rows in the FULL cached result (the `result` page may hold fewer).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub total_rows: Option<u64>,
+    /// `false` when the byte budget truncated ingestion ("N+ rows").
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub complete: Option<bool>,
 }
 
 impl CanvasCellRun {
@@ -32,6 +55,18 @@ impl CanvasCellRun {
             id,
             result: Some(result),
             error: None,
+            total_rows: None,
+            complete: None,
+        }
+    }
+
+    pub fn ingested(id: String, cell: IngestedCell) -> Self {
+        Self {
+            id,
+            result: Some(cell.result),
+            error: None,
+            total_rows: Some(cell.total_rows),
+            complete: Some(cell.complete),
         }
     }
 
@@ -40,6 +75,8 @@ impl CanvasCellRun {
             id,
             result: None,
             error: Some(error),
+            total_rows: None,
+            complete: None,
         }
     }
 }

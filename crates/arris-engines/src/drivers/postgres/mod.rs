@@ -29,17 +29,20 @@ use tokio_postgres_rustls::MakeRustlsConnect;
 
 use crate::{
     ColumnSpec, ConnectionConfig, DriverError, ExplainMode, MutationResult, ObjectRef, PlanResult,
-    QueryLanguage, QueryResult, QueryValue, RowDelete, RowInsert, SchemaNode,
+    QueryLanguage, QueryResult, QueryStream, QueryValue, RowDelete, RowInsert, SchemaNode,
     SchemaNodeKind, TableRef,
 };
 use crate::drivers::errors::Result;
 
+use crate::drivers::common::RowChunkPump;
 use crate::drivers::DatabaseDriver;
 use crate::drivers::sql_builder::SqlBuilder;
 use crate::drivers::tls::TlsParams;
 
+use futures::StreamExt;
+
 use explain::walk_explain;
-use query::{pg_err_msg, pg_to_sql_refs, rows_to_query_result};
+use query::{pg_err_msg, pg_to_sql_refs, row_values, rows_to_query_result};
 use values::PgValue;
 
 pub struct PostgresDriver {
@@ -443,6 +446,54 @@ impl DatabaseDriver for PostgresDriver {
         };
         let _ = client.batch_execute(cleanup).await;
         result
+    }
+
+    async fn run_query_stream(
+        &self,
+        text: &str,
+        params: &[QueryValue],
+        language: QueryLanguage,
+    ) -> Result<QueryStream> {
+        // Streaming bypasses the savepoint fencing, so non-SELECTs and open
+        // manual transactions keep the materialized path.
+        if !self.looks_like_select(text) || *self.in_tx.lock().await {
+            return Ok(QueryStream::from_materialized(
+                self.run_query(text, params, language).await?,
+            ));
+        }
+        let client = self.client().await?;
+        let stmt = client
+            .prepare(text)
+            .await
+            .map_err(|e| DriverError::QueryFailed(pg_err_msg(&e)))?;
+        let columns: Vec<ColumnSpec> = stmt
+            .columns()
+            .iter()
+            .map(|c| ColumnSpec::new(c.name(), c.type_().name()))
+            .collect();
+
+        // The shared pump owns the client + statement for the stream's life
+        // (dropping its receiver cancels and drops the server cursor); this driver
+        // supplies only how to open the row stream and how to map one row.
+        let params = params.to_vec();
+        let stream = RowChunkPump::spawn(
+            columns,
+            move || async move {
+                let wrapped: Vec<PgValue<'_>> = params.iter().map(PgValue).collect();
+                let refs = wrapped
+                    .iter()
+                    .map(|v| v as &dyn tokio_postgres::types::ToSql);
+                let rows = client
+                    .query_raw(&stmt, refs)
+                    .await
+                    .map_err(|e| DriverError::QueryFailed(pg_err_msg(&e)))?;
+                Ok(rows
+                    .map(|r| r.map_err(|e| DriverError::QueryFailed(pg_err_msg(&e))))
+                    .boxed())
+            },
+            |row| row_values(row),
+        );
+        Ok(QueryStream::Rows(stream))
     }
 
     async fn explain_query(

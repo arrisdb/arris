@@ -10,4 +10,8 @@ pub enum CanvasError {
     Conversion(String),
     #[error("query engine error: {0}")]
     Engine(String),
+    #[error("spill encryption error: {0}")]
+    Encryption(String),
+    #[error("query cancelled")]
+    Cancelled,
 }

@@ -1,6 +1,10 @@
+use datafusion::arrow::record_batch::RecordBatch;
+use futures::stream::{BoxStream, StreamExt};
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+
+use super::errors::DriverError;
 
 // ── QueryValue ──────────────────────────────────────────────────────────────
 
@@ -164,6 +168,33 @@ impl QueryResult {
 
     pub fn empty() -> Self {
         Self::new(Vec::new(), Vec::new())
+    }
+}
+
+// ── QueryStream ──────────────────────────────────────────────────────────────
+
+/// A streamed result: schema up front, then row chunks in arrival order.
+pub struct RowChunkStream {
+    pub columns: Vec<ColumnSpec>,
+    /// Each item is one chunk of rows (target `STREAM_CHUNK_ROWS` per chunk).
+    pub chunks: BoxStream<'static, std::result::Result<Vec<Vec<QueryValue>>, DriverError>>,
+}
+
+/// A driver's streamed query result. Clients that natively produce Arrow emit
+/// `Arrow`; everything else emits row chunks and the engine converts.
+pub enum QueryStream {
+    Rows(RowChunkStream),
+    Arrow(BoxStream<'static, std::result::Result<RecordBatch, DriverError>>),
+}
+
+impl QueryStream {
+    /// Wrap a fully materialized result as a single-chunk stream (the default
+    /// fallback for drivers not yet migrated to native streaming).
+    pub fn from_materialized(result: QueryResult) -> Self {
+        Self::Rows(RowChunkStream {
+            columns: result.columns,
+            chunks: futures::stream::iter(vec![Ok(result.rows)]).boxed(),
+        })
     }
 }
 

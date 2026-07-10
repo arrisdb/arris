@@ -2,6 +2,7 @@ import { ChartEditorSections } from "@domains/chart";
 import { Select } from "@shared/ui";
 
 import { useCanvasStore } from "../../../../../../hooks";
+import { DEFAULT_CHART_MAX_ROWS } from "../../../../../../constants";
 import type { ChartComponent } from "../../../../../../types";
 import type { SectionProps } from "../../types";
 import { useCanvasChartEditor } from "./hooks";
@@ -41,6 +42,19 @@ function ChartSectionBody({
           placeholder="Pick a query object"
           onChange={(v) => onChange({ sourceQueryId: v })}
           data-testid="chart-source-select"
+        />
+        <span className="mdbc-pane-label">Max rows</span>
+        <input
+          type="number"
+          min={1}
+          className="mdbc-pane-input"
+          value={component.maxRows ?? ""}
+          placeholder={`Default (${DEFAULT_CHART_MAX_ROWS})`}
+          onChange={(e) => {
+            const n = Number(e.target.value);
+            onChange({ maxRows: e.target.value === "" || n <= 0 ? undefined : n });
+          }}
+          data-testid="chart-max-rows"
         />
       </div>
       <ChartEditorSections pane={pane} />

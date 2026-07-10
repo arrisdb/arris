@@ -60,6 +60,9 @@ gix = { version = "0.85", default-features = false, features = ["max-performance
 datafusion = "52.2"
 futures = "0.3"
 regex-lite = "0.1"
+# encrypted on-disk spill of cached cell results (in-memory per-session key)
+chacha20poly1305 = { version = "0.10", default-features = false, features = ["alloc"] }
+getrandom = "0.2"
 dirs = "6"
 # resolve agent CLIs (`claude`, `codex`) to an absolute path over an augmented
 # search set, so a GUI-launched app with a minimal PATH still finds them.
@@ -129,5 +132,6 @@ nix = { version = "0.31", features = ["signal"] }
 tempfile = "3.27"
 rcgen = "0.13"
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+tokio-util = "0.7"
 testcontainers = "0.27"
 testcontainers-modules = { version = "0.15", features = ["postgres", "mysql", "mariadb", "mongo", "redis", "elastic_search", "kafka", "mssql_server", "clickhouse"] }

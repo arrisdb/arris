@@ -46,12 +46,17 @@ const CANVAS_SAVE_DEBOUNCE_MS = 400;
 /// (`<prefix>:<tabId>:<cellId>`), passed to run and cancel IPC alike.
 const CANVAS_QUERY_ID_PREFIX = "canvas-cell";
 
+/// Default max rows a chart draws when its `maxRows` is unset. Overridable per
+/// chart in the properties panel; bounds render cost and the IPC payload.
+const DEFAULT_CHART_MAX_ROWS = 1000;
+
 export {
   CANVAS_ASK_FENCE,
   CANVAS_DOC_VERSION,
   CANVAS_QUERY_ID_PREFIX,
   CANVAS_SAVE_DEBOUNCE_MS,
   CANVAS_SPEC_FENCE,
+  DEFAULT_CHART_MAX_ROWS,
   DEFAULT_SIZE,
   KNOWN_KINDS,
   LAYOUT_GAP,

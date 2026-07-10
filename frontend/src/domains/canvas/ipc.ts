@@ -11,11 +11,15 @@ interface CanvasCellSpec {
   connectionId: string | null;
 }
 
-/// The outcome of one executed cell: its result, or the error that stopped it.
+/// The outcome of one executed cell: its result page, or the error that stopped
+/// it. `totalRows` counts the FULL cached result (the page may hold fewer);
+/// `complete: false` means the ingestion byte budget truncated the run.
 interface CanvasCellRun {
   id: string;
   result?: QueryResult;
   error?: string;
+  totalRows?: number;
+  complete?: boolean;
 }
 
 /// Run a canvas query cell, auto-running its upstream cells first. `cells` is the
@@ -38,5 +42,28 @@ function cancelCanvasCellIPC(queryId: string): Promise<void> {
   return invoke("cmd_cancel_query", { queryId });
 }
 
-export { cancelCanvasCellIPC, runCanvasCellIPC };
+/// Aggregate (or sample) a chart's data over a source cell's FULL cached result.
+/// `sql` is built from the chart spec against the source cell's sanitized title;
+/// the backend runs it over the cache and returns the small result.
+function queryCanvasCacheIPC(boardId: string, sql: string): Promise<QueryResult> {
+  return invoke("cmd_query_canvas_cache", { boardId, sql });
+}
+
+/// One page (`offset`..`offset + limit`) of a cell's full cached result, by the
+/// cell's sanitized `title`. `null` when the cell has no cached result.
+function fetchCanvasCellPageIPC(
+  boardId: string,
+  title: string,
+  offset: number,
+  limit: number,
+): Promise<QueryResult | null> {
+  return invoke("cmd_fetch_canvas_cell_page", { boardId, title, offset, limit });
+}
+
+export {
+  cancelCanvasCellIPC,
+  fetchCanvasCellPageIPC,
+  queryCanvasCacheIPC,
+  runCanvasCellIPC,
+};
 export type { CanvasCellRun, CanvasCellSpec };

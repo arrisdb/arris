@@ -1,20 +1,80 @@
-import { memo } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 import type { NodeProps } from "reactflow";
+import type { QueryResult } from "@shared";
 import { ChartView } from "@domains/chart";
 
 import { useCanvasStore } from "../../../../hooks";
+import { buildChartQuery, sanitizeCellTitle } from "../../../../utils";
+import { queryCanvasCacheIPC } from "../../../../ipc";
 import type { CanvasNodeData } from "../../types";
 import { CanvasResizer } from "../CanvasResizer";
 
-/// A chart object bound to a query object by `sourceQueryId`. Renders through the
-/// shared ChartView with the upstream query's run result, so it updates whenever
-/// that query re-runs. `nowheel` lets the chart scroll/zoom without panning.
+/// The aggregated (or sampled) result the chart renders, fetched from the source
+/// cell's FULL cached result over IPC. Independent of the source's 500-row page.
+interface ChartData {
+  result?: QueryResult;
+  loading: boolean;
+  error?: string;
+}
+
+/// A chart object bound to a query object by `sourceQueryId`. It does NOT render
+/// the source's 500-row page: it runs a `GROUP BY` (or a bounded sample) over the
+/// source's full cached result in the backend and renders that, so a chart over a
+/// million-row query aggregates every row, not just the page. Re-runs whenever the
+/// source re-runs or the spec's query-shaping fields change. `nowheel` lets the
+/// chart scroll/zoom without panning.
 function ChartNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
   const { tabId } = data;
   const board = useCanvasStore((s) => s.boards[tabId]);
   const component = board?.doc.components.find((c) => c.id === id);
+  const source =
+    component?.kind === "chart" && component.sourceQueryId
+      ? board?.doc.components.find((c) => c.id === component.sourceQueryId)
+      : undefined;
+  const sourceRun =
+    component?.kind === "chart" && component.sourceQueryId
+      ? board?.runs[component.sourceQueryId]
+      : undefined;
+  const sourceTitle =
+    source?.kind === "query" && source.title ? sanitizeCellTitle(source.title) : undefined;
+  const spec = component?.kind === "chart" ? component.spec : undefined;
+  const maxRows = component?.kind === "chart" ? component.maxRows : undefined;
+
+  const query = useMemo(
+    () => (spec && sourceTitle ? buildChartQuery(spec, sourceTitle, maxRows) : null),
+    [spec, sourceTitle, maxRows],
+  );
+
+  const [agg, setAgg] = useState<ChartData>({ loading: false });
+  const sourceResult = sourceRun?.result;
+
+  useEffect(() => {
+    // Aggregate only once the source has produced a result to read from.
+    if (!query || !sourceResult) {
+      setAgg({ loading: false });
+      return;
+    }
+    let cancelled = false;
+    setAgg({ loading: true });
+    queryCanvasCacheIPC(tabId, query.sql)
+      .then((result) => {
+        if (!cancelled) setAgg({ loading: false, result });
+      })
+      .catch((e: unknown) => {
+        if (!cancelled) {
+          setAgg({ loading: false, error: String((e as { message?: string })?.message ?? e) });
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [tabId, query, sourceResult]);
+
   if (!component || component.kind !== "chart") return null;
-  const run = component.sourceQueryId ? board?.runs[component.sourceQueryId] : undefined;
+
+  // The backend already aggregated, so turn ChartView's client-side aggregation
+  // off; a sampled (raw) query keeps the spec as-is for the client mappers.
+  const renderSpec = query?.aggregated ? { ...component.spec, aggregation: "none" as const } : component.spec;
 
   return (
     <>
@@ -27,10 +87,10 @@ function ChartNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
         ) : null}
         <div className="mdbc-canvas-chart-body">
           <ChartView
-            spec={component.spec}
-            result={run?.result}
-            isRunning={run?.running}
-            error={run?.error}
+            spec={renderSpec}
+            result={agg.result}
+            isRunning={sourceRun?.running || agg.loading}
+            error={sourceRun?.error ?? agg.error}
             onEdit={() => {}}
           />
         </div>

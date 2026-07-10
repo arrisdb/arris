@@ -2,7 +2,8 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use arris_engines::{
-    AppEnvironment, CanvasCellRun, CanvasCellSpec, CanvasEngine, ErrorCode, IpcError, QueryValue,
+    AppEnvironment, CanvasCellRun, CanvasCellSpec, CanvasEngine, CanvasError, ErrorCode,
+    IngestedCell, IpcError, QueryEngine, QueryResult, QueryValue,
 };
 use tauri::State;
 use uuid::Uuid;
@@ -71,32 +72,82 @@ pub async fn cmd_run_canvas_cell(
         }
 
         let mut cancelled = false;
-        let outcome: Result<arris_engines::QueryResult, String> = if dep_ids.is_empty() {
+        // A streamed or chained run carries its own totals; the plain
+        // `run_query` path (non-SELECT statements) has none.
+        enum CellOutcome {
+            Ingested(IngestedCell),
+            Plain(arris_engines::QueryResult),
+        }
+        let outcome: Result<CellOutcome, String> = if dep_ids.is_empty() {
             // Normal single-connection run (covers a cell that only reads live
-            // tables). The result is cached below so downstream cells can read it.
+            // tables). SELECTs stream straight into the cell cache (bounded
+            // memory, page peel); everything else runs materialized.
             match cell.connection_id.as_deref() {
                 None => Err("pick a connection for this query cell".to_string()),
                 Some(conn) => match Uuid::parse_str(conn) {
                     Err(_) => Err("invalid connection id".to_string()),
-                    Ok(uuid) => env
-                        .query
-                        .run_query(
-                            uuid,
-                            &env.connection,
-                            proj.as_ref(),
-                            cell.sql.clone(),
-                            Vec::<QueryValue>::new(),
-                            None,
-                            None,
-                            None,
-                            Some(query_id.clone()),
-                        )
-                        .await
-                        .map_err(|e| {
-                            let ipc = IpcError::from(e);
-                            cancelled = matches!(ipc.code, ErrorCode::Cancelled);
-                            ipc.message
-                        }),
+                    Ok(uuid) if QueryEngine::is_streamable_select(&cell.sql) => {
+                        let opened = env
+                            .query
+                            .run_query_stream(
+                                uuid,
+                                &env.connection,
+                                proj.as_ref(),
+                                cell.sql.clone(),
+                                None,
+                                Some(query_id.clone()),
+                            )
+                            .await;
+                        match opened {
+                            Err(e) => {
+                                let ipc = IpcError::from(e);
+                                cancelled = matches!(ipc.code, ErrorCode::Cancelled);
+                                Err(ipc.message)
+                            }
+                            Ok((stream, token)) => {
+                                let ingested = env
+                                    .canvas
+                                    .ingest_cell_stream(
+                                        &board_id,
+                                        &cell.title,
+                                        stream,
+                                        token.as_ref(),
+                                    )
+                                    .await;
+                                env.query.unregister_query(&query_id);
+                                match ingested {
+                                    Ok(cell_run) => Ok(CellOutcome::Ingested(cell_run)),
+                                    Err(CanvasError::Cancelled) => {
+                                        cancelled = true;
+                                        Err(CANVAS_RUN_CANCELLED_MESSAGE.to_string())
+                                    }
+                                    Err(e) => Err(e.to_string()),
+                                }
+                            }
+                        }
+                    }
+                    Ok(uuid) => {
+                        let run = env
+                            .query
+                            .run_query(
+                                uuid,
+                                &env.connection,
+                                proj.as_ref(),
+                                cell.sql.clone(),
+                                Vec::<QueryValue>::new(),
+                                None,
+                                None,
+                                None,
+                                Some(query_id.clone()),
+                            )
+                            .await
+                            .map_err(|e| {
+                                let ipc = IpcError::from(e);
+                                cancelled = matches!(ipc.code, ErrorCode::Cancelled);
+                                ipc.message
+                            });
+                        run.map(CellOutcome::Plain)
+                    }
                 },
             }
         } else if has_live_ref {
@@ -109,7 +160,7 @@ pub async fn cmd_run_canvas_cell(
             let token = env.query.register_cancel_token(query_id.clone());
             let out = tokio::select! {
                 r = env.canvas.run_cell(&board_id, &cell.title, &cell.sql) => {
-                    r.map_err(|e| e.to_string())
+                    r.map(CellOutcome::Ingested).map_err(|e| e.to_string())
                 }
                 _ = token.cancelled() => {
                     cancelled = true;
@@ -121,12 +172,13 @@ pub async fn cmd_run_canvas_cell(
         };
 
         match outcome {
-            Ok(result) => {
-                // Chained cells cache themselves inside run_cell; cache the
-                // normal-path cells here so they can feed downstream.
-                if dep_ids.is_empty() {
-                    let _ = env.canvas.cache_result(&board_id, &cell.title, &result);
-                }
+            Ok(CellOutcome::Ingested(cell_run)) => {
+                // Streamed and chained runs cached themselves during the run.
+                runs.push(CanvasCellRun::ingested(id.clone(), cell_run));
+            }
+            Ok(CellOutcome::Plain(result)) => {
+                // Non-SELECT results are cached here so they can feed downstream.
+                let _ = env.canvas.cache_result(&board_id, &cell.title, &result);
                 runs.push(CanvasCellRun::ok(id.clone(), result));
             }
             Err(message) => {
@@ -149,4 +201,38 @@ pub async fn cmd_run_canvas_cell(
     }
 
     Ok(runs)
+}
+
+/// Aggregate (or sample) a chart's data over the FULL cached result of a source
+/// cell. The frontend builds `sql` from the chart spec: a `GROUP BY` over the
+/// source cell for reducing charts, or a `LIMIT` sample for raw kinds, so the
+/// returned result stays small no matter how many rows the source holds. The
+/// result is ephemeral (never cached back).
+#[tauri::command]
+pub async fn cmd_query_canvas_cache(
+    env: State<'_, Arc<AppEnvironment>>,
+    board_id: String,
+    sql: String,
+) -> Result<QueryResult, IpcError> {
+    env.canvas
+        .query_cache(&board_id, &sql)
+        .await
+        .map_err(ipc_err)
+}
+
+/// One page of a cell's full cached result: rows `[offset, offset + limit)`. The
+/// table object pages through large results with this instead of holding them in
+/// the webview. Returns `None` when the cell has no cached result (never run or
+/// evicted).
+#[tauri::command]
+pub async fn cmd_fetch_canvas_cell_page(
+    env: State<'_, Arc<AppEnvironment>>,
+    board_id: String,
+    title: String,
+    offset: usize,
+    limit: usize,
+) -> Result<Option<QueryResult>, IpcError> {
+    env.canvas
+        .fetch_page(&board_id, &title, offset, limit)
+        .map_err(ipc_err)
 }

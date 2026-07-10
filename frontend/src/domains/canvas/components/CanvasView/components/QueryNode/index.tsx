@@ -9,6 +9,7 @@ import { useCanvasStore } from "../../../../hooks";
 import type { CanvasNodeData } from "../../types";
 import { CanvasResizer } from "../CanvasResizer";
 import { useQueryEditor } from "./hooks";
+import { runResultSummary } from "./utils";
 
 /// A SQL object: a schema-aware CodeMirror editor (same dialect + completion as
 /// the main editor), a Run button, and a one-line run status. It holds no result
@@ -87,8 +88,7 @@ function QueryNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
             <span className="mdbc-canvas-result-empty">Running…</span>
           ) : run?.result ? (
             <span className="mdbc-canvas-result-empty">
-              {run.result.rows.length} row{run.result.rows.length === 1 ? "" : "s"} ·{" "}
-              {run.result.columns.length} column{run.result.columns.length === 1 ? "" : "s"}
+              {runResultSummary(run.result, run.totalRows, run.complete)}
             </span>
           ) : (
             <span className="mdbc-canvas-result-empty">Run the query to preview data</span>

@@ -22,7 +22,10 @@ pub trait Engine: Send + Sync {
 }
 
 pub use agent::AgentEngine;
-pub use canvas::{CanvasCellRun, CanvasCellSpec, CanvasEngine, CanvasError, CellResultCache};
+pub use canvas::{
+    CanvasCellRun, CanvasCellSpec, CanvasEngine, CanvasError, CellCacheWriter, CellResultCache,
+    CellWriteStats, IngestedCell, CELL_RESULT_PAGE_ROWS,
+};
 pub use connection::{ConnectionEngine, ScopedConnection};
 pub use dbt::DbtEngine;
 pub use federation::FederationEngine;
@@ -40,11 +43,12 @@ pub use app::{AppEnvironment, AppEnvironmentError};
 
 pub use connection::types::{ConnectionConfig, DatabaseKind, SaslMechanism, SslMode, TransactionConfig};
 pub use drivers::errors::{DriverError, ErrorCode, IpcError};
+pub use drivers::constants::STREAM_CHUNK_ROWS;
 pub use drivers::types::{
     ColumnSpec, ExplainMode, IsolationLevel, MutationResult, ObjectRef, PlanAttribute, PlanNode,
-    PlanResult, QueryLanguage, QueryResult, QueryValue, RowDelete, RowEdit, RowInsert,
-    SchemaNode, SchemaNodeKind, SqlDialect, StatementType, TableMutationBatch,
-    TableRef, TransactionMode, ValueMap,
+    PlanResult, QueryLanguage, QueryResult, QueryStream, QueryValue, RowChunkStream, RowDelete,
+    RowEdit, RowInsert, SchemaNode, SchemaNodeKind, SqlDialect, StatementType,
+    TableMutationBatch, TableRef, TransactionMode, ValueMap,
 };
 pub use drivers::uri::{PostgresUriComponents, parse_postgres_uri};
 pub use editor::LineCommentPrefix;
