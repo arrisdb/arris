@@ -2,14 +2,26 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use arris_engines::{
-    AppEnvironment, CanvasCellRun, CanvasCellSpec, CanvasEngine, CanvasError, ErrorCode,
-    IngestedCell, IpcError, QueryEngine, QueryResult, QueryValue,
+    AppEnvironment, CanvasCellRun, CanvasCellSpec, CanvasEngine, CanvasError,
+    CELL_INGEST_BYTE_BUDGET, ErrorCode, IngestedCell, IngestedPage, IpcError, QueryEngine,
+    QueryResult, QueryValue,
 };
-use tauri::State;
+use tauri::{Emitter, State};
 use uuid::Uuid;
 
-use crate::commands::constants::CANVAS_RUN_CANCELLED_MESSAGE;
+use crate::commands::constants::{CANVAS_CELL_INGESTED_EVENT, CANVAS_RUN_CANCELLED_MESSAGE};
 use crate::helpers::ipc_err;
+
+/// Payload for `CANVAS_CELL_INGESTED_EVENT`: a terminal cell's full-ingest
+/// totals, emitted once its background drain completes.
+#[derive(Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CellIngestedEvent {
+    board_id: String,
+    cell_id: String,
+    total_rows: u64,
+    complete: bool,
+}
 
 /// Run a canvas query cell, auto-running its upstream cells first.
 ///
@@ -28,6 +40,7 @@ use crate::helpers::ipc_err;
 /// cell and every cell after it in the plan.
 #[tauri::command]
 pub async fn cmd_run_canvas_cell(
+    app: tauri::AppHandle,
     env: State<'_, Arc<AppEnvironment>>,
     board_id: String,
     target_id: String,
@@ -41,6 +54,20 @@ pub async fn cmd_run_canvas_cell(
     let title_to_id: HashMap<String, String> = cells
         .iter()
         .map(|c| (CanvasEngine::sanitize_title(&c.title), c.id.clone()))
+        .collect();
+    // Cells that another cell reads must fully ingest before that dependent
+    // runs; only a terminal cell (nothing depends on it) gets the early-page +
+    // background-finish treatment.
+    let depended_on: HashSet<String> = cells
+        .iter()
+        .flat_map(|c| {
+            CanvasEngine::table_refs(&c.sql)
+                .into_iter()
+                .filter_map(|r| title_to_id.get(&r))
+                .filter(|dep| **dep != c.id)
+                .cloned()
+                .collect::<Vec<_>>()
+        })
         .collect();
 
     let proj = env.project.read().await;
@@ -76,6 +103,9 @@ pub async fn cmd_run_canvas_cell(
         // `run_query` path (non-SELECT statements) has none.
         enum CellOutcome {
             Ingested(IngestedCell),
+            // A terminal cell whose page is ready; its totals arrive later via
+            // the `canvas://cell-ingested` event.
+            Paged(IngestedPage),
             Plain(arris_engines::QueryResult),
         }
         let outcome: Result<CellOutcome, String> = if dep_ids.is_empty() {
@@ -94,6 +124,7 @@ pub async fn cmd_run_canvas_cell(
                                 &env.connection,
                                 proj.as_ref(),
                                 cell.sql.clone(),
+                                cell.limit,
                                 None,
                                 Some(query_id.clone()),
                             )
@@ -104,14 +135,69 @@ pub async fn cmd_run_canvas_cell(
                                 cancelled = matches!(ipc.code, ErrorCode::Cancelled);
                                 Err(ipc.message)
                             }
-                            Ok((stream, token)) => {
-                                let ingested = env
+                            Ok((stream, token, row_cap)) if !depended_on.contains(id) => {
+                                // Terminal cell: return the page now and drain the
+                                // rest into the cache on a background task, which
+                                // emits the totals when done.
+                                match env
                                     .canvas
-                                    .ingest_cell_stream(
+                                    .start_cell_ingest(
                                         &board_id,
                                         &cell.title,
                                         stream,
                                         token.as_ref(),
+                                        CELL_INGEST_BYTE_BUDGET,
+                                        row_cap,
+                                    )
+                                    .await
+                                {
+                                    Ok((page, cont)) => {
+                                        let app = app.clone();
+                                        let env2 = Arc::clone(env.inner());
+                                        let board = board_id.clone();
+                                        let cell_id = id.clone();
+                                        let qid = query_id.clone();
+                                        let bg_token = token.clone();
+                                        tauri::async_runtime::spawn(async move {
+                                            let done = cont.finish(bg_token.as_ref()).await;
+                                            env2.query.unregister_query(&qid);
+                                            if let Ok(done) = done {
+                                                let _ = app.emit(
+                                                    CANVAS_CELL_INGESTED_EVENT,
+                                                    CellIngestedEvent {
+                                                        board_id: board,
+                                                        cell_id,
+                                                        total_rows: done.total_rows,
+                                                        complete: done.complete,
+                                                    },
+                                                );
+                                            }
+                                        });
+                                        Ok(CellOutcome::Paged(page))
+                                    }
+                                    Err(CanvasError::Cancelled) => {
+                                        env.query.unregister_query(&query_id);
+                                        cancelled = true;
+                                        Err(CANVAS_RUN_CANCELLED_MESSAGE.to_string())
+                                    }
+                                    Err(e) => {
+                                        env.query.unregister_query(&query_id);
+                                        Err(e.to_string())
+                                    }
+                                }
+                            }
+                            Ok((stream, token, row_cap)) => {
+                                // Non-terminal cell: a dependent reads its full
+                                // cache, so ingest to completion before moving on.
+                                let ingested = env
+                                    .canvas
+                                    .ingest_cell_stream_with_budget(
+                                        &board_id,
+                                        &cell.title,
+                                        stream,
+                                        token.as_ref(),
+                                        CELL_INGEST_BYTE_BUDGET,
+                                        row_cap,
                                     )
                                     .await;
                                 env.query.unregister_query(&query_id);
@@ -175,6 +261,10 @@ pub async fn cmd_run_canvas_cell(
             Ok(CellOutcome::Ingested(cell_run)) => {
                 // Streamed and chained runs cached themselves during the run.
                 runs.push(CanvasCellRun::ingested(id.clone(), cell_run));
+            }
+            Ok(CellOutcome::Paged(page)) => {
+                // Page is ready; totals land later via `canvas://cell-ingested`.
+                runs.push(CanvasCellRun::ok(id.clone(), page.result));
             }
             Ok(CellOutcome::Plain(result)) => {
                 // Non-SELECT results are cached here so they can feed downstream.

@@ -23,8 +23,9 @@ pub trait Engine: Send + Sync {
 
 pub use agent::AgentEngine;
 pub use canvas::{
-    CanvasCellRun, CanvasCellSpec, CanvasEngine, CanvasError, CellCacheWriter, CellResultCache,
-    CellWriteStats, IngestedCell, CELL_RESULT_PAGE_ROWS,
+    CanvasCellRun, CanvasCellSpec, CanvasEngine, CanvasError, CellCacheWriter, CellIngestContinuation,
+    CellIngestDone, CellResultCache, CellWriteStats, IngestedCell, IngestedPage,
+    CELL_INGEST_BYTE_BUDGET, CELL_RESULT_PAGE_ROWS,
 };
 pub use connection::{ConnectionEngine, ScopedConnection};
 pub use dbt::DbtEngine;

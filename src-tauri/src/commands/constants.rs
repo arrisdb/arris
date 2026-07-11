@@ -9,3 +9,7 @@ pub const ARG_FLAG_PREFIX: char = '-';
 /// Error shown on the target and its remaining upstream cells when a run is
 /// cancelled mid-chain.
 pub const CANVAS_RUN_CANCELLED_MESSAGE: &str = "Query cancelled";
+
+/// Tauri event carrying a canvas cell's full-ingest totals once the background
+/// drain finishes (the UI page was already returned synchronously).
+pub const CANVAS_CELL_INGESTED_EVENT: &str = "canvas://cell-ingested";
