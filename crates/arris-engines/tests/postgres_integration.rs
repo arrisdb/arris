@@ -8,7 +8,7 @@
 //! Each test owns its own container, so they are independent and parallel-safe.
 
 use arris_engines::{
-    CanvasEngine, CanvasError, CellResultCache, ConnectionConfig, ConnectionEngine,
+    CanvasEngine, CanvasError, ConnectionConfig, ConnectionEngine,
     DatabaseDriver, DatabaseKind, ExplainMode, IsolationLevel, ObjectRef, PlanNode, QueryEngine,
     QueryLanguage, QueryResult, QueryValue, SchemaNode, SchemaNodeKind, SslMode,
     TransactionConfig, TransactionMode, driver_for_kind, CELL_INGEST_BYTE_BUDGET, CELL_RESULT_PAGE_ROWS,
@@ -1456,18 +1456,12 @@ async fn object_definition_schema_is_faithful_and_replayable() {
 
 // ── streaming ingestion (canvas path) ───────────────────────────────────────
 
-static STREAM_DIR_SEQ: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+mod streaming_scenario;
+use streaming_scenario::BOARD;
 
-/// A canvas engine over a throwaway cell cache (1 GiB memory / 10 GiB total).
 fn canvas_engine() -> CanvasEngine {
-    let n = STREAM_DIR_SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-    let dir =
-        std::env::temp_dir().join(format!("arris-pg-stream-{}-{}", std::process::id(), n));
-    let cache = CellResultCache::new(dir, 1 << 30, 10 * (1 << 30));
-    CanvasEngine::new(std::sync::Arc::new(cache))
+    streaming_scenario::canvas_engine("pg")
 }
-
-const BOARD: &str = "board-stream";
 
 #[tokio::test]
 async fn streaming_ingests_100k_rows_with_exact_totals_and_page() {

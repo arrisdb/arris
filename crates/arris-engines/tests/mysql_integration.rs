@@ -18,7 +18,7 @@
 //! - MySQL has no boolean type: comparisons yield `1`/`0` integers.
 
 use arris_engines::{
-    CanvasEngine, CanvasError, CellResultCache, ConnectionConfig, DatabaseDriver, DatabaseKind,
+    CanvasEngine, CanvasError, ConnectionConfig, DatabaseDriver, DatabaseKind,
     ExplainMode, IsolationLevel, ObjectRef, QueryEngine, QueryLanguage, QueryResult, QueryValue,
     SchemaNode, SchemaNodeKind, driver_for_kind, CELL_INGEST_BYTE_BUDGET, CELL_RESULT_PAGE_ROWS,
 };
@@ -1083,17 +1083,12 @@ async fn slim_diff_keyless_and_keyed() {
 
 // ── streaming ingestion (canvas path) ───────────────────────────────────────
 
-static STREAM_DIR_SEQ: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+mod streaming_scenario;
+use streaming_scenario::BOARD;
 
-/// A canvas engine over a throwaway cell cache (1 GiB memory / 10 GiB total).
 fn canvas_engine() -> CanvasEngine {
-    let n = STREAM_DIR_SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-    let dir = std::env::temp_dir().join(format!("arris-mysql-stream-{}-{}", std::process::id(), n));
-    let cache = CellResultCache::new(dir, 1 << 30, 10 * (1 << 30));
-    CanvasEngine::new(std::sync::Arc::new(cache))
+    streaming_scenario::canvas_engine("mysql")
 }
-
-const BOARD: &str = "board-stream";
 
 /// Seed `src(n INT PK, label VARCHAR)` with rows 1..=count. MySQL has no lazy
 /// `generate_series`, so the rows come from a digit-table cross join (no
