@@ -11,7 +11,12 @@ import type {
   QueryRunState,
   ReorderOp,
 } from "../types";
-import { CANVAS_QUERY_ID_PREFIX, DEFAULT_SIZE, LAYOUT_GAP } from "../constants";
+import {
+  CANVAS_QUERY_ID_PREFIX,
+  DEFAULT_QUERY_LIMIT,
+  DEFAULT_SIZE,
+  LAYOUT_GAP,
+} from "../constants";
 import {
   deriveDataEdges,
   genId,
@@ -386,6 +391,7 @@ const useCanvasStore = create<CanvasStore>((set, get) => ({
         title: c.title ?? "",
         sql: c.sql,
         connectionId: c.connectionId,
+        limit: c.selectAll ? null : (c.limit ?? DEFAULT_QUERY_LIMIT),
       }));
     const queryId = `${CANVAS_QUERY_ID_PREFIX}:${tabId}:${id}`;
     get().setRun(tabId, id, { running: true, queryId });
