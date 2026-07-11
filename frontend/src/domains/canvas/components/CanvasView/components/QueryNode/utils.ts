@@ -133,6 +133,12 @@ function queryEditorExtensions(input: QueryEditorExtensionsInput): Extension[] {
   ];
 }
 
+// Status while the early page is shown and the full result still streams in.
+function runStreamingSummary(result: QueryResult): string {
+  const rows = result.rows.length;
+  return `first ${rows.toLocaleString()} rows · loading all…`;
+}
+
 // One-line status for a finished run: "first N of M rows" past one page, with
 // a trailing "+" when the ingestion byte budget truncated the run.
 function runResultSummary(
@@ -151,5 +157,10 @@ function runResultSummary(
   return `${rows} row${rows === 1 ? "" : "s"} · ${columnsPart}`;
 }
 
-export { buildCanvasSqlSupport, queryEditorExtensions, runResultSummary };
+export {
+  buildCanvasSqlSupport,
+  queryEditorExtensions,
+  runResultSummary,
+  runStreamingSummary,
+};
 export type { CanvasSqlSupportInput };
