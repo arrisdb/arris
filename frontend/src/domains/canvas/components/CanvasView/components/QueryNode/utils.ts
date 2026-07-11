@@ -133,9 +133,8 @@ function queryEditorExtensions(input: QueryEditorExtensionsInput): Extension[] {
   ];
 }
 
-// One-line status for a finished run. The result holds only the first page;
-// when the full cached result is larger the copy reads "first N of M rows",
-// with a trailing "+" when the ingestion byte budget truncated the run.
+// One-line status for a finished run: "first N of M rows" past one page, with
+// a trailing "+" when the ingestion byte budget truncated the run.
 function runResultSummary(
   result: QueryResult,
   totalRows?: number,

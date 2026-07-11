@@ -17,28 +17,21 @@ interface ChartData {
   error?: string;
 }
 
-/// A chart object bound to a query object by `sourceQueryId`. It does NOT render
-/// the source's 500-row page: it runs a `GROUP BY` (or a bounded sample) over the
-/// source's full cached result in the backend and renders that, so a chart over a
-/// million-row query aggregates every row, not just the page. Re-runs whenever the
-/// source re-runs or the spec's query-shaping fields change. `nowheel` lets the
-/// chart scroll/zoom without panning.
+/// A chart bound to a query by `sourceQueryId`: it aggregates (or samples) the
+/// source's FULL cached result in the backend, never just the 500-row page.
 function ChartNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
   const { tabId } = data;
   const board = useCanvasStore((s) => s.boards[tabId]);
   const component = board?.doc.components.find((c) => c.id === id);
-  const source =
-    component?.kind === "chart" && component.sourceQueryId
-      ? board?.doc.components.find((c) => c.id === component.sourceQueryId)
-      : undefined;
-  const sourceRun =
-    component?.kind === "chart" && component.sourceQueryId
-      ? board?.runs[component.sourceQueryId]
-      : undefined;
+  const chart = component?.kind === "chart" ? component : undefined;
+  const source = chart?.sourceQueryId
+    ? board?.doc.components.find((c) => c.id === chart.sourceQueryId)
+    : undefined;
+  const sourceRun = chart?.sourceQueryId ? board?.runs[chart.sourceQueryId] : undefined;
   const sourceTitle =
     source?.kind === "query" && source.title ? sanitizeCellTitle(source.title) : undefined;
-  const spec = component?.kind === "chart" ? component.spec : undefined;
-  const maxRows = component?.kind === "chart" ? component.maxRows : undefined;
+  const spec = chart?.spec;
+  const maxRows = chart?.maxRows;
 
   const query = useMemo(
     () => (spec && sourceTitle ? buildChartQuery(spec, sourceTitle, maxRows) : null),

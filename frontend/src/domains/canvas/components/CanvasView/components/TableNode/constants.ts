@@ -1,6 +1,5 @@
-// Rows per page in a table object's result grid. The table pages through the
-// source cell's FULL cached result (fetched a page at a time from the backend),
-// so this bounds only what is rendered/shipped at once, not the total.
+// Rows per page in a table object's result grid: bounds what is rendered and
+// shipped at once, not the total (the full result stays in the backend cache).
 const TABLE_PAGE_ROWS = 200;
 
 export { TABLE_PAGE_ROWS };

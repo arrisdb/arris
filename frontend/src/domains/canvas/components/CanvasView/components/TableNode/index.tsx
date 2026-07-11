@@ -10,11 +10,8 @@ import { CanvasResizer } from "../CanvasResizer";
 import { TABLE_PAGE_ROWS } from "./constants";
 import { cellText, pageRangeLabel } from "./utils";
 
-/// A data table bound to a query object by `sourceQueryId`. It pages through the
-/// source cell's FULL cached result: the first page is the source run's own page,
-/// and Prev/Next fetch further pages a page at a time from the backend cache, so a
-/// table over a million-row query can scroll the whole result without ever holding
-/// it all in the webview. `nowheel` lets the grid scroll without panning.
+/// A data table bound to a query by `sourceQueryId`: Prev/Next page through the
+/// source's FULL cached result from the backend, one page in the webview at a time.
 function TableNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
   const { tabId } = data;
   const board = useCanvasStore((s) => s.boards[tabId]);

@@ -3,19 +3,13 @@ import { applyNodeChanges } from "reactflow";
 import type { Node, NodeChange, Viewport } from "reactflow";
 
 import { useTabsStore } from "@shell/hooks/tabsStore";
-import { listenAppEventIPC } from "@shell/ipc";
 import type { EditorTab } from "@shell/types";
 
-import {
-  CANVAS_CELL_INGESTED_EVENT,
-  CANVAS_SAVE_DEBOUNCE_MS,
-  DEFAULT_SIZE,
-} from "../../constants";
+import { CANVAS_SAVE_DEBOUNCE_MS, DEFAULT_SIZE } from "../../constants";
 import { useCanvasStore } from "../../hooks";
 import type {
   CanvasComponent,
   CanvasEdge,
-  CellIngestedEvent,
   ComponentKind,
   ReorderOp,
   ShapeKind,
@@ -62,25 +56,6 @@ function useCanvas(tab: EditorTab) {
     // Re-parse only when the tab identity changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tabId]);
-
-  // Land background-ingest totals: a terminal cell's run response carries only
-  // the first page; this event delivers the full totals and clears the spinner.
-  useEffect(() => {
-    let off: (() => void) | undefined;
-    let cancelled = false;
-    listenAppEventIPC<CellIngestedEvent>(CANVAS_CELL_INGESTED_EVENT, (p) => {
-      useCanvasStore
-        .getState()
-        .applyIngestDone(p.boardId, p.cellId, p.totalRows, p.complete);
-    }).then((f) => {
-      if (cancelled) f();
-      else off = f;
-    });
-    return () => {
-      cancelled = true;
-      off?.();
-    };
-  }, []);
 
   const components = board?.doc.components ?? EMPTY_COMPONENTS;
   const edges = board?.doc.edges ?? EMPTY_EDGES;

@@ -333,13 +333,9 @@ describe("useCanvasStore", () => {
       makeComponent({ kind: "query", id: "q1", sql: "select 1", connectionId: "conn" }),
     );
     const done = get().runQueryComponent(TAB, "q1");
-    // While in flight, the run state carries the cancellation handle.
-    expect(get().boards[TAB].runs.q1).toMatchObject({
-      running: true,
-      queryId: expect.stringContaining("q1"),
-    });
+    expect(get().boards[TAB].runs.q1).toMatchObject({ running: true });
     const queryId = vi.mocked(runCanvasCellIPC).mock.calls[0][3];
-    expect(queryId).toBe(get().boards[TAB].runs.q1.queryId);
+    expect(queryId).toContain("q1");
     await done;
   });
 
@@ -357,9 +353,11 @@ describe("useCanvasStore", () => {
       makeComponent({ kind: "query", id: "q1", sql: "select 1", connectionId: "conn" }),
     );
     const done = get().runQueryComponent(TAB, "q1");
-    const queryId = get().boards[TAB].runs.q1.queryId;
     get().cancelQueryComponent(TAB, "q1");
-    expect(cancelCanvasCellIPC).toHaveBeenCalledWith(queryId);
+    // The cancel handle is derived, matching the id passed to the run call.
+    expect(cancelCanvasCellIPC).toHaveBeenCalledWith(
+      vi.mocked(runCanvasCellIPC).mock.calls[0][3],
+    );
     resolveRun([]);
     await done;
   });

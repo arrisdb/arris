@@ -89,7 +89,7 @@ describe("QueryNode", () => {
 
   it("swaps Run for a Cancel button while the query is running", () => {
     seed(makeComponent({ kind: "query", id: "q", sql: "select 1", connectionId: "c" }));
-    useCanvasStore.getState().setRun(TAB, "q", { running: true, queryId: "qid" });
+    useCanvasStore.getState().setRun(TAB, "q", { running: true });
     renderNode("q");
     expect(screen.queryByRole("button", { name: "Run" })).toBeNull();
     expect(screen.getByRole("button", { name: "Cancel" })).toBeTruthy();
@@ -97,7 +97,7 @@ describe("QueryNode", () => {
 
   it("Cancel asks the store to cancel the in-flight run", () => {
     seed(makeComponent({ kind: "query", id: "q", sql: "select 1", connectionId: "c" }));
-    useCanvasStore.getState().setRun(TAB, "q", { running: true, queryId: "qid" });
+    useCanvasStore.getState().setRun(TAB, "q", { running: true });
     const calls: Array<[string, string]> = [];
     useCanvasStore.setState({
       cancelQueryComponent: (tabId: string, id: string) => calls.push([tabId, id]),

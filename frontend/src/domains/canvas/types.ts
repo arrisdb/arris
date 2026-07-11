@@ -183,8 +183,6 @@ interface CellIngestedEvent {
 /// Runtime execution state for a query object. Never part of `CanvasDoc`.
 interface QueryRunState {
   running?: boolean;
-  /// Backend cancellation handle for the in-flight run; set while `running`.
-  queryId?: string;
   result?: QueryResult;
   error?: string;
   /// Rows in the FULL cached result; `result` holds only the first page.
