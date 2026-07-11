@@ -7,11 +7,13 @@ function cellText(value: QueryValue): string {
 }
 
 /// "start-end of total" for the pager, 1-based and thousands-separated.
-function pageRangeLabel(offset: number, shown: number, total: number): string {
+/// `total` is undefined while the source is still streaming (count unknown).
+function pageRangeLabel(offset: number, shown: number, total?: number): string {
   if (total === 0) return "0 of 0";
   const start = offset + 1;
   const end = offset + shown;
-  return `${start.toLocaleString()}-${end.toLocaleString()} of ${total.toLocaleString()}`;
+  const totalPart = total === undefined ? "…" : total.toLocaleString();
+  return `${start.toLocaleString()}-${end.toLocaleString()} of ${totalPart}`;
 }
 
 export { cellText, pageRangeLabel };
