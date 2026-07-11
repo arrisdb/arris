@@ -151,3 +151,38 @@ INSERT INTO order_items (order_item_id, order_id, product_id, quantity, unit_pri
     (35, 114, 8, 1, 19.00),
     (36, 122, 2, 1, 49.00),
     (37, 126, 1, 1, 129.00);
+
+-- =================================================================
+-- Large events table (10M rows) for streaming-ingestion testing.
+-- StarRocks has no recursive CTE and no lazy generate_series, so the rows
+-- come from a digit-table cross join (10^7 = 10,000,000). The _digits helper
+-- is dropped once the load completes so it does not clutter the browser.
+-- =================================================================
+
+CREATE TABLE _digits (d INT NOT NULL) DUPLICATE KEY(d)
+DISTRIBUTED BY HASH(d) PROPERTIES ("replication_num" = "1");
+
+INSERT INTO _digits VALUES (0),(1),(2),(3),(4),(5),(6),(7),(8),(9);
+
+CREATE TABLE events_10m (
+    id          BIGINT        NOT NULL,
+    user_id     INT           NOT NULL,
+    event_type  VARCHAR(30)   NOT NULL,
+    amount      DECIMAL(10,2) NOT NULL
+) DUPLICATE KEY(id)
+DISTRIBUTED BY HASH(id)
+PROPERTIES ("replication_num" = "1");
+
+INSERT INTO events_10m (id, user_id, event_type, amount)
+SELECT seq + 1,
+       CAST(seq % 1000000 AS INT) + 1,
+       CONCAT('event-', CAST(seq % 6 AS INT)),
+       CAST(seq % 1000 AS DECIMAL(10,2))
+FROM (
+    SELECT t0.d + t1.d * 10 + t2.d * 100 + t3.d * 1000
+         + t4.d * 10000 + t5.d * 100000 + t6.d * 1000000 AS seq
+    FROM _digits t0 CROSS JOIN _digits t1 CROSS JOIN _digits t2 CROSS JOIN _digits t3
+         CROSS JOIN _digits t4 CROSS JOIN _digits t5 CROSS JOIN _digits t6
+) g;
+
+DROP TABLE IF EXISTS _digits;
