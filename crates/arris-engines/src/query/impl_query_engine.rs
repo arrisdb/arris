@@ -515,6 +515,34 @@ impl QueryEngine {
              OFFSET {offset} ROWS FETCH NEXT {fetch_limit} ROWS ONLY"
         )
     }
+
+    /// The dialect-native way to cap `sql` to `fetch_count` rows at `offset`.
+    /// `None` means the dialect cannot be subquery-wrapped without breaking
+    /// ORDER BY (StarRocks and non-LIMIT sources); the caller caps in memory or
+    /// at ingest instead.
+    pub fn limit_wrapped_sql(
+        sql: &str,
+        strategy: &PaginationStrategy,
+        fetch_count: u32,
+        offset: u64,
+    ) -> Option<String> {
+        let trimmed = Self::paginated_subquery_sql(sql);
+        match strategy {
+            PaginationStrategy::SubqueryOffset => Some(format!(
+                "SELECT * FROM ({trimmed}) AS _p LIMIT {fetch_count} OFFSET {offset}"
+            )),
+            PaginationStrategy::TrinoOffset => Some(format!(
+                "SELECT * FROM ({trimmed}) AS _p OFFSET {offset} LIMIT {fetch_count}"
+            )),
+            PaginationStrategy::SqlServerOffset => {
+                Some(Self::sql_server_paginated_query(sql, fetch_count, offset))
+            }
+            PaginationStrategy::OracleOffset => {
+                Some(Self::oracle_paginated_query(sql, fetch_count, offset))
+            }
+            PaginationStrategy::InMemory | PaginationStrategy::None => None,
+        }
+    }
 }
 
 impl Engine for QueryEngine {
@@ -596,6 +624,33 @@ mod tests {
             "SELECT * FROM (SELECT * FROM appdb.dbo.orders) AS _p ORDER BY (SELECT NULL) \
              OFFSET 0 ROWS FETCH NEXT 101 ROWS ONLY"
         );
+    }
+
+    #[test]
+    fn limit_wrapped_sql_wraps_per_dialect_and_skips_in_memory() {
+        use crate::PaginationStrategy as PS;
+        let sql = "SELECT * FROM t";
+        assert_eq!(
+            QueryEngine::limit_wrapped_sql(sql, &PS::SubqueryOffset, 500, 0),
+            Some("SELECT * FROM (SELECT * FROM t) AS _p LIMIT 500 OFFSET 0".to_string())
+        );
+        assert_eq!(
+            QueryEngine::limit_wrapped_sql(sql, &PS::TrinoOffset, 500, 0),
+            Some("SELECT * FROM (SELECT * FROM t) AS _p OFFSET 0 LIMIT 500".to_string())
+        );
+        assert!(
+            QueryEngine::limit_wrapped_sql(sql, &PS::SqlServerOffset, 500, 0)
+                .unwrap()
+                .contains("FETCH NEXT 500 ROWS ONLY")
+        );
+        assert!(
+            QueryEngine::limit_wrapped_sql(sql, &PS::OracleOffset, 500, 0)
+                .unwrap()
+                .contains("FETCH NEXT 500 ROWS ONLY")
+        );
+        // Order-sensitive dialects cannot be subquery-wrapped safely.
+        assert_eq!(QueryEngine::limit_wrapped_sql(sql, &PS::InMemory, 500, 0), None);
+        assert_eq!(QueryEngine::limit_wrapped_sql(sql, &PS::None, 500, 0), None);
     }
 
     #[tokio::test]
