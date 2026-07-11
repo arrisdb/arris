@@ -36,8 +36,8 @@ use std::time::Duration;
 
 use arris_engines::{
     CanvasEngine, CanvasError, CellResultCache, ConnectionConfig, DatabaseDriver, DatabaseKind,
-    ExplainMode, ObjectRef, QueryLanguage, QueryResult, QueryValue, SchemaNode, SchemaNodeKind,
-    driver_for_kind, CELL_RESULT_PAGE_ROWS,
+    ExplainMode, ObjectRef, QueryEngine, QueryLanguage, QueryResult, QueryValue, SchemaNode,
+    SchemaNodeKind, driver_for_kind, CELL_RESULT_PAGE_ROWS,
 };
 use testcontainers::core::{IntoContainerPort, WaitFor};
 use testcontainers::runners::AsyncRunner;
@@ -614,7 +614,7 @@ async fn streaming_byte_budget_truncates_and_reports_incomplete() {
         .expect("open stream");
     // A ~1 MiB budget admits a handful of 8k-row chunks, then stops.
     let out = engine
-        .ingest_cell_stream_with_budget(BOARD, "capped", stream, None, 1 << 20)
+        .ingest_cell_stream_with_budget(BOARD, "capped", stream, None, 1 << 20, None)
         .await
         .expect("ingest stream");
 
@@ -629,4 +629,46 @@ async fn streaming_byte_budget_truncates_and_reports_incomplete() {
         .await
         .expect("chained count");
     assert_eq!(agg.result.rows[0][0], QueryValue::Int(out.total_rows as i64));
+}
+
+#[tokio::test]
+async fn streaming_cell_row_cap_stops_ingest_at_500_in_order() {
+    let (_c, admin, host, port) = start_starrocks().await;
+    run(admin.as_ref(), "CREATE DATABASE it_limit").await;
+    let driver = connect_as(&host, port, "root", "", "it_limit").await;
+    seed_numbers(driver.as_ref(), 10_000).await;
+    let engine = canvas_engine();
+
+    // StarRocks is PaginationStrategy::InMemory: apply_cell_limit must NOT wrap
+    // the SQL (a subquery wrap scrambles ORDER BY) and instead returns an
+    // ingest-side row cap the engine enforces.
+    let (sql, row_cap) = QueryEngine::apply_cell_limit(
+        "SELECT n FROM src ORDER BY n",
+        &driver.pagination_strategy(),
+        Some(500),
+    );
+    assert_eq!(sql, "SELECT n FROM src ORDER BY n", "SQL must pass through unwrapped");
+    assert_eq!(row_cap, Some(500));
+
+    let stream = driver
+        .run_query_stream(&sql, &[], QueryLanguage::Native)
+        .await
+        .expect("open stream");
+    let out = engine
+        .ingest_cell_stream_with_budget(BOARD, "lim", stream, None, 1 << 30, row_cap)
+        .await
+        .expect("ingest stream");
+
+    assert_eq!(out.total_rows, 500);
+    assert!(out.complete, "a row-cap stop is the requested result, not a truncation");
+    assert_eq!(out.result.rows.len(), 500);
+    assert_eq!(out.result.rows[0][0], QueryValue::Int(1));
+    assert_eq!(out.result.rows[499][0], QueryValue::Int(500));
+
+    // The cached cell holds exactly the capped prefix.
+    let agg = engine
+        .run_cell(BOARD, "agglim", "SELECT COUNT(*) AS c FROM lim")
+        .await
+        .expect("chained count");
+    assert_eq!(agg.result.rows[0][0], QueryValue::Int(500));
 }

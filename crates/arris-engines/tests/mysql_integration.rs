@@ -19,8 +19,8 @@
 
 use arris_engines::{
     CanvasEngine, CanvasError, CellResultCache, ConnectionConfig, DatabaseDriver, DatabaseKind,
-    ExplainMode, IsolationLevel, ObjectRef, QueryLanguage, QueryResult, QueryValue, SchemaNode,
-    SchemaNodeKind, driver_for_kind, CELL_RESULT_PAGE_ROWS,
+    ExplainMode, IsolationLevel, ObjectRef, QueryEngine, QueryLanguage, QueryResult, QueryValue,
+    SchemaNode, SchemaNodeKind, driver_for_kind, CELL_RESULT_PAGE_ROWS,
 };
 use testcontainers_modules::mysql::Mysql;
 use testcontainers_modules::testcontainers::runners::AsyncRunner;
@@ -1202,7 +1202,7 @@ async fn streaming_byte_budget_truncates_and_reports_incomplete() {
         .expect("open stream");
     // A ~1 MiB budget admits a handful of 8k-row chunks, then stops.
     let out = engine
-        .ingest_cell_stream_with_budget(BOARD, "capped", stream, None, 1 << 20)
+        .ingest_cell_stream_with_budget(BOARD, "capped", stream, None, 1 << 20, None)
         .await
         .expect("ingest stream");
 
@@ -1217,4 +1217,36 @@ async fn streaming_byte_budget_truncates_and_reports_incomplete() {
         .await
         .expect("chained count");
     assert_eq!(agg.result.rows[0][0], QueryValue::Int(out.total_rows as i64));
+}
+
+#[tokio::test]
+async fn streaming_cell_limit_wraps_sql_and_caps_to_500() {
+    let (_container, driver, _host, _port) = start_mysql().await;
+    seed_numbers(driver.as_ref(), 10_000).await;
+    let engine = canvas_engine();
+
+    // MySQL wraps via SubqueryOffset, so the database itself stops at 500 and
+    // no ingest-side row cap is needed.
+    let (sql, row_cap) = QueryEngine::apply_cell_limit(
+        "SELECT n FROM src ORDER BY n",
+        &driver.pagination_strategy(),
+        Some(500),
+    );
+    assert!(sql.contains("LIMIT 500"), "wrapped SQL:\n{sql}");
+    assert_eq!(row_cap, None);
+
+    let stream = driver
+        .run_query_stream(&sql, &[], QueryLanguage::Native)
+        .await
+        .expect("open stream");
+    let out = engine
+        .ingest_cell_stream_with_budget(BOARD, "lim", stream, None, 1 << 30, row_cap)
+        .await
+        .expect("ingest stream");
+
+    assert_eq!(out.total_rows, 500);
+    assert!(out.complete, "a LIMIT-capped run is a complete result");
+    assert_eq!(out.result.rows.len(), 500);
+    assert_eq!(out.result.rows[0][0], QueryValue::Int(1));
+    assert_eq!(out.result.rows[499][0], QueryValue::Int(500));
 }
