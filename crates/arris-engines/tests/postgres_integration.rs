@@ -1573,3 +1573,126 @@ async fn streaming_byte_budget_truncates_and_reports_incomplete() {
         .expect("chained count");
     assert_eq!(agg.result.rows[0][0], QueryValue::Int(out.total_rows as i64));
 }
+
+#[tokio::test]
+async fn streaming_cell_limit_wraps_sql_and_caps_to_500() {
+    let (_container, driver) = start_pg().await;
+    let engine = canvas_engine();
+
+    // Postgres wraps via SubqueryOffset, so the database itself stops at 500
+    // and no ingest-side row cap is needed.
+    let (sql, row_cap) = QueryEngine::apply_cell_limit(
+        "SELECT n FROM generate_series(1, 100000) AS n ORDER BY n",
+        &driver.pagination_strategy(),
+        Some(500),
+    );
+    assert!(sql.contains("LIMIT 500"), "wrapped SQL:\n{sql}");
+    assert_eq!(row_cap, None);
+
+    let stream = driver
+        .run_query_stream(&sql, &[], QueryLanguage::Native)
+        .await
+        .expect("open stream");
+    let out = engine
+        .ingest_cell_stream_with_budget(BOARD, "lim", stream, None, 1 << 30, row_cap)
+        .await
+        .expect("ingest stream");
+
+    assert_eq!(out.total_rows, 500);
+    assert!(out.complete, "a LIMIT-capped run is a complete result");
+    assert_eq!(out.result.rows.len(), 500);
+    assert_eq!(out.result.rows[0][0], QueryValue::Int(1));
+    assert_eq!(out.result.rows[499][0], QueryValue::Int(500));
+}
+
+#[tokio::test]
+async fn streaming_cell_row_cap_stops_ingest_at_500_in_order() {
+    let (_container, driver) = start_pg().await;
+    let engine = canvas_engine();
+
+    // The ingest-side fallback (used for dialects that cannot be wrapped):
+    // the stream is opened un-limited and the engine stops after 500 rows.
+    let stream = driver
+        .run_query_stream(
+            "SELECT n FROM generate_series(1, 100000) AS n ORDER BY n",
+            &[],
+            QueryLanguage::Native,
+        )
+        .await
+        .expect("open stream");
+    let out = engine
+        .ingest_cell_stream_with_budget(BOARD, "capped500", stream, None, 1 << 30, Some(500))
+        .await
+        .expect("ingest stream");
+
+    assert_eq!(out.total_rows, 500);
+    assert!(out.complete, "a row-cap stop is the requested result, not a truncation");
+    assert_eq!(out.result.rows[0][0], QueryValue::Int(1));
+    assert_eq!(out.result.rows[499][0], QueryValue::Int(500));
+    let agg = engine
+        .run_cell(BOARD, "agg500", "SELECT COUNT(*) AS c FROM capped500")
+        .await
+        .expect("chained count");
+    assert_eq!(agg.result.rows[0][0], QueryValue::Int(500));
+}
+
+#[tokio::test]
+async fn streaming_select_all_ingests_full_result() {
+    let (_container, driver) = start_pg().await;
+    let engine = canvas_engine();
+
+    // "Select all rows": no limit, no cap; the full result lands in the cache.
+    let (sql, row_cap) = QueryEngine::apply_cell_limit(
+        "SELECT n FROM generate_series(1, 100000) AS n",
+        &driver.pagination_strategy(),
+        None,
+    );
+    assert_eq!(row_cap, None);
+
+    let stream = driver
+        .run_query_stream(&sql, &[], QueryLanguage::Native)
+        .await
+        .expect("open stream");
+    let out = engine
+        .ingest_cell_stream_with_budget(BOARD, "all", stream, None, 1 << 30, row_cap)
+        .await
+        .expect("ingest stream");
+
+    assert_eq!(out.total_rows, 100_000);
+    assert!(out.complete);
+    assert_eq!(out.result.rows.len(), CELL_RESULT_PAGE_ROWS);
+}
+
+#[tokio::test]
+async fn streaming_early_page_then_background_finish_reports_totals() {
+    let (_container, driver) = start_pg().await;
+    let engine = canvas_engine();
+
+    // The terminal-cell path: the page returns as soon as it fills, the
+    // continuation drains the rest, and the totals cover the whole result.
+    let stream = driver
+        .run_query_stream(
+            "SELECT n FROM generate_series(1, 100000) AS n",
+            &[],
+            QueryLanguage::Native,
+        )
+        .await
+        .expect("open stream");
+    let (page, cont) = engine
+        .start_cell_ingest(BOARD, "early", stream, None, 1 << 30, None)
+        .await
+        .expect("start ingest");
+    assert_eq!(page.result.rows.len(), CELL_RESULT_PAGE_ROWS);
+    assert_eq!(page.result.rows[0][0], QueryValue::Int(1));
+
+    let done = cont.finish(None).await.expect("background finish");
+    assert_eq!(done.total_rows, 100_000);
+    assert!(done.complete);
+
+    // The finished cache entry serves the full result to chained cells.
+    let agg = engine
+        .run_cell(BOARD, "aggearly", "SELECT COUNT(*) AS c FROM early")
+        .await
+        .expect("chained count");
+    assert_eq!(agg.result.rows[0][0], QueryValue::Int(100_000));
+}
