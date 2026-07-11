@@ -28,7 +28,7 @@ trino = ["dep:reqwest"]
 clickhouse = ["dep:clickhouse"]
 dynamodb = ["dep:aws-config", "dep:aws-sdk-dynamodb"]
 # StarRocks speaks the MySQL wire protocol, so it reuses mysql_async + rustls.
-starrocks = ["dep:mysql_async", "dep:rustls"]
+starrocks = ["dep:mysql_async", "dep:rustls", "dep:async-stream"]
 
 [dependencies]
 # shared
