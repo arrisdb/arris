@@ -4,9 +4,10 @@ use std::time::Instant;
 
 use async_trait::async_trait;
 use indexmap::IndexMap;
+use futures::StreamExt;
 use mysql_async::prelude::Queryable;
 use mysql_async::{
-    ClientIdentity, Conn, Opts, OptsBuilder, Params, Pool, Row, SslOpts, Value as MyValue,
+    ClientIdentity, Column, Conn, Opts, OptsBuilder, Params, Pool, Row, SslOpts, Value as MyValue,
     consts::ColumnType,
 };
 use percent_encoding::{AsciiSet, CONTROLS, utf8_percent_encode};
@@ -14,12 +15,13 @@ use tokio::sync::Mutex;
 
 use crate::drivers::DatabaseDriver;
 use crate::drivers::PaginationStrategy;
+use crate::drivers::common::RowChunkPump;
 use crate::drivers::errors::Result;
 use crate::drivers::sql_builder::SqlBuilder;
 use crate::{
     ColumnSpec, ConnectionConfig, DriverError, ExplainMode, MutationResult, ObjectRef,
-    PlanAttribute, PlanNode, PlanResult, QueryLanguage, QueryResult, QueryValue, RowDelete,
-    RowInsert, SchemaNode, SchemaNodeKind, SslMode, TableRef, ValueMap,
+    PlanAttribute, PlanNode, PlanResult, QueryLanguage, QueryResult, QueryStream, QueryValue,
+    RowDelete, RowInsert, SchemaNode, SchemaNodeKind, SslMode, TableRef, ValueMap,
 };
 
 use super::convert::Convert;
@@ -184,6 +186,31 @@ impl StarrocksDriver {
         } else {
             Params::Positional(params.iter().map(Convert::query_to_mysql).collect())
         }
+    }
+
+    /// Column specs for a prepared statement's result set, used to seed a
+    /// streamed `RowChunkStream` before any row arrives.
+    fn stmt_columns_to_specs(cols: &[Column]) -> Vec<ColumnSpec> {
+        cols.iter()
+            .map(|c| {
+                ColumnSpec::new(
+                    c.name_str().into_owned(),
+                    Convert::column_type_str(c.column_type()),
+                )
+            })
+            .collect()
+    }
+
+    /// Maps one streamed row to `QueryValue`s, inferring each column's type from
+    /// the row's own metadata (same conversion as the buffered path).
+    fn row_to_query_values(row: &Row) -> Vec<QueryValue> {
+        let cols = row.columns_ref();
+        (0..cols.len())
+            .map(|i| {
+                let v = row.as_ref(i).cloned().unwrap_or(MyValue::NULL);
+                Convert::mysql_to_query(v, cols[i].column_type())
+            })
+            .collect()
     }
 
     fn rows_to_query_result(
@@ -504,6 +531,66 @@ impl DatabaseDriver for StarrocksDriver {
                 ..Default::default()
             })
         }
+    }
+
+    async fn run_query_stream(
+        &self,
+        text: &str,
+        params: &[QueryValue],
+        language: QueryLanguage,
+    ) -> Result<QueryStream> {
+        // StarRocks has no interactive transactions, so the only non-streaming
+        // case is a non-SELECT (materialized fallback).
+        if !self.looks_like_select(text) {
+            return Ok(QueryStream::from_materialized(
+                self.run_query(text, params, language).await?,
+            ));
+        }
+        let mut conn = self.conn().await?;
+        // Prepare to learn the result columns up front (the prepared statement is
+        // connection-local, so it executes on the same `conn` moved into the
+        // stream). StarRocks prepared-statement support varies by version, so a
+        // prepare failure drops this connection and materializes on a fresh one
+        // rather than erroring.
+        let stmt = match conn.prep(text).await {
+            Ok(stmt) => stmt,
+            Err(_) => {
+                drop(conn);
+                return Ok(QueryStream::from_materialized(
+                    self.run_query(text, params, language).await?,
+                ));
+            }
+        };
+        let columns = Self::stmt_columns_to_specs(stmt.columns());
+        let params = Self::params_to_mysql(params);
+
+        // The generator owns the connection + statement for the stream's life, so
+        // dropping the stream returns the connection to the pool and ends the
+        // server-side result set (drop-to-cancel). `async_stream` is required
+        // because mysql_async's result stream borrows the connection, which a
+        // plain owned `'static` stream cannot express.
+        let stream = RowChunkPump::spawn(
+            columns,
+            move || async move {
+                let rows = async_stream::try_stream! {
+                    let mut conn = conn;
+                    let mut result = conn
+                        .exec_iter(stmt, params)
+                        .await
+                        .map_err(|e| DriverError::QueryFailed(e.to_string()))?;
+                    while let Some(row) = result
+                        .next()
+                        .await
+                        .map_err(|e| DriverError::QueryFailed(e.to_string()))?
+                    {
+                        yield row;
+                    }
+                };
+                Ok(rows.boxed())
+            },
+            |row| Self::row_to_query_values(row),
+        );
+        Ok(QueryStream::Rows(stream))
     }
 
     fn pagination_strategy(&self) -> PaginationStrategy {
