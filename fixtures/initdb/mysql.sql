@@ -234,7 +234,7 @@ SELECT
 FROM s1 CROSS JOIN s2;
 
 -- =================================================================
--- Large user accounts table (10M rows) for federation perf testing
+-- Large user accounts table (1M rows) for federation perf testing
 -- =================================================================
 
 CREATE TABLE user_accounts_1m (
@@ -265,4 +265,37 @@ SELECT
     ELT(1+FLOOR(RAND()*4), 'free','starter','pro','enterprise'),
     ROUND(RAND()*500, 2),
     FLOOR(RAND()*2)
+FROM s1 CROSS JOIN s2;
+
+-- =================================================================
+-- Large events table (10M rows) for streaming-ingestion testing
+-- =================================================================
+
+CREATE TABLE events_10m (
+    id          BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id     INT NOT NULL,
+    event_type  VARCHAR(30) NOT NULL,
+    event_time  DATETIME NOT NULL,
+    device      VARCHAR(20) NOT NULL,
+    country     VARCHAR(30) NOT NULL,
+    amount      DECIMAL(10,2) NOT NULL,
+    INDEX idx_events_user (user_id),
+    INDEX idx_events_type (event_type),
+    INDEX idx_events_time (event_time)
+);
+
+-- 10000 x 1000 = 10,000,000 rows; s1 recurses to 10000 so raise the CTE cap.
+SET cte_max_recursion_depth = 10001;
+
+INSERT INTO events_10m
+    (user_id, event_type, event_time, device, country, amount)
+WITH RECURSIVE s1 AS (SELECT 1 AS n UNION ALL SELECT n+1 FROM s1 WHERE n < 10000),
+               s2 AS (SELECT 1 AS n UNION ALL SELECT n+1 FROM s2 WHERE n < 1000)
+SELECT
+    1 + FLOOR(RAND()*1000000),
+    ELT(1+FLOOR(RAND()*6), 'view','click','purchase','signup','logout','share'),
+    DATE_ADD('2024-01-01 00:00:00', INTERVAL FLOOR(RAND()*31536000) SECOND),
+    ELT(1+FLOOR(RAND()*4), 'ios','android','web','desktop'),
+    ELT(1+FLOOR(RAND()*10), 'US','UK','Canada','Germany','France','Japan','Australia','Brazil','India','Mexico'),
+    ROUND(RAND()*1000, 2)
 FROM s1 CROSS JOIN s2;
