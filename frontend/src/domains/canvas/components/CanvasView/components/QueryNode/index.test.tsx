@@ -95,6 +95,21 @@ describe("QueryNode", () => {
     expect(screen.getByRole("button", { name: "Cancel" })).toBeTruthy();
   });
 
+  it("shows the early page row count while the full result still streams", () => {
+    seed(makeComponent({ kind: "query", id: "q", sql: "select 1", connectionId: "c" }));
+    useCanvasStore.getState().setRun(TAB, "q", {
+      result: {
+        columns: [{ name: "n", type: "number" }],
+        rows: [[{ kind: "int", value: 1 }]],
+      } as never,
+      running: true,
+    });
+    renderNode("q");
+    expect(screen.getByText(/first 1 rows · loading all…/)).toBeTruthy();
+    expect(screen.queryByText("Running…")).toBeNull();
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeTruthy();
+  });
+
   it("Cancel asks the store to cancel the in-flight run", () => {
     seed(makeComponent({ kind: "query", id: "q", sql: "select 1", connectionId: "c" }));
     useCanvasStore.getState().setRun(TAB, "q", { running: true });

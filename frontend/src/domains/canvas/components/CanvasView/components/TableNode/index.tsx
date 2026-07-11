@@ -89,6 +89,8 @@ function TableNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
                 ))}
               </tbody>
             </table>
+          ) : streaming ? (
+            <div className="mdbc-canvas-result-empty">Running…</div>
           ) : (
             <div className="mdbc-canvas-result-empty">
               {sourceId ? "Run the source query to see results" : "Pick a source query"}
