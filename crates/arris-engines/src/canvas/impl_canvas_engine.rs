@@ -333,12 +333,21 @@ impl CanvasEngine {
         stream: QueryStream,
         cancel: Option<&CancellationToken>,
     ) -> Result<IngestedCell, CanvasError> {
-        self.ingest_cell_stream_with_budget(board, title, stream, cancel, CELL_INGEST_BYTE_BUDGET)
-            .await
+        self.ingest_cell_stream_with_budget(
+            board,
+            title,
+            stream,
+            cancel,
+            CELL_INGEST_BYTE_BUDGET,
+            None,
+        )
+        .await
     }
 
     /// `ingest_cell_stream` with an explicit byte budget (tests shrink it to
-    /// force the truncated, `complete: false` path).
+    /// force the truncated, `complete: false` path) and an optional voluntary
+    /// row cap (a per-cell LIMIT on order-sensitive dialects that cannot be
+    /// SQL-wrapped; a cap stop reports `complete: true`).
     pub async fn ingest_cell_stream_with_budget(
         &self,
         board: &str,
@@ -346,13 +355,16 @@ impl CanvasEngine {
         stream: QueryStream,
         cancel: Option<&CancellationToken>,
         budget: usize,
+        row_cap: Option<u64>,
     ) -> Result<IngestedCell, CanvasError> {
         let start = Instant::now();
         let key = Self::key(board, title);
         let mut writer = self.cache.begin_with_budget(&key, budget);
         let outcome = match stream {
-            QueryStream::Rows(rows) => Self::pump_rows(rows, &mut writer, cancel).await,
-            QueryStream::Arrow(batches) => Self::pump_arrow(batches, &mut writer, cancel).await,
+            QueryStream::Rows(rows) => Self::pump_rows(rows, &mut writer, cancel, row_cap).await,
+            QueryStream::Arrow(batches) => {
+                Self::pump_arrow(batches, &mut writer, cancel, row_cap).await
+            }
         };
         match outcome {
             Ok((mut result, complete)) => {
@@ -380,10 +392,12 @@ impl CanvasEngine {
         mut rows: RowChunkStream,
         writer: &mut CellCacheWriter,
         cancel: Option<&CancellationToken>,
+        row_cap: Option<u64>,
     ) -> Result<(QueryResult, bool), CanvasError> {
         let mut builder = ArrowChunkBuilder::new(&rows.columns);
         let mut page: Vec<Vec<QueryValue>> = Vec::new();
         let mut complete = true;
+        let mut total: u64 = 0;
         loop {
             let next = match cancel {
                 Some(token) => tokio::select! {
@@ -393,14 +407,26 @@ impl CanvasEngine {
                 None => rows.chunks.next().await,
             };
             let Some(chunk) = next else { break };
-            let chunk = chunk.map_err(Self::driver_stream_error)?;
+            let mut chunk = chunk.map_err(Self::driver_stream_error)?;
+            // Trim the last chunk to the remaining cap so exactly `cap` rows land.
+            if let Some(cap) = row_cap {
+                let remaining = cap.saturating_sub(total) as usize;
+                if chunk.len() > remaining {
+                    chunk.truncate(remaining);
+                }
+            }
             if page.len() < CELL_RESULT_PAGE_ROWS {
                 let take = (CELL_RESULT_PAGE_ROWS - page.len()).min(chunk.len());
                 page.extend_from_slice(&chunk[..take]);
             }
+            total += chunk.len() as u64;
             let batch = builder.batch(&chunk).map_err(CanvasError::Conversion)?;
             if !writer.append(batch)? {
                 complete = false;
+                break;
+            }
+            // A voluntary cap stop leaves `complete` true (asked for n, got n).
+            if row_cap.is_some_and(|cap| total >= cap) {
                 break;
             }
         }
@@ -417,10 +443,12 @@ impl CanvasEngine {
         mut batches: BoxStream<'static, Result<RecordBatch, DriverError>>,
         writer: &mut CellCacheWriter,
         cancel: Option<&CancellationToken>,
+        row_cap: Option<u64>,
     ) -> Result<(QueryResult, bool), CanvasError> {
         let mut page: Vec<RecordBatch> = Vec::new();
         let mut page_rows = 0usize;
         let mut complete = true;
+        let mut total: u64 = 0;
         loop {
             let next = match cancel {
                 Some(token) => tokio::select! {
@@ -430,14 +458,24 @@ impl CanvasEngine {
                 None => batches.next().await,
             };
             let Some(batch) = next else { break };
-            let batch = batch.map_err(Self::driver_stream_error)?;
+            let mut batch = batch.map_err(Self::driver_stream_error)?;
+            if let Some(cap) = row_cap {
+                let remaining = cap.saturating_sub(total) as usize;
+                if batch.num_rows() > remaining {
+                    batch = batch.slice(0, remaining);
+                }
+            }
             if page_rows < CELL_RESULT_PAGE_ROWS {
                 let take = (CELL_RESULT_PAGE_ROWS - page_rows).min(batch.num_rows());
                 page.push(batch.slice(0, take));
                 page_rows += take;
             }
+            total += batch.num_rows() as u64;
             if !writer.append(batch)? {
                 complete = false;
+                break;
+            }
+            if row_cap.is_some_and(|cap| total >= cap) {
                 break;
             }
         }
@@ -703,7 +741,7 @@ mod tests {
         let engine = engine();
         // A tiny budget admits the first chunk at most.
         let out = engine
-            .ingest_cell_stream_with_budget(BOARD, "a", synthetic_stream(4, 100), None, 1)
+            .ingest_cell_stream_with_budget(BOARD, "a", synthetic_stream(4, 100), None, 1, None)
             .await
             .unwrap();
         assert!(!out.complete, "budget stop must be surfaced, never silent");
@@ -712,6 +750,34 @@ mod tests {
         assert_eq!(out.total_rows, 100);
         assert_eq!(out.result.rows.len(), 100);
         assert!(!engine.cache().contains(&CanvasEngine::key(BOARD, "a")));
+    }
+
+    #[tokio::test]
+    async fn row_cap_stops_ingest_and_reports_complete() {
+        let engine = engine();
+        // 3 chunks x 300 = 900 rows; a cap of 500 stops mid-second-chunk.
+        let out = engine
+            .ingest_cell_stream_with_budget(
+                BOARD,
+                "capped",
+                synthetic_stream(3, 300),
+                None,
+                CELL_INGEST_BYTE_BUDGET,
+                Some(500),
+            )
+            .await
+            .unwrap();
+        assert_eq!(out.total_rows, 500);
+        assert!(out.complete, "a voluntary row cap is complete, not truncated");
+        assert_eq!(out.result.rows.len(), CELL_RESULT_PAGE_ROWS);
+        assert_eq!(out.result.rows[0][0], QueryValue::Int(0));
+        assert_eq!(out.result.rows[499][0], QueryValue::Int(499));
+        // The full capped result is cached and queryable.
+        let agg = engine
+            .run_cell(BOARD, "b", "SELECT COUNT(*) AS c FROM capped")
+            .await
+            .unwrap();
+        assert_eq!(int_at(&agg.result, 0, 0), 500);
     }
 
     #[tokio::test]

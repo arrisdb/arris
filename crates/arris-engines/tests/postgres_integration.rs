@@ -1557,7 +1557,7 @@ async fn streaming_byte_budget_truncates_and_reports_incomplete() {
         .expect("open stream");
     // A ~1 MiB budget admits a handful of 8k-row chunks, then stops.
     let out = engine
-        .ingest_cell_stream_with_budget(BOARD, "capped", stream, None, 1 << 20)
+        .ingest_cell_stream_with_budget(BOARD, "capped", stream, None, 1 << 20, None)
         .await
         .expect("ingest stream");
 
