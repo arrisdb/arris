@@ -20,7 +20,7 @@
 use arris_engines::{
     CanvasEngine, CanvasError, CellResultCache, ConnectionConfig, DatabaseDriver, DatabaseKind,
     ExplainMode, IsolationLevel, ObjectRef, QueryEngine, QueryLanguage, QueryResult, QueryValue,
-    SchemaNode, SchemaNodeKind, driver_for_kind, CELL_RESULT_PAGE_ROWS,
+    SchemaNode, SchemaNodeKind, driver_for_kind, CELL_INGEST_BYTE_BUDGET, CELL_RESULT_PAGE_ROWS,
 };
 use testcontainers_modules::mysql::Mysql;
 use testcontainers_modules::testcontainers::runners::AsyncRunner;
@@ -1134,7 +1134,7 @@ async fn streaming_ingests_100k_rows_with_exact_totals_and_page() {
         .await
         .expect("open stream");
     let out = engine
-        .ingest_cell_stream(BOARD, "big", stream, None)
+        .ingest_cell_stream(BOARD, "big", stream, None, CELL_INGEST_BYTE_BUDGET, None)
         .await
         .expect("ingest stream");
 
@@ -1178,7 +1178,7 @@ async fn streaming_cancel_mid_stream_registers_no_cache_entry() {
     });
 
     let err = engine
-        .ingest_cell_stream(BOARD, "huge", stream, Some(&token))
+        .ingest_cell_stream(BOARD, "huge", stream, Some(&token), CELL_INGEST_BYTE_BUDGET, None)
         .await
         .expect_err("cancel must fail the ingest");
     assert!(matches!(err, CanvasError::Cancelled), "got {err:?}");
@@ -1202,7 +1202,7 @@ async fn streaming_byte_budget_truncates_and_reports_incomplete() {
         .expect("open stream");
     // A ~1 MiB budget admits a handful of 8k-row chunks, then stops.
     let out = engine
-        .ingest_cell_stream_with_budget(BOARD, "capped", stream, None, 1 << 20, None)
+        .ingest_cell_stream(BOARD, "capped", stream, None, 1 << 20, None)
         .await
         .expect("ingest stream");
 
@@ -1240,7 +1240,7 @@ async fn streaming_cell_limit_wraps_sql_and_caps_to_500() {
         .await
         .expect("open stream");
     let out = engine
-        .ingest_cell_stream_with_budget(BOARD, "lim", stream, None, 1 << 30, row_cap)
+        .ingest_cell_stream(BOARD, "lim", stream, None, 1 << 30, row_cap)
         .await
         .expect("ingest stream");
 

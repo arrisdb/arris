@@ -4,7 +4,6 @@ use std::sync::{Arc, Mutex};
 
 use datafusion::arrow::record_batch::RecordBatch;
 
-use super::constants::CELL_INGEST_BYTE_BUDGET;
 use super::errors::CanvasError;
 use super::impl_cell_cache_writer::CellCacheWriter;
 use super::impl_spill_cipher::SpillCipher;
@@ -110,7 +109,7 @@ impl CellResultCache {
         };
         std::fs::create_dir_all(spill_dir).map_err(|e| CanvasError::Io(e.to_string()))?;
         inner.seq += 1;
-        let path = spill_dir.join(format!("cell-{}.arrow", inner.seq));
+        let path = Self::spill_file_path(spill_dir, inner.seq);
         cipher.encrypt_to_file(&path, &batches)?;
         if let Some(entry) = inner.entries.get_mut(key) {
             inner.mem_bytes -= entry.bytes;
@@ -172,14 +171,8 @@ impl CellResultCache {
     }
 
     /// Open an appendable writer for a cell's result so streamed batches land in
-    /// the cache incrementally, capped at `CELL_INGEST_BYTE_BUDGET`.
-    pub fn begin(self: &Arc<Self>, key: &str) -> CellCacheWriter {
-        self.begin_with_budget(key, CELL_INGEST_BYTE_BUDGET)
-    }
-
-    /// `begin` with an explicit byte budget (tests shrink it to force the
-    /// truncated, `complete: false` path).
-    pub fn begin_with_budget(self: &Arc<Self>, key: &str, budget: usize) -> CellCacheWriter {
+    /// the cache incrementally, capped at `budget` bytes.
+    pub fn begin(self: &Arc<Self>, key: &str, budget: usize) -> CellCacheWriter {
         CellCacheWriter::new(self.clone(), key.to_string(), budget)
     }
 
@@ -188,12 +181,16 @@ impl CellResultCache {
         self.mem_budget
     }
 
+    fn spill_file_path(spill_dir: &Path, seq: u64) -> PathBuf {
+        spill_dir.join(format!("cell-{seq}.arrow"))
+    }
+
     /// Reserve a fresh spill-file path (creates the spill dir).
     pub(super) fn next_spill_path(&self) -> Result<PathBuf, CanvasError> {
         std::fs::create_dir_all(&self.spill_dir).map_err(|e| CanvasError::Io(e.to_string()))?;
         let mut inner = self.inner.lock().unwrap();
         inner.seq += 1;
-        Ok(self.spill_dir.join(format!("cell-{}.arrow", inner.seq)))
+        Ok(Self::spill_file_path(&self.spill_dir, inner.seq))
     }
 
     /// A streaming encrypted writer for a reserved spill path (used by

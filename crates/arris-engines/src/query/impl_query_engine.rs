@@ -159,12 +159,6 @@ impl QueryEngine {
         }
     }
 
-    /// Whether `sql` is a SELECT-shaped statement the canvas can ingest as a
-    /// stream; everything else goes through `run_query`.
-    pub fn is_streamable_select(sql: &str) -> bool {
-        Self::is_select_query(sql)
-    }
-
     pub async fn cancel_query(&self, query_id: String) -> Result<(), QueryError> {
         if let Some((_, rq)) = self.running_queries.remove(&query_id) {
             rq.cancel_token.cancel();
@@ -292,7 +286,7 @@ impl QueryEngine {
         sql.trim().trim_end_matches(';').trim_end()
     }
 
-    fn is_select_query(sql: &str) -> bool {
+    pub fn is_select_query(sql: &str) -> bool {
         use sqlparser::ast::Statement;
         use sqlparser::dialect::GenericDialect;
         use sqlparser::parser::Parser;
@@ -422,40 +416,14 @@ impl QueryEngine {
         let fetch_limit = ps + 1;
         let offset = (ps as u64) * (pg as u64);
 
-        match driver.pagination_strategy() {
-            PaginationStrategy::SubqueryOffset => {
-                let sql = Self::paginated_subquery_sql(sql);
-                let paginated =
-                    format!("SELECT * FROM ({sql}) AS _p LIMIT {fetch_limit} OFFSET {offset}");
+        match Self::limit_wrapped_sql(sql, &driver.pagination_strategy(), fetch_limit, offset) {
+            Some(paginated) => {
                 let mut result =
                     Self::cancellable_query(driver, &paginated, params, lang, cancel_token).await?;
                 Self::trim_paginated_result(&mut result, ps);
                 Ok(result)
             }
-            PaginationStrategy::TrinoOffset => {
-                let sql = Self::paginated_subquery_sql(sql);
-                let paginated =
-                    format!("SELECT * FROM ({sql}) AS _p OFFSET {offset} LIMIT {fetch_limit}");
-                let mut result =
-                    Self::cancellable_query(driver, &paginated, params, lang, cancel_token).await?;
-                Self::trim_paginated_result(&mut result, ps);
-                Ok(result)
-            }
-            PaginationStrategy::SqlServerOffset => {
-                let paginated = Self::sql_server_paginated_query(sql, fetch_limit, offset);
-                let mut result =
-                    Self::cancellable_query(driver, &paginated, params, lang, cancel_token).await?;
-                Self::trim_paginated_result(&mut result, ps);
-                Ok(result)
-            }
-            PaginationStrategy::OracleOffset => {
-                let paginated = Self::oracle_paginated_query(sql, fetch_limit, offset);
-                let mut result =
-                    Self::cancellable_query(driver, &paginated, params, lang, cancel_token).await?;
-                Self::trim_paginated_result(&mut result, ps);
-                Ok(result)
-            }
-            PaginationStrategy::InMemory | PaginationStrategy::None => {
+            None => {
                 let mut result =
                     Self::cancellable_query(driver, sql, params, lang, cancel_token).await?;
                 let offset = (ps as usize) * (pg as usize);
