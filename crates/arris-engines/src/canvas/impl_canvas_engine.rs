@@ -738,6 +738,7 @@ mod tests {
             title: title.to_string(),
             sql: sql.to_string(),
             connection_id: None,
+            limit: None,
         }
     }
 

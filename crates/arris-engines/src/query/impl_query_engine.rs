@@ -105,12 +105,16 @@ impl QueryEngine {
         connection: &ConnectionEngine,
         project: Option<&ProjectState>,
         sql: String,
+        limit: Option<u64>,
         language: Option<QueryLanguage>,
         query_id: Option<String>,
-    ) -> Result<(QueryStream, Option<CancellationToken>), QueryError> {
+    ) -> Result<(QueryStream, Option<CancellationToken>, Option<u64>), QueryError> {
         let driver = connection.driver_for(connection_id, project).await?;
         let lang = language.unwrap_or_default();
-        let sql = Self::trim_trailing_sql_semicolon(&sql);
+        let trimmed = Self::trim_trailing_sql_semicolon(&sql);
+        // Apply the per-cell LIMIT: wrap the SQL for dialects that support it,
+        // otherwise fall back to an ingest row cap the caller enforces.
+        let (sql, row_cap) = Self::apply_cell_limit(trimmed, &driver.pagination_strategy(), limit);
 
         let txcfg = connection.transaction_config(connection_id).await;
         if matches!(txcfg.mode, crate::TransactionMode::Manual)
@@ -135,17 +139,17 @@ impl QueryEngine {
         let opened = match cancel_token.as_ref() {
             Some(token) => {
                 tokio::select! {
-                    r = driver.run_query_stream(sql, &[], lang) => r,
+                    r = driver.run_query_stream(&sql, &[], lang) => r,
                     _ = token.cancelled() => {
                         let _ = driver.cancel_running_query().await;
                         Err(DriverError::Cancelled)
                     }
                 }
             }
-            None => driver.run_query_stream(sql, &[], lang).await,
+            None => driver.run_query_stream(&sql, &[], lang).await,
         };
         match opened {
-            Ok(stream) => Ok((stream, cancel_token)),
+            Ok(stream) => Ok((stream, cancel_token, row_cap)),
             Err(e) => {
                 if let Some(qid) = &query_id {
                     self.running_queries.remove(qid);
@@ -543,6 +547,23 @@ impl QueryEngine {
             PaginationStrategy::InMemory | PaginationStrategy::None => None,
         }
     }
+
+    /// Resolve a per-cell `limit` into the SQL to send and any ingest row cap.
+    /// Wrappable dialects rewrite the SQL (the DB does top-N); order-sensitive
+    /// ones keep the SQL and cap at ingest. `None` limit means select-all.
+    pub fn apply_cell_limit(
+        sql: &str,
+        strategy: &PaginationStrategy,
+        limit: Option<u64>,
+    ) -> (String, Option<u64>) {
+        match limit {
+            None => (sql.to_string(), None),
+            Some(n) => match Self::limit_wrapped_sql(sql, strategy, n as u32, 0) {
+                Some(wrapped) => (wrapped, None),
+                None => (sql.to_string(), Some(n)),
+            },
+        }
+    }
 }
 
 impl Engine for QueryEngine {
@@ -651,6 +672,21 @@ mod tests {
         // Order-sensitive dialects cannot be subquery-wrapped safely.
         assert_eq!(QueryEngine::limit_wrapped_sql(sql, &PS::InMemory, 500, 0), None);
         assert_eq!(QueryEngine::limit_wrapped_sql(sql, &PS::None, 500, 0), None);
+    }
+
+    #[test]
+    fn apply_cell_limit_chooses_wrap_or_cap_by_strategy() {
+        use crate::PaginationStrategy as PS;
+        let (sql, cap) = QueryEngine::apply_cell_limit("SELECT * FROM t", &PS::SubqueryOffset, Some(500));
+        assert_eq!(sql, "SELECT * FROM (SELECT * FROM t) AS _p LIMIT 500 OFFSET 0");
+        assert_eq!(cap, None);
+        let (sql, cap) = QueryEngine::apply_cell_limit("SELECT * FROM t", &PS::InMemory, Some(500));
+        assert_eq!(sql, "SELECT * FROM t");
+        assert_eq!(cap, Some(500));
+        // Select-all: unchanged SQL, no cap.
+        let (sql, cap) = QueryEngine::apply_cell_limit("SELECT * FROM t", &PS::SubqueryOffset, None);
+        assert_eq!(sql, "SELECT * FROM t");
+        assert_eq!(cap, None);
     }
 
     #[tokio::test]

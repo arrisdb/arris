@@ -12,6 +12,10 @@ pub struct CanvasCellSpec {
     pub title: String,
     pub sql: String,
     pub connection_id: Option<String>,
+    /// Per-cell row limit: `Some(n)` caps the fetch to n rows, `None` fetches
+    /// the full result ("Select all rows").
+    #[serde(default)]
+    pub limit: Option<u64>,
 }
 
 /// Totals reported by a finished `CellCacheWriter`.
