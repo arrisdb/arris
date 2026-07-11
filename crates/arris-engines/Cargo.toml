@@ -14,7 +14,7 @@ default = ["postgres", "sqlite", "mongodb", "mysql", "kafka", "mixpanel", "redis
 postgres = ["dep:tokio-postgres", "dep:bytes", "dep:tokio-postgres-rustls", "dep:rustls", "dep:rustls-pemfile", "dep:rustls-pki-types"]
 sqlite = []
 mongodb = ["dep:mongodb", "dep:futures-util"]
-mysql = ["dep:mysql_async", "dep:rustls"]
+mysql = ["dep:mysql_async", "dep:rustls", "dep:async-stream"]
 kafka = ["dep:rdkafka", "dep:reqwest"]
 mixpanel = ["dep:reqwest"]
 redis = ["dep:redis"]
@@ -94,6 +94,9 @@ futures-util = { version = "0.3", optional = true }
 
 # drivers: mysql / mariadb
 mysql_async = { version = "0.36", default-features = false, features = ["default-rustls-ring"], optional = true }
+# lets the mysql row stream own its Conn across yields (mysql_async's result
+# stream borrows the connection, so a plain owned stream is impossible).
+async-stream = { version = "0.3", optional = true }
 
 # drivers: kafka + mixpanel + elasticsearch (shared reqwest)
 rdkafka = { version = "0.39", features = ["cmake-build", "ssl-vendored"], optional = true }

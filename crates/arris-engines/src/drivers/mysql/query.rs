@@ -1,10 +1,31 @@
 use std::sync::Arc;
 
-use mysql_async::{Params, Row, Value as MyValue, consts::ColumnType};
+use mysql_async::{Column, Params, Row, Value as MyValue, consts::ColumnType};
 
 use crate::{ColumnSpec, QueryResult, QueryValue};
 
 use super::values::{column_type_str, mysql_to_query, query_to_mysql};
+
+/// Column specs for a prepared statement's result set, used to seed a streamed
+/// `RowChunkStream` before any row arrives (mirrors the materialized path's
+/// `ColumnSpec` shaping).
+pub(super) fn stmt_columns_to_specs(cols: &[Column]) -> Vec<ColumnSpec> {
+    cols.iter()
+        .map(|c| ColumnSpec::new(c.name_str().into_owned(), column_type_str(c.column_type())))
+        .collect()
+}
+
+/// Maps one streamed row to `QueryValue`s, inferring each column's type from
+/// the row's own column metadata (the same conversion the buffered path uses).
+pub(super) fn row_to_query_values(row: &Row) -> Vec<QueryValue> {
+    let cols = row.columns_ref();
+    (0..cols.len())
+        .map(|i| {
+            let v = row.as_ref(i).cloned().unwrap_or(MyValue::NULL);
+            mysql_to_query(v, cols[i].column_type())
+        })
+        .collect()
+}
 
 pub(super) fn rows_to_query_result(
     rows: Vec<Row>,

@@ -198,6 +198,7 @@ name = "arris-engines"
 version = "0.12.0"
 dependencies = [
  "anyhow",
+ "async-stream",
  "async-trait",
  "aws-config",
  "aws-sdk-dynamodb",
