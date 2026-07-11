@@ -34,10 +34,9 @@ use crate::{
 use crate::drivers::errors::Result;
 
 use crate::drivers::DatabaseDriver;
-use crate::drivers::common::RowChunkPump;
+use crate::drivers::common::MysqlWireStream;
 use crate::drivers::sql_builder::SqlBuilder;
 
-use futures::StreamExt;
 
 use config::build_opts;
 use definition::{DefinitionQuery, definition_from_row};
@@ -299,20 +298,16 @@ impl DatabaseDriver for MysqlDriver {
         params: &[QueryValue],
         language: QueryLanguage,
     ) -> Result<QueryStream> {
-        // Streaming needs its own pooled connection to own for the stream's life,
-        // so an open manual transaction (which must reuse the pinned tx
-        // connection) and non-SELECTs keep the materialized path.
+        // Streaming needs its own pooled connection for the stream's life, so an
+        // open manual transaction (pinned conn) and non-SELECTs stay materialized.
         if !self.looks_like_select(text) || self.in_transaction().await {
             return Ok(QueryStream::from_materialized(
                 self.run_query(text, params, language).await?,
             ));
         }
         let mut conn = self.conn().await?;
-        // Prepare on this connection to learn the result columns up front; the
-        // prepared statement is connection-local, so it executes on the same
-        // `conn` moved into the stream below. Not every SELECT-shaped statement
-        // is preparable (some `SHOW` forms), so a prepare failure falls back to
-        // materializing on the same connection rather than erroring.
+        // Prepare learns the result columns up front. Some SELECT-shaped forms
+        // (e.g. SHOW) are not preparable: fall back to materializing on this conn.
         let stmt = match conn.prep(text).await {
             Ok(stmt) => stmt,
             Err(_) => {
@@ -322,34 +317,13 @@ impl DatabaseDriver for MysqlDriver {
         };
         let columns = stmt_columns_to_specs(stmt.columns());
         let params = params_to_mysql(params);
-
-        // The generator owns the connection + statement for the stream's life,
-        // so dropping the stream returns the connection to the pool and ends the
-        // server-side result set (drop-to-cancel). `async_stream` is required
-        // because mysql_async's result stream borrows the connection, which a
-        // plain owned `'static` stream cannot express.
-        let stream = RowChunkPump::spawn(
+        Ok(QueryStream::Rows(MysqlWireStream::open(
+            conn,
+            stmt,
+            params,
             columns,
-            move || async move {
-                let rows = async_stream::try_stream! {
-                    let mut conn = conn;
-                    let mut result = conn
-                        .exec_iter(stmt, params)
-                        .await
-                        .map_err(|e| DriverError::QueryFailed(e.to_string()))?;
-                    while let Some(row) = result
-                        .next()
-                        .await
-                        .map_err(|e| DriverError::QueryFailed(e.to_string()))?
-                    {
-                        yield row;
-                    }
-                };
-                Ok(rows.boxed())
-            },
             row_to_query_values,
-        );
-        Ok(QueryStream::Rows(stream))
+        )))
     }
 
     async fn explain_query(

@@ -6,24 +6,21 @@ use crate::{ColumnSpec, QueryResult, QueryValue};
 
 use super::values::{column_type_str, mysql_to_query, query_to_mysql};
 
-/// Column specs for a prepared statement's result set, used to seed a streamed
-/// `RowChunkStream` before any row arrives (mirrors the materialized path's
-/// `ColumnSpec` shaping).
+/// Column specs for a prepared statement's result set, seeding a streamed
+/// `RowChunkStream` before any row arrives.
 pub(super) fn stmt_columns_to_specs(cols: &[Column]) -> Vec<ColumnSpec> {
     cols.iter()
         .map(|c| ColumnSpec::new(c.name_str().into_owned(), column_type_str(c.column_type())))
         .collect()
 }
 
-/// Maps one streamed row to `QueryValue`s, inferring each column's type from
-/// the row's own column metadata (the same conversion the buffered path uses).
-pub(super) fn row_to_query_values(row: &Row) -> Vec<QueryValue> {
-    let cols = row.columns_ref();
-    (0..cols.len())
-        .map(|i| {
-            let v = row.as_ref(i).cloned().unwrap_or(MyValue::NULL);
-            mysql_to_query(v, cols[i].column_type())
-        })
+/// One streamed row to `QueryValue`s (values moved out, not cloned).
+pub(super) fn row_to_query_values(row: Row) -> Vec<QueryValue> {
+    let types: Vec<ColumnType> = row.columns_ref().iter().map(|c| c.column_type()).collect();
+    row.unwrap()
+        .into_iter()
+        .zip(types)
+        .map(|(v, t)| mysql_to_query(v, t))
         .collect()
 }
 

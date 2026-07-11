@@ -119,9 +119,8 @@ impl CellResultCache {
         Ok(())
     }
 
-    /// Bring both tiers back within budget: first spill the coldest in-memory
-    /// entries until the memory tier fits, then evict the coldest entries
-    /// outright until the combined footprint fits (always keeping the newest).
+    /// Spill the coldest in-memory entries until the memory tier fits, then
+    /// evict coldest-first until the combined footprint fits (keep the newest).
     fn enforce(
         inner: &mut Inner,
         mem_budget: usize,
@@ -147,9 +146,8 @@ impl CellResultCache {
         Ok(())
     }
 
-    /// Store (or replace) a cell's result. Inserts into the memory tier, then
-    /// enforces the budgets (spill/evict as needed). An empty batch set is a
-    /// no-op (nothing to cache).
+    /// Store (or replace) a cell's result in the memory tier, then enforce the
+    /// budgets. An empty batch set is a no-op.
     pub fn put(&self, key: &str, batches: Vec<RecordBatch>) -> Result<(), CanvasError> {
         if batches.is_empty() {
             return Ok(());

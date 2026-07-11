@@ -12,10 +12,8 @@ use super::constants::{SPILL_KEY_LEN, SPILL_NONCE_LEN};
 use super::errors::CanvasError;
 use super::impl_spill_writer::SpillWriter;
 
-/// Encrypts each cached-cell spill file with a random per-session key held ONLY
-/// in memory (never persisted). The key dies with the process, so a spill file
-/// left behind by a crash is cryptographically inert and the startup purge just
-/// tidies it up. XChaCha20-Poly1305 with a fresh random 192-bit nonce per frame.
+/// XChaCha20-Poly1305 over spill files with a random per-session key held only
+/// in memory: the key dies with the process, so crash-orphaned files are inert.
 #[derive(Clone)]
 pub(super) struct SpillCipher {
     key: Arc<[u8; SPILL_KEY_LEN]>,

@@ -1,17 +1,15 @@
 use std::sync::Arc;
 
 use datafusion::arrow::array::{
-    ArrayRef, BinaryArray, BooleanArray, Float64Array, Int64Array, StringArray,
+    ArrayRef, BinaryArray, BooleanArray, Float64Array, Int64Array, StringBuilder,
 };
 use datafusion::arrow::datatypes::{DataType, Field, Schema, SchemaRef};
 use datafusion::arrow::record_batch::{RecordBatch, RecordBatchOptions};
 
 use crate::{ColumnSpec, QueryValue};
 
-/// Converts row chunks into Arrow `RecordBatch`es with the one shared
-/// QueryValue -> Arrow type mapping (federation scans reuse it too).
-/// The schema locks on the first chunk; later chunks coerce to it (mismatched
-/// cells become NULL or stringify), so types never drift mid-stream.
+/// Converts row chunks into Arrow `RecordBatch`es with the one shared QueryValue
+/// -> Arrow mapping; the schema locks on the first chunk (mismatches NULL out).
 pub struct ArrowChunkBuilder {
     columns: Vec<ColumnSpec>,
     schema: Option<SchemaRef>,
@@ -23,11 +21,6 @@ impl ArrowChunkBuilder {
             columns: columns.to_vec(),
             schema: None,
         }
-    }
-
-    /// The locked schema; `None` until the first `batch` call.
-    pub fn schema(&self) -> Option<SchemaRef> {
-        self.schema.clone()
     }
 
     /// Convert one chunk of rows into a `RecordBatch`, locking the schema from
@@ -166,22 +159,23 @@ impl ArrowChunkBuilder {
                 Arc::new(arr) as ArrayRef
             }
             _ => {
-                let strings: Vec<Option<String>> = rows
-                    .iter()
-                    .map(|row| {
-                        src_idx.and_then(|i| row.get(i)).and_then(|v| match v {
-                            QueryValue::Text(s) => Some(s.clone()),
-                            QueryValue::Json(s) => Some(s.clone()),
-                            QueryValue::Decimal(s) => Some(s.clone()),
-                            QueryValue::Int(n) => Some(n.to_string()),
-                            QueryValue::Double(n) => Some(n.to_string()),
-                            QueryValue::Bool(b) => Some(b.to_string()),
-                            _ => None,
-                        })
-                    })
-                    .collect();
-                let arr: StringArray = strings.iter().map(|s| s.as_deref()).collect();
-                Arc::new(arr) as ArrayRef
+                // StringBuilder appends borrowed text straight into the array
+                // buffer: no intermediate String per cell on the hot ingest path.
+                let mut b = StringBuilder::new();
+                for row in rows {
+                    match src_idx.and_then(|i| row.get(i)) {
+                        Some(QueryValue::Text(s))
+                        | Some(QueryValue::Json(s))
+                        | Some(QueryValue::Decimal(s)) => b.append_value(s),
+                        Some(QueryValue::Int(n)) => b.append_value(n.to_string()),
+                        Some(QueryValue::Double(n)) => b.append_value(n.to_string()),
+                        Some(QueryValue::Bool(v)) => {
+                            b.append_value(if *v { "true" } else { "false" })
+                        }
+                        _ => b.append_null(),
+                    }
+                }
+                Arc::new(b.finish()) as ArrayRef
             }
         }
     }
@@ -200,12 +194,11 @@ mod tests {
     #[test]
     fn first_chunk_locks_the_schema() {
         let mut b = ArrowChunkBuilder::new(&[col("n", "int8"), col("s", "text")]);
-        assert!(b.schema().is_none());
         let batch = b
             .batch(&[vec![QueryValue::Int(1), QueryValue::Text("a".into())]])
             .unwrap();
         assert_eq!(batch.num_rows(), 1);
-        let schema = b.schema().unwrap();
+        let schema = batch.schema();
         assert_eq!(schema.field(0).data_type(), &DataType::Int64);
         assert_eq!(schema.field(1).data_type(), &DataType::Utf8);
     }

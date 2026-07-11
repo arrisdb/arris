@@ -4,7 +4,6 @@ use std::time::Instant;
 
 use async_trait::async_trait;
 use indexmap::IndexMap;
-use futures::StreamExt;
 use mysql_async::prelude::Queryable;
 use mysql_async::{
     ClientIdentity, Column, Conn, Opts, OptsBuilder, Params, Pool, Row, SslOpts, Value as MyValue,
@@ -15,7 +14,7 @@ use tokio::sync::Mutex;
 
 use crate::drivers::DatabaseDriver;
 use crate::drivers::PaginationStrategy;
-use crate::drivers::common::RowChunkPump;
+use crate::drivers::common::MysqlWireStream;
 use crate::drivers::errors::Result;
 use crate::drivers::sql_builder::SqlBuilder;
 use crate::{
@@ -201,15 +200,13 @@ impl StarrocksDriver {
             .collect()
     }
 
-    /// Maps one streamed row to `QueryValue`s, inferring each column's type from
-    /// the row's own metadata (same conversion as the buffered path).
-    fn row_to_query_values(row: &Row) -> Vec<QueryValue> {
-        let cols = row.columns_ref();
-        (0..cols.len())
-            .map(|i| {
-                let v = row.as_ref(i).cloned().unwrap_or(MyValue::NULL);
-                Convert::mysql_to_query(v, cols[i].column_type())
-            })
+    /// One streamed row to `QueryValue`s (values moved out, not cloned).
+    fn row_to_query_values(row: Row) -> Vec<QueryValue> {
+        let types: Vec<_> = row.columns_ref().iter().map(|c| c.column_type()).collect();
+        row.unwrap()
+            .into_iter()
+            .zip(types)
+            .map(|(v, t)| Convert::mysql_to_query(v, t))
             .collect()
     }
 
@@ -547,11 +544,8 @@ impl DatabaseDriver for StarrocksDriver {
             ));
         }
         let mut conn = self.conn().await?;
-        // Prepare to learn the result columns up front (the prepared statement is
-        // connection-local, so it executes on the same `conn` moved into the
-        // stream). StarRocks prepared-statement support varies by version, so a
-        // prepare failure drops this connection and materializes on a fresh one
-        // rather than erroring.
+        // Prepare learns the result columns up front. StarRocks prepared-statement
+        // support varies by version: a failure materializes on a fresh conn.
         let stmt = match conn.prep(text).await {
             Ok(stmt) => stmt,
             Err(_) => {
@@ -563,34 +557,13 @@ impl DatabaseDriver for StarrocksDriver {
         };
         let columns = Self::stmt_columns_to_specs(stmt.columns());
         let params = Self::params_to_mysql(params);
-
-        // The generator owns the connection + statement for the stream's life, so
-        // dropping the stream returns the connection to the pool and ends the
-        // server-side result set (drop-to-cancel). `async_stream` is required
-        // because mysql_async's result stream borrows the connection, which a
-        // plain owned `'static` stream cannot express.
-        let stream = RowChunkPump::spawn(
+        Ok(QueryStream::Rows(MysqlWireStream::open(
+            conn,
+            stmt,
+            params,
             columns,
-            move || async move {
-                let rows = async_stream::try_stream! {
-                    let mut conn = conn;
-                    let mut result = conn
-                        .exec_iter(stmt, params)
-                        .await
-                        .map_err(|e| DriverError::QueryFailed(e.to_string()))?;
-                    while let Some(row) = result
-                        .next()
-                        .await
-                        .map_err(|e| DriverError::QueryFailed(e.to_string()))?
-                    {
-                        yield row;
-                    }
-                };
-                Ok(rows.boxed())
-            },
-            |row| Self::row_to_query_values(row),
-        );
-        Ok(QueryStream::Rows(stream))
+            Self::row_to_query_values,
+        )))
     }
 
     fn pagination_strategy(&self) -> PaginationStrategy {
