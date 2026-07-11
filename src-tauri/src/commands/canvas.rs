@@ -158,20 +158,25 @@ pub async fn cmd_run_canvas_cell(
                                         let cell_id = id.clone();
                                         let qid = query_id.clone();
                                         let bg_token = token.clone();
+                                        let page_rows = page.result.rows.len() as u64;
                                         tauri::async_runtime::spawn(async move {
                                             let done = cont.finish(bg_token.as_ref()).await;
                                             env2.query.unregister_query(&qid);
-                                            if let Ok(done) = done {
-                                                let _ = app.emit(
-                                                    CANVAS_CELL_INGESTED_EVENT,
-                                                    CellIngestedEvent {
-                                                        board_id: board,
-                                                        cell_id,
-                                                        total_rows: done.total_rows,
-                                                        complete: done.complete,
-                                                    },
-                                                );
-                                            }
+                                            // Emit even on error/cancel (with the page's rows and
+                                            // complete: false) so the cell's spinner always clears.
+                                            let (total_rows, complete) = match done {
+                                                Ok(done) => (done.total_rows, done.complete),
+                                                Err(_) => (page_rows, false),
+                                            };
+                                            let _ = app.emit(
+                                                CANVAS_CELL_INGESTED_EVENT,
+                                                CellIngestedEvent {
+                                                    board_id: board,
+                                                    cell_id,
+                                                    total_rows,
+                                                    complete,
+                                                },
+                                            );
                                         });
                                         Ok(CellOutcome::Paged(page))
                                     }
@@ -268,8 +273,19 @@ pub async fn cmd_run_canvas_cell(
             }
             Ok(CellOutcome::Plain(result)) => {
                 // Non-SELECT results are cached here so they can feed downstream.
+                // They are fully materialized, so their totals are known now; the
+                // frontend keeps a totals-less run spinning until the ingest event,
+                // which never fires for this path.
                 let _ = env.canvas.cache_result(&board_id, &cell.title, &result);
-                runs.push(CanvasCellRun::ok(id.clone(), result));
+                let total_rows = result.rows.len() as u64;
+                runs.push(CanvasCellRun::ingested(
+                    id.clone(),
+                    IngestedCell {
+                        result,
+                        total_rows,
+                        complete: true,
+                    },
+                ));
             }
             Err(message) => {
                 failed.insert(id.clone());

@@ -130,6 +130,81 @@ describe("useCanvasStore", () => {
     expect(targets).toEqual(["q2", "q3"]);
   });
 
+  it("runQueryComponent maps each cell's limit and null for select-all", async () => {
+    vi.mocked(runCanvasCellIPC).mockResolvedValue([]);
+    get().ensureBoard(TAB, "");
+    get().addComponent(
+      TAB,
+      makeComponent({ kind: "query", id: "c1", sql: "select 1", connectionId: "c" }),
+    );
+    get().addComponent(
+      TAB,
+      makeComponent({ kind: "query", id: "c2", sql: "select 2", connectionId: "c" }),
+    );
+    get().updateComponent(TAB, "c1", { limit: 1000 });
+    get().updateComponent(TAB, "c2", { selectAll: true });
+    await get().runQueryComponent(TAB, "c1");
+    const cells = vi.mocked(runCanvasCellIPC).mock.calls[0][2];
+    expect(cells.find((c) => c.id === "c1")!.limit).toBe(1000);
+    expect(cells.find((c) => c.id === "c2")!.limit).toBe(null);
+  });
+
+  it("keeps a totals-less run spinning until applyIngestDone lands the event", async () => {
+    vi.mocked(runCanvasCellIPC).mockResolvedValue([
+      { id: "c1", result: { columns: [], rows: [], elapsed: 0 } },
+    ]);
+    get().ensureBoard(TAB, "");
+    get().addComponent(
+      TAB,
+      makeComponent({ kind: "query", id: "c1", sql: "select 1", connectionId: "c" }),
+    );
+    await get().runQueryComponent(TAB, "c1");
+    // No totals in the response: the page landed but the background drain is
+    // still running, so the spinner stays on until the ingest event.
+    expect(get().boards[TAB].runs.c1.running).toBe(true);
+    expect(get().boards[TAB].runs.c1.result).toBeTruthy();
+    get().applyIngestDone(TAB, "c1", 42, true);
+    const run = get().boards[TAB].runs.c1;
+    expect(run.running).toBe(false);
+    expect(run.totalRows).toBe(42);
+    expect(run.complete).toBe(true);
+    expect(run.result).toBeTruthy();
+  });
+
+  it("a run that already carries totals settles immediately", async () => {
+    vi.mocked(runCanvasCellIPC).mockResolvedValue([
+      { id: "c1", result: { columns: [], rows: [], elapsed: 0 }, totalRows: 7, complete: true },
+    ]);
+    get().ensureBoard(TAB, "");
+    get().addComponent(
+      TAB,
+      makeComponent({ kind: "query", id: "c1", sql: "select 1", connectionId: "c" }),
+    );
+    await get().runQueryComponent(TAB, "c1");
+    const run = get().boards[TAB].runs.c1;
+    expect(run.running).toBeFalsy();
+    expect(run.totalRows).toBe(7);
+  });
+
+  it("applyIngestDone keeps event totals when it beats the run response", async () => {
+    get().ensureBoard(TAB, "");
+    get().addComponent(
+      TAB,
+      makeComponent({ kind: "query", id: "c1", sql: "select 1", connectionId: "c" }),
+    );
+    // The background drain can finish (event applied) before the awaited run
+    // response is processed; the response must not restart the spinner.
+    vi.mocked(runCanvasCellIPC).mockImplementation(async () => {
+      get().applyIngestDone(TAB, "c1", 9, true);
+      return [{ id: "c1", result: { columns: [], rows: [], elapsed: 0 } }];
+    });
+    await get().runQueryComponent(TAB, "c1");
+    const run = get().boards[TAB].runs.c1;
+    expect(run.running).toBe(false);
+    expect(run.totalRows).toBe(9);
+    expect(run.result).toBeTruthy();
+  });
+
   it("applyAgentSpec removes the ids in the remove list, with their edges and runs", () => {
     get().ensureBoard(TAB, "");
     get().applyAgentSpec(
@@ -236,7 +311,7 @@ describe("useCanvasStore", () => {
 
   it("runQueryComponent applies each executed cell's result", async () => {
     vi.mocked(runCanvasCellIPC).mockResolvedValue([
-      { id: "q1", result: { columns: [], rows: [], elapsed: 1 } },
+      { id: "q1", result: { columns: [], rows: [], elapsed: 1 }, totalRows: 0, complete: true },
     ]);
     get().ensureBoard(TAB, "");
     get().addComponent(

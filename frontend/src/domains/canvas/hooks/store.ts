@@ -82,6 +82,14 @@ interface CanvasStore {
     connectionId: string | null,
   ) => string[];
   setRun: (tabId: string, id: string, run: QueryRunState) => void;
+  /// Land a cell's full-ingest totals from the `canvas://cell-ingested` event,
+  /// clearing the spinner the early page left running.
+  applyIngestDone: (
+    tabId: string,
+    id: string,
+    totalRows: number,
+    complete: boolean,
+  ) => void;
   /// Execute a query object and store its result/error in `runs`.
   runQueryComponent: (tabId: string, id: string) => Promise<void>;
   /// Ask the backend to cancel a query object's in-flight run. The awaited run
@@ -374,6 +382,12 @@ const useCanvasStore = create<CanvasStore>((set, get) => ({
       };
     }),
 
+  applyIngestDone: (tabId, id, totalRows, complete) => {
+    const run = get().boards[tabId]?.runs[id];
+    if (!run) return;
+    get().setRun(tabId, id, { ...run, totalRows, complete, running: false });
+  },
+
   runQueryComponent: async (tabId, id) => {
     const board = get().boards[tabId];
     const comp = board?.doc.components.find((c) => c.id === id);
@@ -399,13 +413,35 @@ const useCanvasStore = create<CanvasStore>((set, get) => ({
       const runs = await runCanvasCellIPC(tabId, id, cells, queryId);
       // Apply each executed cell's outcome (target + its upstream dependencies).
       for (const r of runs) {
-        get().setRun(
-          tabId,
-          r.id,
-          r.error
-            ? { error: r.error }
-            : { result: r.result, totalRows: r.totalRows, complete: r.complete },
-        );
+        if (r.error) {
+          get().setRun(tabId, r.id, { error: r.error });
+          continue;
+        }
+        if (r.totalRows === undefined) {
+          // Early page: the background drain reports totals via the
+          // `canvas://cell-ingested` event. Keep the spinner (and the cancel
+          // handle) unless the event already landed.
+          const prev = get().boards[tabId]?.runs[r.id];
+          const settled = prev?.running === false && prev.totalRows !== undefined;
+          get().setRun(
+            tabId,
+            r.id,
+            settled
+              ? {
+                  result: r.result,
+                  totalRows: prev.totalRows,
+                  complete: prev.complete,
+                  running: false,
+                }
+              : { result: r.result, running: true, queryId },
+          );
+          continue;
+        }
+        get().setRun(tabId, r.id, {
+          result: r.result,
+          totalRows: r.totalRows,
+          complete: r.complete,
+        });
       }
       const targetOk = runs.some((r) => r.id === id && r.result);
       // The cell the user ran gets a preview table on first success; the

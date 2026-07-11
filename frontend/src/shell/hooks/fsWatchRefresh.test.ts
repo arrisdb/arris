@@ -33,9 +33,9 @@ describe("useFsWatchRefresh", () => {
     vi.useFakeTimers();
     handler = null;
     unlisten = vi.fn();
-    listenMock.mockImplementation((event: string, cb: () => void) => {
+    listenMock.mockImplementation((event: string, cb: (payload: unknown) => void) => {
       expect(event).toBe("fs:changed");
-      handler = cb;
+      handler = () => cb(undefined);
       return Promise.resolve(unlisten);
     });
     refreshMock.mockReset();
