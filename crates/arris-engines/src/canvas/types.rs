@@ -31,6 +31,20 @@ pub struct IngestedCell {
     pub complete: bool,
 }
 
+/// The UI page peeled from the front of a streamed cell run. The rest of the
+/// result continues into the cache via the run's `CellIngestContinuation`.
+#[derive(Clone, Debug)]
+pub struct IngestedPage {
+    pub result: QueryResult,
+}
+
+/// Totals reported once a cell's background ingest finishes.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct CellIngestDone {
+    pub total_rows: u64,
+    pub complete: bool,
+}
+
 /// The outcome of running one cell during a chained run: either its result or the
 /// error that stopped it (a failed upstream blocks its descendants).
 #[derive(Clone, Debug, Serialize)]

@@ -17,7 +17,7 @@ use super::constants::{CELL_INGEST_BYTE_BUDGET, CELL_RESULT_PAGE_ROWS, QUERY_MEM
 use super::errors::CanvasError;
 use super::impl_cell_cache_writer::CellCacheWriter;
 use super::impl_cell_result_cache::CellResultCache;
-use super::types::{CanvasCellSpec, IngestedCell};
+use super::types::{CanvasCellSpec, CellIngestDone, IngestedCell, IngestedPage};
 use crate::drivers::common::ArrowChunkBuilder;
 use crate::federation::FederationEngine;
 use crate::{DriverError, QueryResult, QueryStream, QueryValue, RowChunkStream};
@@ -358,128 +358,190 @@ impl CanvasEngine {
         row_cap: Option<u64>,
     ) -> Result<IngestedCell, CanvasError> {
         let start = Instant::now();
+        let (page, cont) = self
+            .start_cell_ingest(board, title, stream, cancel, budget, row_cap)
+            .await?;
+        let done = cont.finish(cancel).await?;
+        let mut result = page.result;
+        result.elapsed = start.elapsed().as_secs_f64();
+        // A budget stop can refuse a chunk whose rows were already peeled into
+        // the page; the reported total is at least what the UI shows.
+        let total_rows = done.total_rows.max(result.rows.len() as u64);
+        Ok(IngestedCell {
+            result,
+            total_rows,
+            complete: done.complete,
+        })
+    }
+
+    /// Begin streaming a driver's result into the cell cache and return the UI
+    /// page as soon as it is filled (or the stream ends / the cap is hit). The
+    /// returned continuation drains the remainder; call `finish` on it in the
+    /// foreground or a spawned task. A phase-1 error or cancel aborts the cache
+    /// writer so no partial entry is registered.
+    pub async fn start_cell_ingest(
+        &self,
+        board: &str,
+        title: &str,
+        stream: QueryStream,
+        cancel: Option<&CancellationToken>,
+        budget: usize,
+        row_cap: Option<u64>,
+    ) -> Result<(IngestedPage, CellIngestContinuation), CanvasError> {
         let key = Self::key(board, title);
-        let mut writer = self.cache.begin_with_budget(&key, budget);
-        let outcome = match stream {
-            QueryStream::Rows(rows) => Self::pump_rows(rows, &mut writer, cancel, row_cap).await,
-            QueryStream::Arrow(batches) => {
-                Self::pump_arrow(batches, &mut writer, cancel, row_cap).await
-            }
-        };
-        match outcome {
-            Ok((mut result, complete)) => {
-                let stats = writer.finish()?;
-                result.elapsed = start.elapsed().as_secs_f64();
-                // A budget stop can refuse a chunk whose rows were already
-                // peeled into the page; the total is at least what the UI shows.
-                let total_rows = stats.total_rows.max(result.rows.len() as u64);
-                Ok(IngestedCell {
-                    result,
-                    total_rows,
-                    complete,
-                })
-            }
-            Err(e) => {
-                writer.abort();
-                Err(e)
-            }
+        let writer = self.cache.begin_with_budget(&key, budget);
+        match stream {
+            QueryStream::Rows(rows) => Self::start_rows(rows, writer, cancel, row_cap).await,
+            QueryStream::Arrow(batches) => Self::start_arrow(batches, writer, cancel, row_cap).await,
         }
     }
 
-    /// Drain a row-chunk stream into the writer, peeling the UI page. Returns
-    /// the page result and whether the full stream fit the byte budget.
-    async fn pump_rows(
+    /// Phase 1 for a row stream: read chunks (appending each to the cache) until
+    /// the page fills, the stream ends, or the cap is reached.
+    async fn start_rows(
         mut rows: RowChunkStream,
-        writer: &mut CellCacheWriter,
+        mut writer: CellCacheWriter,
         cancel: Option<&CancellationToken>,
         row_cap: Option<u64>,
-    ) -> Result<(QueryResult, bool), CanvasError> {
+    ) -> Result<(IngestedPage, CellIngestContinuation), CanvasError> {
         let mut builder = ArrowChunkBuilder::new(&rows.columns);
+        let columns = rows.columns.clone();
         let mut page: Vec<Vec<QueryValue>> = Vec::new();
-        let mut complete = true;
         let mut total: u64 = 0;
-        loop {
+        let mut complete = true;
+        while page.len() < CELL_RESULT_PAGE_ROWS {
             let next = match cancel {
                 Some(token) => tokio::select! {
                     item = rows.chunks.next() => item,
-                    _ = token.cancelled() => return Err(CanvasError::Cancelled),
+                    _ = token.cancelled() => {
+                        writer.abort();
+                        return Err(CanvasError::Cancelled);
+                    }
                 },
                 None => rows.chunks.next().await,
             };
-            let Some(chunk) = next else { break };
-            let mut chunk = chunk.map_err(Self::driver_stream_error)?;
-            // Trim the last chunk to the remaining cap so exactly `cap` rows land.
+            let Some(item) = next else { break };
+            let mut chunk = match item.map_err(Self::driver_stream_error) {
+                Ok(c) => c,
+                Err(e) => {
+                    writer.abort();
+                    return Err(e);
+                }
+            };
             if let Some(cap) = row_cap {
                 let remaining = cap.saturating_sub(total) as usize;
                 if chunk.len() > remaining {
                     chunk.truncate(remaining);
                 }
             }
-            if page.len() < CELL_RESULT_PAGE_ROWS {
-                let take = (CELL_RESULT_PAGE_ROWS - page.len()).min(chunk.len());
-                page.extend_from_slice(&chunk[..take]);
+            let take = (CELL_RESULT_PAGE_ROWS - page.len()).min(chunk.len());
+            page.extend_from_slice(&chunk[..take]);
+            let batch = match builder.batch(&chunk).map_err(CanvasError::Conversion) {
+                Ok(b) => b,
+                Err(e) => {
+                    writer.abort();
+                    return Err(e);
+                }
+            };
+            match writer.append(batch) {
+                Ok(true) => {}
+                Ok(false) => {
+                    complete = false;
+                    break;
+                }
+                Err(e) => {
+                    writer.abort();
+                    return Err(e);
+                }
             }
             total += chunk.len() as u64;
-            let batch = builder.batch(&chunk).map_err(CanvasError::Conversion)?;
-            if !writer.append(batch)? {
-                complete = false;
-                break;
-            }
-            // A voluntary cap stop leaves `complete` true (asked for n, got n).
             if row_cap.is_some_and(|cap| total >= cap) {
                 break;
             }
         }
         let result = QueryResult {
-            columns: rows.columns,
+            columns,
             rows: page,
             ..Default::default()
         };
-        Ok((result, complete))
+        let cont = CellIngestContinuation {
+            writer,
+            source: IngestSource::Rows {
+                chunks: rows.chunks,
+                builder,
+            },
+            total,
+            complete,
+            row_cap,
+        };
+        Ok((IngestedPage { result }, cont))
     }
 
-    /// Arrow-native variant of `pump_rows` (no row DTO involved).
-    async fn pump_arrow(
+    /// Phase 1 for an Arrow stream (no row DTO involved).
+    async fn start_arrow(
         mut batches: BoxStream<'static, Result<RecordBatch, DriverError>>,
-        writer: &mut CellCacheWriter,
+        mut writer: CellCacheWriter,
         cancel: Option<&CancellationToken>,
         row_cap: Option<u64>,
-    ) -> Result<(QueryResult, bool), CanvasError> {
+    ) -> Result<(IngestedPage, CellIngestContinuation), CanvasError> {
         let mut page: Vec<RecordBatch> = Vec::new();
         let mut page_rows = 0usize;
-        let mut complete = true;
         let mut total: u64 = 0;
-        loop {
+        let mut complete = true;
+        while page_rows < CELL_RESULT_PAGE_ROWS {
             let next = match cancel {
                 Some(token) => tokio::select! {
                     item = batches.next() => item,
-                    _ = token.cancelled() => return Err(CanvasError::Cancelled),
+                    _ = token.cancelled() => {
+                        writer.abort();
+                        return Err(CanvasError::Cancelled);
+                    }
                 },
                 None => batches.next().await,
             };
-            let Some(batch) = next else { break };
-            let mut batch = batch.map_err(Self::driver_stream_error)?;
+            let Some(item) = next else { break };
+            let mut batch = match item.map_err(Self::driver_stream_error) {
+                Ok(b) => b,
+                Err(e) => {
+                    writer.abort();
+                    return Err(e);
+                }
+            };
             if let Some(cap) = row_cap {
                 let remaining = cap.saturating_sub(total) as usize;
                 if batch.num_rows() > remaining {
                     batch = batch.slice(0, remaining);
                 }
             }
-            if page_rows < CELL_RESULT_PAGE_ROWS {
-                let take = (CELL_RESULT_PAGE_ROWS - page_rows).min(batch.num_rows());
-                page.push(batch.slice(0, take));
-                page_rows += take;
+            let take = (CELL_RESULT_PAGE_ROWS - page_rows).min(batch.num_rows());
+            page.push(batch.slice(0, take));
+            page_rows += take;
+            let rows = batch.num_rows() as u64;
+            match writer.append(batch) {
+                Ok(true) => {}
+                Ok(false) => {
+                    complete = false;
+                    break;
+                }
+                Err(e) => {
+                    writer.abort();
+                    return Err(e);
+                }
             }
-            total += batch.num_rows() as u64;
-            if !writer.append(batch)? {
-                complete = false;
-                break;
-            }
+            total += rows;
             if row_cap.is_some_and(|cap| total >= cap) {
                 break;
             }
         }
-        Ok((FederationEngine::batches_to_query_result(&page, 0.0), complete))
+        let result = FederationEngine::batches_to_query_result(&page, 0.0);
+        let cont = CellIngestContinuation {
+            writer,
+            source: IngestSource::Arrow(batches),
+            total,
+            complete,
+            row_cap,
+        };
+        Ok((IngestedPage { result }, cont))
     }
 
     fn driver_stream_error(e: DriverError) -> CanvasError {
@@ -494,6 +556,133 @@ impl CanvasEngine {
         for title in titles {
             self.cache.remove(&Self::key(board, title));
         }
+    }
+}
+
+/// The stream a `CellIngestContinuation` drains after the page has been peeled.
+enum IngestSource {
+    Rows {
+        chunks: BoxStream<'static, Result<Vec<Vec<QueryValue>>, DriverError>>,
+        builder: ArrowChunkBuilder,
+    },
+    Arrow(BoxStream<'static, Result<RecordBatch, DriverError>>),
+}
+
+/// Owns the open cache writer and the remainder of a streamed cell result after
+/// its UI page was returned. `finish` drains the rest into the cache (bounded
+/// memory) and reports the totals; it is `Send` so it can run on a spawned task.
+pub struct CellIngestContinuation {
+    writer: CellCacheWriter,
+    source: IngestSource,
+    total: u64,
+    complete: bool,
+    row_cap: Option<u64>,
+}
+
+impl CellIngestContinuation {
+    /// Drain the remaining stream into the cache and finalize the entry. A
+    /// cancel or driver error aborts the writer (no entry registered).
+    pub async fn finish(
+        mut self,
+        cancel: Option<&CancellationToken>,
+    ) -> Result<CellIngestDone, CanvasError> {
+        let already_capped = self.row_cap.is_some_and(|cap| self.total >= cap);
+        // Skip the drain when phase 1 already stopped (byte budget or row cap).
+        if self.complete && !already_capped {
+            let row_cap = self.row_cap;
+            let drained = match &mut self.source {
+                IngestSource::Rows { chunks, builder } => {
+                    Self::drain_rows(chunks, builder, &mut self.writer, cancel, row_cap, &mut self.total)
+                        .await
+                }
+                IngestSource::Arrow(batches) => {
+                    Self::drain_arrow(batches, &mut self.writer, cancel, row_cap, &mut self.total).await
+                }
+            };
+            match drained {
+                Ok(complete) => self.complete = complete,
+                Err(e) => {
+                    self.writer.abort();
+                    return Err(e);
+                }
+            }
+        }
+        let stats = self.writer.finish()?;
+        Ok(CellIngestDone {
+            total_rows: stats.total_rows,
+            complete: self.complete,
+        })
+    }
+
+    async fn drain_rows(
+        chunks: &mut BoxStream<'static, Result<Vec<Vec<QueryValue>>, DriverError>>,
+        builder: &mut ArrowChunkBuilder,
+        writer: &mut CellCacheWriter,
+        cancel: Option<&CancellationToken>,
+        row_cap: Option<u64>,
+        total: &mut u64,
+    ) -> Result<bool, CanvasError> {
+        loop {
+            let next = match cancel {
+                Some(token) => tokio::select! {
+                    item = chunks.next() => item,
+                    _ = token.cancelled() => return Err(CanvasError::Cancelled),
+                },
+                None => chunks.next().await,
+            };
+            let Some(item) = next else { break };
+            let mut chunk = item.map_err(CanvasEngine::driver_stream_error)?;
+            if let Some(cap) = row_cap {
+                let remaining = cap.saturating_sub(*total) as usize;
+                if chunk.len() > remaining {
+                    chunk.truncate(remaining);
+                }
+            }
+            let batch = builder.batch(&chunk).map_err(CanvasError::Conversion)?;
+            if !writer.append(batch)? {
+                return Ok(false);
+            }
+            *total += chunk.len() as u64;
+            if row_cap.is_some_and(|cap| *total >= cap) {
+                break;
+            }
+        }
+        Ok(true)
+    }
+
+    async fn drain_arrow(
+        batches: &mut BoxStream<'static, Result<RecordBatch, DriverError>>,
+        writer: &mut CellCacheWriter,
+        cancel: Option<&CancellationToken>,
+        row_cap: Option<u64>,
+        total: &mut u64,
+    ) -> Result<bool, CanvasError> {
+        loop {
+            let next = match cancel {
+                Some(token) => tokio::select! {
+                    item = batches.next() => item,
+                    _ = token.cancelled() => return Err(CanvasError::Cancelled),
+                },
+                None => batches.next().await,
+            };
+            let Some(item) = next else { break };
+            let mut batch = item.map_err(CanvasEngine::driver_stream_error)?;
+            if let Some(cap) = row_cap {
+                let remaining = cap.saturating_sub(*total) as usize;
+                if batch.num_rows() > remaining {
+                    batch = batch.slice(0, remaining);
+                }
+            }
+            let rows = batch.num_rows() as u64;
+            if !writer.append(batch)? {
+                return Ok(false);
+            }
+            *total += rows;
+            if row_cap.is_some_and(|cap| *total >= cap) {
+                break;
+            }
+        }
+        Ok(true)
     }
 }
 
@@ -778,6 +967,41 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(int_at(&agg.result, 0, 0), 500);
+    }
+
+    #[tokio::test]
+    async fn start_cell_ingest_returns_page_before_finish() {
+        use futures::channel::mpsc;
+        let engine = engine();
+        // One chunk fills the whole page; the channel stays open so the drain
+        // would block, proving the page is returned before `finish`.
+        let first: Vec<Vec<QueryValue>> = (0..CELL_RESULT_PAGE_ROWS as i64)
+            .map(|n| vec![QueryValue::Int(n), QueryValue::Text(format!("row-{n}"))])
+            .collect();
+        let (mut tx, rx) = mpsc::channel::<Result<Vec<Vec<QueryValue>>, DriverError>>(4);
+        tx.try_send(Ok(first)).unwrap();
+        let rows = RowChunkStream {
+            columns: vec![col("n", "int8"), col("s", "text")],
+            chunks: rx.boxed(),
+        };
+        let (page, cont) = engine
+            .start_cell_ingest(
+                BOARD,
+                "big",
+                QueryStream::Rows(rows),
+                None,
+                CELL_INGEST_BYTE_BUDGET,
+                None,
+            )
+            .await
+            .unwrap();
+        assert_eq!(page.result.rows.len(), CELL_RESULT_PAGE_ROWS);
+        assert_eq!(page.result.rows[0][0], QueryValue::Int(0));
+        // Close the stream so the background drain can complete.
+        tx.close_channel();
+        let done = cont.finish(None).await.unwrap();
+        assert_eq!(done.total_rows, CELL_RESULT_PAGE_ROWS as u64);
+        assert!(done.complete);
     }
 
     #[tokio::test]
