@@ -46,6 +46,30 @@ describe("QuerySection", () => {
     expect(container).toBeTruthy();
   });
 
+  it("shows the default limit and patches edits", () => {
+    const onChange = vi.fn();
+    const { getByLabelText } = render(
+      <QuerySection tabId="t" component={comp} onChange={onChange} />,
+    );
+    const limit = getByLabelText("Limit") as HTMLInputElement;
+    expect(limit.value).toBe("500");
+    expect(limit.disabled).toBe(false);
+    fireEvent.change(limit, { target: { value: "1000" } });
+    expect(onChange).toHaveBeenCalledWith({ limit: 1000 });
+  });
+
+  it("select-all patches and disables the limit input", () => {
+    const onChange = vi.fn();
+    const { getByLabelText, rerender } = render(
+      <QuerySection tabId="t" component={comp} onChange={onChange} />,
+    );
+    fireEvent.click(getByLabelText("Select all rows"));
+    expect(onChange).toHaveBeenCalledWith({ selectAll: true });
+    const checked = { ...comp, selectAll: true };
+    rerender(<QuerySection tabId="t" component={checked} onChange={onChange} />);
+    expect((getByLabelText("Limit") as HTMLInputElement).disabled).toBe(true);
+  });
+
   it("renders nothing for a non-query object", () => {
     const other = makeComponent({ kind: "shape", id: "s", shape: "rect" });
     const { container } = render(
