@@ -162,3 +162,33 @@ AS SELECT customer_id, sum(amount) AS total
    FROM demo.orders
    WHERE status = 'completed'
    GROUP BY customer_id;
+
+-- =================================================================
+-- Large table (10,000,000 rows) to exercise streaming ingestion from
+-- the app. Schema matches the mysql/starrocks `events_10m` fixture.
+-- Distinct rand() nonces keep the generated columns independent.
+-- =================================================================
+
+CREATE TABLE IF NOT EXISTS demo.events_10m
+(
+    id          UInt64,
+    user_id     UInt32,
+    event_type  LowCardinality(String),
+    event_time  DateTime,
+    device      LowCardinality(String),
+    country     LowCardinality(String),
+    amount      Decimal(10, 2)
+)
+ENGINE = MergeTree
+ORDER BY id;
+
+INSERT INTO demo.events_10m
+SELECT
+    number + 1,
+    (rand() % 1000000) + 1,
+    ['view', 'click', 'purchase', 'signup', 'logout', 'share'][(rand(1) % 6) + 1],
+    toDateTime('2024-01-01 00:00:00') + toIntervalSecond(rand(2) % 31536000),
+    ['ios', 'android', 'web', 'desktop'][(rand(3) % 4) + 1],
+    ['US', 'UK', 'Canada', 'Germany', 'France', 'Japan', 'Australia', 'Brazil', 'India', 'Mexico'][(rand(4) % 10) + 1],
+    toDecimal64(round((rand(5) % 100000) / 100.0, 2), 2)
+FROM numbers(10000000);
