@@ -4,6 +4,7 @@ use std::time::Instant;
 
 use async_trait::async_trait;
 use indexmap::IndexMap;
+use futures::StreamExt;
 use mysql_async::prelude::Queryable;
 use mysql_async::{
     ClientIdentity, Column, Conn, Opts, OptsBuilder, Params, Pool, Row, SslOpts, Value as MyValue,
@@ -14,7 +15,7 @@ use tokio::sync::Mutex;
 
 use crate::drivers::DatabaseDriver;
 use crate::drivers::PaginationStrategy;
-use crate::drivers::common::MysqlWireStream;
+use crate::drivers::common::RowChunkPump;
 use crate::drivers::errors::Result;
 use crate::drivers::sql_builder::SqlBuilder;
 use crate::{
@@ -557,13 +558,30 @@ impl DatabaseDriver for StarrocksDriver {
         };
         let columns = Self::stmt_columns_to_specs(stmt.columns());
         let params = Self::params_to_mysql(params);
-        Ok(QueryStream::Rows(MysqlWireStream::open(
-            conn,
-            stmt,
-            params,
+        // async_stream because mysql_async's result stream borrows the conn; the
+        // generator owns conn + stmt across yields, so dropping the stream drops both.
+        let rows = RowChunkPump::spawn(
             columns,
+            move || async move {
+                let rows = async_stream::try_stream! {
+                    let mut conn = conn;
+                    let mut result = conn
+                        .exec_iter(stmt, params)
+                        .await
+                        .map_err(|e| DriverError::QueryFailed(e.to_string()))?;
+                    while let Some(row) = result
+                        .next()
+                        .await
+                        .map_err(|e| DriverError::QueryFailed(e.to_string()))?
+                    {
+                        yield row;
+                    }
+                };
+                Ok(rows.boxed())
+            },
             Self::row_to_query_values,
-        )))
+        );
+        Ok(QueryStream::Rows(rows))
     }
 
     fn pagination_strategy(&self) -> PaginationStrategy {

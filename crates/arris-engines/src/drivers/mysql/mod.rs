@@ -22,6 +22,7 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use async_trait::async_trait;
+use futures::StreamExt;
 use mysql_async::prelude::Queryable;
 use mysql_async::{Conn, Opts, Params, Pool, Row, TxOpts};
 use tokio::sync::Mutex;
@@ -34,7 +35,7 @@ use crate::{
 use crate::drivers::errors::Result;
 
 use crate::drivers::DatabaseDriver;
-use crate::drivers::common::MysqlWireStream;
+use crate::drivers::common::RowChunkPump;
 use crate::drivers::sql_builder::SqlBuilder;
 
 
@@ -317,13 +318,30 @@ impl DatabaseDriver for MysqlDriver {
         };
         let columns = stmt_columns_to_specs(stmt.columns());
         let params = params_to_mysql(params);
-        Ok(QueryStream::Rows(MysqlWireStream::open(
-            conn,
-            stmt,
-            params,
+        // async_stream because mysql_async's result stream borrows the conn; the
+        // generator owns conn + stmt across yields, so dropping the stream drops both.
+        let rows = RowChunkPump::spawn(
             columns,
+            move || async move {
+                let rows = async_stream::try_stream! {
+                    let mut conn = conn;
+                    let mut result = conn
+                        .exec_iter(stmt, params)
+                        .await
+                        .map_err(|e| DriverError::QueryFailed(e.to_string()))?;
+                    while let Some(row) = result
+                        .next()
+                        .await
+                        .map_err(|e| DriverError::QueryFailed(e.to_string()))?
+                    {
+                        yield row;
+                    }
+                };
+                Ok(rows.boxed())
+            },
             row_to_query_values,
-        )))
+        );
+        Ok(QueryStream::Rows(rows))
     }
 
     async fn explain_query(
