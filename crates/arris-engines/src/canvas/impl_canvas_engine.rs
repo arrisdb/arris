@@ -360,7 +360,7 @@ impl CanvasEngine {
     /// Phase 1 for a row stream: read chunks (appending each to the cache) until
     /// the page fills, the stream ends, or the cap is reached.
     async fn start_rows(
-        mut rows: RowChunkStream,
+        rows: RowChunkStream,
         mut writer: CellCacheWriter,
         cancel: Option<&CancellationToken>,
         row_cap: Option<u64>,
@@ -429,7 +429,7 @@ impl CanvasEngine {
 
     /// Phase 1 for an Arrow stream (no row DTO involved).
     async fn start_arrow(
-        mut batches: BoxStream<'static, Result<RecordBatch, DriverError>>,
+        batches: BoxStream<'static, Result<RecordBatch, DriverError>>,
         mut writer: CellCacheWriter,
         cancel: Option<&CancellationToken>,
         row_cap: Option<u64>,
