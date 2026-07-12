@@ -3,8 +3,10 @@ use std::time::Instant;
 use duckdb::arrow::datatypes::DataType;
 use duckdb::types::Value as DuckValue;
 use duckdb::{params_from_iter, Connection};
+use tokio::sync::{mpsc, oneshot};
 
 use crate::{ColumnSpec, DriverError, QueryResult, QueryValue};
+use crate::drivers::constants::STREAM_CHUNK_ROWS;
 use crate::drivers::errors::Result;
 
 use super::values::{map_query_value, map_value_ref};
@@ -90,6 +92,84 @@ pub(super) fn run_select(conn: &Connection, sql: &str, params: &[QueryValue]) ->
             elapsed: started.elapsed().as_secs_f64(),
             ..Default::default()
         })
+    }
+}
+
+/// Send columns over `col_tx`, then row chunks over `chunk_tx`. Holds the
+/// connection lock; a dropped receiver ends the query and frees the conn.
+pub(super) fn stream_select(
+    conn: &Connection,
+    sql: &str,
+    params: &[QueryValue],
+    col_tx: oneshot::Sender<Result<Vec<ColumnSpec>>>,
+    chunk_tx: mpsc::Sender<std::result::Result<Vec<Vec<QueryValue>>, DriverError>>,
+) {
+    let mut stmt = match conn.prepare(sql) {
+        Ok(s) => s,
+        Err(e) => {
+            let _ = col_tx.send(Err(DriverError::QueryFailed(e.to_string())));
+            return;
+        }
+    };
+    let bound: Vec<DuckValue> = params.iter().map(map_query_value).collect();
+    let mut rows = match stmt.query(params_from_iter(bound)) {
+        Ok(r) => r,
+        Err(e) => {
+            let _ = col_tx.send(Err(DriverError::QueryFailed(e.to_string())));
+            return;
+        }
+    };
+    // Rows::as_ref exposes the executed statement's result schema without a
+    // borrow conflict against the live row iterator.
+    let (columns, col_count) = match rows.as_ref() {
+        Some(s) => {
+            let n = s.column_count();
+            let cols = (0..n)
+                .map(|i| {
+                    let name = s.column_name(i).map_or("?", |v| v).to_owned();
+                    ColumnSpec::new(name, duck_type_label(&s.column_type(i)))
+                })
+                .collect();
+            (cols, n)
+        }
+        None => (Vec::new(), 0),
+    };
+    if col_tx.send(Ok(columns)).is_err() {
+        return;
+    }
+    let mut chunk: Vec<Vec<QueryValue>> = Vec::with_capacity(STREAM_CHUNK_ROWS);
+    loop {
+        match rows.next() {
+            Ok(Some(row)) => {
+                let mut r = Vec::with_capacity(col_count);
+                for i in 0..col_count {
+                    match row.get_ref(i) {
+                        Ok(v) => r.push(map_value_ref(v)),
+                        Err(e) => {
+                            let _ = chunk_tx
+                                .blocking_send(Err(DriverError::QueryFailed(e.to_string())));
+                            return;
+                        }
+                    }
+                }
+                chunk.push(r);
+                if chunk.len() >= STREAM_CHUNK_ROWS {
+                    let full =
+                        std::mem::replace(&mut chunk, Vec::with_capacity(STREAM_CHUNK_ROWS));
+                    if chunk_tx.blocking_send(Ok(full)).is_err() {
+                        return;
+                    }
+                }
+            }
+            Ok(None) => break,
+            Err(e) => {
+                let _ = chunk_tx.blocking_send(Err(DriverError::QueryFailed(e.to_string())));
+                return;
+            }
+        }
+    }
+    if !chunk.is_empty() {
+        let _ = chunk_tx.blocking_send(Ok(chunk));
     }
 }
 

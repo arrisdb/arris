@@ -8,20 +8,22 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use duckdb::Connection;
-use tokio::sync::Mutex;
+use futures::StreamExt;
+use tokio::sync::{mpsc, oneshot, Mutex};
 use tokio::task;
 
 use crate::{
     ConnectionConfig, DriverError, ExplainMode, MutationResult, PlanAttribute, PlanNode,
-    PlanResult, QueryLanguage, QueryResult, QueryValue, RowDelete, RowInsert, SchemaNode,
-    TableRef,
+    PlanResult, QueryLanguage, QueryResult, QueryStream, QueryValue, RowChunkStream, RowDelete,
+    RowInsert, SchemaNode, TableRef,
 };
+use crate::drivers::constants::STREAM_CHUNK_CHANNEL_CAPACITY;
 use crate::drivers::errors::Result;
 
 use crate::drivers::DatabaseDriver;
 use crate::drivers::sql_builder::SqlBuilder;
 
-use query::{run_exec, run_select};
+use query::{run_exec, run_select, stream_select};
 use schema::{build_schema_nodes, primary_key_columns};
 
 #[derive(Default)]
@@ -132,6 +134,43 @@ impl DatabaseDriver for DuckdbDriver {
         } else {
             self.with_conn(move |c| run_exec(c, &sql, &p)).await
         }
+    }
+
+    async fn run_query_stream(
+        &self,
+        text: &str,
+        params: &[QueryValue],
+        language: QueryLanguage,
+    ) -> Result<QueryStream> {
+        // A background drain must not hold the single connection's lock inside
+        // a manual transaction, and non-SELECTs have no rows: both materialize.
+        if !self.looks_like_select(text) || self.in_transaction().await {
+            return Ok(QueryStream::from_materialized(
+                self.run_query(text, params, language).await?,
+            ));
+        }
+        let sql = text.to_owned();
+        let p = params.to_vec();
+        let inner = self.inner.clone();
+        let (col_tx, col_rx) = oneshot::channel();
+        let (chunk_tx, chunk_rx) = mpsc::channel(STREAM_CHUNK_CHANNEL_CAPACITY);
+        task::spawn_blocking(move || {
+            let guard = inner.blocking_lock();
+            match guard.as_ref() {
+                Some(conn) => stream_select(conn, &sql, &p, col_tx, chunk_tx),
+                None => {
+                    let _ = col_tx.send(Err(DriverError::NotConnected));
+                }
+            }
+        });
+        let columns = col_rx
+            .await
+            .map_err(|_| DriverError::other("streaming task exited before returning columns"))??;
+        let chunks = futures::stream::unfold(chunk_rx, |mut rx| async move {
+            rx.recv().await.map(|item| (item, rx))
+        })
+        .boxed();
+        Ok(QueryStream::Rows(RowChunkStream { columns, chunks }))
     }
 
     fn select_like_keywords(&self) -> &'static [&'static str] {
@@ -674,5 +713,128 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(r.rows[0][0], QueryValue::Data(vec![0xde, 0xad]));
+    }
+
+    // ── run_query_stream ─────────────────────────────────────────────────────
+
+    use crate::ColumnSpec;
+    use crate::drivers::constants::STREAM_CHUNK_ROWS;
+
+    async fn drain(
+        stream: QueryStream,
+    ) -> (
+        Vec<ColumnSpec>,
+        Vec<std::result::Result<Vec<Vec<QueryValue>>, DriverError>>,
+    ) {
+        match stream {
+            QueryStream::Rows(rs) => (rs.columns, rs.chunks.collect().await),
+            QueryStream::Arrow(_) => panic!("expected a row stream"),
+        }
+    }
+
+    async fn seed_range(d: &DuckdbDriver, total: usize) {
+        d.run_query(
+            &format!("CREATE TABLE t AS SELECT range AS n FROM range({total})"),
+            &[],
+            QueryLanguage::Native,
+        )
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn run_query_stream_chunks_a_large_select_in_order() {
+        let d = DuckdbDriver::new();
+        d.connect(&cfg(":memory:")).await.unwrap();
+        let total = STREAM_CHUNK_ROWS + 5;
+        seed_range(&d, total).await;
+
+        let stream = d
+            .run_query_stream("SELECT n FROM t ORDER BY n", &[], QueryLanguage::Native)
+            .await
+            .unwrap();
+        let (columns, chunks) = drain(stream).await;
+
+        assert_eq!(columns.len(), 1);
+        assert_eq!(columns[0].name, "n");
+        assert_eq!(columns[0].type_hint, "BIGINT");
+        assert_eq!(chunks.len(), 2);
+        let first = chunks[0].as_ref().unwrap();
+        assert_eq!(first.len(), STREAM_CHUNK_ROWS);
+        assert_eq!(first[0][0], QueryValue::Int(0));
+        let last = chunks[1].as_ref().unwrap();
+        assert_eq!(last.len(), 5);
+        assert_eq!(last[4][0], QueryValue::Int(total as i64 - 1));
+    }
+
+    #[tokio::test]
+    async fn run_query_stream_materializes_non_select() {
+        let d = DuckdbDriver::new();
+        d.connect(&cfg(":memory:")).await.unwrap();
+        d.run_query("CREATE TABLE m (n INTEGER)", &[], QueryLanguage::Native)
+            .await
+            .unwrap();
+
+        let stream = d
+            .run_query_stream("INSERT INTO m VALUES (7)", &[], QueryLanguage::Native)
+            .await
+            .unwrap();
+        let (_, chunks) = drain(stream).await;
+        assert_eq!(chunks.len(), 1);
+        assert!(chunks[0].as_ref().unwrap().is_empty());
+
+        let r = d
+            .run_query("SELECT COUNT(*) FROM m", &[], QueryLanguage::Native)
+            .await
+            .unwrap();
+        assert_eq!(r.rows[0][0], QueryValue::Int(1));
+    }
+
+    #[tokio::test]
+    async fn run_query_stream_materializes_inside_a_manual_transaction() {
+        let d = DuckdbDriver::new();
+        d.connect(&cfg(":memory:")).await.unwrap();
+        let total = STREAM_CHUNK_ROWS + 5;
+        seed_range(&d, total).await;
+
+        d.begin_transaction(crate::IsolationLevel::Default)
+            .await
+            .unwrap();
+        let stream = d
+            .run_query_stream("SELECT n FROM t", &[], QueryLanguage::Native)
+            .await
+            .unwrap();
+        let (_, chunks) = drain(stream).await;
+        // Materialized results arrive as one chunk regardless of size.
+        assert_eq!(chunks.len(), 1);
+        assert_eq!(chunks[0].as_ref().unwrap().len(), total);
+        d.rollback_transaction().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn dropping_the_stream_frees_the_connection() {
+        let d = DuckdbDriver::new();
+        d.connect(&cfg(":memory:")).await.unwrap();
+        seed_range(&d, 100_000).await;
+
+        let stream = d
+            .run_query_stream("SELECT n FROM t", &[], QueryLanguage::Native)
+            .await
+            .unwrap();
+        let QueryStream::Rows(mut rs) = stream else {
+            panic!("expected a row stream")
+        };
+        rs.chunks.next().await.unwrap().unwrap();
+        drop(rs);
+
+        // Hangs here (and times out) if the abandoned stream kept the lock.
+        let r = tokio::time::timeout(
+            std::time::Duration::from_secs(10),
+            d.run_query("SELECT 1", &[], QueryLanguage::Native),
+        )
+        .await
+        .expect("connection stayed locked after the stream was dropped")
+        .unwrap();
+        assert_eq!(r.rows[0][0], QueryValue::Int(1));
     }
 }
