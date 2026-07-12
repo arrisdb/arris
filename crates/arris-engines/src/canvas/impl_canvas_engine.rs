@@ -344,9 +344,12 @@ impl CanvasEngine {
         cancel: Option<&CancellationToken>,
     ) -> Result<Option<T>, CanvasError> {
         match cancel {
+            // Biased: a cancelled token wins over an already-ready chunk (a
+            // synchronously-buffered first chunk would otherwise race the token).
             Some(token) => tokio::select! {
-                item = stream.next() => Ok(item),
+                biased;
                 _ = token.cancelled() => Err(CanvasError::Cancelled),
+                item = stream.next() => Ok(item),
             },
             None => Ok(stream.next().await),
         }

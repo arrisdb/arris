@@ -976,10 +976,8 @@ async fn sql_dml_errors_surface_cleanly() {
 }
 
 // ── streaming ingestion (canvas cell path) ──────────────────────────────────
-// MongoDB is the first schemaless streaming source. `run_query_stream` on a
-// many-document `find` uses a two-pass scan: pass 1 accumulates the full column
-// union (guaranteed completeness), pass 2 streams rows onto those columns. These
-// tests drive the same `CanvasEngine::ingest_cell_stream` path the app uses.
+// `run_query_stream` on a `find` fixes columns from the first chunk's field
+// union, then streams the rest. Drives the app's `ingest_cell_stream` path.
 
 mod streaming_scenario;
 use streaming_scenario::BOARD;
@@ -1043,9 +1041,9 @@ async fn streaming_ingests_100k_docs_with_exact_totals_and_page() {
 }
 
 #[tokio::test]
-async fn streaming_columns_are_complete_beyond_the_first_page() {
-    // The completeness guarantee: a field present only on a document past the
-    // 500-row page still earns a column, because pass 1 scans the whole result.
+async fn streaming_columns_cover_the_whole_first_chunk_not_just_the_page() {
+    // Columns come from the first chunk's union, not the 500-row page: a field
+    // on doc 501 (past the page, within the chunk) still earns a column.
     let (_c, driver, client) = start_mongo().await;
     let coll = client.database(DB).collection::<Document>("src");
     let head: Vec<Document> = (1..=500).map(|n| doc! { "a": n }).collect();

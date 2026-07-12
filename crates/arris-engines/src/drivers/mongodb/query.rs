@@ -112,49 +112,67 @@ where
     Ok(result)
 }
 
-/// Stream a `find` result with guaranteed column completeness. Pass 1 scans the
-/// whole cursor to accumulate the top-level field union (rows discarded, so
-/// memory stays flat over huge collections); pass 2 re-issues the same find and
-/// streams rows chunked onto the fixed columns. Reads the collection twice.
+/// Stream a `find` in one cursor pass: buffer the first chunk to fix columns
+/// from its field union (`_id` first), emit it, then stream the rest onto those
+/// columns. Fields appearing only beyond the first chunk get no column.
 pub(super) async fn stream_find(
     coll: Collection<Document>,
     request: &MongoRequest,
 ) -> Result<RowChunkStream> {
     let params = find_params(request)?;
+    let mut cursor = build_find_cursor(&coll, &params).await?;
 
-    let mut scan = build_find_cursor(&coll, &params).await?;
+    let mut first: Vec<Document> = Vec::new();
     let mut union: IndexMap<String, ColumnSpec> = IndexMap::new();
-    while let Some(item) = scan.next().await {
-        let doc = item.map_err(|e| DriverError::QueryFailed(e.to_string()))?;
-        accumulate_columns(&mut union, &doc);
+    while first.len() < STREAM_CHUNK_ROWS {
+        match cursor.next().await {
+            Some(item) => {
+                let doc = item.map_err(|e| DriverError::QueryFailed(e.to_string()))?;
+                accumulate_columns(&mut union, &doc);
+                first.push(doc);
+            }
+            None => break,
+        }
     }
     let columns = finalize_columns(union);
     let order: Vec<String> = columns.iter().map(|c| c.name.clone()).collect();
+    let first_rows: Vec<Vec<QueryValue>> =
+        first.iter().map(|d| row_from_doc(d, &order)).collect();
 
-    let cursor = build_find_cursor(&coll, &params).await?;
     let chunks: BoxStream<'static, std::result::Result<Vec<Vec<QueryValue>>, DriverError>> =
-        stream::unfold((cursor, order), |(mut cursor, order)| async move {
-            let mut chunk: Vec<Vec<QueryValue>> = Vec::new();
-            loop {
-                match cursor.next().await {
-                    Some(Ok(doc)) => {
-                        chunk.push(row_from_doc(&doc, &order));
-                        if chunk.len() >= STREAM_CHUNK_ROWS {
-                            break;
-                        }
+        stream::unfold(
+            (Some(first_rows), cursor, order),
+            |(first_opt, mut cursor, order)| async move {
+                if let Some(rows) = first_opt {
+                    if !rows.is_empty() {
+                        return Some((Ok(rows), (None, cursor, order)));
                     }
-                    Some(Err(e)) => {
-                        return Some((Err(DriverError::QueryFailed(e.to_string())), (cursor, order)));
-                    }
-                    None => break,
                 }
-            }
-            if chunk.is_empty() {
-                None
-            } else {
-                Some((Ok(chunk), (cursor, order)))
-            }
-        })
+                let mut chunk: Vec<Vec<QueryValue>> = Vec::new();
+                loop {
+                    match cursor.next().await {
+                        Some(Ok(doc)) => {
+                            chunk.push(row_from_doc(&doc, &order));
+                            if chunk.len() >= STREAM_CHUNK_ROWS {
+                                break;
+                            }
+                        }
+                        Some(Err(e)) => {
+                            return Some((
+                                Err(DriverError::QueryFailed(e.to_string())),
+                                (None, cursor, order),
+                            ));
+                        }
+                        None => break,
+                    }
+                }
+                if chunk.is_empty() {
+                    None
+                } else {
+                    Some((Ok(chunk), (None, cursor, order)))
+                }
+            },
+        )
         .boxed();
 
     Ok(RowChunkStream { columns, chunks })
