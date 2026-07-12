@@ -4,13 +4,27 @@ use std::sync::Arc;
 use arris_engines::{
     AppEnvironment, CanvasCellRun, CanvasCellSpec, CanvasEngine, CanvasError,
     CELL_INGEST_BYTE_BUDGET, ErrorCode, IngestedCell, IpcError, ProjectState, QueryEngine,
-    QueryResult, QueryValue,
+    QueryLanguage, QueryResult, QueryValue,
 };
 use tauri::{Emitter, State};
 use uuid::Uuid;
 
-use crate::commands::constants::{CANVAS_CELL_INGESTED_EVENT, CANVAS_RUN_CANCELLED_MESSAGE};
+use crate::commands::constants::{
+    CANVAS_CELL_INGESTED_EVENT, CANVAS_RUN_CANCELLED_MESSAGE, MONGO_SHELL_STMT_PREFIX,
+};
 use crate::helpers::ipc_err;
+
+/// Canvas cells author SQL against each source's SQL frontend (mongo/es/redis
+/// translate it); the one exception is a native Mongo shell statement, which no
+/// SQL frontend parses. Route those to the native language, everything else SQL.
+/// This mirrors the console's SQL-vs-native dialect switch, resolved per cell.
+fn cell_query_language(sql: &str) -> QueryLanguage {
+    if sql.trim_start().starts_with(MONGO_SHELL_STMT_PREFIX) {
+        QueryLanguage::Native
+    } else {
+        QueryLanguage::Sql
+    }
+}
 
 /// Payload for `CANVAS_CELL_INGESTED_EVENT`: a terminal cell's full-ingest
 /// totals, emitted once its background drain completes.
@@ -62,7 +76,7 @@ async fn run_streamed_cell(
             proj,
             cell.sql.clone(),
             cell.limit,
-            None,
+            Some(cell_query_language(&cell.sql)),
             Some(query_id.to_string()),
         )
         .await;
@@ -233,7 +247,7 @@ pub async fn cmd_run_canvas_cell(
                                 proj.as_ref(),
                                 cell.sql.clone(),
                                 Vec::<QueryValue>::new(),
-                                None,
+                                Some(cell_query_language(&cell.sql)),
                                 None,
                                 None,
                                 Some(query_id.clone()),
@@ -334,4 +348,24 @@ pub async fn cmd_fetch_canvas_cell_page(
     env.canvas
         .fetch_page(&board_id, &title, offset, limit)
         .map_err(ipc_err)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn sql_cells_use_the_sql_frontend() {
+        assert_eq!(cell_query_language("SELECT * FROM appdb.events_10m"), QueryLanguage::Sql);
+        assert_eq!(cell_query_language("  select 1"), QueryLanguage::Sql);
+        // `database.table` in a FROM clause is SQL, not a shell statement.
+        assert_eq!(cell_query_language("SELECT * FROM db.events"), QueryLanguage::Sql);
+        assert_eq!(cell_query_language("INSERT INTO t VALUES (1)"), QueryLanguage::Sql);
+    }
+
+    #[test]
+    fn native_mongo_shell_statements_use_the_native_language() {
+        assert_eq!(cell_query_language("db.events_10m.find({})"), QueryLanguage::Native);
+        assert_eq!(cell_query_language("  db.orders.aggregate([])"), QueryLanguage::Native);
+    }
 }
