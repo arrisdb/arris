@@ -1322,3 +1322,181 @@ async fn slim_diff_keyless_and_keyed() {
     dbt_diff_scenario::assert_keyless(driver.as_ref(), DiffDialect::MsSql, prod, new_select).await;
     dbt_diff_scenario::assert_keyed(driver.as_ref(), DiffDialect::MsSql, prod, new_select).await;
 }
+
+// ── streaming ingestion ───────────────────────────────────────────────────────
+
+mod streaming_scenario;
+
+use arris_engines::{
+    CanvasEngine, CanvasError, CELL_INGEST_BYTE_BUDGET, CELL_RESULT_PAGE_ROWS, QueryEngine,
+};
+use streaming_scenario::BOARD;
+use tokio_util::sync::CancellationToken;
+
+fn stream_canvas_engine() -> CanvasEngine {
+    streaming_scenario::canvas_engine("mssql")
+}
+
+/// Boot a container and connect straight to `master` (no `USE appdb`). Streaming
+/// opens a fresh connection from the stored config, so keeping the pinned client
+/// and the ephemeral stream connection in the same database lets both see `src`.
+async fn start_mssql_stream() -> (ContainerAsync<MssqlServer>, Box<dyn DatabaseDriver>) {
+    let container = MssqlServer::default()
+        .with_accept_eula()
+        .with_sa_password(SA_PASSWORD)
+        .with_tag("2022-latest")
+        .start()
+        .await
+        .expect("start mssql container");
+    let host = container.get_host().await.expect("container host").to_string();
+    let port = container
+        .get_host_port_ipv4(1433)
+        .await
+        .expect("container port");
+
+    let mut cfg = ConnectionConfig::new("it-mssql-stream", DatabaseKind::Mssql);
+    cfg.host = host;
+    cfg.port = port;
+    cfg.user = "sa".to_string();
+    cfg.password = SA_PASSWORD.to_string();
+    cfg.database = "master".to_string();
+    cfg.ssl_mode = arris_engines::SslMode::Required;
+
+    let driver = driver_for_kind(DatabaseKind::Mssql).expect("mssql driver");
+    driver.connect(&cfg).await.expect("connect to mssql");
+    (container, driver)
+}
+
+/// Create `src` and fill it with `count` rows `{n, label}` via a set-based tally
+/// insert (fast; no per-row round trips).
+async fn seed_stream_src(driver: &dyn DatabaseDriver, count: i64) {
+    run(driver, "CREATE TABLE src (n INT PRIMARY KEY, label NVARCHAR(50))").await;
+    let sql = format!(
+        "INSERT INTO src (n, label) \
+         SELECT rn, CONCAT(N'row-', rn) \
+         FROM (SELECT TOP ({count}) ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS rn \
+               FROM sys.all_objects a CROSS JOIN sys.all_objects b) AS t"
+    );
+    run(driver, &sql).await;
+}
+
+#[tokio::test]
+async fn streaming_ingests_100k_rows_with_exact_totals_and_page() {
+    let (_c, driver) = start_mssql_stream().await;
+    seed_stream_src(driver.as_ref(), 100_000).await;
+    let engine = stream_canvas_engine();
+
+    let stream = driver
+        .run_query_stream("SELECT n, label FROM src ORDER BY n", &[], QueryLanguage::Sql)
+        .await
+        .expect("open stream");
+    let out = engine
+        .ingest_cell_stream(BOARD, "big", stream, None, CELL_INGEST_BYTE_BUDGET, None)
+        .await
+        .expect("ingest stream");
+
+    assert_eq!(out.total_rows, 100_000);
+    assert!(out.complete);
+    assert_eq!(out.result.rows.len(), CELL_RESULT_PAGE_ROWS);
+    let names: Vec<&str> = out.result.columns.iter().map(|c| c.name.as_str()).collect();
+    assert_eq!(names, vec!["n", "label"]);
+    assert_eq!(out.result.rows[0][0], QueryValue::Int(1));
+    assert_eq!(out.result.rows[0][1], QueryValue::Text("row-1".into()));
+    assert_eq!(out.result.rows[499][0], QueryValue::Int(500));
+
+    // A chained cell aggregates the FULL cached result, not the 500-row page.
+    let agg = engine
+        .run_cell(BOARD, "sums", "SELECT COUNT(*) AS c, SUM(n) AS s FROM big")
+        .await
+        .expect("chained aggregate");
+    assert_eq!(agg.result.rows[0][0], QueryValue::Int(100_000));
+    assert_eq!(agg.result.rows[0][1], QueryValue::Int(5_000_050_000));
+}
+
+#[tokio::test]
+async fn streaming_cancel_registers_no_cache_entry() {
+    let (_c, driver) = start_mssql_stream().await;
+    seed_stream_src(driver.as_ref(), 5_000).await;
+    let engine = stream_canvas_engine();
+
+    let stream = driver
+        .run_query_stream("SELECT n FROM src", &[], QueryLanguage::Sql)
+        .await
+        .expect("open stream");
+
+    // A pre-cancelled token exercises the abort path deterministically.
+    let token = CancellationToken::new();
+    token.cancel();
+
+    let err = engine
+        .ingest_cell_stream(BOARD, "huge", stream, Some(&token), CELL_INGEST_BYTE_BUDGET, None)
+        .await
+        .expect_err("cancel must fail the ingest");
+    assert!(matches!(err, CanvasError::Cancelled), "got {err:?}");
+
+    // The aborted cell was never registered, so downstream cannot read it.
+    let chained = engine.run_cell(BOARD, "agg", "SELECT COUNT(*) FROM huge").await;
+    assert!(chained.is_err(), "cancelled cell must not be queryable");
+
+    // The pinned client is healthy after the aborted stream's connection drops.
+    let healthy = run(driver.as_ref(), "SELECT COUNT(*) AS c FROM src").await;
+    assert_eq!(healthy.rows[0][0], QueryValue::Int(5_000));
+}
+
+#[tokio::test]
+async fn streaming_byte_budget_truncates_and_reports_incomplete() {
+    let (_c, driver) = start_mssql_stream().await;
+    seed_stream_src(driver.as_ref(), 100_000).await;
+    let engine = stream_canvas_engine();
+
+    let stream = driver
+        .run_query_stream("SELECT n, label FROM src ORDER BY n", &[], QueryLanguage::Sql)
+        .await
+        .expect("open stream");
+    // A ~1 MiB budget admits a few chunks, then stops.
+    let out = engine
+        .ingest_cell_stream(BOARD, "capped", stream, None, 1 << 20, None)
+        .await
+        .expect("ingest stream");
+
+    assert!(!out.complete, "budget stop must be surfaced, never silent");
+    assert!(out.total_rows >= CELL_RESULT_PAGE_ROWS as u64);
+    assert!(out.total_rows < 100_000, "budget must truncate the run");
+    assert_eq!(out.result.rows.len(), CELL_RESULT_PAGE_ROWS);
+
+    let agg = engine
+        .run_cell(BOARD, "agg", "SELECT COUNT(*) AS c FROM capped")
+        .await
+        .expect("chained count");
+    assert_eq!(agg.result.rows[0][0], QueryValue::Int(out.total_rows as i64));
+}
+
+#[tokio::test]
+async fn streaming_cell_limit_caps_to_500() {
+    let (_c, driver) = start_mssql_stream().await;
+    seed_stream_src(driver.as_ref(), 10_000).await;
+    let engine = stream_canvas_engine();
+
+    // SQL Server is a wrappable dialect, so the per-cell limit rewrites the query
+    // (the DB does top-N via OFFSET/FETCH) and leaves no ingest-side row cap.
+    let (sql, row_cap) = QueryEngine::apply_cell_limit(
+        "SELECT n FROM src",
+        &driver.pagination_strategy(),
+        Some(500),
+    );
+    assert!(sql.contains("FETCH NEXT 500 ROWS ONLY"), "got {sql}");
+    assert_eq!(row_cap, None);
+
+    let stream = driver
+        .run_query_stream(&sql, &[], QueryLanguage::Sql)
+        .await
+        .expect("open stream");
+    let out = engine
+        .ingest_cell_stream(BOARD, "lim", stream, None, 1 << 30, row_cap)
+        .await
+        .expect("ingest stream");
+
+    assert_eq!(out.total_rows, 500);
+    assert!(out.complete, "a top-N result is complete");
+    assert_eq!(out.result.rows.len(), 500);
+}

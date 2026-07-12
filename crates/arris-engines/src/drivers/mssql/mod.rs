@@ -14,8 +14,8 @@ use tokio_util::compat::Compat;
 
 use crate::{
     ConnectionConfig, DriverError, ExplainMode, MutationResult, ObjectRef, PlanAttribute, PlanNode,
-    PlanResult, QueryLanguage, QueryResult, QueryValue, RowDelete, RowInsert, SchemaNode,
-    TableRef,
+    PlanResult, QueryLanguage, QueryResult, QueryStream, QueryValue, RowDelete, RowInsert,
+    SchemaNode, TableRef,
 };
 use crate::drivers::errors::Result;
 
@@ -23,11 +23,11 @@ use crate::drivers::DatabaseDriver;
 use crate::drivers::sql_builder::SqlBuilder;
 
 use config::{build_config, connect_tcp};
-use query::rows_to_query_result;
+use query::{rows_to_query_result, stream_query};
 use schema::{MssqlColumn, MssqlObject, MssqlSchema, build_mssql_schema_tree, mssql_kind_from_catalog};
 use values::{SqlParam, ToSql};
 
-type MssqlClient = Client<Compat<TcpStream>>;
+pub(super) type MssqlClient = Client<Compat<TcpStream>>;
 
 pub struct MssqlDriver {
     inner: Mutex<Option<MssqlClient>>,
@@ -518,6 +518,31 @@ impl DatabaseDriver for MssqlDriver {
                 })
             }
         }
+    }
+
+    async fn run_query_stream(
+        &self,
+        text: &str,
+        params: &[QueryValue],
+        language: QueryLanguage,
+    ) -> Result<QueryStream> {
+        // Streaming runs on a fresh ephemeral connection, so non-SELECTs and an
+        // open manual transaction (pinned to the main client) stay materialized.
+        if !self.looks_like_select(text) || self.in_transaction().await {
+            return Ok(QueryStream::from_materialized(
+                self.run_query(text, params, language).await?,
+            ));
+        }
+        let cfg = self
+            .cancel_config
+            .lock()
+            .await
+            .clone()
+            .ok_or(DriverError::NotConnected)?;
+        let client = connect_tcp(&cfg).await?;
+        Ok(QueryStream::Rows(
+            stream_query(client, text.to_owned(), params.to_vec()).await?,
+        ))
     }
 
     async fn explain_query(
