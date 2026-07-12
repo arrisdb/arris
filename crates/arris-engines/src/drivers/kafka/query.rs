@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use futures::stream::{self, StreamExt};
 use rdkafka::consumer::{BaseConsumer, Consumer};
 use rdkafka::message::{BorrowedMessage, Message};
@@ -11,7 +13,7 @@ use crate::{ColumnSpec, DriverError, QueryValue, RowChunkStream};
 
 use super::constants::{
     CONSUME_TIMEOUT, EMPTY_POLLS_BEFORE_STOP, MAX_ROWS, METADATA_TIMEOUT, POLL_INTERVAL,
-    STREAM_ROW_CHANNEL_CAPACITY,
+    STREAM_ROW_CHANNEL_CAPACITY, WATERMARK_IDLE_POLLS_BEFORE_STOP,
 };
 use super::schema_registry::{columns_from_rows, SchemaRegistryClient};
 use super::sql_parser::{
@@ -22,8 +24,12 @@ use super::KafkaState;
 // ── shared consume helpers ──────────────────────────────────────────────────
 
 /// Create a fresh consumer and assign every partition of the query's topic at
-/// the requested start offset. Shared by the buffered and streaming paths.
-fn build_assigned_consumer(cc: &ClientConfig, query: &KafkaQuery) -> Result<BaseConsumer> {
+/// the requested start offset. Returns the assigned partition ids. Shared by the
+/// buffered and streaming paths.
+fn build_assigned_consumer(
+    cc: &ClientConfig,
+    query: &KafkaQuery,
+) -> Result<(BaseConsumer, Vec<i32>)> {
     use rdkafka::TopicPartitionList;
 
     let consumer: BaseConsumer = cc
@@ -61,7 +67,7 @@ fn build_assigned_consumer(cc: &ClientConfig, query: &KafkaQuery) -> Result<Base
     consumer
         .assign(&tpl)
         .map_err(|e| DriverError::QueryFailed(e.to_string()))?;
-    Ok(consumer)
+    Ok((consumer, partition_ids))
 }
 
 /// Decode a message payload to a JSON row, injecting the `_partition`/`_offset`/
@@ -119,7 +125,7 @@ pub(super) fn consume_topic_fresh(
     cc: &ClientConfig,
     query: &KafkaQuery,
 ) -> Result<Vec<serde_json::Value>> {
-    let consumer = build_assigned_consumer(cc, query)?;
+    let (consumer, _partitions) = build_assigned_consumer(cc, query)?;
 
     let max_rows = query.limit.unwrap_or(MAX_ROWS).min(MAX_ROWS);
     let mut rows = Vec::with_capacity(max_rows);
@@ -191,7 +197,7 @@ async fn columns_upfront(
         SelectClause::All => {
             let sr = registry?;
             let subject = format!("{}-value", query.topic);
-            let mut cols = sr.get_columns_for_subject(&subject).await.ok()?;
+            let mut cols = sr.get_columns_for_subject(&subject).await.ok().flatten()?;
             cols.extend(meta_columns());
             Some(cols)
         }
@@ -237,18 +243,38 @@ fn project_row(row: &serde_json::Value, columns: &[ColumnSpec]) -> Vec<QueryValu
 
 /// Blocking poll loop feeding parsed, filtered rows to the async chunker. No row
 /// cap (only the query's `LIMIT`); a bounded channel backpressures the consumer.
+///
+/// A historical read (from the beginning) terminates once every partition
+/// reaches its start-of-read high watermark, so the whole snapshot drains
+/// without a wall-clock guess. A tail read (`[LATEST]`) has no bounded end, so
+/// it keeps the consume timeout.
 fn stream_poll_blocking(
     cc: ClientConfig,
     query: KafkaQuery,
     row_tx: mpsc::Sender<Result<serde_json::Value>>,
 ) {
-    let consumer = match build_assigned_consumer(&cc, &query) {
-        Ok(c) => c,
+    let (consumer, partitions) = match build_assigned_consumer(&cc, &query) {
+        Ok(pair) => pair,
         Err(e) => {
             let _ = row_tx.blocking_send(Err(e));
             return;
         }
     };
+
+    let mut targets: HashMap<i32, i64> = HashMap::new();
+    if !query.from_latest {
+        for pid in &partitions {
+            if let Ok((low, high)) =
+                consumer.fetch_watermarks(&query.topic, *pid, METADATA_TIMEOUT)
+            {
+                if high > low {
+                    targets.insert(*pid, high);
+                }
+            }
+        }
+    }
+    let use_watermarks = !targets.is_empty();
+
     let deadline = std::time::Instant::now() + CONSUME_TIMEOUT;
     let mut empty_polls = 0u32;
     let mut sent = 0usize;
@@ -257,24 +283,37 @@ fn stream_poll_blocking(
         if query.limit.is_some_and(|l| sent >= l) {
             break;
         }
-        let now = std::time::Instant::now();
-        if now >= deadline {
+        if !use_watermarks && std::time::Instant::now() >= deadline {
             break;
         }
-        let poll_timeout = deadline.saturating_duration_since(now).min(POLL_INTERVAL);
+        let poll_timeout = if use_watermarks {
+            POLL_INTERVAL
+        } else {
+            deadline
+                .saturating_duration_since(std::time::Instant::now())
+                .min(POLL_INTERVAL)
+        };
         match consumer.poll(poll_timeout) {
             Some(Ok(msg)) => {
                 empty_polls = 0;
-                let Some(row) = message_to_row(&msg) else {
-                    continue;
-                };
-                if !passes_filter(&row, &query) {
-                    continue;
+                // Offsets advance for every message, filtered or not, so track
+                // watermark progress before deciding whether to emit the row.
+                if let Some(&high) = targets.get(&msg.partition()) {
+                    if msg.offset() + 1 >= high {
+                        targets.remove(&msg.partition());
+                    }
                 }
-                if row_tx.blocking_send(Ok(row)).is_err() {
-                    return; // consumer dropped: cancel
+                if let Some(row) = message_to_row(&msg) {
+                    if passes_filter(&row, &query) {
+                        if row_tx.blocking_send(Ok(row)).is_err() {
+                            return; // consumer dropped: cancel
+                        }
+                        sent += 1;
+                    }
                 }
-                sent += 1;
+                if use_watermarks && targets.is_empty() {
+                    break;
+                }
             }
             Some(Err(e)) => {
                 let _ = row_tx.blocking_send(Err(DriverError::QueryFailed(e.to_string())));
@@ -282,7 +321,11 @@ fn stream_poll_blocking(
             }
             None => {
                 empty_polls += 1;
-                if sent > 0 && empty_polls >= EMPTY_POLLS_BEFORE_STOP {
+                if use_watermarks {
+                    if empty_polls >= WATERMARK_IDLE_POLLS_BEFORE_STOP {
+                        break;
+                    }
+                } else if sent > 0 && empty_polls >= EMPTY_POLLS_BEFORE_STOP {
                     break;
                 }
             }
