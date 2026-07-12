@@ -1,11 +1,12 @@
-use futures_util::stream::{self, BoxStream, StreamExt};
+use futures_util::stream::{self, StreamExt};
 use indexmap::IndexMap;
-use mongodb::bson::Document;
+use mongodb::bson::{Document, RawDocumentBuf};
 use mongodb::options::{
     AggregateOptions, CountOptions, FindOneOptions, FindOptions,
 };
 use mongodb::{Collection, Cursor};
 
+use crate::drivers::common::RowChunkPump;
 use crate::drivers::constants::STREAM_CHUNK_ROWS;
 use crate::{
     ColumnSpec, DriverError, QueryLanguage, QueryResult, QueryValue, RowChunkStream,
@@ -14,7 +15,7 @@ use crate::drivers::errors::Result;
 
 use super::mutation::{json_to_doc, json_to_pipeline};
 use super::parser::{Chain, MongoRequest, Verb};
-use super::tabular::{accumulate_columns, finalize_columns, row_from_doc};
+use super::tabular::{accumulate_columns_raw, column_index, finalize_columns, project_row_raw};
 
 pub(super) fn parse_request(text: &str, language: QueryLanguage) -> Result<MongoRequest> {
     match language {
@@ -58,10 +59,10 @@ fn find_params(request: &MongoRequest) -> Result<FindParams> {
     Ok(FindParams { filter, projection, limit, skip, sort })
 }
 
-async fn build_find_cursor(
-    coll: &Collection<Document>,
-    params: &FindParams,
-) -> Result<Cursor<Document>> {
+async fn build_find_cursor<T>(coll: &Collection<T>, params: &FindParams) -> Result<Cursor<T>>
+where
+    T: serde::de::DeserializeOwned + Send + Sync + Unpin + 'static,
+{
     let opts = FindOptions::builder()
         .projection(params.projection.clone())
         .sort(params.sort.clone())
@@ -113,69 +114,42 @@ where
 }
 
 /// Stream a `find` in one cursor pass: buffer the first chunk to fix columns
-/// from its field union (`_id` first), emit it, then stream the rest onto those
-/// columns. Fields appearing only beyond the first chunk get no column.
+/// from its field union (`_id` first), then hand the sampled docs plus the rest
+/// of the cursor to `RowChunkPump`, which maps bson to rows on a spawned task
+/// (overlapping deserialize/convert with the consumer's Arrow build + spill).
+/// Fields appearing only beyond the first chunk get no column.
 pub(super) async fn stream_find(
     coll: Collection<Document>,
     request: &MongoRequest,
 ) -> Result<RowChunkStream> {
     let params = find_params(request)?;
+    let coll = coll.clone_with_type::<RawDocumentBuf>();
     let mut cursor = build_find_cursor(&coll, &params).await?;
 
-    let mut first: Vec<Document> = Vec::new();
+    let mut first: Vec<RawDocumentBuf> = Vec::new();
     let mut union: IndexMap<String, ColumnSpec> = IndexMap::new();
     while first.len() < STREAM_CHUNK_ROWS {
         match cursor.next().await {
             Some(item) => {
                 let doc = item.map_err(|e| DriverError::QueryFailed(e.to_string()))?;
-                accumulate_columns(&mut union, &doc);
+                accumulate_columns_raw(&mut union, &doc);
                 first.push(doc);
             }
             None => break,
         }
     }
     let columns = finalize_columns(union);
-    let order: Vec<String> = columns.iter().map(|c| c.name.clone()).collect();
-    let first_rows: Vec<Vec<QueryValue>> =
-        first.iter().map(|d| row_from_doc(d, &order)).collect();
+    let index = column_index(&columns);
+    let width = columns.len();
 
-    let chunks: BoxStream<'static, std::result::Result<Vec<Vec<QueryValue>>, DriverError>> =
-        stream::unfold(
-            (Some(first_rows), cursor, order),
-            |(first_opt, mut cursor, order)| async move {
-                if let Some(rows) = first_opt {
-                    if !rows.is_empty() {
-                        return Some((Ok(rows), (None, cursor, order)));
-                    }
-                }
-                let mut chunk: Vec<Vec<QueryValue>> = Vec::new();
-                loop {
-                    match cursor.next().await {
-                        Some(Ok(doc)) => {
-                            chunk.push(row_from_doc(&doc, &order));
-                            if chunk.len() >= STREAM_CHUNK_ROWS {
-                                break;
-                            }
-                        }
-                        Some(Err(e)) => {
-                            return Some((
-                                Err(DriverError::QueryFailed(e.to_string())),
-                                (None, cursor, order),
-                            ));
-                        }
-                        None => break,
-                    }
-                }
-                if chunk.is_empty() {
-                    None
-                } else {
-                    Some((Ok(chunk), (None, cursor, order)))
-                }
-            },
-        )
-        .boxed();
+    let rest = cursor.map(|r| r.map_err(|e| DriverError::QueryFailed(e.to_string())));
+    let rows = stream::iter(first.into_iter().map(Ok::<_, DriverError>)).chain(rest);
 
-    Ok(RowChunkStream { columns, chunks })
+    Ok(RowChunkPump::spawn(
+        columns,
+        move || async move { Ok(rows) },
+        move |doc: RawDocumentBuf| project_row_raw(&doc, &index, width),
+    ))
 }
 
 pub(super) async fn execute_aggregate<F>(

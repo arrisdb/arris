@@ -3,8 +3,10 @@
 //! first column (mirrors the Swift `MongoBSON.flattenTopLevel +
 //! MongoDriver.tabularize` pair).
 
+use std::collections::HashMap;
+
 use indexmap::IndexMap;
-use mongodb::bson::{Bson, Document};
+use mongodb::bson::{Bson, Document, RawBsonRef, RawDocument};
 
 use crate::{ColumnSpec, QueryResult, QueryValue};
 
@@ -30,12 +32,29 @@ pub(super) fn finalize_columns(columns: IndexMap<String, ColumnSpec>) -> Vec<Col
     out
 }
 
-/// Project one document onto a fixed column order; absent fields render `Null`.
-pub(super) fn row_from_doc(doc: &Document, order: &[String]) -> Vec<QueryValue> {
-    order
+/// Map each column name to its row position, for O(fields) projection.
+pub(super) fn column_index(columns: &[ColumnSpec]) -> HashMap<String, usize> {
+    columns
         .iter()
-        .map(|col| doc.get(col).map_or(QueryValue::Null, bson_to_value))
+        .enumerate()
+        .map(|(i, c)| (c.name.clone(), i))
         .collect()
+}
+
+/// Project one document onto the fixed columns in a single pass over its fields
+/// (absent columns stay `Null`), instead of a per-column lookup.
+pub(super) fn project_row(
+    doc: &Document,
+    index: &HashMap<String, usize>,
+    width: usize,
+) -> Vec<QueryValue> {
+    let mut row = vec![QueryValue::Null; width];
+    for (k, v) in doc {
+        if let Some(&i) = index.get(k.as_str()) {
+            row[i] = bson_to_value(v);
+        }
+    }
+    row
 }
 
 /// Build a `QueryResult` from MongoDB documents. Top-level fields become
@@ -48,8 +67,9 @@ pub fn tabularize(docs: &[Document]) -> QueryResult {
         accumulate_columns(&mut columns, doc);
     }
     let columns = finalize_columns(columns);
-    let order: Vec<String> = columns.iter().map(|c| c.name.clone()).collect();
-    let rows = docs.iter().map(|doc| row_from_doc(doc, &order)).collect();
+    let index = column_index(&columns);
+    let width = columns.len();
+    let rows = docs.iter().map(|doc| project_row(doc, &index, width)).collect();
 
     QueryResult {
         columns,
@@ -111,6 +131,86 @@ pub fn bson_to_value(v: &Bson) -> QueryValue {
         Bson::MinKey => QueryValue::Text("MinKey".into()),
         Bson::DbPointer(_) => QueryValue::Text("DBPointer".into()),
     }
+}
+
+// ── raw BSON (streaming) ────────────────────────────────────────────────────
+// Streaming fetches `RawDocumentBuf` and converts field refs straight to
+// `QueryValue`, skipping the ~4x-costlier `Document` (per-field String/Bson) alloc.
+
+fn raw_type_hint(v: RawBsonRef) -> &'static str {
+    match v {
+        RawBsonRef::Double(_) => "double",
+        RawBsonRef::String(_) => "string",
+        RawBsonRef::Array(_) => "array",
+        RawBsonRef::Document(_) => "object",
+        RawBsonRef::Boolean(_) => "bool",
+        RawBsonRef::Null => "null",
+        RawBsonRef::RegularExpression(_) => "regex",
+        RawBsonRef::JavaScriptCode(_) | RawBsonRef::JavaScriptCodeWithScope(_) => "javascript",
+        RawBsonRef::Int32(_) => "int32",
+        RawBsonRef::Int64(_) => "int64",
+        RawBsonRef::Timestamp(_) => "timestamp",
+        RawBsonRef::Binary(_) => "binary",
+        RawBsonRef::ObjectId(_) => "ObjectId",
+        RawBsonRef::DateTime(_) => "date",
+        RawBsonRef::Symbol(_) => "symbol",
+        RawBsonRef::Decimal128(_) => "decimal",
+        RawBsonRef::Undefined => "undefined",
+        RawBsonRef::MaxKey => "maxKey",
+        RawBsonRef::MinKey => "minKey",
+        RawBsonRef::DbPointer(_) => "dbPointer",
+    }
+}
+
+fn raw_to_value(v: RawBsonRef) -> QueryValue {
+    match v {
+        RawBsonRef::Null | RawBsonRef::Undefined => QueryValue::Null,
+        RawBsonRef::Boolean(b) => QueryValue::Bool(b),
+        RawBsonRef::Int32(n) => QueryValue::Int(i64::from(n)),
+        RawBsonRef::Int64(n) => QueryValue::Int(n),
+        RawBsonRef::Double(f) => QueryValue::Double(f),
+        RawBsonRef::String(s) => QueryValue::Text(s.to_owned()),
+        RawBsonRef::ObjectId(oid) => QueryValue::Text(oid.to_hex()),
+        RawBsonRef::DateTime(dt) => {
+            QueryValue::Text(dt.try_to_rfc3339_string().unwrap_or_else(|_| dt.to_string()))
+        }
+        RawBsonRef::Binary(b) => QueryValue::Data(b.bytes.to_vec()),
+        RawBsonRef::Decimal128(d) => QueryValue::Text(d.to_string()),
+        RawBsonRef::Symbol(s) => QueryValue::Text(s.to_owned()),
+        RawBsonRef::JavaScriptCode(c) => QueryValue::Text(c.to_owned()),
+        RawBsonRef::Timestamp(t) => QueryValue::Text(format!("Timestamp({}, {})", t.time, t.increment)),
+        RawBsonRef::MaxKey => QueryValue::Text("MaxKey".into()),
+        RawBsonRef::MinKey => QueryValue::Text("MinKey".into()),
+        // Nested docs/arrays/regex/etc. are rare: own them and reuse the Bson path.
+        other => Bson::try_from(other).map_or(QueryValue::Null, |b| bson_to_value(&b)),
+    }
+}
+
+/// Fold a raw document's top-level fields into the running column union
+/// (malformed fields skipped). Raw counterpart of [`accumulate_columns`].
+pub(super) fn accumulate_columns_raw(columns: &mut IndexMap<String, ColumnSpec>, doc: &RawDocument) {
+    for (k, v) in doc.iter().flatten() {
+        let k = k.as_str();
+        columns
+            .entry(k.to_owned())
+            .or_insert_with(|| ColumnSpec::new(k, raw_type_hint(v)));
+    }
+}
+
+/// Project a raw document onto the fixed columns in one pass. Raw counterpart of
+/// [`project_row`].
+pub(super) fn project_row_raw(
+    doc: &RawDocument,
+    index: &HashMap<String, usize>,
+    width: usize,
+) -> Vec<QueryValue> {
+    let mut row = vec![QueryValue::Null; width];
+    for (k, v) in doc.iter().flatten() {
+        if let Some(&i) = index.get(k.as_str()) {
+            row[i] = raw_to_value(v);
+        }
+    }
+    row
 }
 
 #[cfg(test)]
@@ -181,9 +281,14 @@ mod tests {
     }
 
     #[test]
-    fn row_from_doc_projects_onto_order_with_nulls() {
-        let order = vec!["_id".to_owned(), "a".to_owned(), "b".to_owned()];
-        let row = row_from_doc(&doc! { "_id": 1, "b": 5 }, &order);
+    fn project_row_places_fields_by_index_with_nulls() {
+        let cols = vec![
+            ColumnSpec::new("_id", "ObjectId"),
+            ColumnSpec::new("a", "int32"),
+            ColumnSpec::new("b", "int32"),
+        ];
+        let index = column_index(&cols);
+        let row = project_row(&doc! { "_id": 1, "b": 5 }, &index, cols.len());
         assert_eq!(row, vec![QueryValue::Int(1), QueryValue::Null, QueryValue::Int(5)]);
     }
 
