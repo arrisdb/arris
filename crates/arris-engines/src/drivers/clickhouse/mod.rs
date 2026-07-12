@@ -15,6 +15,7 @@
 //! - Staged edits map to ClickHouse mutations: `INSERT`, and `ALTER TABLE …
 //!   UPDATE/DELETE … SETTINGS mutations_sync = 2` so they complete synchronously.
 
+mod constants;
 mod explain;
 mod query;
 mod values;
@@ -29,8 +30,8 @@ use crate::drivers::sql_builder::SqlBuilder;
 use crate::drivers::DatabaseDriver;
 use crate::{
     ConnectionConfig, DriverError, ExplainMode, MutationResult, PlanResult, QueryLanguage,
-    QueryResult, QueryValue, RowDelete, RowInsert, SchemaNode, SchemaNodeKind, TableRef,
-    ValueMap,
+    QueryResult, QueryStream, QueryValue, RowDelete, RowInsert, SchemaNode, SchemaNodeKind,
+    TableRef, ValueMap,
 };
 
 use explain::walk_explain;
@@ -282,6 +283,23 @@ impl DatabaseDriver for ClickhouseDriver {
                 ..Default::default()
             })
         }
+    }
+
+    async fn run_query_stream(
+        &self,
+        text: &str,
+        params: &[QueryValue],
+        language: QueryLanguage,
+    ) -> Result<QueryStream> {
+        // HTTP is stateless (no manual transaction to fence), so only SELECT-shape
+        // statements stream; everything else has no rows and materializes.
+        if !self.looks_like_select(text) {
+            return Ok(QueryStream::from_materialized(
+                self.run_query(text, params, language).await?,
+            ));
+        }
+        let client = self.client().await?;
+        Ok(QueryStream::Rows(query::stream_select(&client, text).await?))
     }
 
     async fn explain_query(
