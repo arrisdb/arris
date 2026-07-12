@@ -333,24 +333,16 @@ fn stream_poll_blocking(
     }
 }
 
-/// Stream a plain projection: resolve columns up front (registry / explicit) or
-/// sample the first chunk to fix them, then hand the rest to `RowChunkPump`.
-pub(super) async fn stream_query(
-    cc: ClientConfig,
-    query: KafkaQuery,
-    registry: Option<SchemaRegistryClient>,
+/// Fix columns (up front, or by sampling the first chunk of `rows`) then hand
+/// the sampled rows plus the rest of the stream to `RowChunkPump`.
+async fn assemble_stream(
+    upfront: Option<Vec<ColumnSpec>>,
+    rows: futures::stream::BoxStream<'static, Result<serde_json::Value>>,
 ) -> Result<RowChunkStream> {
-    let upfront = columns_upfront(&query, registry.as_ref()).await;
-
-    let (row_tx, row_rx) = mpsc::channel::<Result<serde_json::Value>>(STREAM_ROW_CHANNEL_CAPACITY);
-    let poll_query = query.clone();
-    tokio::task::spawn_blocking(move || stream_poll_blocking(cc, poll_query, row_tx));
-
-    let mut rows = stream::unfold(row_rx, |mut rx| async move {
-        rx.recv().await.map(|item| (item, rx))
-    })
-    .boxed();
-
+    // Fuse: sampling may drain the stream to its terminal `None`, and the
+    // `chain` below re-polls it afterwards. An unfused mpsc-backed stream panics
+    // on that post-`None` poll (returns nothing for a sub-chunk result).
+    let mut rows = rows.fuse();
     let (columns, first): (Vec<ColumnSpec>, Vec<serde_json::Value>) = match upfront {
         Some(cols) => (cols, Vec::new()),
         None => {
@@ -373,6 +365,27 @@ pub(super) async fn stream_query(
         move || async move { Ok::<_, DriverError>(combined) },
         move |row: serde_json::Value| project_row(&row, &map_cols),
     ))
+}
+
+/// Stream a plain projection: resolve columns up front (registry / explicit) or
+/// sample the first chunk to fix them, then hand the rest to `RowChunkPump`.
+pub(super) async fn stream_query(
+    cc: ClientConfig,
+    query: KafkaQuery,
+    registry: Option<SchemaRegistryClient>,
+) -> Result<RowChunkStream> {
+    let upfront = columns_upfront(&query, registry.as_ref()).await;
+
+    let (row_tx, row_rx) = mpsc::channel::<Result<serde_json::Value>>(STREAM_ROW_CHANNEL_CAPACITY);
+    let poll_query = query.clone();
+    tokio::task::spawn_blocking(move || stream_poll_blocking(cc, poll_query, row_tx));
+
+    let rows = stream::unfold(row_rx, |mut rx| async move {
+        rx.recv().await.map(|item| (item, rx))
+    })
+    .boxed();
+
+    assemble_stream(upfront, rows).await
 }
 
 // ── projection / aggregation ────────────────────────────────────────────────
@@ -638,6 +651,34 @@ mod tests {
     #[tokio::test]
     async fn columns_upfront_none_for_select_star_without_registry() {
         assert!(columns_upfront(&query_all("t"), None).await.is_none());
+    }
+
+    async fn assembled_row_count(n: usize) -> usize {
+        // `unfold` (like the real mpsc-backed stream) panics if re-polled after
+        // `None`, so this catches a missing fuse; `stream::iter` would not.
+        let rows = stream::unfold(0usize, move |i| async move {
+            (i < n).then(|| (Ok(serde_json::json!({ "n": i })), i + 1))
+        })
+        .boxed();
+        let rs = assemble_stream(None, rows).await.unwrap();
+        let mut chunks = rs.chunks;
+        let mut total = 0usize;
+        while let Some(item) = chunks.next().await {
+            total += item.unwrap().len();
+        }
+        total
+    }
+
+    #[tokio::test]
+    async fn assemble_emits_all_rows_below_chunk_size() {
+        // Stream ends during sampling (n < STREAM_CHUNK_ROWS): every row must
+        // still reach the output. Regression: LIMIT 1000 returned nothing.
+        assert_eq!(assembled_row_count(1000).await, 1000);
+    }
+
+    #[tokio::test]
+    async fn assemble_emits_all_rows_above_chunk_size() {
+        assert_eq!(assembled_row_count(STREAM_CHUNK_ROWS + 1808).await, STREAM_CHUNK_ROWS + 1808);
     }
 
     #[test]
