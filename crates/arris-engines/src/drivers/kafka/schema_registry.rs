@@ -2,6 +2,7 @@ use anyhow::{Context, Result};
 use crate::{ColumnSpec, SchemaNode, SchemaNodeKind};
 use serde::Deserialize;
 
+#[derive(Clone)]
 pub struct SchemaRegistryClient {
     base_url: String,
     client: reqwest::Client,
@@ -149,6 +150,25 @@ pub fn columns_from_json_sample(sample: &serde_json::Value) -> Vec<ColumnSpec> {
             .collect(),
         _ => vec![fallback_value_column()],
     }
+}
+
+/// Column union over sampled rows: first-seen field order, and a null hint gets
+/// upgraded to the first concrete type seen for that field.
+pub fn columns_from_rows(rows: &[serde_json::Value]) -> Vec<ColumnSpec> {
+    let mut union: indexmap::IndexMap<String, ColumnSpec> = indexmap::IndexMap::new();
+    for row in rows {
+        for col in columns_from_json_sample(row) {
+            union
+                .entry(col.name.clone())
+                .and_modify(|existing| {
+                    if existing.type_hint == "null" && col.type_hint != "null" {
+                        existing.type_hint = col.type_hint.clone();
+                    }
+                })
+                .or_insert(col);
+        }
+    }
+    union.into_values().collect()
 }
 
 fn json_value_type(val: &serde_json::Value) -> String {

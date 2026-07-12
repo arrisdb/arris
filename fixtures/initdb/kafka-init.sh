@@ -4,6 +4,9 @@ set -e
 BROKER="kafka:19092"
 SCHEMA_REGISTRY="http://schema-registry:8081"
 
+# Row count for the large streaming-test topic (events_large).
+LARGE_EVENTS_COUNT=10000000
+
 # =================================================================
 # Canonical sample dataset — one topic per table, JSON records.
 # Same keys / rows as every other engine so cross-source joins line up.
@@ -182,9 +185,31 @@ for i in $(seq 1 100); do
   echo "{\"id\":$i,\"customer_id\":$customer_id,\"action\":\"$action\",\"ip\":\"10.0.$((RANDOM % 256)).$((RANDOM % 256))\"}"
 done | kafka-console-producer --bootstrap-server $BROKER --topic audit-log
 
+echo "=== Producing large events topic ($LARGE_EVENTS_COUNT records) ==="
+kafka-topics --bootstrap-server $BROKER --create --if-not-exists --topic events_large --partitions 12 --replication-factor 1
+# Skip re-producing on restart if the topic already holds the full dataset.
+EXISTING=$(kafka-run-class kafka.tools.GetOffsetShell --broker-list $BROKER --topic events_large --time -1 2>/dev/null | awk -F: '{s+=$3} END{print s+0}')
+if [ "$EXISTING" -ge "$LARGE_EVENTS_COUNT" ]; then
+  echo "events_large already has $EXISTING records, skipping"
+else
+  awk -v n="$LARGE_EVENTS_COUNT" 'BEGIN{
+    srand(42);
+    split("page_view,click,scroll,form_submit,search,add_to_cart,purchase,logout",et,",");
+    split("/home,/products,/product/123,/cart,/checkout,/account,/search,/about",pg,",");
+    for(i=1;i<=n;i++){
+      c=1+int(rand()*12); e=et[1+int(rand()*8)]; p=pg[1+int(rand()*8)];
+      d=50+int(rand()*10000); mo=1+int(rand()*12); da=1+int(rand()*28);
+      printf "{\"event_id\":%d,\"customer_id\":%d,\"event_type\":\"%s\",\"page\":\"%s\",\"duration_ms\":%d,\"timestamp\":\"2025-%02d-%02dT%02d:%02d:%02dZ\"}\n", i,c,e,p,d,mo,da,int(rand()*24),int(rand()*60),int(rand()*60);
+    }
+  }' | kafka-console-producer --bootstrap-server $BROKER --topic events_large \
+      --producer-property compression.type=lz4 \
+      --producer-property batch.size=1000000 \
+      --producer-property linger.ms=100
+fi
+
 echo "=== Registering consumer groups ==="
 timeout 10 kafka-console-consumer --bootstrap-server $BROKER --topic orders --group order-processing-svc --from-beginning --max-messages 5 > /dev/null 2>&1 || true
 timeout 10 kafka-console-consumer --bootstrap-server $BROKER --topic events --group analytics-pipeline --from-beginning --max-messages 5 > /dev/null 2>&1 || true
 timeout 10 kafka-console-consumer --bootstrap-server $BROKER --topic notifications --group notification-sender --from-beginning --max-messages 5 > /dev/null 2>&1 || true
 
-echo "=== Kafka init complete: 7 topics, 3 consumer groups ==="
+echo "=== Kafka init complete: 8 topics, 3 consumer groups ==="
