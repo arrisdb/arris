@@ -1,8 +1,16 @@
+use std::collections::VecDeque;
+
+use futures_util::stream;
 use indexmap::IndexMap;
 use percent_encoding::{NON_ALPHANUMERIC, utf8_percent_encode};
+use reqwest::Client;
 use serde_json::Value;
 
-use crate::QueryValue;
+use crate::drivers::common::RowChunkPump;
+use crate::drivers::errors::{DriverError, Result};
+use crate::{ColumnSpec, QueryValue, RowChunkStream};
+
+use super::constants::ES_SQL_FETCH_SIZE;
 
 pub(super) struct ParsedRequest {
     pub(super) method: String,
@@ -96,4 +104,136 @@ pub(super) fn query_value_to_json(v: &QueryValue) -> Value {
 
 pub(super) fn encode_path_part(value: &str) -> String {
     utf8_percent_encode(value, NON_ALPHANUMERIC).to_string()
+}
+
+/// POST a `_sql` payload (first page or cursor continuation) and return the
+/// parsed body, surfacing Elasticsearch's structured error on a non-2xx status.
+pub(super) async fn post_sql_page(
+    client: &Client,
+    sql_url: &str,
+    payload: &Value,
+) -> Result<Value> {
+    let resp = client
+        .post(sql_url)
+        .header("content-type", "application/json")
+        .body(payload.to_string())
+        .send()
+        .await
+        .map_err(|e| DriverError::QueryFailed(e.to_string()))?;
+
+    let status = resp.status();
+    let body: Value = resp
+        .json()
+        .await
+        .map_err(|e| DriverError::QueryFailed(e.to_string()))?;
+
+    if !status.is_success() {
+        let err_msg = body["error"]["reason"]
+            .as_str()
+            .or_else(|| body["error"]["root_cause"][0]["reason"].as_str())
+            .or_else(|| body["error"].as_str())
+            .unwrap_or("Unknown error");
+        return Err(DriverError::QueryFailed(format!("HTTP {status}: {err_msg}")));
+    }
+    Ok(body)
+}
+
+/// The initial `_sql` request body: the query plus the cursor page size.
+pub(super) fn sql_first_payload(sql: &str) -> Value {
+    serde_json::json!({
+        "query": sql.trim().trim_end_matches(';'),
+        "fetch_size": ES_SQL_FETCH_SIZE,
+    })
+}
+
+pub(super) fn sql_columns(body: &Value) -> Vec<ColumnSpec> {
+    body["columns"]
+        .as_array()
+        .map(|cols| {
+            cols.iter()
+                .map(|c| {
+                    ColumnSpec::new(
+                        c["name"].as_str().unwrap_or("?"),
+                        c["type"].as_str().unwrap_or("dynamic"),
+                    )
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+pub(super) fn sql_rows(body: &Value) -> Vec<Vec<QueryValue>> {
+    body["rows"]
+        .as_array()
+        .map(|rs| {
+            rs.iter()
+                .map(|row| {
+                    row.as_array()
+                        .map(|cells| cells.iter().map(es_value_to_query).collect())
+                        .unwrap_or_default()
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// The pagination cursor, present until the final page.
+pub(super) fn sql_cursor(body: &Value) -> Option<String> {
+    body["cursor"]
+        .as_str()
+        .filter(|c| !c.is_empty())
+        .map(ToOwned::to_owned)
+}
+
+/// State threaded through the cursor unfold: buffered rows of the current page
+/// plus the token for the next page (`None` once exhausted or on error).
+struct SqlCursor {
+    client: Client,
+    sql_url: String,
+    pending: VecDeque<Vec<QueryValue>>,
+    cursor: Option<String>,
+}
+
+/// Stream a SQL SELECT via the `_sql` cursor: the first page carries the column
+/// metadata and first rows, then each cursor round trip yields the next page,
+/// pumped onto a chunked, backpressured stream. Column types are declared by ES,
+/// so no sampling is needed.
+pub(super) async fn stream_sql(
+    client: Client,
+    base_url: String,
+    sql: &str,
+) -> Result<RowChunkStream> {
+    let sql_url = format!("{base_url}/_sql");
+    let first = post_sql_page(&client, &sql_url, &sql_first_payload(sql)).await?;
+    let columns = sql_columns(&first);
+    let state = SqlCursor {
+        client,
+        sql_url,
+        pending: sql_rows(&first).into(),
+        cursor: sql_cursor(&first),
+    };
+
+    let rows = stream::unfold(state, |mut s| async move {
+        loop {
+            if let Some(row) = s.pending.pop_front() {
+                return Some((Ok(row), s));
+            }
+            let cursor = s.cursor.take()?;
+            match post_sql_page(&s.client, &s.sql_url, &serde_json::json!({ "cursor": cursor })).await
+            {
+                Ok(body) => {
+                    s.pending = sql_rows(&body).into();
+                    s.cursor = sql_cursor(&body);
+                }
+                // cursor is now None and pending empty, so the next poll ends the stream.
+                Err(e) => return Some((Err(e), s)),
+            }
+        }
+    });
+
+    Ok(RowChunkPump::spawn(
+        columns,
+        move || async move { Ok(rows) },
+        |row| row,
+    ))
 }
