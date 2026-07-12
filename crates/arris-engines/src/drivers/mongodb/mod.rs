@@ -36,7 +36,7 @@ use mongodb::Client;
 
 use crate::{
     ConnectionConfig, DriverError, ExplainMode, MutationResult,
-    QueryLanguage, QueryResult, QueryValue, RowDelete, RowInsert, SchemaNode,
+    QueryLanguage, QueryResult, QueryStream, QueryValue, RowDelete, RowInsert, SchemaNode,
     SchemaNodeKind, TableRef,
 };
 use crate::drivers::errors::Result;
@@ -46,7 +46,7 @@ use mutation::{changes_to_set_doc, insert_doc_from, primary_key_filter};
 use parser::Verb;
 use query::{
     build_explain_command, execute_aggregate, execute_count, execute_delete, execute_find,
-    execute_insert, execute_update, parse_request,
+    execute_insert, execute_update, parse_request, stream_find,
 };
 use schema::{collection_detail, collection_node_kind, fields_from_docs, index_nodes};
 
@@ -173,6 +173,28 @@ impl DatabaseDriver for MongoDriver {
         let started = Instant::now();
         self.dispatch_request(request, || started.elapsed().as_secs_f64())
             .await
+    }
+
+    async fn run_query_stream(
+        &self,
+        text: &str,
+        params: &[QueryValue],
+        language: QueryLanguage,
+    ) -> Result<QueryStream> {
+        let request = parse_request(text, language)?;
+        // Only many-document `find` streams; find-one, aggregate, count, and
+        // writes are bounded or single-doc, so the materialized path is fine.
+        if !matches!(request.verb, Verb::Find) {
+            return Ok(QueryStream::from_materialized(
+                self.run_query(text, params, language).await?,
+            ));
+        }
+        let (client, default_db) = self.state().await?;
+        let db_name = request.database.as_deref().unwrap_or(&default_db);
+        let coll = client
+            .database(db_name)
+            .collection::<Document>(&request.collection);
+        Ok(QueryStream::Rows(stream_find(coll, &request).await?))
     }
 
     async fn explain_query(

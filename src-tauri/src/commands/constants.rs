@@ -13,3 +13,7 @@ pub const CANVAS_RUN_CANCELLED_MESSAGE: &str = "Query cancelled";
 /// Tauri event carrying a canvas cell's full-ingest totals once the background
 /// drain finishes (the UI page was already returned synchronously).
 pub const CANVAS_CELL_INGESTED_EVENT: &str = "canvas://cell-ingested";
+
+/// A canvas cell beginning with this is a native Mongo shell statement
+/// (`db.<coll>.<verb>(...)`); no SQL frontend parses it. Everything else is SQL.
+pub const MONGO_SHELL_STMT_PREFIX: &str = "db.";

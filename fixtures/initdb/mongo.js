@@ -169,4 +169,33 @@ db.sales_transactions.createIndex({ sale_date: 1 });
 db.sales_transactions.createIndex({ region: 1 });
 db.sales_transactions.createIndex({ category: 1 });
 
+// -----------------------------------------------------------------
+// events_10m (10M documents) - streaming-ingest perf testing.
+// Schema matches the mysql/starrocks/clickhouse `events_10m` fixture.
+// -----------------------------------------------------------------
+const eventTypes = ["view", "click", "purchase", "signup", "logout", "share"];
+const devices    = ["ios", "android", "web", "desktop"];
+const countries  = ["US", "UK", "Canada", "Germany", "France", "Japan", "Australia", "Brazil", "India", "Mexico"];
+
+const EVENTS_TOTAL = 10000000;
+const EVENTS_BASE_DATE = new Date("2024-01-01").getTime();
+const YEAR_MS = 31536000000;
+
+for (let start = 0; start < EVENTS_TOTAL; start += BATCH) {
+  const batch = [];
+  for (let j = 0; j < BATCH; j++) {
+    const i = start + j;
+    batch.push({
+      _id:        i + 1,
+      user_id:    (Math.floor(Math.random() * 1000000)) + 1,
+      event_type: eventTypes[Math.floor(Math.random() * eventTypes.length)],
+      event_time: new Date(EVENTS_BASE_DATE + Math.floor(Math.random() * YEAR_MS)),
+      device:     devices[Math.floor(Math.random() * devices.length)],
+      country:    countries[Math.floor(Math.random() * countries.length)],
+      amount:     round2(Math.random() * 1000),
+    });
+  }
+  db.events_10m.insertMany(batch, { ordered: false });
+}
+
 print("MongoDB sample data seeded: appdb");
