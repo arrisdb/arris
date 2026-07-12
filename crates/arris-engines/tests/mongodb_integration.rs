@@ -974,3 +974,198 @@ async fn sql_dml_errors_surface_cleanly() {
         );
     }
 }
+
+// ── streaming ingestion (canvas cell path) ──────────────────────────────────
+// MongoDB is the first schemaless streaming source. `run_query_stream` on a
+// many-document `find` uses a two-pass scan: pass 1 accumulates the full column
+// union (guaranteed completeness), pass 2 streams rows onto those columns. These
+// tests drive the same `CanvasEngine::ingest_cell_stream` path the app uses.
+
+mod streaming_scenario;
+use streaming_scenario::BOARD;
+
+use arris_engines::{
+    CanvasEngine, CanvasError, QueryEngine, CELL_INGEST_BYTE_BUDGET, CELL_RESULT_PAGE_ROWS,
+};
+use tokio_util::sync::CancellationToken;
+
+fn canvas_engine() -> CanvasEngine {
+    streaming_scenario::canvas_engine("mongodb")
+}
+
+/// Insert `count` docs `{n, label}` into `testdb.src` via the raw client, in
+/// bounded batches (Mongo has no server-side row generator).
+async fn seed_src(client: &Client, count: i64) {
+    let coll = client.database(DB).collection::<Document>("src");
+    let batch: i64 = 10_000;
+    let mut start = 1;
+    while start <= count {
+        let end = (start + batch - 1).min(count);
+        let docs: Vec<Document> = (start..=end)
+            .map(|n| doc! { "n": n, "label": format!("row-{n}") })
+            .collect();
+        coll.insert_many(docs).await.expect("seed insert");
+        start = end + 1;
+    }
+}
+
+#[tokio::test]
+async fn streaming_ingests_100k_docs_with_exact_totals_and_page() {
+    let (_c, driver, client) = start_mongo().await;
+    seed_src(&client, 100_000).await;
+    let engine = canvas_engine();
+
+    let stream = driver
+        .run_query_stream(r#"db.src.find({}).sort({"n":1})"#, &[], QueryLanguage::Native)
+        .await
+        .expect("open stream");
+    let out = engine
+        .ingest_cell_stream(BOARD, "big", stream, None, CELL_INGEST_BYTE_BUDGET, None)
+        .await
+        .expect("ingest stream");
+
+    assert_eq!(out.total_rows, 100_000);
+    assert!(out.complete);
+    assert_eq!(out.result.rows.len(), CELL_RESULT_PAGE_ROWS);
+    let names: Vec<&str> = out.result.columns.iter().map(|c| c.name.as_str()).collect();
+    assert_eq!(names, vec!["_id", "n", "label"]);
+    assert_eq!(out.result.rows[0][1], QueryValue::Int(1));
+    assert_eq!(out.result.rows[0][2], QueryValue::Text("row-1".into()));
+    assert_eq!(out.result.rows[499][1], QueryValue::Int(500));
+
+    // A chained cell aggregates the FULL cached result, not the 500-row page.
+    let agg = engine
+        .run_cell(BOARD, "sums", "SELECT COUNT(*) AS c, SUM(n) AS s FROM big")
+        .await
+        .expect("chained aggregate");
+    assert_eq!(agg.result.rows[0][0], QueryValue::Int(100_000));
+    assert_eq!(agg.result.rows[0][1], QueryValue::Int(5_000_050_000));
+}
+
+#[tokio::test]
+async fn streaming_columns_are_complete_beyond_the_first_page() {
+    // The completeness guarantee: a field present only on a document past the
+    // 500-row page still earns a column, because pass 1 scans the whole result.
+    let (_c, driver, client) = start_mongo().await;
+    let coll = client.database(DB).collection::<Document>("src");
+    let head: Vec<Document> = (1..=500).map(|n| doc! { "a": n }).collect();
+    coll.insert_many(head).await.expect("seed head");
+    coll.insert_one(doc! { "a": 501_i64, "late": "surfaced" })
+        .await
+        .expect("seed tail");
+    let engine = canvas_engine();
+
+    let stream = driver
+        .run_query_stream(r#"db.src.find({}).sort({"a":1})"#, &[], QueryLanguage::Native)
+        .await
+        .expect("open stream");
+    let out = engine
+        .ingest_cell_stream(BOARD, "wide", stream, None, CELL_INGEST_BYTE_BUDGET, None)
+        .await
+        .expect("ingest stream");
+
+    assert_eq!(out.total_rows, 501);
+    assert!(out.complete);
+    assert_eq!(out.result.rows.len(), CELL_RESULT_PAGE_ROWS);
+    let names: Vec<&str> = out.result.columns.iter().map(|c| c.name.as_str()).collect();
+    assert!(names.contains(&"late"), "late field must have a column: {names:?}");
+
+    // The page never shows `late` (it's on row 501), yet the cache holds it.
+    let agg = engine
+        .run_cell(BOARD, "late_row", "SELECT late FROM wide WHERE late IS NOT NULL")
+        .await
+        .expect("chained select");
+    assert_eq!(agg.result.rows.len(), 1);
+    assert_eq!(agg.result.rows[0][0], QueryValue::Text("surfaced".into()));
+}
+
+#[tokio::test]
+async fn streaming_cancel_registers_no_cache_entry() {
+    let (_c, driver, client) = start_mongo().await;
+    seed_src(&client, 5_000).await;
+    let engine = canvas_engine();
+
+    let stream = driver
+        .run_query_stream(r#"db.src.find({})"#, &[], QueryLanguage::Native)
+        .await
+        .expect("open stream");
+
+    // A pre-cancelled token exercises the abort path deterministically.
+    let token = CancellationToken::new();
+    token.cancel();
+
+    let err = engine
+        .ingest_cell_stream(BOARD, "huge", stream, Some(&token), CELL_INGEST_BYTE_BUDGET, None)
+        .await
+        .expect_err("cancel must fail the ingest");
+    assert!(matches!(err, CanvasError::Cancelled), "got {err:?}");
+
+    // The aborted cell was never registered, so downstream cannot read it.
+    let chained = engine.run_cell(BOARD, "agg", "SELECT COUNT(*) FROM huge").await;
+    assert!(chained.is_err(), "cancelled cell must not be queryable");
+
+    // The driver is healthy for new queries after the aborted stream drops.
+    let r = driver
+        .run_query(r#"db.src.countDocuments({})"#, &[], QueryLanguage::Native)
+        .await
+        .expect("query after cancel");
+    assert_eq!(r.rows[0][0], QueryValue::Int(5_000));
+}
+
+#[tokio::test]
+async fn streaming_byte_budget_truncates_and_reports_incomplete() {
+    let (_c, driver, client) = start_mongo().await;
+    seed_src(&client, 100_000).await;
+    let engine = canvas_engine();
+
+    let stream = driver
+        .run_query_stream(r#"db.src.find({}).sort({"n":1})"#, &[], QueryLanguage::Native)
+        .await
+        .expect("open stream");
+    // A ~1 MiB budget admits a few chunks, then stops.
+    let out = engine
+        .ingest_cell_stream(BOARD, "capped", stream, None, 1 << 20, None)
+        .await
+        .expect("ingest stream");
+
+    assert!(!out.complete, "budget stop must be surfaced, never silent");
+    assert!(out.total_rows >= CELL_RESULT_PAGE_ROWS as u64);
+    assert!(out.total_rows < 100_000, "budget must truncate the run");
+    assert_eq!(out.result.rows.len(), CELL_RESULT_PAGE_ROWS);
+
+    let agg = engine
+        .run_cell(BOARD, "agg", "SELECT COUNT(*) AS c FROM capped")
+        .await
+        .expect("chained count");
+    assert_eq!(agg.result.rows[0][0], QueryValue::Int(out.total_rows as i64));
+}
+
+#[tokio::test]
+async fn streaming_cell_limit_caps_to_500() {
+    let (_c, driver, client) = start_mongo().await;
+    seed_src(&client, 10_000).await;
+    let engine = canvas_engine();
+
+    // Mongo has no SQL LIMIT wrap (PaginationStrategy::None), so the per-cell
+    // limit becomes an ingest-side row cap and the query text is untouched.
+    let (sql, row_cap) = QueryEngine::apply_cell_limit(
+        r#"db.src.find({}).sort({"n":1})"#,
+        &driver.pagination_strategy(),
+        Some(500),
+    );
+    assert_eq!(sql, r#"db.src.find({}).sort({"n":1})"#);
+    assert_eq!(row_cap, Some(500));
+
+    let stream = driver
+        .run_query_stream(&sql, &[], QueryLanguage::Native)
+        .await
+        .expect("open stream");
+    let out = engine
+        .ingest_cell_stream(BOARD, "lim", stream, None, 1 << 30, row_cap)
+        .await
+        .expect("ingest stream");
+
+    assert_eq!(out.total_rows, 500);
+    assert!(out.complete, "a row-capped run is a complete result");
+    assert_eq!(out.result.rows.len(), 500);
+}
