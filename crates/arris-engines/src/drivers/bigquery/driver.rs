@@ -13,8 +13,8 @@ use crate::drivers::sql_builder::SqlBuilder;
 use crate::drivers::DatabaseDriver;
 use crate::{
     ConnectionConfig, DatabaseKind, DriverError, ExplainMode, MutationResult, PlanNode,
-    PlanResult, QueryLanguage, QueryResult, QueryValue, RowDelete, RowInsert, SchemaNode,
-    TableRef, ValueMap,
+    PlanResult, QueryLanguage, QueryResult, QueryStream, QueryValue, RowDelete, RowInsert,
+    SchemaNode, TableRef, ValueMap,
 };
 
 struct ConnState {
@@ -283,6 +283,29 @@ impl DatabaseDriver for BigqueryDriver {
             elapsed: started.elapsed().as_secs_f64(),
             ..Default::default()
         })
+    }
+
+    async fn run_query_stream(
+        &self,
+        text: &str,
+        params: &[QueryValue],
+        language: QueryLanguage,
+    ) -> Result<QueryStream> {
+        // Only SELECT result sets page; DML/DDL is single-shot with an
+        // affected-rows count, so it stays on the materialized path.
+        if !self.looks_like_select(text) {
+            return Ok(QueryStream::from_materialized(
+                self.run_query(text, params, language).await?,
+            ));
+        }
+        let (client, project, location) = {
+            let guard = self.inner.lock().await;
+            let state = guard.as_ref().ok_or(DriverError::NotConnected)?;
+            (state.client.clone(), state.project_id.clone(), state.location.clone())
+        };
+        Ok(QueryStream::Rows(
+            query::stream_query(client, project, location, text.to_owned()).await?,
+        ))
     }
 
     async fn object_definition(&self, object: &crate::ObjectRef) -> Result<String> {
