@@ -52,6 +52,9 @@ __pycache__/
 # Generated SSL test certs for the postgres-ssl compose service
 fixtures/initdb/postgres-ssl/certs/
 
+# Generated embedded-engine fixture databases (see fixtures/embedded-init.sh)
+fixtures/embedded/
+
 # Release artifacts
 release/
 
