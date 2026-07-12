@@ -1,10 +1,8 @@
 import type { AggFn, ChartKind, ChartSpec } from "@shared";
 import { DEFAULT_CHART_MAX_ROWS } from "../constants";
 
-/// The SQL a chart runs over its source cell's FULL cached result, plus whether
-/// that SQL already aggregated. When `aggregated`, the chart feeds the result to
-/// ChartView with its own client-side aggregation turned off (the backend did it);
-/// otherwise the SQL is a bounded sample the client maps/bins as usual.
+/// The SQL a chart runs over its source cell's full cached result; `aggregated`
+/// tells ChartView to skip its own client-side aggregation (the backend did it).
 interface ChartQuery {
   sql: string;
   aggregated: boolean;
@@ -25,9 +23,8 @@ const AGG_SQL: Record<Exclude<AggFn, "none">, string> = {
   count: "COUNT",
 };
 
-/// Quote a column identifier for DataFusion (case-sensitive), doubling any inner
-/// quote. The source table name is left UNQUOTED on purpose: the backend detects
-/// which cached cell to register by scanning the bare identifier after `FROM`.
+/// Quote a column identifier for DataFusion. The source table name stays UNQUOTED:
+/// the backend finds the cached cell by scanning the bare identifier after `FROM`.
 function quoteCol(name: string): string {
   return `"${name.replace(/"/g, '""')}"`;
 }
@@ -43,12 +40,8 @@ function activeAgg(spec: ChartSpec): Exclude<AggFn, "none"> | null {
   return spec.aggregation && spec.aggregation !== "none" ? spec.aggregation : null;
 }
 
-/// Build the SQL a chart uses to read its source cell over the full cached result.
-/// `sourceTitle` must already be sanitized (it is the bare table identifier the
-/// backend resolves to the cached cell). `maxRows` caps how many rows the chart
-/// draws (the top groups for an aggregation, the first points for a raw chart);
-/// unset falls back to `DEFAULT_CHART_MAX_ROWS`. Returns `null` when the spec has
-/// nothing to plot yet (no measure, or no columns at all).
+/// Build a chart's SQL over its source cell (`sourceTitle` pre-sanitized); `maxRows`
+/// caps drawn rows (default `DEFAULT_CHART_MAX_ROWS`). `null` when nothing to plot.
 function buildChartQuery(
   spec: ChartSpec,
   sourceTitle: string,

@@ -6,13 +6,9 @@ use datafusion::arrow::record_batch::RecordBatch;
 use super::errors::CanvasError;
 use super::impl_cell_result_cache::CellResultCache;
 use super::impl_spill_writer::SpillWriter;
-use super::types::CellWriteStats;
 
-/// An appendable writer for one cell's streamed result. Batches accumulate in
-/// memory until the cache's memory budget, then spill to an Arrow IPC file
-/// mid-stream; `finish` registers the entry, `abort` discards everything.
-/// A hard byte budget caps ingestion: `append` refuses the batch that would
-/// cross it so the run can stop and report `complete: false`.
+/// Appendable writer for one cell's streamed result: buffers in memory, spills
+/// mid-stream past the memory budget; `append` refuses batches past the byte budget.
 pub struct CellCacheWriter {
     cache: Arc<CellResultCache>,
     key: String,
@@ -75,13 +71,14 @@ impl CellCacheWriter {
         Ok(true)
     }
 
-    /// Close the writer and register the entry in the cache. An empty result
-    /// registers nothing (same as `put` with no batches).
-    pub fn finish(self) -> Result<CellWriteStats, CanvasError> {
-        let stats = CellWriteStats {
-            total_rows: self.rows,
-            total_bytes: self.bytes,
-        };
+    /// Rows accepted so far (refused and empty batches not counted).
+    pub fn rows(&self) -> u64 {
+        self.rows
+    }
+
+    /// Close the writer, register the entry in the cache (an empty result
+    /// registers nothing), and return the total rows written.
+    pub fn finish(self) -> Result<u64, CanvasError> {
         match self.file {
             Some((path, writer)) => {
                 writer.finish()?;
@@ -93,7 +90,7 @@ impl CellCacheWriter {
                 }
             }
         }
-        Ok(stats)
+        Ok(self.rows)
     }
 
     /// Discard everything written so far (the entry was never registered).
@@ -146,12 +143,10 @@ mod tests {
     #[test]
     fn append_and_finish_registers_a_readable_entry() {
         let cache = cache(BIG);
-        let mut w = cache.begin("a");
+        let mut w = cache.begin("a", BIG);
         assert!(w.append(batch(&[1, 2])).unwrap());
         assert!(w.append(batch(&[3])).unwrap());
-        let stats = w.finish().unwrap();
-        assert_eq!(stats.total_rows, 3);
-        assert!(stats.total_bytes > 0);
+        assert_eq!(w.finish().unwrap(), 3);
         assert_eq!(first_col_i64(&cache.get("a").unwrap().unwrap()), vec![1, 2, 3]);
         assert!(!cache.is_on_disk("a"));
     }
@@ -160,11 +155,10 @@ mod tests {
     fn crossing_the_memory_budget_spills_mid_stream() {
         // A 1-byte memory tier forces the spill on the first append.
         let cache = cache(1);
-        let mut w = cache.begin("a");
+        let mut w = cache.begin("a", BIG);
         assert!(w.append(batch(&[1, 2])).unwrap());
         assert!(w.append(batch(&[3, 4])).unwrap());
-        let stats = w.finish().unwrap();
-        assert_eq!(stats.total_rows, 4);
+        assert_eq!(w.finish().unwrap(), 4);
         assert!(cache.is_on_disk("a"), "entry should be registered spilled");
         assert_eq!(
             first_col_i64(&cache.get("a").unwrap().unwrap()),
@@ -176,18 +170,17 @@ mod tests {
     fn byte_budget_refuses_the_overflowing_batch() {
         let cache = cache(BIG);
         let unit = batch(&[1]).get_array_memory_size();
-        let mut w = cache.begin_with_budget("a", unit);
+        let mut w = cache.begin("a", unit);
         assert!(w.append(batch(&[1])).unwrap());
         assert!(!w.append(batch(&[2])).unwrap(), "second batch crosses budget");
-        let stats = w.finish().unwrap();
-        assert_eq!(stats.total_rows, 1, "refused batch is not counted");
+        assert_eq!(w.finish().unwrap(), 1, "refused batch is not counted");
         assert_eq!(first_col_i64(&cache.get("a").unwrap().unwrap()), vec![1]);
     }
 
     #[test]
     fn abort_leaves_no_entry_and_removes_the_spill_file() {
         let cache = cache(1);
-        let mut w = cache.begin("a");
+        let mut w = cache.begin("a", BIG);
         w.append(batch(&[1, 2])).unwrap();
         let spill_path = w.file.as_ref().map(|(p, _)| p.clone()).unwrap();
         assert!(spill_path.exists());
@@ -199,19 +192,17 @@ mod tests {
     #[test]
     fn finishing_with_nothing_written_registers_no_entry() {
         let cache = cache(BIG);
-        let w = cache.begin("a");
-        let stats = w.finish().unwrap();
-        assert_eq!(stats.total_rows, 0);
+        let w = cache.begin("a", BIG);
+        assert_eq!(w.finish().unwrap(), 0);
         assert!(!cache.contains("a"));
     }
 
     #[test]
     fn empty_batches_are_skipped_but_not_counted() {
         let cache = cache(BIG);
-        let mut w = cache.begin("a");
+        let mut w = cache.begin("a", BIG);
         assert!(w.append(batch(&[])).unwrap());
         assert!(w.append(batch(&[7])).unwrap());
-        let stats = w.finish().unwrap();
-        assert_eq!(stats.total_rows, 1);
+        assert_eq!(w.finish().unwrap(), 1);
     }
 }

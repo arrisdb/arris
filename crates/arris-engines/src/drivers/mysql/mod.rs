@@ -22,24 +22,30 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use async_trait::async_trait;
+use futures::StreamExt;
 use mysql_async::prelude::Queryable;
 use mysql_async::{Conn, Opts, Params, Pool, Row, TxOpts};
 use tokio::sync::Mutex;
 
 use crate::{
     ConnectionConfig, DriverError, ExplainMode, MutationResult, PlanAttribute, PlanNode,
-    PlanResult, QueryLanguage, QueryResult, QueryValue, RowDelete, RowInsert, SchemaNode,
-    SchemaNodeKind, TableRef,
+    PlanResult, QueryLanguage, QueryResult, QueryStream, QueryValue, RowDelete, RowInsert,
+    SchemaNode, SchemaNodeKind, TableRef,
 };
 use crate::drivers::errors::Result;
 
 use crate::drivers::DatabaseDriver;
+use crate::drivers::common::RowChunkPump;
 use crate::drivers::sql_builder::SqlBuilder;
+
 
 use config::build_opts;
 use definition::{DefinitionQuery, definition_from_row};
 use explain::walk_mysql_plan;
-use query::{params_to_mysql, rows_first_column_to_string, rows_to_query_result};
+use query::{
+    params_to_mysql, row_to_query_values, rows_first_column_to_string, rows_to_query_result,
+    stmt_columns_to_specs,
+};
 use schema::{
     MysqlColumnRow, MysqlNamedObjectRow, MysqlRoutineRow, MysqlTableRow, build_mysql_schema_tree,
 };
@@ -285,6 +291,57 @@ impl DatabaseDriver for MysqlDriver {
             let mut conn = self.conn().await?;
             Self::run_on_conn(&mut conn, text, params, is_select).await
         }
+    }
+
+    async fn run_query_stream(
+        &self,
+        text: &str,
+        params: &[QueryValue],
+        language: QueryLanguage,
+    ) -> Result<QueryStream> {
+        // Streaming needs its own pooled connection for the stream's life, so an
+        // open manual transaction (pinned conn) and non-SELECTs stay materialized.
+        if !self.looks_like_select(text) || self.in_transaction().await {
+            return Ok(QueryStream::from_materialized(
+                self.run_query(text, params, language).await?,
+            ));
+        }
+        let mut conn = self.conn().await?;
+        // Prepare learns the result columns up front. Some SELECT-shaped forms
+        // (e.g. SHOW) are not preparable: fall back to materializing on this conn.
+        let stmt = match conn.prep(text).await {
+            Ok(stmt) => stmt,
+            Err(_) => {
+                let result = Self::run_on_conn(&mut conn, text, params, true).await?;
+                return Ok(QueryStream::from_materialized(result));
+            }
+        };
+        let columns = stmt_columns_to_specs(stmt.columns());
+        let params = params_to_mysql(params);
+        // async_stream because mysql_async's result stream borrows the conn; the
+        // generator owns conn + stmt across yields, so dropping the stream drops both.
+        let rows = RowChunkPump::spawn(
+            columns,
+            move || async move {
+                let rows = async_stream::try_stream! {
+                    let mut conn = conn;
+                    let mut result = conn
+                        .exec_iter(stmt, params)
+                        .await
+                        .map_err(|e| DriverError::QueryFailed(e.to_string()))?;
+                    while let Some(row) = result
+                        .next()
+                        .await
+                        .map_err(|e| DriverError::QueryFailed(e.to_string()))?
+                    {
+                        yield row;
+                    }
+                };
+                Ok(rows.boxed())
+            },
+            row_to_query_values,
+        );
+        Ok(QueryStream::Rows(rows))
     }
 
     async fn explain_query(

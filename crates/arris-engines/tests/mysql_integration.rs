@@ -18,12 +18,14 @@
 //! - MySQL has no boolean type: comparisons yield `1`/`0` integers.
 
 use arris_engines::{
-    ConnectionConfig, DatabaseDriver, DatabaseKind, ExplainMode, IsolationLevel, ObjectRef,
-    QueryLanguage, QueryResult, QueryValue, SchemaNode, SchemaNodeKind, driver_for_kind,
+    CanvasEngine, CanvasError, ConnectionConfig, DatabaseDriver, DatabaseKind,
+    ExplainMode, IsolationLevel, ObjectRef, QueryEngine, QueryLanguage, QueryResult, QueryValue,
+    SchemaNode, SchemaNodeKind, driver_for_kind, CELL_INGEST_BYTE_BUDGET, CELL_RESULT_PAGE_ROWS,
 };
 use testcontainers_modules::mysql::Mysql;
 use testcontainers_modules::testcontainers::runners::AsyncRunner;
 use testcontainers_modules::testcontainers::{ContainerAsync, ImageExt};
+use tokio_util::sync::CancellationToken;
 
 // ── harness ─────────────────────────────────────────────────────────────────
 
@@ -1077,4 +1079,169 @@ async fn slim_diff_keyless_and_keyed() {
 
     dbt_diff_scenario::assert_keyless(driver.as_ref(), DiffDialect::MySql, prod, new_select).await;
     dbt_diff_scenario::assert_keyed(driver.as_ref(), DiffDialect::MySql, prod, new_select).await;
+}
+
+// ── streaming ingestion (canvas path) ───────────────────────────────────────
+
+mod streaming_scenario;
+use streaming_scenario::BOARD;
+
+fn canvas_engine() -> CanvasEngine {
+    streaming_scenario::canvas_engine("mysql")
+}
+
+/// Seed `src(n INT PK, label VARCHAR)` with rows 1..=count. MySQL has no lazy
+/// `generate_series`, so the rows come from a digit-table cross join (no
+/// recursion, no per-session `cte_max_recursion_depth`). `count` must be a
+/// power of ten.
+async fn seed_numbers(driver: &dyn DatabaseDriver, count: u64) {
+    run(driver, "CREATE TABLE _digits (d INT)").await;
+    run(driver, "INSERT INTO _digits VALUES (0),(1),(2),(3),(4),(5),(6),(7),(8),(9)").await;
+    run(driver, "CREATE TABLE src (n INT PRIMARY KEY, label VARCHAR(32))").await;
+
+    let factors = count.to_string().len() - 1;
+    let seq_expr = (0..factors)
+        .map(|i| format!("t{i}.d * {}", 10u64.pow(i as u32)))
+        .collect::<Vec<_>>()
+        .join(" + ");
+    let from = (0..factors)
+        .map(|i| format!("_digits t{i}"))
+        .collect::<Vec<_>>()
+        .join(" CROSS JOIN ");
+    run(
+        driver,
+        &format!(
+            "INSERT INTO src (n, label) \
+             SELECT seq + 1, CONCAT('row-', seq + 1) FROM (SELECT {seq_expr} AS seq FROM {from}) g"
+        ),
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn streaming_ingests_100k_rows_with_exact_totals_and_page() {
+    let (_container, driver, _host, _port) = start_mysql().await;
+    seed_numbers(driver.as_ref(), 100_000).await;
+    let engine = canvas_engine();
+
+    let stream = driver
+        .run_query_stream("SELECT n, label FROM src ORDER BY n", &[], QueryLanguage::Native)
+        .await
+        .expect("open stream");
+    let out = engine
+        .ingest_cell_stream(BOARD, "big", stream, None, CELL_INGEST_BYTE_BUDGET, None)
+        .await
+        .expect("ingest stream");
+
+    assert_eq!(out.total_rows, 100_000);
+    assert!(out.complete);
+    assert_eq!(out.result.rows.len(), CELL_RESULT_PAGE_ROWS);
+    let names: Vec<&str> = out.result.columns.iter().map(|c| c.name.as_str()).collect();
+    assert_eq!(names, vec!["n", "label"]);
+    assert_eq!(out.result.columns[0].type_hint, "int");
+    assert_eq!(out.result.columns[1].type_hint, "varchar");
+    assert_eq!(out.result.rows[0][0], QueryValue::Int(1));
+    assert_eq!(out.result.rows[0][1], QueryValue::Text("row-1".into()));
+    assert_eq!(out.result.rows[499][0], QueryValue::Int(500));
+
+    // A chained cell aggregates the FULL cached result, not the 500-row page.
+    let agg = engine
+        .run_cell(BOARD, "sums", "SELECT COUNT(*) AS c, SUM(n) AS s FROM big")
+        .await
+        .expect("chained aggregate");
+    assert_eq!(agg.result.rows[0][0], QueryValue::Int(100_000));
+    assert_eq!(agg.result.rows[0][1], QueryValue::Int(5_000_050_000));
+}
+
+#[tokio::test]
+async fn streaming_cancel_mid_stream_registers_no_cache_entry() {
+    let (_container, driver, _host, _port) = start_mysql().await;
+    seed_numbers(driver.as_ref(), 1_000_000).await;
+    let engine = canvas_engine();
+
+    // 1M rows keep the stream running while the cancel fires.
+    let stream = driver
+        .run_query_stream("SELECT n FROM src", &[], QueryLanguage::Native)
+        .await
+        .expect("open stream");
+
+    let token = CancellationToken::new();
+    let canceller = token.clone();
+    tokio::spawn(async move {
+        tokio::time::sleep(std::time::Duration::from_millis(150)).await;
+        canceller.cancel();
+    });
+
+    let err = engine
+        .ingest_cell_stream(BOARD, "huge", stream, Some(&token), CELL_INGEST_BYTE_BUDGET, None)
+        .await
+        .expect_err("cancel must fail the ingest");
+    assert!(matches!(err, CanvasError::Cancelled), "got {err:?}");
+    // Mirror the app's cancel path: the driver-level kill also fires.
+    driver.cancel_running_query().await.expect("mysql cancel request");
+
+    // The aborted cell was never registered, so downstream cannot read it.
+    let chained = engine.run_cell(BOARD, "agg", "SELECT COUNT(*) FROM huge").await;
+    assert!(chained.is_err(), "cancelled cell must not be queryable");
+}
+
+#[tokio::test]
+async fn streaming_byte_budget_truncates_and_reports_incomplete() {
+    let (_container, driver, _host, _port) = start_mysql().await;
+    seed_numbers(driver.as_ref(), 1_000_000).await;
+    let engine = canvas_engine();
+
+    let stream = driver
+        .run_query_stream("SELECT n FROM src ORDER BY n", &[], QueryLanguage::Native)
+        .await
+        .expect("open stream");
+    // A ~1 MiB budget admits a handful of 8k-row chunks, then stops.
+    let out = engine
+        .ingest_cell_stream(BOARD, "capped", stream, None, 1 << 20, None)
+        .await
+        .expect("ingest stream");
+
+    assert!(!out.complete, "budget stop must be surfaced, never silent");
+    assert!(out.total_rows >= CELL_RESULT_PAGE_ROWS as u64);
+    assert!(out.total_rows < 1_000_000, "budget must truncate the run");
+    assert_eq!(out.result.rows.len(), CELL_RESULT_PAGE_ROWS);
+
+    // The cached prefix stays queryable and matches the reported total.
+    let agg = engine
+        .run_cell(BOARD, "agg", "SELECT COUNT(*) AS c FROM capped")
+        .await
+        .expect("chained count");
+    assert_eq!(agg.result.rows[0][0], QueryValue::Int(out.total_rows as i64));
+}
+
+#[tokio::test]
+async fn streaming_cell_limit_wraps_sql_and_caps_to_500() {
+    let (_container, driver, _host, _port) = start_mysql().await;
+    seed_numbers(driver.as_ref(), 10_000).await;
+    let engine = canvas_engine();
+
+    // MySQL wraps via SubqueryOffset, so the database itself stops at 500 and
+    // no ingest-side row cap is needed.
+    let (sql, row_cap) = QueryEngine::apply_cell_limit(
+        "SELECT n FROM src ORDER BY n",
+        &driver.pagination_strategy(),
+        Some(500),
+    );
+    assert!(sql.contains("LIMIT 500"), "wrapped SQL:\n{sql}");
+    assert_eq!(row_cap, None);
+
+    let stream = driver
+        .run_query_stream(&sql, &[], QueryLanguage::Native)
+        .await
+        .expect("open stream");
+    let out = engine
+        .ingest_cell_stream(BOARD, "lim", stream, None, 1 << 30, row_cap)
+        .await
+        .expect("ingest stream");
+
+    assert_eq!(out.total_rows, 500);
+    assert!(out.complete, "a LIMIT-capped run is a complete result");
+    assert_eq!(out.result.rows.len(), 500);
+    assert_eq!(out.result.rows[0][0], QueryValue::Int(1));
+    assert_eq!(out.result.rows[499][0], QueryValue::Int(500));
 }

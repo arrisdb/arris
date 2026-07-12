@@ -491,7 +491,7 @@ impl DatabaseDriver for PostgresDriver {
                     .map(|r| r.map_err(|e| DriverError::QueryFailed(pg_err_msg(&e))))
                     .boxed())
             },
-            |row| row_values(row),
+            |row| row_values(&row),
         );
         Ok(QueryStream::Rows(stream))
     }

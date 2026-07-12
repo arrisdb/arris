@@ -127,4 +127,29 @@ describe("TableNode", () => {
     renderNode("tbl");
     expect(screen.queryByText("Next")).toBeNull();
   });
+
+  it("renders the early page while the source is still streaming", () => {
+    useCanvasStore.setState({ boards: {} });
+    useCanvasStore.getState().ensureBoard(TAB, "");
+    useCanvasStore
+      .getState()
+      .addComponent(TAB, makeComponent({ kind: "table", id: "tbl", sourceQueryId: "q", previewRows: 2 }));
+    // Early page landed; totals still streaming in (no totalRows yet).
+    useCanvasStore.getState().setRun(TAB, "q", { result: manyRows(3), running: true });
+    renderNode("tbl");
+
+    expect(screen.queryByText("Running…")).toBeNull();
+    // Header + 2 capped body rows are visible immediately.
+    expect(document.querySelectorAll(".mdbc-canvas-result-table tr").length).toBe(3);
+    // Total unknown until ingest completes; paging waits for the cache.
+    expect(screen.getByText("1-2 of …")).toBeTruthy();
+    expect((screen.getByText("Next") as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByText("Prev") as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("shows Running… while streaming before the early page arrives", () => {
+    useCanvasStore.getState().setRun(TAB, "q", { running: true });
+    renderNode("tbl");
+    expect(screen.getByText("Running…")).toBeTruthy();
+  });
 });

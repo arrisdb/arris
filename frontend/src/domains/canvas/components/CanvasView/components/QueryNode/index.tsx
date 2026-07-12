@@ -9,7 +9,7 @@ import { useCanvasStore } from "../../../../hooks";
 import type { CanvasNodeData } from "../../types";
 import { CanvasResizer } from "../CanvasResizer";
 import { useQueryEditor } from "./hooks";
-import { runResultSummary } from "./utils";
+import { runResultSummary, runStreamingSummary } from "./utils";
 
 /// A SQL object: a schema-aware CodeMirror editor (same dialect + completion as
 /// the main editor), a Run button, and a one-line run status. It holds no result
@@ -84,12 +84,14 @@ function QueryNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
         <div className="mdbc-canvas-query-status">
           {run?.error ? (
             <span className="mdbc-canvas-result-error">{run.error}</span>
-          ) : run?.running ? (
-            <span className="mdbc-canvas-result-empty">Running…</span>
           ) : run?.result ? (
             <span className="mdbc-canvas-result-empty">
-              {runResultSummary(run.result, run.totalRows, run.complete)}
+              {run.running
+                ? runStreamingSummary(run.result)
+                : runResultSummary(run.result, run.totalRows, run.complete)}
             </span>
+          ) : run?.running ? (
+            <span className="mdbc-canvas-result-empty">Running…</span>
           ) : (
             <span className="mdbc-canvas-result-empty">Run the query to preview data</span>
           )}

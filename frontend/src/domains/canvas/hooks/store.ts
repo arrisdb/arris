@@ -11,7 +11,12 @@ import type {
   QueryRunState,
   ReorderOp,
 } from "../types";
-import { CANVAS_QUERY_ID_PREFIX, DEFAULT_SIZE, LAYOUT_GAP } from "../constants";
+import {
+  CANVAS_QUERY_ID_PREFIX,
+  DEFAULT_QUERY_LIMIT,
+  DEFAULT_SIZE,
+  LAYOUT_GAP,
+} from "../constants";
 import {
   deriveDataEdges,
   genId,
@@ -77,6 +82,14 @@ interface CanvasStore {
     connectionId: string | null,
   ) => string[];
   setRun: (tabId: string, id: string, run: QueryRunState) => void;
+  /// Land a cell's full-ingest totals from the `canvas://cell-ingested` event,
+  /// clearing the spinner the early page left running.
+  applyIngestDone: (
+    tabId: string,
+    id: string,
+    totalRows: number,
+    complete: boolean,
+  ) => void;
   /// Execute a query object and store its result/error in `runs`.
   runQueryComponent: (tabId: string, id: string) => Promise<void>;
   /// Ask the backend to cancel a query object's in-flight run. The awaited run
@@ -92,6 +105,11 @@ interface CanvasStore {
 /// Normalize any thrown value into a readable message. Tauri rejects IPC with a
 /// plain `{ code, message }` object (not an Error), so pull `message` out rather
 /// than stringifying the object into a useless "[object Object]".
+/// Backend cancellation handle for a cell's run, derived (never stored).
+function cellQueryId(tabId: string, id: string): string {
+  return `${CANVAS_QUERY_ID_PREFIX}:${tabId}:${id}`;
+}
+
 function errToString(err: unknown): string {
   if (typeof err === "string") return err;
   if (err instanceof Error) return err.message;
@@ -369,6 +387,12 @@ const useCanvasStore = create<CanvasStore>((set, get) => ({
       };
     }),
 
+  applyIngestDone: (tabId, id, totalRows, complete) => {
+    const run = get().boards[tabId]?.runs[id];
+    if (!run) return;
+    get().setRun(tabId, id, { ...run, totalRows, complete, running: false });
+  },
+
   runQueryComponent: async (tabId, id) => {
     const board = get().boards[tabId];
     const comp = board?.doc.components.find((c) => c.id === id);
@@ -386,20 +410,42 @@ const useCanvasStore = create<CanvasStore>((set, get) => ({
         title: c.title ?? "",
         sql: c.sql,
         connectionId: c.connectionId,
+        limit: c.selectAll ? null : (c.limit ?? DEFAULT_QUERY_LIMIT),
       }));
-    const queryId = `${CANVAS_QUERY_ID_PREFIX}:${tabId}:${id}`;
-    get().setRun(tabId, id, { running: true, queryId });
+    const queryId = cellQueryId(tabId, id);
+    get().setRun(tabId, id, { running: true });
     try {
       const runs = await runCanvasCellIPC(tabId, id, cells, queryId);
       // Apply each executed cell's outcome (target + its upstream dependencies).
       for (const r of runs) {
-        get().setRun(
-          tabId,
-          r.id,
-          r.error
-            ? { error: r.error }
-            : { result: r.result, totalRows: r.totalRows, complete: r.complete },
-        );
+        if (r.error) {
+          get().setRun(tabId, r.id, { error: r.error });
+          continue;
+        }
+        if (r.totalRows === undefined) {
+          // Early page: totals arrive via `canvas://cell-ingested`. Keep the
+          // spinner unless the event already landed.
+          const prev = get().boards[tabId]?.runs[r.id];
+          const settled = prev?.running === false && prev.totalRows !== undefined;
+          get().setRun(
+            tabId,
+            r.id,
+            settled
+              ? {
+                  result: r.result,
+                  totalRows: prev.totalRows,
+                  complete: prev.complete,
+                  running: false,
+                }
+              : { result: r.result, running: true },
+          );
+          continue;
+        }
+        get().setRun(tabId, r.id, {
+          result: r.result,
+          totalRows: r.totalRows,
+          complete: r.complete,
+        });
       }
       const targetOk = runs.some((r) => r.id === id && r.result);
       // The cell the user ran gets a preview table on first success; the
@@ -416,11 +462,10 @@ const useCanvasStore = create<CanvasStore>((set, get) => ({
   },
 
   cancelQueryComponent: (tabId, id) => {
-    const run = get().boards[tabId]?.runs[id];
-    if (!run?.running || !run.queryId) return;
+    if (!get().boards[tabId]?.runs[id]?.running) return;
     // Fire-and-forget: the awaited runQueryComponent call applies the
     // cancelled outcome; a failed cancel changes nothing.
-    cancelCanvasCellIPC(run.queryId).catch(() => {});
+    cancelCanvasCellIPC(cellQueryId(tabId, id)).catch(() => {});
   },
 
   runAllQueries: async (tabId) => {

@@ -8,10 +8,8 @@ use datafusion::arrow::record_batch::RecordBatch;
 use super::errors::CanvasError;
 use super::impl_spill_cipher::SpillCipher;
 
-/// A streaming writer for one encrypted spill file. Each `write` serializes one
-/// batch to Arrow IPC, seals it under the session key, and appends a length-
-/// prefixed frame, so a huge cell streams to disk a batch at a time (never fully
-/// buffered) while every byte on disk is ciphertext.
+/// Streaming writer for one encrypted spill file: each `write` seals one Arrow
+/// IPC batch into a length-prefixed frame, so huge cells stream without buffering.
 pub(super) struct SpillWriter {
     cipher: SpillCipher,
     out: BufWriter<File>,

@@ -105,12 +105,16 @@ impl QueryEngine {
         connection: &ConnectionEngine,
         project: Option<&ProjectState>,
         sql: String,
+        limit: Option<u64>,
         language: Option<QueryLanguage>,
         query_id: Option<String>,
-    ) -> Result<(QueryStream, Option<CancellationToken>), QueryError> {
+    ) -> Result<(QueryStream, Option<CancellationToken>, Option<u64>), QueryError> {
         let driver = connection.driver_for(connection_id, project).await?;
         let lang = language.unwrap_or_default();
-        let sql = Self::trim_trailing_sql_semicolon(&sql);
+        let trimmed = Self::trim_trailing_sql_semicolon(&sql);
+        // Apply the per-cell LIMIT: wrap the SQL for dialects that support it,
+        // otherwise fall back to an ingest row cap the caller enforces.
+        let (sql, row_cap) = Self::apply_cell_limit(trimmed, &driver.pagination_strategy(), limit);
 
         let txcfg = connection.transaction_config(connection_id).await;
         if matches!(txcfg.mode, crate::TransactionMode::Manual)
@@ -135,17 +139,17 @@ impl QueryEngine {
         let opened = match cancel_token.as_ref() {
             Some(token) => {
                 tokio::select! {
-                    r = driver.run_query_stream(sql, &[], lang) => r,
+                    r = driver.run_query_stream(&sql, &[], lang) => r,
                     _ = token.cancelled() => {
                         let _ = driver.cancel_running_query().await;
                         Err(DriverError::Cancelled)
                     }
                 }
             }
-            None => driver.run_query_stream(sql, &[], lang).await,
+            None => driver.run_query_stream(&sql, &[], lang).await,
         };
         match opened {
-            Ok(stream) => Ok((stream, cancel_token)),
+            Ok(stream) => Ok((stream, cancel_token, row_cap)),
             Err(e) => {
                 if let Some(qid) = &query_id {
                     self.running_queries.remove(qid);
@@ -153,12 +157,6 @@ impl QueryEngine {
                 Err(e.into())
             }
         }
-    }
-
-    /// Whether `sql` is a SELECT-shaped statement the canvas can ingest as a
-    /// stream; everything else goes through `run_query`.
-    pub fn is_streamable_select(sql: &str) -> bool {
-        Self::is_select_query(sql)
     }
 
     pub async fn cancel_query(&self, query_id: String) -> Result<(), QueryError> {
@@ -288,7 +286,7 @@ impl QueryEngine {
         sql.trim().trim_end_matches(';').trim_end()
     }
 
-    fn is_select_query(sql: &str) -> bool {
+    pub fn is_select_query(sql: &str) -> bool {
         use sqlparser::ast::Statement;
         use sqlparser::dialect::GenericDialect;
         use sqlparser::parser::Parser;
@@ -418,40 +416,14 @@ impl QueryEngine {
         let fetch_limit = ps + 1;
         let offset = (ps as u64) * (pg as u64);
 
-        match driver.pagination_strategy() {
-            PaginationStrategy::SubqueryOffset => {
-                let sql = Self::paginated_subquery_sql(sql);
-                let paginated =
-                    format!("SELECT * FROM ({sql}) AS _p LIMIT {fetch_limit} OFFSET {offset}");
+        match Self::limit_wrapped_sql(sql, &driver.pagination_strategy(), fetch_limit, offset) {
+            Some(paginated) => {
                 let mut result =
                     Self::cancellable_query(driver, &paginated, params, lang, cancel_token).await?;
                 Self::trim_paginated_result(&mut result, ps);
                 Ok(result)
             }
-            PaginationStrategy::TrinoOffset => {
-                let sql = Self::paginated_subquery_sql(sql);
-                let paginated =
-                    format!("SELECT * FROM ({sql}) AS _p OFFSET {offset} LIMIT {fetch_limit}");
-                let mut result =
-                    Self::cancellable_query(driver, &paginated, params, lang, cancel_token).await?;
-                Self::trim_paginated_result(&mut result, ps);
-                Ok(result)
-            }
-            PaginationStrategy::SqlServerOffset => {
-                let paginated = Self::sql_server_paginated_query(sql, fetch_limit, offset);
-                let mut result =
-                    Self::cancellable_query(driver, &paginated, params, lang, cancel_token).await?;
-                Self::trim_paginated_result(&mut result, ps);
-                Ok(result)
-            }
-            PaginationStrategy::OracleOffset => {
-                let paginated = Self::oracle_paginated_query(sql, fetch_limit, offset);
-                let mut result =
-                    Self::cancellable_query(driver, &paginated, params, lang, cancel_token).await?;
-                Self::trim_paginated_result(&mut result, ps);
-                Ok(result)
-            }
-            PaginationStrategy::InMemory | PaginationStrategy::None => {
+            None => {
                 let mut result =
                     Self::cancellable_query(driver, sql, params, lang, cancel_token).await?;
                 let offset = (ps as usize) * (pg as usize);
@@ -514,6 +486,51 @@ impl QueryEngine {
             "SELECT * FROM ({sql}) \
              OFFSET {offset} ROWS FETCH NEXT {fetch_limit} ROWS ONLY"
         )
+    }
+
+    /// The dialect-native way to cap `sql` to `fetch_count` rows at `offset`.
+    /// `None` means the dialect cannot be subquery-wrapped without breaking
+    /// ORDER BY (StarRocks and non-LIMIT sources); the caller caps in memory or
+    /// at ingest instead.
+    pub fn limit_wrapped_sql(
+        sql: &str,
+        strategy: &PaginationStrategy,
+        fetch_count: u32,
+        offset: u64,
+    ) -> Option<String> {
+        let trimmed = Self::paginated_subquery_sql(sql);
+        match strategy {
+            PaginationStrategy::SubqueryOffset => Some(format!(
+                "SELECT * FROM ({trimmed}) AS _p LIMIT {fetch_count} OFFSET {offset}"
+            )),
+            PaginationStrategy::TrinoOffset => Some(format!(
+                "SELECT * FROM ({trimmed}) AS _p OFFSET {offset} LIMIT {fetch_count}"
+            )),
+            PaginationStrategy::SqlServerOffset => {
+                Some(Self::sql_server_paginated_query(sql, fetch_count, offset))
+            }
+            PaginationStrategy::OracleOffset => {
+                Some(Self::oracle_paginated_query(sql, fetch_count, offset))
+            }
+            PaginationStrategy::InMemory | PaginationStrategy::None => None,
+        }
+    }
+
+    /// Resolve a per-cell `limit` into the SQL to send and any ingest row cap.
+    /// Wrappable dialects rewrite the SQL (the DB does top-N); order-sensitive
+    /// ones keep the SQL and cap at ingest. `None` limit means select-all.
+    pub fn apply_cell_limit(
+        sql: &str,
+        strategy: &PaginationStrategy,
+        limit: Option<u64>,
+    ) -> (String, Option<u64>) {
+        match limit {
+            None => (sql.to_string(), None),
+            Some(n) => match Self::limit_wrapped_sql(sql, strategy, n as u32, 0) {
+                Some(wrapped) => (wrapped, None),
+                None => (sql.to_string(), Some(n)),
+            },
+        }
     }
 }
 
@@ -596,6 +613,48 @@ mod tests {
             "SELECT * FROM (SELECT * FROM appdb.dbo.orders) AS _p ORDER BY (SELECT NULL) \
              OFFSET 0 ROWS FETCH NEXT 101 ROWS ONLY"
         );
+    }
+
+    #[test]
+    fn limit_wrapped_sql_wraps_per_dialect_and_skips_in_memory() {
+        use crate::PaginationStrategy as PS;
+        let sql = "SELECT * FROM t";
+        assert_eq!(
+            QueryEngine::limit_wrapped_sql(sql, &PS::SubqueryOffset, 500, 0),
+            Some("SELECT * FROM (SELECT * FROM t) AS _p LIMIT 500 OFFSET 0".to_string())
+        );
+        assert_eq!(
+            QueryEngine::limit_wrapped_sql(sql, &PS::TrinoOffset, 500, 0),
+            Some("SELECT * FROM (SELECT * FROM t) AS _p OFFSET 0 LIMIT 500".to_string())
+        );
+        assert!(
+            QueryEngine::limit_wrapped_sql(sql, &PS::SqlServerOffset, 500, 0)
+                .unwrap()
+                .contains("FETCH NEXT 500 ROWS ONLY")
+        );
+        assert!(
+            QueryEngine::limit_wrapped_sql(sql, &PS::OracleOffset, 500, 0)
+                .unwrap()
+                .contains("FETCH NEXT 500 ROWS ONLY")
+        );
+        // Order-sensitive dialects cannot be subquery-wrapped safely.
+        assert_eq!(QueryEngine::limit_wrapped_sql(sql, &PS::InMemory, 500, 0), None);
+        assert_eq!(QueryEngine::limit_wrapped_sql(sql, &PS::None, 500, 0), None);
+    }
+
+    #[test]
+    fn apply_cell_limit_chooses_wrap_or_cap_by_strategy() {
+        use crate::PaginationStrategy as PS;
+        let (sql, cap) = QueryEngine::apply_cell_limit("SELECT * FROM t", &PS::SubqueryOffset, Some(500));
+        assert_eq!(sql, "SELECT * FROM (SELECT * FROM t) AS _p LIMIT 500 OFFSET 0");
+        assert_eq!(cap, None);
+        let (sql, cap) = QueryEngine::apply_cell_limit("SELECT * FROM t", &PS::InMemory, Some(500));
+        assert_eq!(sql, "SELECT * FROM t");
+        assert_eq!(cap, Some(500));
+        // Select-all: unchanged SQL, no cap.
+        let (sql, cap) = QueryEngine::apply_cell_limit("SELECT * FROM t", &PS::SubqueryOffset, None);
+        assert_eq!(sql, "SELECT * FROM t");
+        assert_eq!(cap, None);
     }
 
     #[tokio::test]

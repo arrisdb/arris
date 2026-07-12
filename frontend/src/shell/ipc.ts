@@ -75,8 +75,11 @@ function openProjectDialogIPC(title?: string) {
   return openDialog({ directory: true, multiple: false, title });
 }
 
-function listenAppEventIPC(event: string, handler: () => void) {
-  return listen(event, handler);
+function listenAppEventIPC<T = unknown>(
+  event: string,
+  handler: (payload: T) => void,
+) {
+  return listen<T>(event, (e) => handler(e.payload));
 }
 
 function getCurrentWebviewIPC() {

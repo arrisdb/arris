@@ -9,6 +9,8 @@ interface CanvasCellSpec {
   title: string;
   sql: string;
   connectionId: string | null;
+  /// Row limit for the fetch; `null` fetches the full result ("Select all rows").
+  limit: number | null;
 }
 
 /// The outcome of one executed cell: its result page, or the error that stopped

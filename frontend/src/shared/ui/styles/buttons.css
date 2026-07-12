@@ -78,6 +78,8 @@
   white-space: nowrap;
 }
 .mdbc-btn:hover { background: rgb(var(--m-overlay-rgb) / 0.08); }
+.mdbc-btn:disabled { opacity: 0.4; cursor: default; }
+.mdbc-btn:disabled:hover { background: rgb(var(--m-overlay-rgb) / 0.05); }
 .mdbc-btn.primary {
   background: rgb(var(--m-overlay-rgb) / 0.08);
   border-color: var(--m-sep-strong);

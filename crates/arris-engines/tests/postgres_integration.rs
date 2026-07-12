@@ -8,10 +8,10 @@
 //! Each test owns its own container, so they are independent and parallel-safe.
 
 use arris_engines::{
-    CanvasEngine, CanvasError, CellResultCache, ConnectionConfig, ConnectionEngine,
+    CanvasEngine, CanvasError, ConnectionConfig, ConnectionEngine,
     DatabaseDriver, DatabaseKind, ExplainMode, IsolationLevel, ObjectRef, PlanNode, QueryEngine,
     QueryLanguage, QueryResult, QueryValue, SchemaNode, SchemaNodeKind, SslMode,
-    TransactionConfig, TransactionMode, driver_for_kind, CELL_RESULT_PAGE_ROWS,
+    TransactionConfig, TransactionMode, driver_for_kind, CELL_INGEST_BYTE_BUDGET, CELL_RESULT_PAGE_ROWS,
 };
 use tokio_util::sync::CancellationToken;
 use testcontainers_modules::postgres::Postgres;
@@ -1456,18 +1456,12 @@ async fn object_definition_schema_is_faithful_and_replayable() {
 
 // ── streaming ingestion (canvas path) ───────────────────────────────────────
 
-static STREAM_DIR_SEQ: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+mod streaming_scenario;
+use streaming_scenario::BOARD;
 
-/// A canvas engine over a throwaway cell cache (1 GiB memory / 10 GiB total).
 fn canvas_engine() -> CanvasEngine {
-    let n = STREAM_DIR_SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-    let dir =
-        std::env::temp_dir().join(format!("arris-pg-stream-{}-{}", std::process::id(), n));
-    let cache = CellResultCache::new(dir, 1 << 30, 10 * (1 << 30));
-    CanvasEngine::new(std::sync::Arc::new(cache))
+    streaming_scenario::canvas_engine("pg")
 }
-
-const BOARD: &str = "board-stream";
 
 #[tokio::test]
 async fn streaming_ingests_100k_rows_with_exact_totals_and_page() {
@@ -1483,7 +1477,7 @@ async fn streaming_ingests_100k_rows_with_exact_totals_and_page() {
         .await
         .expect("open stream");
     let out = engine
-        .ingest_cell_stream(BOARD, "big", stream, None)
+        .ingest_cell_stream(BOARD, "big", stream, None, CELL_INGEST_BYTE_BUDGET, None)
         .await
         .expect("ingest stream");
 
@@ -1530,7 +1524,7 @@ async fn streaming_cancel_mid_stream_registers_no_cache_entry() {
     });
 
     let err = engine
-        .ingest_cell_stream(BOARD, "huge", stream, Some(&token))
+        .ingest_cell_stream(BOARD, "huge", stream, Some(&token), CELL_INGEST_BYTE_BUDGET, None)
         .await
         .expect_err("cancel must fail the ingest");
     assert!(matches!(err, CanvasError::Cancelled), "got {err:?}");
@@ -1557,7 +1551,7 @@ async fn streaming_byte_budget_truncates_and_reports_incomplete() {
         .expect("open stream");
     // A ~1 MiB budget admits a handful of 8k-row chunks, then stops.
     let out = engine
-        .ingest_cell_stream_with_budget(BOARD, "capped", stream, None, 1 << 20)
+        .ingest_cell_stream(BOARD, "capped", stream, None, 1 << 20, None)
         .await
         .expect("ingest stream");
 
@@ -1572,4 +1566,127 @@ async fn streaming_byte_budget_truncates_and_reports_incomplete() {
         .await
         .expect("chained count");
     assert_eq!(agg.result.rows[0][0], QueryValue::Int(out.total_rows as i64));
+}
+
+#[tokio::test]
+async fn streaming_cell_limit_wraps_sql_and_caps_to_500() {
+    let (_container, driver) = start_pg().await;
+    let engine = canvas_engine();
+
+    // Postgres wraps via SubqueryOffset, so the database itself stops at 500
+    // and no ingest-side row cap is needed.
+    let (sql, row_cap) = QueryEngine::apply_cell_limit(
+        "SELECT n FROM generate_series(1, 100000) AS n ORDER BY n",
+        &driver.pagination_strategy(),
+        Some(500),
+    );
+    assert!(sql.contains("LIMIT 500"), "wrapped SQL:\n{sql}");
+    assert_eq!(row_cap, None);
+
+    let stream = driver
+        .run_query_stream(&sql, &[], QueryLanguage::Native)
+        .await
+        .expect("open stream");
+    let out = engine
+        .ingest_cell_stream(BOARD, "lim", stream, None, 1 << 30, row_cap)
+        .await
+        .expect("ingest stream");
+
+    assert_eq!(out.total_rows, 500);
+    assert!(out.complete, "a LIMIT-capped run is a complete result");
+    assert_eq!(out.result.rows.len(), 500);
+    assert_eq!(out.result.rows[0][0], QueryValue::Int(1));
+    assert_eq!(out.result.rows[499][0], QueryValue::Int(500));
+}
+
+#[tokio::test]
+async fn streaming_cell_row_cap_stops_ingest_at_500_in_order() {
+    let (_container, driver) = start_pg().await;
+    let engine = canvas_engine();
+
+    // The ingest-side fallback (used for dialects that cannot be wrapped):
+    // the stream is opened un-limited and the engine stops after 500 rows.
+    let stream = driver
+        .run_query_stream(
+            "SELECT n FROM generate_series(1, 100000) AS n ORDER BY n",
+            &[],
+            QueryLanguage::Native,
+        )
+        .await
+        .expect("open stream");
+    let out = engine
+        .ingest_cell_stream(BOARD, "capped500", stream, None, 1 << 30, Some(500))
+        .await
+        .expect("ingest stream");
+
+    assert_eq!(out.total_rows, 500);
+    assert!(out.complete, "a row-cap stop is the requested result, not a truncation");
+    assert_eq!(out.result.rows[0][0], QueryValue::Int(1));
+    assert_eq!(out.result.rows[499][0], QueryValue::Int(500));
+    let agg = engine
+        .run_cell(BOARD, "agg500", "SELECT COUNT(*) AS c FROM capped500")
+        .await
+        .expect("chained count");
+    assert_eq!(agg.result.rows[0][0], QueryValue::Int(500));
+}
+
+#[tokio::test]
+async fn streaming_select_all_ingests_full_result() {
+    let (_container, driver) = start_pg().await;
+    let engine = canvas_engine();
+
+    // "Select all rows": no limit, no cap; the full result lands in the cache.
+    let (sql, row_cap) = QueryEngine::apply_cell_limit(
+        "SELECT n FROM generate_series(1, 100000) AS n",
+        &driver.pagination_strategy(),
+        None,
+    );
+    assert_eq!(row_cap, None);
+
+    let stream = driver
+        .run_query_stream(&sql, &[], QueryLanguage::Native)
+        .await
+        .expect("open stream");
+    let out = engine
+        .ingest_cell_stream(BOARD, "all", stream, None, 1 << 30, row_cap)
+        .await
+        .expect("ingest stream");
+
+    assert_eq!(out.total_rows, 100_000);
+    assert!(out.complete);
+    assert_eq!(out.result.rows.len(), CELL_RESULT_PAGE_ROWS);
+}
+
+#[tokio::test]
+async fn streaming_early_page_then_background_finish_reports_totals() {
+    let (_container, driver) = start_pg().await;
+    let engine = canvas_engine();
+
+    // The terminal-cell path: the page returns as soon as it fills, the
+    // continuation drains the rest, and the totals cover the whole result.
+    let stream = driver
+        .run_query_stream(
+            "SELECT n FROM generate_series(1, 100000) AS n",
+            &[],
+            QueryLanguage::Native,
+        )
+        .await
+        .expect("open stream");
+    let (page, cont) = engine
+        .start_cell_ingest(BOARD, "early", stream, None, 1 << 30, None)
+        .await
+        .expect("start ingest");
+    assert_eq!(page.rows.len(), CELL_RESULT_PAGE_ROWS);
+    assert_eq!(page.rows[0][0], QueryValue::Int(1));
+
+    let done = cont.finish(None).await.expect("background finish");
+    assert_eq!(done.total_rows, 100_000);
+    assert!(done.complete);
+
+    // The finished cache entry serves the full result to chained cells.
+    let agg = engine
+        .run_cell(BOARD, "aggearly", "SELECT COUNT(*) AS c FROM early")
+        .await
+        .expect("chained count");
+    assert_eq!(agg.result.rows[0][0], QueryValue::Int(100_000));
 }

@@ -7,7 +7,13 @@ import type { EditorTab } from "@shell/types";
 
 import { CANVAS_SAVE_DEBOUNCE_MS, DEFAULT_SIZE } from "../../constants";
 import { useCanvasStore } from "../../hooks";
-import type { CanvasComponent, CanvasEdge, ComponentKind, ReorderOp, ShapeKind } from "../../types";
+import type {
+  CanvasComponent,
+  CanvasEdge,
+  ComponentKind,
+  ReorderOp,
+  ShapeKind,
+} from "../../types";
 import { makeComponent, serializeDoc } from "../../utils";
 import type { CanvasMode, CanvasNodeData } from "./types";
 import {

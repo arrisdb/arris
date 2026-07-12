@@ -2,6 +2,7 @@ import { DatabaseKindIcon } from "@domains/connection";
 import { useConnectionsStore } from "@domains/connection/hooks";
 import { Select } from "@shared/ui";
 
+import { DEFAULT_QUERY_LIMIT } from "../../../../../../constants";
 import type { SectionProps } from "../../types";
 
 /// Query-specific controls: a title and the connection the SQL runs against. The
@@ -34,6 +35,30 @@ function QuerySection({ component, onChange }: SectionProps) {
         onChange={(v) => onChange({ connectionId: v })}
         data-testid="query-connection-select"
       />
+      <span className="mdbc-pane-label">Limit</span>
+      <input
+        type="number"
+        className="mdbc-pane-input"
+        min={1}
+        value={component.limit ?? DEFAULT_QUERY_LIMIT}
+        disabled={!!component.selectAll}
+        onChange={(e) =>
+          onChange({
+            limit: Math.max(1, Number(e.target.value) || DEFAULT_QUERY_LIMIT),
+          })
+        }
+        aria-label="Limit"
+      />
+      <label className="mdbc-canvas-prop-row">
+        <span className="mdbc-pane-label">Select all rows</span>
+        <input
+          type="checkbox"
+          className="mdbc-checkbox"
+          checked={!!component.selectAll}
+          onChange={(e) => onChange({ selectAll: e.target.checked })}
+          aria-label="Select all rows"
+        />
+      </label>
     </div>
   );
 }

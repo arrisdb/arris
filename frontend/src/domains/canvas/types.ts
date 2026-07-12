@@ -67,6 +67,11 @@ interface QueryComponent extends BaseComponent {
   connectionId: string | null;
   sql: string;
   title?: string;
+  /// Row limit sent with the run (absent = DEFAULT_QUERY_LIMIT); ignored when
+  /// `selectAll` is on.
+  limit?: number;
+  /// Fetch the full result instead of `limit` rows.
+  selectAll?: boolean;
 }
 
 /// A chart bound to a query object's data by `sourceQueryId`. Renders through the
@@ -166,11 +171,18 @@ interface CanvasDoc {
   chat?: ChatEntry[];
 }
 
+/// Payload of the `canvas://cell-ingested` event: a terminal cell's full-ingest
+/// totals, emitted once its background drain completes.
+interface CellIngestedEvent {
+  boardId: string;
+  cellId: string;
+  totalRows: number;
+  complete: boolean;
+}
+
 /// Runtime execution state for a query object. Never part of `CanvasDoc`.
 interface QueryRunState {
   running?: boolean;
-  /// Backend cancellation handle for the in-flight run; set while `running`.
-  queryId?: string;
   result?: QueryResult;
   error?: string;
   /// Rows in the FULL cached result; `result` holds only the first page.
@@ -251,6 +263,7 @@ export type {
   CanvasDoc,
   CanvasEdge,
   CanvasViewport,
+  CellIngestedEvent,
   ChatEntry,
   ChatRole,
   ChartComponent,

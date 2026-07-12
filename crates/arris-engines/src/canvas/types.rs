@@ -12,21 +12,24 @@ pub struct CanvasCellSpec {
     pub title: String,
     pub sql: String,
     pub connection_id: Option<String>,
+    /// Per-cell row limit: `Some(n)` caps the fetch to n rows, `None` fetches
+    /// the full result ("Select all rows").
+    #[serde(default)]
+    pub limit: Option<u64>,
 }
 
-/// Totals reported by a finished `CellCacheWriter`.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct CellWriteStats {
-    pub total_rows: u64,
-    pub total_bytes: usize,
-}
-
-/// One cell's ingested run: the UI page plus the full-result totals. The full
-/// data lives only in the cell cache; `complete: false` means the byte budget
-/// stopped ingestion early ("N+ rows").
+/// One cell's ingested run: the UI page plus the full-result totals.
+/// `complete: false` means the byte budget stopped ingestion early ("N+ rows").
 #[derive(Clone, Debug)]
 pub struct IngestedCell {
     pub result: QueryResult,
+    pub total_rows: u64,
+    pub complete: bool,
+}
+
+/// Totals reported once a cell's background ingest finishes.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct CellIngestDone {
     pub total_rows: u64,
     pub complete: bool,
 }

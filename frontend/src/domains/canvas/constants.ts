@@ -50,13 +50,23 @@ const CANVAS_QUERY_ID_PREFIX = "canvas-cell";
 /// chart in the properties panel; bounds render cost and the IPC payload.
 const DEFAULT_CHART_MAX_ROWS = 1000;
 
+/// Default row limit a query cell fetches when its `limit` is unset and
+/// "Select all rows" is off. Overridable per cell in the properties panel.
+const DEFAULT_QUERY_LIMIT = 500;
+
+/// Tauri event carrying a cell's full-ingest totals once the background drain
+/// finishes (the UI page arrived with the run response).
+const CANVAS_CELL_INGESTED_EVENT = "canvas://cell-ingested";
+
 export {
   CANVAS_ASK_FENCE,
+  CANVAS_CELL_INGESTED_EVENT,
   CANVAS_DOC_VERSION,
   CANVAS_QUERY_ID_PREFIX,
   CANVAS_SAVE_DEBOUNCE_MS,
   CANVAS_SPEC_FENCE,
   DEFAULT_CHART_MAX_ROWS,
+  DEFAULT_QUERY_LIMIT,
   DEFAULT_SIZE,
   KNOWN_KINDS,
   LAYOUT_GAP,

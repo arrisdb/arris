@@ -12,7 +12,7 @@ pub use constants::{
     CELL_INGEST_BYTE_BUDGET, CELL_RESULT_PAGE_ROWS,
 };
 pub use errors::CanvasError;
-pub use impl_canvas_engine::CanvasEngine;
+pub use impl_canvas_engine::{CanvasEngine, CellIngestContinuation};
 pub use impl_cell_cache_writer::CellCacheWriter;
 pub use impl_cell_result_cache::CellResultCache;
-pub use types::{CanvasCellRun, CanvasCellSpec, CellWriteStats, IngestedCell};
+pub use types::{CanvasCellRun, CanvasCellSpec, CellIngestDone, IngestedCell};

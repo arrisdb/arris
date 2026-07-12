@@ -10,11 +10,8 @@ import { CanvasResizer } from "../CanvasResizer";
 import { TABLE_PAGE_ROWS } from "./constants";
 import { cellText, pageRangeLabel } from "./utils";
 
-/// A data table bound to a query object by `sourceQueryId`. It pages through the
-/// source cell's FULL cached result: the first page is the source run's own page,
-/// and Prev/Next fetch further pages a page at a time from the backend cache, so a
-/// table over a million-row query can scroll the whole result without ever holding
-/// it all in the webview. `nowheel` lets the grid scroll without panning.
+/// A data table bound to a query by `sourceQueryId`: Prev/Next page through the
+/// source's FULL cached result from the backend, one page in the webview at a time.
 function TableNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
   const { tabId } = data;
   const board = useCanvasStore((s) => s.boards[tabId]);
@@ -27,6 +24,9 @@ function TableNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
   const pageSize = (component?.kind === "table" && component.previewRows) || TABLE_PAGE_ROWS;
 
   const sourceResult = sourceRun?.result;
+  // While the source is still streaming into the cache, the early page is shown
+  // but the full row count is unknown and cache pages are not yet readable.
+  const streaming = !!sourceRun?.running;
   const total = sourceRun?.totalRows ?? sourceResult?.rows.length ?? 0;
   const [offset, setOffset] = useState(0);
   const [page, setPage] = useState<QueryResult | undefined>(sourceResult);
@@ -42,8 +42,9 @@ function TableNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
       if (!sourceTitle) return;
       fetchCanvasCellPageIPC(tabId, sourceTitle, next, pageSize)
         .then((result) => {
+          if (!result) return;
           setOffset(next);
-          if (result) setPage(result);
+          setPage(result);
         })
         .catch(() => {});
     },
@@ -53,9 +54,9 @@ function TableNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
   if (!component || component.kind !== "table") return null;
 
   const rows = page?.rows.slice(0, pageSize) ?? [];
-  const canPrev = offset > 0;
-  const canNext = offset + pageSize < total;
-  const showPager = !!page && total > pageSize;
+  const canPrev = !streaming && offset > 0;
+  const canNext = !streaming && offset + pageSize < total;
+  const showPager = !!page && (streaming || total > pageSize);
 
   return (
     <>
@@ -69,8 +70,6 @@ function TableNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
         <div className="nowheel mdbc-canvas-result">
           {sourceRun?.error ? (
             <div className="mdbc-canvas-result-error">{sourceRun.error}</div>
-          ) : sourceRun?.running ? (
-            <div className="mdbc-canvas-result-empty">Running…</div>
           ) : page ? (
             <table className="mdbc-canvas-result-table">
               <thead>
@@ -90,6 +89,8 @@ function TableNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
                 ))}
               </tbody>
             </table>
+          ) : streaming ? (
+            <div className="mdbc-canvas-result-empty">Running…</div>
           ) : (
             <div className="mdbc-canvas-result-empty">
               {sourceId ? "Run the source query to see results" : "Pick a source query"}
@@ -98,7 +99,7 @@ function TableNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
         </div>
         {showPager ? (
           <div className="mdbc-canvas-result-pager">
-            <span>{pageRangeLabel(offset, rows.length, total)}</span>
+            <span>{pageRangeLabel(offset, rows.length, streaming ? undefined : total)}</span>
             <span>
               <button
                 type="button"

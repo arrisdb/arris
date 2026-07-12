@@ -7,14 +7,8 @@ use crate::drivers::constants::{STREAM_CHUNK_CHANNEL_CAPACITY, STREAM_CHUNK_ROWS
 use crate::drivers::errors::DriverError;
 use crate::drivers::types::{ColumnSpec, QueryValue, RowChunkStream};
 
-/// The reusable core every row-based streaming driver shares: spawns a background
-/// task that opens a driver's row stream, drains it into `STREAM_CHUNK_ROWS`-sized
-/// chunks over a bounded channel (keeping backpressure on the wire), and exposes
-/// the receiver as a `RowChunkStream`. A driver supplies only two things: `open`,
-/// how to start its native row stream (moved into the task so its client/statement
-/// outlive the stream, and its initial error is surfaced as the first item), and
-/// `map`, how to turn one native row into a `Vec<QueryValue>`. Dropping the
-/// returned stream's receiver ends the task and its server cursor (drop-to-cancel).
+/// Shared core for row-streaming drivers: a spawned task `open`s the native row
+/// stream and `map`s it into a chunked, backpressured `RowChunkStream`; drop-to-cancel.
 pub struct RowChunkPump;
 
 impl RowChunkPump {
@@ -27,7 +21,7 @@ impl RowChunkPump {
         Open: FnOnce() -> Fut + Send + 'static,
         Fut: Future<Output = Result<St, DriverError>> + Send + 'static,
         St: Stream<Item = Result<Row, DriverError>> + Send + 'static,
-        Map: Fn(&Row) -> Vec<QueryValue> + Send + 'static,
+        Map: Fn(Row) -> Vec<QueryValue> + Send + 'static,
         Row: Send + 'static,
     {
         let (tx, rx) = mpsc::channel(STREAM_CHUNK_CHANNEL_CAPACITY);
@@ -44,7 +38,7 @@ impl RowChunkPump {
             while let Some(item) = rows.next().await {
                 match item {
                     Ok(row) => {
-                        chunk.push(map(&row));
+                        chunk.push(map(row));
                         if chunk.len() >= STREAM_CHUNK_ROWS {
                             let full = std::mem::replace(
                                 &mut chunk,
@@ -101,7 +95,7 @@ mod tests {
         let rs = RowChunkPump::spawn(
             cols(),
             || async { Ok(int_rows(vec![1, 2, 3])) },
-            |n: &i64| vec![QueryValue::Int(*n)],
+            |n: i64| vec![QueryValue::Int(n)],
         );
         assert_eq!(rs.columns, cols());
         let flat: Vec<QueryValue> = drain(rs)
@@ -122,7 +116,7 @@ mod tests {
         let rs = RowChunkPump::spawn(
             cols(),
             move || async move { Ok(int_rows((0..total as i64).collect())) },
-            |n: &i64| vec![QueryValue::Int(*n)],
+            |n: i64| vec![QueryValue::Int(n)],
         );
         let chunks = drain(rs).await;
         assert_eq!(chunks.len(), 2, "one full chunk plus a one-row tail");
@@ -139,7 +133,7 @@ mod tests {
                     "boom".into(),
                 ))
             },
-            |n: &i64| vec![QueryValue::Int(*n)],
+            |n: i64| vec![QueryValue::Int(n)],
         );
         let chunks = drain(rs).await;
         assert_eq!(chunks.len(), 1);
@@ -154,8 +148,8 @@ mod tests {
             Ok(2),
         ])
         .boxed();
-        let rs = RowChunkPump::spawn(cols(), move || async move { Ok(stream) }, |n: &i64| {
-            vec![QueryValue::Int(*n)]
+        let rs = RowChunkPump::spawn(cols(), move || async move { Ok(stream) }, |n: i64| {
+            vec![QueryValue::Int(n)]
         });
         let chunks = drain(rs).await;
         // The pre-error rows were still in the open chunk (never flushed), so the
