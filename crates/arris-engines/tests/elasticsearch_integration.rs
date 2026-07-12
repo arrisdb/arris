@@ -824,3 +824,184 @@ async fn access_control_unavailable_when_security_disabled() {
         "the _security API must be unavailable when security is disabled"
     );
 }
+
+// ===========================================================================
+// Streaming ingestion (canvas cell). A SQL SELECT drains the `_sql` cursor into
+// the cell cache in the background while the first 500-row page returns
+// synchronously. Unlike schemaless Mongo, ES SQL declares its column types on
+// the first page, so there is no first-chunk sampling to cover.
+// ===========================================================================
+
+mod streaming_scenario;
+
+use arris_engines::{
+    CanvasEngine, CanvasError, CELL_INGEST_BYTE_BUDGET, CELL_RESULT_PAGE_ROWS, QueryEngine,
+};
+use streaming_scenario::BOARD;
+use tokio_util::sync::CancellationToken;
+
+fn canvas_engine() -> CanvasEngine {
+    streaming_scenario::canvas_engine("elasticsearch")
+}
+
+/// Base URL for the container's mapped 9200 port. Seeding goes over raw HTTP
+/// because the engine's native path trims the trailing newline the `_bulk` API
+/// requires; assertions still run through the engine.
+async fn es_url(container: &ContainerAsync<GenericImage>) -> String {
+    let host = container.get_host().await.expect("host").to_string();
+    let port = container.get_host_port_ipv4(9200).await.expect("port");
+    format!("http://{host}:{port}")
+}
+
+/// Bulk-index `count` docs `{n, label}` into the `src` index, then refresh so
+/// the SQL cursor sees them.
+async fn seed_src(container: &ContainerAsync<GenericImage>, count: i64) {
+    let base = es_url(container).await;
+    let client = reqwest::Client::new();
+    let batch: i64 = 10_000;
+    let mut start = 1;
+    while start <= count {
+        let end = (start + batch - 1).min(count);
+        let mut body = String::new();
+        for n in start..=end {
+            body.push_str("{\"index\":{}}\n");
+            body.push_str(&format!("{{\"n\":{n},\"label\":\"row-{n}\"}}\n"));
+        }
+        let resp = client
+            .post(format!("{base}/src/_bulk"))
+            .header("content-type", "application/x-ndjson")
+            .body(body)
+            .send()
+            .await
+            .expect("bulk seed");
+        assert!(resp.status().is_success(), "bulk failed: {}", resp.status());
+        start = end + 1;
+    }
+    client
+        .post(format!("{base}/src/_refresh"))
+        .send()
+        .await
+        .expect("refresh");
+}
+
+#[tokio::test]
+async fn streaming_ingests_100k_docs_with_exact_totals_and_page() {
+    let (container, driver) = start_es().await;
+    seed_src(&container, 100_000).await;
+    let engine = canvas_engine();
+
+    let stream = driver
+        .run_query_stream("SELECT n, label FROM src ORDER BY n", &[], QueryLanguage::Sql)
+        .await
+        .expect("open stream");
+    let out = engine
+        .ingest_cell_stream(BOARD, "big", stream, None, CELL_INGEST_BYTE_BUDGET, None)
+        .await
+        .expect("ingest stream");
+
+    assert_eq!(out.total_rows, 100_000);
+    assert!(out.complete);
+    assert_eq!(out.result.rows.len(), CELL_RESULT_PAGE_ROWS);
+    let names: Vec<&str> = out.result.columns.iter().map(|c| c.name.as_str()).collect();
+    assert_eq!(names, vec!["n", "label"]);
+    assert_eq!(out.result.rows[0][0], QueryValue::Int(1));
+    assert_eq!(out.result.rows[0][1], QueryValue::Text("row-1".into()));
+    assert_eq!(out.result.rows[499][0], QueryValue::Int(500));
+
+    // A chained cell aggregates the FULL cached result, not the 500-row page.
+    let agg = engine
+        .run_cell(BOARD, "sums", "SELECT COUNT(*) AS c, SUM(n) AS s FROM big")
+        .await
+        .expect("chained aggregate");
+    assert_eq!(agg.result.rows[0][0], QueryValue::Int(100_000));
+    assert_eq!(agg.result.rows[0][1], QueryValue::Int(5_000_050_000));
+}
+
+#[tokio::test]
+async fn streaming_cancel_registers_no_cache_entry() {
+    let (container, driver) = start_es().await;
+    seed_src(&container, 5_000).await;
+    let engine = canvas_engine();
+
+    let stream = driver
+        .run_query_stream("SELECT n FROM src", &[], QueryLanguage::Sql)
+        .await
+        .expect("open stream");
+
+    // A pre-cancelled token exercises the abort path deterministically.
+    let token = CancellationToken::new();
+    token.cancel();
+
+    let err = engine
+        .ingest_cell_stream(BOARD, "huge", stream, Some(&token), CELL_INGEST_BYTE_BUDGET, None)
+        .await
+        .expect_err("cancel must fail the ingest");
+    assert!(matches!(err, CanvasError::Cancelled), "got {err:?}");
+
+    // The aborted cell was never registered, so downstream cannot read it.
+    let chained = engine.run_cell(BOARD, "agg", "SELECT COUNT(*) FROM huge").await;
+    assert!(chained.is_err(), "cancelled cell must not be queryable");
+
+    // The driver is healthy for new queries after the aborted stream drops.
+    let r = run_sql(driver.as_ref(), "SELECT COUNT(*) AS c FROM src").await;
+    assert_eq!(r.rows[0][0], QueryValue::Int(5_000));
+}
+
+#[tokio::test]
+async fn streaming_byte_budget_truncates_and_reports_incomplete() {
+    let (container, driver) = start_es().await;
+    seed_src(&container, 100_000).await;
+    let engine = canvas_engine();
+
+    let stream = driver
+        .run_query_stream("SELECT n, label FROM src ORDER BY n", &[], QueryLanguage::Sql)
+        .await
+        .expect("open stream");
+    // A ~1 MiB budget admits a few chunks, then stops.
+    let out = engine
+        .ingest_cell_stream(BOARD, "capped", stream, None, 1 << 20, None)
+        .await
+        .expect("ingest stream");
+
+    assert!(!out.complete, "budget stop must be surfaced, never silent");
+    assert!(out.total_rows >= CELL_RESULT_PAGE_ROWS as u64);
+    assert!(out.total_rows < 100_000, "budget must truncate the run");
+    assert_eq!(out.result.rows.len(), CELL_RESULT_PAGE_ROWS);
+
+    let agg = engine
+        .run_cell(BOARD, "agg", "SELECT COUNT(*) AS c FROM capped")
+        .await
+        .expect("chained count");
+    assert_eq!(agg.result.rows[0][0], QueryValue::Int(out.total_rows as i64));
+}
+
+#[tokio::test]
+async fn streaming_cell_limit_caps_to_500() {
+    let (container, driver) = start_es().await;
+    seed_src(&container, 10_000).await;
+    let engine = canvas_engine();
+
+    // ES SQL has a LIMIT clause, but the driver reports PaginationStrategy::None,
+    // so the per-cell limit becomes an ingest-side row cap and the query text is
+    // left untouched.
+    let (sql, row_cap) = QueryEngine::apply_cell_limit(
+        "SELECT n FROM src ORDER BY n",
+        &driver.pagination_strategy(),
+        Some(500),
+    );
+    assert_eq!(sql, "SELECT n FROM src ORDER BY n");
+    assert_eq!(row_cap, Some(500));
+
+    let stream = driver
+        .run_query_stream(&sql, &[], QueryLanguage::Sql)
+        .await
+        .expect("open stream");
+    let out = engine
+        .ingest_cell_stream(BOARD, "lim", stream, None, 1 << 30, row_cap)
+        .await
+        .expect("ingest stream");
+
+    assert_eq!(out.total_rows, 500);
+    assert!(out.complete, "a row-capped run is a complete result");
+    assert_eq!(out.result.rows.len(), 500);
+}
