@@ -839,3 +839,164 @@ async fn slim_diff_keyless_and_keyed() {
     dbt_diff_scenario::assert_keyless(&*d, DiffDialect::Standard, prod, new_select).await;
     dbt_diff_scenario::assert_keyed(&*d, DiffDialect::Standard, prod, new_select).await;
 }
+
+// ── streaming ingestion (canvas path) ───────────────────────────────────────
+
+mod streaming_scenario;
+use streaming_scenario::BOARD;
+
+use arris_engines::{
+    CanvasEngine, CanvasError, QueryEngine, CELL_INGEST_BYTE_BUDGET, CELL_RESULT_PAGE_ROWS,
+};
+use tokio_util::sync::CancellationToken;
+
+fn canvas_engine() -> CanvasEngine {
+    streaming_scenario::canvas_engine("sqlite")
+}
+
+/// Seed `src(n INTEGER PK, label TEXT)` with rows 1..=count.
+async fn seed_numbers(driver: &dyn DatabaseDriver, count: u64) {
+    run(driver, "CREATE TABLE src (n INTEGER PRIMARY KEY, label TEXT)").await;
+    run(
+        driver,
+        &format!(
+            "INSERT INTO src WITH RECURSIVE seq(n) AS \
+             (SELECT 1 UNION ALL SELECT n+1 FROM seq WHERE n < {count}) \
+             SELECT n, 'row-' || n FROM seq"
+        ),
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn streaming_ingests_100k_rows_with_exact_totals_and_page() {
+    let driver = start_sqlite().await;
+    seed_numbers(driver.as_ref(), 100_000).await;
+    let engine = canvas_engine();
+
+    let stream = driver
+        .run_query_stream("SELECT n, label FROM src ORDER BY n", &[], QueryLanguage::Native)
+        .await
+        .expect("open stream");
+    let out = engine
+        .ingest_cell_stream(BOARD, "big", stream, None, CELL_INGEST_BYTE_BUDGET, None)
+        .await
+        .expect("ingest stream");
+
+    assert_eq!(out.total_rows, 100_000);
+    assert!(out.complete);
+    assert_eq!(out.result.rows.len(), CELL_RESULT_PAGE_ROWS);
+    let names: Vec<&str> = out.result.columns.iter().map(|c| c.name.as_str()).collect();
+    assert_eq!(names, vec!["n", "label"]);
+    assert_eq!(out.result.columns[0].type_hint, "INTEGER");
+    assert_eq!(out.result.columns[1].type_hint, "TEXT");
+    assert_eq!(out.result.rows[0][0], QueryValue::Int(1));
+    assert_eq!(out.result.rows[0][1], QueryValue::Text("row-1".into()));
+    assert_eq!(out.result.rows[499][0], QueryValue::Int(500));
+
+    // A chained cell aggregates the FULL cached result, not the 500-row page.
+    let agg = engine
+        .run_cell(BOARD, "sums", "SELECT COUNT(*) AS c, SUM(n) AS s FROM big")
+        .await
+        .expect("chained aggregate");
+    assert_eq!(agg.result.rows[0][0], QueryValue::Int(100_000));
+    assert_eq!(agg.result.rows[0][1], QueryValue::Int(5_000_050_000));
+}
+
+#[tokio::test]
+async fn streaming_cancel_registers_no_cache_entry_and_frees_the_connection() {
+    let driver = start_sqlite().await;
+    seed_numbers(driver.as_ref(), 1_000_000).await;
+    let engine = canvas_engine();
+
+    let stream = driver
+        .run_query_stream("SELECT n FROM src", &[], QueryLanguage::Native)
+        .await
+        .expect("open stream");
+
+    // Embedded engines finish 1M rows too fast to race a timer; a
+    // pre-cancelled token exercises the same abort path deterministically.
+    let token = CancellationToken::new();
+    token.cancel();
+
+    let err = engine
+        .ingest_cell_stream(BOARD, "huge", stream, Some(&token), CELL_INGEST_BYTE_BUDGET, None)
+        .await
+        .expect_err("cancel must fail the ingest");
+    assert!(matches!(err, CanvasError::Cancelled), "got {err:?}");
+
+    // The aborted cell was never registered, so downstream cannot read it.
+    let chained = engine.run_cell(BOARD, "agg", "SELECT COUNT(*) FROM huge").await;
+    assert!(chained.is_err(), "cancelled cell must not be queryable");
+
+    // Dropping the aborted stream must release the single connection.
+    let r = tokio::time::timeout(
+        std::time::Duration::from_secs(10),
+        driver.run_query("SELECT 1", &[], QueryLanguage::Native),
+    )
+    .await
+    .expect("connection stayed locked after the cancelled ingest")
+    .expect("query after cancel");
+    assert_eq!(r.rows[0][0], QueryValue::Int(1));
+}
+
+#[tokio::test]
+async fn streaming_byte_budget_truncates_and_reports_incomplete() {
+    let driver = start_sqlite().await;
+    seed_numbers(driver.as_ref(), 1_000_000).await;
+    let engine = canvas_engine();
+
+    let stream = driver
+        .run_query_stream("SELECT n FROM src ORDER BY n", &[], QueryLanguage::Native)
+        .await
+        .expect("open stream");
+    // A ~1 MiB budget admits a handful of 8k-row chunks, then stops.
+    let out = engine
+        .ingest_cell_stream(BOARD, "capped", stream, None, 1 << 20, None)
+        .await
+        .expect("ingest stream");
+
+    assert!(!out.complete, "budget stop must be surfaced, never silent");
+    assert!(out.total_rows >= CELL_RESULT_PAGE_ROWS as u64);
+    assert!(out.total_rows < 1_000_000, "budget must truncate the run");
+    assert_eq!(out.result.rows.len(), CELL_RESULT_PAGE_ROWS);
+
+    // The cached prefix stays queryable and matches the reported total.
+    let agg = engine
+        .run_cell(BOARD, "agg", "SELECT COUNT(*) AS c FROM capped")
+        .await
+        .expect("chained count");
+    assert_eq!(agg.result.rows[0][0], QueryValue::Int(out.total_rows as i64));
+}
+
+#[tokio::test]
+async fn streaming_cell_limit_wraps_sql_and_caps_to_500() {
+    let driver = start_sqlite().await;
+    seed_numbers(driver.as_ref(), 10_000).await;
+    let engine = canvas_engine();
+
+    // SQLite wraps via SubqueryOffset, so the database itself stops at 500 and
+    // no ingest-side row cap is needed.
+    let (sql, row_cap) = QueryEngine::apply_cell_limit(
+        "SELECT n FROM src ORDER BY n",
+        &driver.pagination_strategy(),
+        Some(500),
+    );
+    assert!(sql.contains("LIMIT 500"), "wrapped SQL:\n{sql}");
+    assert_eq!(row_cap, None);
+
+    let stream = driver
+        .run_query_stream(&sql, &[], QueryLanguage::Native)
+        .await
+        .expect("open stream");
+    let out = engine
+        .ingest_cell_stream(BOARD, "lim", stream, None, 1 << 30, row_cap)
+        .await
+        .expect("ingest stream");
+
+    assert_eq!(out.total_rows, 500);
+    assert!(out.complete, "a LIMIT-capped run is a complete result");
+    assert_eq!(out.result.rows.len(), 500);
+    assert_eq!(out.result.rows[0][0], QueryValue::Int(1));
+    assert_eq!(out.result.rows[499][0], QueryValue::Int(500));
+}
