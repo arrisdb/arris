@@ -365,12 +365,15 @@ impl CanvasEngine {
         cancel: Option<&CancellationToken>,
         row_cap: Option<u64>,
     ) -> Result<(QueryResult, CellIngestContinuation), CanvasError> {
+        // Fuse so a re-poll after the stream ends (empty result: phase 1 hits
+        // `None`, then `finish` still drains) yields `None` instead of panicking.
+        let mut chunks = rows.chunks.fuse().boxed();
         let mut builder = ArrowChunkBuilder::new(&rows.columns);
-        let columns = rows.columns.clone();
+        let columns = rows.columns;
         let mut page: Vec<Vec<QueryValue>> = Vec::new();
         let mut complete = true;
         while page.len() < CELL_RESULT_PAGE_ROWS {
-            let next = match Self::next_or_cancelled(&mut rows.chunks, cancel).await {
+            let next = match Self::next_or_cancelled(&mut chunks, cancel).await {
                 Ok(n) => n,
                 Err(e) => {
                     writer.abort();
@@ -417,10 +420,7 @@ impl CanvasEngine {
         };
         let cont = CellIngestContinuation {
             writer,
-            source: IngestSource::Rows {
-                chunks: rows.chunks,
-                builder,
-            },
+            source: IngestSource::Rows { chunks, builder },
             complete,
             row_cap,
         };
@@ -434,6 +434,8 @@ impl CanvasEngine {
         cancel: Option<&CancellationToken>,
         row_cap: Option<u64>,
     ) -> Result<(QueryResult, CellIngestContinuation), CanvasError> {
+        // Fuse: same reason as `start_rows` (re-poll after end must not panic).
+        let mut batches = batches.fuse().boxed();
         let mut page: Vec<RecordBatch> = Vec::new();
         let mut page_rows = 0usize;
         let mut complete = true;
@@ -836,6 +838,31 @@ mod tests {
             .unwrap();
         assert_eq!(int_at(&agg.result, 0, 0), 900);
         assert_eq!(int_at(&agg.result, 0, 1), (0..900).sum::<i64>());
+    }
+
+    #[tokio::test]
+    async fn terminal_empty_unfold_stream_finishes_without_panicking() {
+        // Regression: an unfold stream that ends immediately (empty result, e.g.
+        // a Mongo find on a missing collection) is polled by phase 1 (page fill)
+        // AND again by finish's drain. Without a fuse the second poll panics
+        // ("Unfold must not be polled after it returned None"), the ingest task
+        // dies, and the cell spins forever.
+        let engine = engine();
+        let stream = QueryStream::Rows(RowChunkStream {
+            columns: vec![col("n", "int64")],
+            chunks: futures::stream::unfold((), |_| async {
+                None::<(std::result::Result<Vec<Vec<QueryValue>>, DriverError>, ())>
+            })
+            .boxed(),
+        });
+        let (page, cont) = engine
+            .start_cell_ingest(BOARD, "empty", stream, None, CELL_INGEST_BYTE_BUDGET, None)
+            .await
+            .unwrap();
+        assert_eq!(page.rows.len(), 0);
+        let done = cont.finish(None).await.unwrap();
+        assert!(done.complete);
+        assert_eq!(done.total_rows, 0);
     }
 
     #[tokio::test]
