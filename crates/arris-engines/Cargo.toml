@@ -134,6 +134,9 @@ nix = { version = "0.31", features = ["signal"] }
 [dev-dependencies]
 tempfile = "3.27"
 rcgen = "0.13"
+# Raw HTTP for bulk-seeding the Elasticsearch streaming tests (the engine's
+# native path trims the trailing newline the _bulk API requires).
+reqwest = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 tokio-util = "0.7"
 testcontainers = "0.27"

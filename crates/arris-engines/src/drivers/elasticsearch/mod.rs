@@ -1,3 +1,4 @@
+mod constants;
 mod query;
 mod schema;
 
@@ -11,7 +12,7 @@ use tokio::sync::Mutex;
 
 use crate::{
     ColumnSpec, ConnectionConfig, DriverError, ExplainMode, MutationResult, PlanResult,
-    QueryLanguage, QueryResult, QueryValue, RowDelete, RowInsert, SchemaNode,
+    QueryLanguage, QueryResult, QueryStream, QueryValue, RowDelete, RowInsert, SchemaNode,
     SchemaNodeKind, TableRef,
 };
 use crate::drivers::errors::Result;
@@ -19,7 +20,8 @@ use crate::drivers::errors::Result;
 use crate::drivers::DatabaseDriver;
 
 use query::{
-    encode_path_part, es_value_to_query, flatten_source, parse_request, query_value_to_json,
+    encode_path_part, es_value_to_query, flatten_source, parse_request, post_sql_page,
+    query_value_to_json, sql_columns, sql_cursor, sql_first_payload, sql_rows, stream_sql,
 };
 use schema::{
     alias_nodes, data_stream_nodes, field_nodes_from_mapping, index_template_nodes, schema_path,
@@ -145,90 +147,23 @@ impl ElasticsearchDriver {
         ))
     }
 
-    /// POST a payload to the `_sql` endpoint and return the parsed JSON body,
-    /// surfacing Elasticsearch's structured error on a non-2xx status.
-    async fn post_sql(st: &EsState, payload: &Value) -> Result<Value> {
-        let url = format!("{}/_sql", st.base_url);
-        let resp = st
-            .client
-            .post(&url)
-            .header("content-type", "application/json")
-            .body(payload.to_string())
-            .send()
-            .await
-            .map_err(|e| DriverError::QueryFailed(e.to_string()))?;
-
-        let status = resp.status();
-        let body: Value = resp
-            .json()
-            .await
-            .map_err(|e| DriverError::QueryFailed(e.to_string()))?;
-
-        if !status.is_success() {
-            let err_msg = body["error"]["reason"]
-                .as_str()
-                .or_else(|| body["error"]["root_cause"][0]["reason"].as_str())
-                .or_else(|| body["error"].as_str())
-                .unwrap_or("Unknown error");
-            return Err(DriverError::QueryFailed(format!(
-                "HTTP {status}: {err_msg}"
-            )));
-        }
-
-        Ok(body)
-    }
-
-    fn es_rows(body: &Value) -> Vec<Vec<QueryValue>> {
-        body["rows"]
-            .as_array()
-            .map(|rs| {
-                rs.iter()
-                    .map(|row| {
-                        row.as_array()
-                            .map(|cells| cells.iter().map(es_value_to_query).collect())
-                            .unwrap_or_default()
-                    })
-                    .collect()
-            })
-            .unwrap_or_default()
-    }
-
     async fn run_sql_query(st: &EsState, sql: &str, started: Instant) -> Result<QueryResult> {
         Self::ensure_read_only_sql(sql)?;
 
         // First page carries the column metadata; subsequent pages are fetched by
-        // replaying the returned `cursor`. Following the cursor is required so a
-        // full-table federation scan returns every row instead of truncating at
-        // `fetch_size`. The cursor is absent on the final page (and is
-        // auto-closed by ES once exhausted).
-        let mut body = Self::post_sql(
-            st,
-            &serde_json::json!({
-                "query": sql.trim().trim_end_matches(';'),
-                "fetch_size": 1000,
-            }),
-        )
-        .await?;
+        // replaying the returned cursor so a full-table scan returns every row
+        // instead of truncating at `fetch_size`. The cursor is absent on the
+        // final page (and is auto-closed by ES once exhausted).
+        let sql_url = format!("{}/_sql", st.base_url);
+        let mut body = post_sql_page(&st.client, &sql_url, &sql_first_payload(sql)).await?;
+        let columns = sql_columns(&body);
+        let mut rows = sql_rows(&body);
 
-        let columns: Vec<ColumnSpec> = body["columns"]
-            .as_array()
-            .map(|cols| {
-                cols.iter()
-                    .map(|c| {
-                        ColumnSpec::new(
-                            c["name"].as_str().unwrap_or("?"),
-                            c["type"].as_str().unwrap_or("dynamic"),
-                        )
-                    })
-                    .collect()
-            })
-            .unwrap_or_default();
-
-        let mut rows = Self::es_rows(&body);
-
-        while let Some(cursor) = body["cursor"].as_str().filter(|c| !c.is_empty()) {
-            body = Self::post_sql(st, &serde_json::json!({ "cursor": cursor })).await?;
-            rows.extend(Self::es_rows(&body));
+        let mut cursor = sql_cursor(&body);
+        while let Some(c) = cursor {
+            body = post_sql_page(&st.client, &sql_url, &serde_json::json!({ "cursor": c })).await?;
+            rows.extend(sql_rows(&body));
+            cursor = sql_cursor(&body);
         }
 
         Ok(QueryResult {
@@ -458,6 +393,28 @@ impl DatabaseDriver for ElasticsearchDriver {
                 ..Default::default()
             })
         }
+    }
+
+    async fn run_query_stream(
+        &self,
+        text: &str,
+        params: &[QueryValue],
+        language: QueryLanguage,
+    ) -> Result<QueryStream> {
+        // Only SQL SELECT streams via the `_sql` cursor; native `_search` and
+        // writes are bounded or single-shot, so the materialized path is fine.
+        if language != QueryLanguage::Sql {
+            return Ok(QueryStream::from_materialized(
+                self.run_query(text, params, language).await?,
+            ));
+        }
+        Self::ensure_read_only_sql(text)?;
+        let (client, base_url) = {
+            let guard = self.inner.lock().await;
+            let st = guard.as_ref().ok_or(DriverError::NotConnected)?;
+            (st.client.clone(), st.base_url.clone())
+        };
+        Ok(QueryStream::Rows(stream_sql(client, base_url, text).await?))
     }
 
     async fn supports_explain(&self, _mode: ExplainMode) -> bool {

@@ -19,6 +19,7 @@ curl -sS -X DELETE "$ES_URL/products" >/dev/null || true
 curl -sS -X DELETE "$ES_URL/orders" >/dev/null || true
 curl -sS -X DELETE "$ES_URL/order_items" >/dev/null || true
 curl -sS -X DELETE "$ES_URL/logs" >/dev/null || true
+curl -sS -X DELETE "$ES_URL/events_10m" >/dev/null || true
 curl -sS -X DELETE "$ES_URL/_data_stream/metrics-prod" >/dev/null || true
 
 # =================================================================
@@ -355,6 +356,53 @@ es_post "/metrics-prod/_bulk" "application/x-ndjson" <<'NDJSON'
 {"create":{}}
 {"@timestamp":"2025-04-01T10:02:00Z","service":"worker","host":"worker-1","cpu_pct":0.81,"mem_bytes":734003200,"labels":{"region":"us-east","env":"dev"}}
 NDJSON
+
+# =================================================================
+# Large index for streaming-ingestion testing. 10M docs; refresh is
+# disabled during the bulk load and re-enabled after, so indexing stays
+# fast on the small container heap.
+# =================================================================
+
+es_put "/events_10m" <<'JSON'
+{
+  "settings": { "refresh_interval": "-1", "number_of_replicas": 0 },
+  "mappings": {
+    "properties": {
+      "id": { "type": "long" },
+      "user_id": { "type": "integer" },
+      "event_type": { "type": "keyword" },
+      "event_time": { "type": "date" },
+      "device": { "type": "keyword" },
+      "country": { "type": "keyword" },
+      "amount": { "type": "scaled_float", "scaling_factor": 100 }
+    }
+  }
+}
+JSON
+
+echo "Seeding events_10m (10,000,000 docs)..."
+TOTAL=10000000
+BATCH=10000
+i=0
+while [ $i -lt $TOTAL ]; do
+  end=$((i + BATCH))
+  awk -v s="$i" -v e="$end" 'BEGIN {
+    split("view click purchase signup logout", et, " ")
+    split("ios android web", dv, " ")
+    split("US GB DE CA AU JP", cc, " ")
+    for (n = s + 1; n <= e; n++) {
+      printf "{\"index\":{\"_id\":\"%d\"}}\n", n
+      printf "{\"id\":%d,\"user_id\":%d,\"event_type\":\"%s\",\"event_time\":\"2025-06-%02dT00:00:00Z\",\"device\":\"%s\",\"country\":\"%s\",\"amount\":%d.%02d}\n", \
+        n, n % 100000, et[(n % 5) + 1], (n % 28) + 1, dv[(n % 3) + 1], cc[(n % 6) + 1], n % 500, n % 100
+    }
+  }' | curl -sS -X POST "$ES_URL/events_10m/_bulk" \
+    -H 'Content-Type: application/x-ndjson' --data-binary @- >/dev/null
+  i=$end
+done
+
+es_put "/events_10m/_settings" <<'JSON'
+{ "index": { "refresh_interval": "1s" } }
+JSON
 
 curl -sS -X POST "$ES_URL/_refresh"
 
