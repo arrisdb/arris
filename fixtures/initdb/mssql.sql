@@ -360,3 +360,50 @@ GO
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'ix_invoices_paid_issued_at' AND object_id = OBJECT_ID(N'sales.invoices'))
     CREATE INDEX ix_invoices_paid_issued_at ON sales.invoices (paid, issued_at);
 GO
+
+-- =================================================================
+-- Large table (10M rows) for exercising streaming-chunk ingestion
+-- against the local container. Seeded in 1M-row batches so the
+-- transaction log stays bounded during load.
+-- =================================================================
+
+IF OBJECT_ID(N'dbo.events_10m', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.events_10m (
+        id         BIGINT PRIMARY KEY,
+        user_id    INT NOT NULL,
+        event_type NVARCHAR(20) NOT NULL,
+        device     NVARCHAR(20) NOT NULL,
+        country    CHAR(2) NOT NULL,
+        event_time DATETIME2(0) NOT NULL,
+        amount     DECIMAL(10,2) NOT NULL
+    );
+END;
+GO
+
+IF NOT EXISTS (SELECT 1 FROM dbo.events_10m)
+BEGIN
+    SET NOCOUNT ON;
+    DECLARE @batch INT = 1000000;
+    DECLARE @start BIGINT = 1;
+    DECLARE @total BIGINT = 10000000;
+    WHILE @start <= @total
+    BEGIN
+        INSERT INTO dbo.events_10m (id, user_id, event_type, device, country, event_time, amount)
+        SELECT
+            rn,
+            (rn % 100000) + 1,
+            CHOOSE((rn % 5) + 1, N'view', N'click', N'purchase', N'signup', N'logout'),
+            CHOOSE((rn % 3) + 1, N'ios', N'android', N'web'),
+            CHOOSE((rn % 4) + 1, 'US', 'GB', 'CA', 'DE'),
+            DATEADD(SECOND, rn % 31536000, '2025-01-01T00:00:00'),
+            CAST((rn % 10000) AS DECIMAL(10,2)) / 100
+        FROM (
+            SELECT TOP (@batch)
+                ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) + @start - 1 AS rn
+            FROM sys.all_objects a CROSS JOIN sys.all_objects b
+        ) AS t;
+        SET @start = @start + @batch;
+    END;
+END;
+GO
