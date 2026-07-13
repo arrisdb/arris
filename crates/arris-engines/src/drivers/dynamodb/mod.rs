@@ -30,13 +30,17 @@ use aws_config::BehaviorVersion;
 use aws_sdk_dynamodb::Client;
 use aws_sdk_dynamodb::config::{Credentials, Region};
 use aws_sdk_dynamodb::types::{AttributeValue, KeyType, ScalarAttributeType};
+use futures::stream::{self, StreamExt};
 use indexmap::IndexSet;
 
 use crate::drivers::DatabaseDriver;
+use crate::drivers::common::RowChunkPump;
+use crate::drivers::constants::STREAM_CHUNK_ROWS;
 use crate::drivers::errors::Result;
 use crate::{
     ConnectionConfig, DriverError, ExplainMode, MutationResult, PlanResult, QueryLanguage,
-    QueryResult, QueryValue, RowDelete, RowInsert, SchemaNode, SchemaNodeKind, TableRef, ValueMap,
+    QueryResult, QueryStream, QueryValue, RowChunkStream, RowDelete, RowInsert, SchemaNode,
+    SchemaNodeKind, TableRef, ValueMap,
 };
 
 use convert::{attr_value, item_value, type_name};
@@ -60,6 +64,16 @@ struct InsertPlan {
     table: String,
     columns: Vec<String>,
     rows: Vec<Vec<AttributeValue>>,
+}
+
+/// Cursor state for streaming a PartiQL read: the next page token and the
+/// current page's items not yet yielded. `next_token == None` means drained.
+struct PageState {
+    client: Client,
+    statement: String,
+    params: Option<Vec<AttributeValue>>,
+    next_token: Option<String>,
+    pending: std::vec::IntoIter<HashMap<String, AttributeValue>>,
 }
 
 #[derive(Default)]
@@ -165,20 +179,15 @@ impl DynamoDbDriver {
         cols
     }
 
-    /// Shapes a set of DynamoDB items into `(column specs, rows)`. Column order
-    /// follows the SELECT projection when supplied (DynamoDB returns items as
-    /// unordered attribute maps, so projection order would otherwise be lost);
-    /// otherwise the deterministic discovered order is used. Each column's
-    /// displayed type is inferred from the first non-null value in that column.
-    fn shape_items(
+    /// Ordered output column names for a set of items. Uses the SELECT projection
+    /// order only when it lines up with the returned data (at least one projected
+    /// name is present); a `*` or expression projection falls back to the
+    /// deterministic discovered order.
+    fn ordered_columns(
         items: &[HashMap<String, AttributeValue>],
         order: Option<&[String]>,
-    ) -> (Vec<crate::ColumnSpec>, Vec<Vec<QueryValue>>) {
-        // Use the projection order only when it lines up with the returned data
-        // (at least one projected name is present). A `*` or an expression
-        // projection yields names that do not match attribute keys, so fall back
-        // to discovery there.
-        let columns: Vec<String> = match order {
+    ) -> Vec<String> {
+        match order {
             Some(cols)
                 if !cols.is_empty()
                     && cols.iter().any(|c| items.iter().any(|it| it.contains_key(c))) =>
@@ -186,9 +195,16 @@ impl DynamoDbDriver {
                 cols.to_vec()
             }
             _ => Self::discovered_columns(items),
-        };
+        }
+    }
 
-        let column_specs = columns
+    /// Column specs for `columns`; each type is inferred from the first non-null
+    /// value in that column (falling back to any value, else `null`).
+    fn column_specs_for(
+        items: &[HashMap<String, AttributeValue>],
+        columns: &[String],
+    ) -> Vec<crate::ColumnSpec> {
+        columns
             .iter()
             .map(|name| {
                 let ty = items
@@ -200,18 +216,31 @@ impl DynamoDbDriver {
                     .unwrap_or("null");
                 crate::ColumnSpec::new(name.clone(), ty)
             })
-            .collect();
+            .collect()
+    }
 
-        let rows: Vec<Vec<QueryValue>> = items
+    /// Projects one item into a row aligned to `columns`, absent attrs as `Null`.
+    fn project_item(
+        item: &HashMap<String, AttributeValue>,
+        columns: &[String],
+    ) -> Vec<QueryValue> {
+        columns
             .iter()
-            .map(|item| {
-                columns
-                    .iter()
-                    .map(|col| item.get(col).map(item_value).unwrap_or(QueryValue::Null))
-                    .collect()
-            })
-            .collect();
+            .map(|col| item.get(col).map(item_value).unwrap_or(QueryValue::Null))
+            .collect()
+    }
 
+    /// Shapes a set of DynamoDB items into `(column specs, rows)`. Column order
+    /// follows the SELECT projection when supplied (DynamoDB returns items as
+    /// unordered attribute maps, so projection order would otherwise be lost);
+    /// otherwise the deterministic discovered order is used.
+    fn shape_items(
+        items: &[HashMap<String, AttributeValue>],
+        order: Option<&[String]>,
+    ) -> (Vec<crate::ColumnSpec>, Vec<Vec<QueryValue>>) {
+        let columns = Self::ordered_columns(items, order);
+        let column_specs = Self::column_specs_for(items, &columns);
+        let rows = items.iter().map(|item| Self::project_item(item, &columns)).collect();
         (column_specs, rows)
     }
 
@@ -772,6 +801,82 @@ impl DynamoDbDriver {
         result.elapsed = started.elapsed().as_secs_f64();
         Ok(result)
     }
+
+    /// Streams a `PartiQL` SELECT page by page over `NextToken`. Buffers the
+    /// first chunk to fix columns from real items (DynamoDB is schemaless), then
+    /// hands the sampled items plus a stream that follows `NextToken` to
+    /// `RowChunkPump`. Attributes that first appear after the first chunk get no
+    /// column, matching the buffered read's first-page behaviour.
+    async fn stream_read(
+        client: Client,
+        text: String,
+        params: Option<Vec<AttributeValue>>,
+    ) -> Result<RowChunkStream> {
+        let mut first: Vec<HashMap<String, AttributeValue>> = Vec::new();
+        let mut next_token: Option<String> = None;
+        loop {
+            let out = client
+                .execute_statement()
+                .statement(&text)
+                .set_parameters(params.clone())
+                .set_next_token(next_token.clone())
+                .send()
+                .await
+                .map_err(Self::query_err)?;
+            first.extend(out.items().iter().cloned());
+            next_token = out.next_token().map(str::to_owned);
+            if next_token.is_none() || first.len() >= STREAM_CHUNK_ROWS {
+                break;
+            }
+        }
+
+        let projection = Self::projection_list(&text);
+        let columns = Self::ordered_columns(&first, projection.as_deref());
+        let specs = Self::column_specs_for(&first, &columns);
+
+        let state = PageState {
+            client,
+            statement: text,
+            params,
+            next_token,
+            pending: Vec::new().into_iter(),
+        };
+        let rest = stream::unfold(state, |mut st| async move {
+            loop {
+                if let Some(item) = st.pending.next() {
+                    return Some((Ok(item), st));
+                }
+                let token = st.next_token.take()?;
+                match st
+                    .client
+                    .execute_statement()
+                    .statement(&st.statement)
+                    .set_parameters(st.params.clone())
+                    .set_next_token(Some(token))
+                    .send()
+                    .await
+                {
+                    Ok(out) => {
+                        let items: Vec<HashMap<String, AttributeValue>> = out.items().to_vec();
+                        st.next_token = out.next_token().map(str::to_owned);
+                        st.pending = items.into_iter();
+                    }
+                    Err(e) => {
+                        st.next_token = None;
+                        return Some((Err(Self::query_err(e)), st));
+                    }
+                }
+            }
+        });
+
+        let rows = stream::iter(first.into_iter().map(Ok::<_, DriverError>)).chain(rest);
+        let map_columns = columns;
+        Ok(RowChunkPump::spawn(
+            specs,
+            move || async move { Ok(rows) },
+            move |item: HashMap<String, AttributeValue>| Self::project_item(&item, &map_columns),
+        ))
+    }
 }
 
 #[async_trait]
@@ -983,6 +1088,32 @@ impl DatabaseDriver for DynamoDbDriver {
             return self.run_standard_insert(&client, text, started).await;
         }
         self.run_write(&client, text, partiql_params, started).await
+    }
+
+    async fn run_query_stream(
+        &self,
+        text: &str,
+        params: &[QueryValue],
+        language: QueryLanguage,
+    ) -> Result<QueryStream> {
+        // Only a plain SELECT read streams page-by-page over NextToken. ORDER BY
+        // needs the whole result buffered to sort in memory, and writes have no
+        // row stream, so both stay on the materialized path.
+        if !Self::is_read(text) {
+            return Ok(QueryStream::from_materialized(
+                self.run_query(text, params, language).await?,
+            ));
+        }
+        let (statement, order_terms) = Self::split_order_by(text);
+        if !order_terms.is_empty() {
+            return Ok(QueryStream::from_materialized(
+                self.run_query(text, params, language).await?,
+            ));
+        }
+        let client = self.client().await?;
+        Ok(QueryStream::Rows(
+            Self::stream_read(client, statement, Self::partiql_params(params)).await?,
+        ))
     }
 
     async fn explain_query(
@@ -1369,6 +1500,57 @@ mod tests {
         let (stmt, terms) = DynamoDbDriver::split_order_by("SELECT * FROM t");
         assert_eq!(stmt, "SELECT * FROM t");
         assert!(terms.is_empty());
+    }
+
+    #[test]
+    fn ordered_columns_uses_projection_when_data_matches() {
+        let mut item = HashMap::new();
+        item.insert("b".to_owned(), AttributeValue::N("1".into()));
+        item.insert("a".to_owned(), AttributeValue::N("2".into()));
+        let order = vec!["a".to_owned(), "b".to_owned()];
+        assert_eq!(
+            DynamoDbDriver::ordered_columns(&[item], Some(&order)),
+            vec!["a", "b"]
+        );
+    }
+
+    #[test]
+    fn ordered_columns_falls_back_to_discovery_when_projection_missing() {
+        let mut item = HashMap::new();
+        item.insert("zebra".to_owned(), AttributeValue::S("z".into()));
+        item.insert("apple".to_owned(), AttributeValue::S("a".into()));
+        // Projected names none of which exist -> sorted discovery order.
+        let order = vec!["nope".to_owned()];
+        assert_eq!(
+            DynamoDbDriver::ordered_columns(&[item], Some(&order)),
+            vec!["apple", "zebra"]
+        );
+    }
+
+    #[test]
+    fn column_specs_for_infers_type_from_first_non_null() {
+        let mut null_row = HashMap::new();
+        null_row.insert("v".to_owned(), AttributeValue::Null(true));
+        let mut num_row = HashMap::new();
+        num_row.insert("v".to_owned(), AttributeValue::N("5".into()));
+        let specs =
+            DynamoDbDriver::column_specs_for(&[null_row, num_row], &["v".to_owned()]);
+        assert_eq!(specs.len(), 1);
+        assert_eq!(specs[0].name, "v");
+        assert_eq!(specs[0].type_hint, "number");
+    }
+
+    #[test]
+    fn project_item_aligns_row_and_nulls_missing() {
+        let mut item = HashMap::new();
+        item.insert("id".to_owned(), AttributeValue::N("9".into()));
+        item.insert("name".to_owned(), AttributeValue::S("x".into()));
+        let cols = vec!["id".to_owned(), "missing".to_owned(), "name".to_owned()];
+        let row = DynamoDbDriver::project_item(&item, &cols);
+        assert_eq!(
+            row,
+            vec![QueryValue::Int(9), QueryValue::Null, QueryValue::Text("x".into())]
+        );
     }
 
     #[test]
