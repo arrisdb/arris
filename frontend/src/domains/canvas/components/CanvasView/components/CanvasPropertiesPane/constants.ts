@@ -33,10 +33,14 @@ const LINE_STYLE_OPTIONS: SelectOption[] = [
 const DEFAULT_SHAPE_FILL = "#3a3950";
 const DEFAULT_SHAPE_STROKE = "#7c6cff";
 const DEFAULT_TEXT_COLOR = "#e8e8ea";
+/// Swatch fallback when a text object has no background yet (the renderer stays
+/// transparent until the user actually picks one).
+const DEFAULT_TEXT_BG = "#2a2a33";
 
 export {
   DEFAULT_SHAPE_FILL,
   DEFAULT_SHAPE_STROKE,
+  DEFAULT_TEXT_BG,
   DEFAULT_TEXT_COLOR,
   KIND_LABEL,
   LINE_STYLE_OPTIONS,

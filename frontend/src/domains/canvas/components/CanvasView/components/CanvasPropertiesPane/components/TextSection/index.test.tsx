@@ -8,25 +8,62 @@ describe("TextSection", () => {
   it("writes font size and toggles bold", () => {
     const onChange = vi.fn();
     const comp = makeComponent({ kind: "text", id: "t" });
-    const { container, getByTitle } = render(
+    const { container, getByLabelText } = render(
       <TextSection tabId="t" component={comp} onChange={onChange} />,
     );
     const size = container.querySelector('input[type="number"]') as HTMLInputElement;
     fireEvent.change(size, { target: { value: "24" } });
     expect(onChange).toHaveBeenCalledWith({ style: { fontSize: 24 } });
 
-    fireEvent.click(getByTitle("Bold"));
+    fireEvent.click(getByLabelText("Bold"));
     expect(onChange).toHaveBeenCalledWith({ style: { bold: true } });
+  });
+
+  it("toggles italic, underline, and strike run styles", () => {
+    const onChange = vi.fn();
+    const comp = makeComponent({ kind: "text", id: "t" });
+    const { getByLabelText } = render(
+      <TextSection tabId="t" component={comp} onChange={onChange} />,
+    );
+    fireEvent.click(getByLabelText("Italic"));
+    expect(onChange).toHaveBeenCalledWith({ style: { italic: true } });
+    fireEvent.click(getByLabelText("Underline"));
+    expect(onChange).toHaveBeenCalledWith({ style: { underline: true } });
+    fireEvent.click(getByLabelText("Strikethrough"));
+    expect(onChange).toHaveBeenCalledWith({ style: { strike: true } });
+  });
+
+  it("clears a run style that is already active", () => {
+    const onChange = vi.fn();
+    const comp = makeComponent({ kind: "text", id: "t" });
+    if (comp.kind === "text") comp.style = { bold: true };
+    const { getByLabelText } = render(
+      <TextSection tabId="t" component={comp} onChange={onChange} />,
+    );
+    fireEvent.click(getByLabelText("Bold"));
+    expect(onChange).toHaveBeenCalledWith({ style: { bold: false } });
   });
 
   it("writes alignment", () => {
     const onChange = vi.fn();
     const comp = makeComponent({ kind: "text", id: "t" });
-    const { getByTitle } = render(
+    const { getByLabelText } = render(
       <TextSection tabId="t" component={comp} onChange={onChange} />,
     );
-    fireEvent.click(getByTitle("Align center"));
+    fireEvent.click(getByLabelText("Align center"));
     expect(onChange).toHaveBeenCalledWith({ style: { align: "center" } });
+  });
+
+  it("writes text and background colours", () => {
+    const onChange = vi.fn();
+    const comp = makeComponent({ kind: "text", id: "t" });
+    const { getByLabelText } = render(
+      <TextSection tabId="t" component={comp} onChange={onChange} />,
+    );
+    fireEvent.change(getByLabelText("Text colour"), { target: { value: "#112233" } });
+    expect(onChange).toHaveBeenCalledWith({ style: { color: "#112233" } });
+    fireEvent.change(getByLabelText("Background colour"), { target: { value: "#445566" } });
+    expect(onChange).toHaveBeenCalledWith({ style: { backgroundColor: "#445566" } });
   });
 
   it("renders nothing for a non-text object", () => {
@@ -37,11 +74,11 @@ describe("TextSection", () => {
     expect(container.querySelector(".mdbc-pane-form")).toBeNull();
   });
 
-  it("uses the compact colour swatch", () => {
+  it("uses compact colour swatches for text and background", () => {
     const comp = makeComponent({ kind: "text", id: "t" });
     const { container } = render(
       <TextSection tabId="t" component={comp} onChange={vi.fn()} />,
     );
-    expect(container.querySelectorAll(".mdbc-canvas-color")).toHaveLength(1);
+    expect(container.querySelectorAll(".mdbc-canvas-color")).toHaveLength(2);
   });
 });

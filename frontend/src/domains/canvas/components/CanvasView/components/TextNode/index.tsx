@@ -27,11 +27,24 @@ function TextNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
   const style = component.style ?? {};
   const align = style.align ?? "left";
   // Text styling rides CSS custom properties (the inline-style guard allows only
-  // `--`-prefixed props); bold + alignment ride classes the stylesheet keys off.
+  // `--`-prefixed props); weight/style/decoration + alignment ride classes.
   const css = {
     "--canvas-text-fs": `${style.fontSize ?? 16}px`,
     "--canvas-text-color": style.color ?? "var(--m-fg)",
+    "--canvas-text-bg": style.backgroundColor ?? "transparent",
   } as CSSProperties;
+  const classes = [
+    "nowheel",
+    "mdbc-canvas-text-input",
+    `align-${align}`,
+    style.bold && "bold",
+    style.italic && "italic",
+    style.underline && "underline",
+    style.strike && "strike",
+    editing && "nodrag",
+  ]
+    .filter(Boolean)
+    .join(" ");
   return (
     <>
       <CanvasResizer tabId={tabId} id={id} visible={selected} />
@@ -41,7 +54,7 @@ function TextNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
       >
         <textarea
           ref={inputRef}
-          className={`nowheel mdbc-canvas-text-input align-${align}${style.bold ? " bold" : ""}${editing ? " nodrag" : ""}`}
+          className={classes}
           style={css}
           value={component.text}
           placeholder="Double-click to edit"

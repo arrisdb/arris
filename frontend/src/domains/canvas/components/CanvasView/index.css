@@ -326,9 +326,9 @@
   resize: none;
   border: none;
   outline: none;
-  background: transparent;
-  /* Font size + colour are driven by the properties pane via CSS custom
-     properties (with sensible fallbacks). Alignment + weight ride classes. */
+  /* Font size + colours are driven by the properties pane via CSS custom
+     properties (with sensible fallbacks). Alignment + run styles ride classes. */
+  background: var(--canvas-text-bg, transparent);
   color: var(--canvas-text-color, var(--m-fg));
   font-family: var(--m-font);
   font-size: var(--canvas-text-fs, var(--m-fs-md));
@@ -337,6 +337,10 @@
 }
 
 .mdbc-canvas-text-input.bold { font-weight: 700; }
+.mdbc-canvas-text-input.italic { font-style: italic; }
+.mdbc-canvas-text-input.underline { text-decoration: underline; }
+.mdbc-canvas-text-input.strike { text-decoration: line-through; }
+.mdbc-canvas-text-input.underline.strike { text-decoration: underline line-through; }
 .mdbc-canvas-text-input.align-left { text-align: left; }
 .mdbc-canvas-text-input.align-center { text-align: center; }
 .mdbc-canvas-text-input.align-right { text-align: right; }

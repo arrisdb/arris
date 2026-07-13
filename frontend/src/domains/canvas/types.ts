@@ -18,8 +18,12 @@ type LineStyle = "solid" | "dashed" | "dotted";
 interface TextStyle {
   fontSize?: number;
   bold?: boolean;
+  italic?: boolean;
+  underline?: boolean;
+  strike?: boolean;
   align?: TextAlign;
   color?: string;
+  backgroundColor?: string;
 }
 
 interface ShapeStyle {
