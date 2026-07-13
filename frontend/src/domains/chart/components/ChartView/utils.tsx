@@ -969,7 +969,7 @@ function chartEmptyMessage(
   if (error) return error;
   if (!result) return "Run a query to see a chart";
   if (!spec || !spec.kind || !spec.xColumn || spec.yColumns.length === 0) {
-    return "Customize chart";
+    return "Configure the chart to view the data";
   }
   if (!hasData) return "No data";
   return null;

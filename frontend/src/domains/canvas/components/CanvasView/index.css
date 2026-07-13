@@ -548,16 +548,20 @@
   position: relative;
 }
 
-/* Bottom status bar: shows the query/chart error in red. Only rendered when
-   something went wrong; wraps long schema-error text. */
+/* Bottom status bar: the sample-size and last-refresh readout (muted), or the
+   query/chart error in red (.error). Wraps long schema-error text. */
 .mdbc-canvas-chart-status {
   flex: 0 0 auto;
   padding: 6px 10px;
   border-top: 1px solid var(--m-sep);
   font-size: var(--m-fs-xs);
-  color: var(--m-red);
+  color: var(--m-fg-3);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+
+.mdbc-canvas-chart-status.error {
+  color: var(--m-red);
 }
 
 /* ── sticky note ──────────────────────────────────────────────────────────── */

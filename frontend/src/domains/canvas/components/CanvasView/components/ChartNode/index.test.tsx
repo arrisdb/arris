@@ -178,6 +178,36 @@ describe("ChartNode", () => {
     expect(screen.getByTestId("chart-node-error").textContent).toContain("No field named device");
   });
 
+  it("shows a sample-size and refresh status once the source has run", async () => {
+    useCanvasStore.getState().ensureBoard(TAB, "");
+    useCanvasStore
+      .getState()
+      .addComponent(TAB, makeComponent({ kind: "query", id: "q", title: "Sales" }));
+    useCanvasStore.getState().addComponent(
+      TAB,
+      makeComponent({
+        kind: "chart",
+        id: "c",
+        sourceQueryId: "q",
+        maxRows: 250,
+        spec: { kind: "bar", xColumn: "event_type", yColumns: [] },
+      }),
+    );
+    useCanvasStore.getState().setRun(TAB, "q", {
+      result: { columns: [{ name: "event_type", type_hint: "text" }], rows: [], elapsed: 0 },
+      totalRows: 1000,
+      endedAt: 1_700_000_000_000,
+    });
+    render(
+      <ReactFlowProvider>
+        <ChartNode {...nodeProps("c")} />
+      </ReactFlowProvider>,
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId("chart-node-status").textContent).toContain("up to 250 rows sampled"),
+    );
+  });
+
   it("does not query when the source has not produced a result", () => {
     useCanvasStore.getState().ensureBoard(TAB, "");
     useCanvasStore

@@ -47,7 +47,7 @@ describe("ChartView", () => {
 
   it("prompts to customize when spec has no x/y", () => {
     render(<ChartView spec={undefined} result={RESULT} onEdit={vi.fn()} />);
-    expect(screen.getByTestId("chart-view-empty").textContent).toContain("Customize chart");
+    expect(screen.getByTestId("chart-view-empty").textContent).toContain("Configure the chart to view the data");
   });
 
   it("shows running state", () => {

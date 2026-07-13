@@ -4,11 +4,13 @@ import type { ChartSpec, QueryResult } from "@shared";
 import { ChartView, reconcileChartSpec } from "@domains/chart";
 
 import { useCanvasStore } from "../../../../hooks";
+import { DEFAULT_CHART_MAX_ROWS } from "../../../../constants";
 import { buildChartQuery, sanitizeCellTitle } from "../../../../utils";
 import { queryCanvasCacheIPC } from "../../../../ipc";
 import type { CanvasNodeData } from "../../types";
 import { CanvasResizer } from "../CanvasResizer";
 import { CHART_FALLBACK_TITLE } from "./constants";
+import { chartStatusSummary } from "./utils";
 
 /// The aggregated (or sampled) result the chart renders, fetched from the source
 /// cell's FULL cached result over IPC. Independent of the source's 500-row page.
@@ -96,6 +98,15 @@ function ChartNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
   const title = component.title || sourceName || CHART_FALLBACK_TITLE;
   const error = sourceRun?.error ?? agg.error;
 
+  // Fall back to the source's result when the chart has nothing to plot yet (no
+  // measure picked), so ChartView shows "Configure the chart..." instead of the
+  // "Run a query" state even though the source already ran.
+  const viewResult = agg.result ?? (query ? undefined : sourceResult);
+  const sampleCap = maxRows && maxRows > 0 ? maxRows : DEFAULT_CHART_MAX_ROWS;
+  const status = sourceResult
+    ? chartStatusSummary(agg.result?.rows.length, sampleCap, sourceRun?.endedAt)
+    : null;
+
   return (
     <>
       <CanvasResizer tabId={tabId} id={id} visible={selected} />
@@ -106,14 +117,18 @@ function ChartNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
         <div className="mdbc-canvas-chart-body">
           <ChartView
             spec={renderSpec}
-            result={agg.result}
+            result={viewResult}
             isRunning={sourceRun?.running || agg.loading}
             onEdit={() => {}}
           />
         </div>
         {error ? (
-          <div className="mdbc-canvas-chart-status" data-testid="chart-node-error">
+          <div className="mdbc-canvas-chart-status error" data-testid="chart-node-error">
             {error}
+          </div>
+        ) : status ? (
+          <div className="mdbc-canvas-chart-status" data-testid="chart-node-status">
+            {status}
           </div>
         ) : null}
       </div>
