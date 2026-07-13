@@ -149,8 +149,9 @@ function runStreamingSummary(result: QueryResult): string {
   return `first ${rows.toLocaleString()} rows · loading all…`;
 }
 
-// One-line status for a finished run: "first N of M rows" past one page, with
-// a trailing "+" when the ingestion byte budget truncated the run.
+// One-line status for a finished run: the FULL row count (the cell shows no rows
+// inline, a bound table does, so the page size is irrelevant here). A trailing
+// "+" marks a run the ingestion byte budget truncated.
 function runResultSummary(
   result: QueryResult,
   totalRows?: number,
@@ -161,10 +162,7 @@ function runResultSummary(
   const columnsPart = `${cols} column${cols === 1 ? "" : "s"}`;
   const truncated = complete === false;
   const total = Math.max(totalRows ?? rows, rows);
-  if (truncated || total > rows) {
-    return `first ${rows} of ${total}${truncated ? "+" : ""} rows · ${columnsPart}`;
-  }
-  return `${rows} row${rows === 1 ? "" : "s"} · ${columnsPart}`;
+  return `${total}${truncated ? "+" : ""} row${total === 1 ? "" : "s"} · ${columnsPart}`;
 }
 
 export {
