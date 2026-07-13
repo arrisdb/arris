@@ -1,14 +1,13 @@
+mod constants;
 mod query;
 pub mod schema_registry;
 pub mod sql_parser;
 
-use std::time::Duration;
-
 use async_trait::async_trait;
 use crate::{
     ConnectionConfig, DriverError, ExplainMode, MutationResult, PlanResult,
-    QueryLanguage, QueryResult, QueryValue, RowDelete, RowInsert, SchemaNode,
-    SchemaNodeKind, TableRef,
+    QueryLanguage, QueryResult, QueryStream, QueryValue, RowDelete, RowInsert,
+    SchemaNode, SchemaNodeKind, TableRef,
 };
 use crate::drivers::errors::Result;
 use rdkafka::admin::AdminClient;
@@ -18,12 +17,9 @@ use rdkafka::ClientConfig;
 use tokio::sync::Mutex;
 
 use crate::drivers::DatabaseDriver;
+use constants::METADATA_TIMEOUT;
 use schema_registry::SchemaRegistryClient;
 use sql_parser::parse_kafka_sql;
-
-const MAX_ROWS: usize = 10_000;
-const CONSUME_TIMEOUT: Duration = Duration::from_secs(30);
-const METADATA_TIMEOUT: Duration = Duration::from_secs(10);
 
 pub struct KafkaDriver {
     inner: Mutex<Option<KafkaState>>,
@@ -234,6 +230,32 @@ impl DatabaseDriver for KafkaDriver {
             elapsed: start.elapsed().as_secs_f64(),
             ..Default::default()
         })
+    }
+
+    async fn run_query_stream(
+        &self,
+        text: &str,
+        params: &[QueryValue],
+        language: QueryLanguage,
+    ) -> Result<QueryStream> {
+        let parsed = parse_kafka_sql(text).map_err(|e| DriverError::QueryFailed(e.to_string()))?;
+
+        // GROUP BY / ORDER BY buffer the whole result to aggregate or sort, so
+        // they stay on the materialized path; plain projections stream.
+        if !query::is_streamable(&parsed) {
+            return Ok(QueryStream::from_materialized(
+                self.run_query(text, params, language).await?,
+            ));
+        }
+
+        let (cc, registry) = {
+            let guard = self.inner.lock().await;
+            let state = guard.as_ref().ok_or(DriverError::NotConnected)?;
+            (state.client_config.clone(), state.schema_registry.clone())
+        };
+        Ok(QueryStream::Rows(
+            query::stream_query(cc, parsed, registry).await?,
+        ))
     }
 
     async fn supports_explain(&self, _mode: ExplainMode) -> bool {

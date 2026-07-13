@@ -2,6 +2,7 @@ use anyhow::{Context, Result};
 use crate::{ColumnSpec, SchemaNode, SchemaNodeKind};
 use serde::Deserialize;
 
+#[derive(Clone)]
 pub struct SchemaRegistryClient {
     base_url: String,
     client: reqwest::Client,
@@ -46,7 +47,9 @@ impl SchemaRegistryClient {
         Ok(subjects)
     }
 
-    pub async fn get_columns_for_subject(&self, subject: &str) -> Result<Vec<ColumnSpec>> {
+    /// `None` when the subject has no registered schema (404) or an empty one, so
+    /// the caller falls back to sampling rows rather than a bogus `value` column.
+    pub async fn get_columns_for_subject(&self, subject: &str) -> Result<Option<Vec<ColumnSpec>>> {
         let url = format!("{}/subjects/{}/versions/latest", self.base_url, subject);
         let resp = self
             .client
@@ -56,7 +59,7 @@ impl SchemaRegistryClient {
             .context("Schema Registry: failed to get schema")?;
 
         if !resp.status().is_success() {
-            return Ok(vec![fallback_value_column()]);
+            return Ok(None);
         }
 
         let schema_resp: SchemaResponse = resp.json().await.context("Schema Registry: bad response")?;
@@ -65,7 +68,7 @@ impl SchemaRegistryClient {
 
     pub async fn get_topic_schema_nodes(&self, topic: &str) -> Result<Vec<SchemaNode>> {
         let subject = format!("{topic}-value");
-        let columns = self.get_columns_for_subject(&subject).await?;
+        let columns = self.get_columns_for_subject(&subject).await?.unwrap_or_default();
         Ok(columns
             .into_iter()
             .map(|col| SchemaNode {
@@ -79,25 +82,24 @@ impl SchemaRegistryClient {
     }
 }
 
-fn parse_avro_columns(schema_json: &str) -> Result<Vec<ColumnSpec>> {
+fn parse_avro_columns(schema_json: &str) -> Result<Option<Vec<ColumnSpec>>> {
     let schema: AvroSchema =
         serde_json::from_str(schema_json).context("Failed to parse Avro schema")?;
 
     if schema.fields.is_empty() {
-        return Ok(vec![fallback_value_column()]);
+        return Ok(None);
     }
 
-    Ok(schema
-        .fields
-        .iter()
-        .map(|f| {
-            let type_hint = avro_type_to_hint(&f.field_type);
-            ColumnSpec {
+    Ok(Some(
+        schema
+            .fields
+            .iter()
+            .map(|f| ColumnSpec {
                 name: f.name.clone(),
-                type_hint,
-            }
-        })
-        .collect())
+                type_hint: avro_type_to_hint(&f.field_type),
+            })
+            .collect(),
+    ))
 }
 
 fn avro_type_to_hint(val: &serde_json::Value) -> String {
@@ -151,6 +153,25 @@ pub fn columns_from_json_sample(sample: &serde_json::Value) -> Vec<ColumnSpec> {
     }
 }
 
+/// Column union over sampled rows: first-seen field order, and a null hint gets
+/// upgraded to the first concrete type seen for that field.
+pub fn columns_from_rows(rows: &[serde_json::Value]) -> Vec<ColumnSpec> {
+    let mut union: indexmap::IndexMap<String, ColumnSpec> = indexmap::IndexMap::new();
+    for row in rows {
+        for col in columns_from_json_sample(row) {
+            union
+                .entry(col.name.clone())
+                .and_modify(|existing| {
+                    if existing.type_hint == "null" && col.type_hint != "null" {
+                        existing.type_hint = col.type_hint.clone();
+                    }
+                })
+                .or_insert(col);
+        }
+    }
+    union.into_values().collect()
+}
+
 fn json_value_type(val: &serde_json::Value) -> String {
     match val {
         serde_json::Value::Null => "null".to_string(),
@@ -183,7 +204,7 @@ mod tests {
                 {"name": "email", "type": ["null", "string"]}
             ]
         }"#;
-        let cols = parse_avro_columns(schema).unwrap();
+        let cols = parse_avro_columns(schema).unwrap().unwrap();
         assert_eq!(cols.len(), 3);
         assert_eq!(cols[0].name, "id");
         assert_eq!(cols[0].type_hint, "long");
@@ -194,11 +215,9 @@ mod tests {
     }
 
     #[test]
-    fn parse_avro_empty_fallback() {
+    fn parse_avro_no_fields_is_none() {
         let schema = r#"{"type": "string"}"#;
-        let cols = parse_avro_columns(schema).unwrap();
-        assert_eq!(cols.len(), 1);
-        assert_eq!(cols[0].name, "value");
+        assert!(parse_avro_columns(schema).unwrap().is_none());
     }
 
     #[test]
@@ -210,7 +229,7 @@ mod tests {
                 {"name": "data", "type": {"type": "map", "values": "string"}}
             ]
         }"#;
-        let cols = parse_avro_columns(schema).unwrap();
+        let cols = parse_avro_columns(schema).unwrap().unwrap();
         assert_eq!(cols[0].type_hint, "map");
     }
 
