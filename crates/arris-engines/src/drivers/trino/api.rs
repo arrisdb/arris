@@ -1,5 +1,6 @@
 use std::time::Duration;
 
+use futures::stream::{BoxStream, StreamExt};
 use reqwest::{Certificate, Client};
 use serde::Deserialize;
 use serde_json::Value;
@@ -7,6 +8,11 @@ use serde_json::Value;
 use crate::drivers::errors::Result;
 use crate::DriverError;
 
+/// One raw Trino row (JSON cells) or a paging error, as delivered by the lazy
+/// `nextUri` walk.
+pub(super) type RowStream = BoxStream<'static, std::result::Result<Vec<Value>, DriverError>>;
+
+#[derive(Clone)]
 pub(super) struct TrinoApi {
     http: Client,
     base_url: String,
@@ -59,9 +65,7 @@ impl TrinoApi {
         })
     }
 
-    /// Run a statement to completion, following `nextUri` links until the
-    /// query finishes, accumulating columns and rows along the way.
-    pub(super) async fn query(&self, sql: &str) -> Result<TrinoResponse> {
+    fn post_req(&self, sql: &str) -> reqwest::RequestBuilder {
         let mut req = self
             .http
             .post(format!("{}/v1/statement", self.base_url))
@@ -77,8 +81,13 @@ impl TrinoApi {
         if let Some(password) = &self.password {
             req = req.basic_auth(&self.user, Some(password));
         }
+        req
+    }
 
-        let mut page = self.send(req).await?;
+    /// Run a statement to completion, following `nextUri` links until the
+    /// query finishes, accumulating columns and rows along the way.
+    pub(super) async fn query(&self, sql: &str) -> Result<TrinoResponse> {
+        let mut page = self.send(self.post_req(sql)).await?;
 
         let mut columns: Vec<TrinoColumn> = Vec::new();
         let mut rows: Vec<Vec<Value>> = Vec::new();
@@ -124,6 +133,42 @@ impl TrinoApi {
         req
     }
 
+    /// Follow `nextUri` pages only until the columns are known, then hand back a
+    /// lazy stream that walks the remaining pages on demand. Trino applies
+    /// ORDER BY / aggregation / LIMIT server-side, so paged rows are already
+    /// final and stream without any in-driver reordering.
+    pub(super) async fn open_row_stream(&self, sql: &str) -> Result<(Vec<TrinoColumn>, RowStream)> {
+        let mut page = self.send(self.post_req(sql)).await?;
+        let mut columns: Vec<TrinoColumn> = Vec::new();
+        let mut buffered: Vec<Vec<Value>> = Vec::new();
+        loop {
+            if let Some(err) = page.error {
+                return Err(DriverError::QueryFailed(err.message));
+            }
+            if columns.is_empty() {
+                if let Some(cols) = page.columns.take() {
+                    columns = cols;
+                }
+            }
+            if let Some(data) = page.data.take() {
+                buffered.extend(data);
+            }
+            if !columns.is_empty() {
+                break;
+            }
+            match page.next_uri.take() {
+                Some(next) => page = self.send(self.authed_get(&next)).await?,
+                None => break,
+            }
+        }
+        let cursor = PageCursor {
+            api: self.clone(),
+            next_uri: page.next_uri.take(),
+            pending: buffered.into_iter(),
+        };
+        Ok((columns, cursor.into_row_stream()))
+    }
+
     async fn send(&self, req: reqwest::RequestBuilder) -> Result<StatementPage> {
         let resp = req
             .send()
@@ -138,6 +183,43 @@ impl TrinoApi {
             return Err(DriverError::QueryFailed(raw));
         }
         serde_json::from_str(&raw).map_err(|e| DriverError::QueryFailed(e.to_string()))
+    }
+}
+
+/// Lazy `nextUri` walk: drains the current page's buffered rows, then fetches
+/// the next page on demand. Owns a cheap `TrinoApi` clone so the stream outlives
+/// the connection guard.
+struct PageCursor {
+    api: TrinoApi,
+    next_uri: Option<String>,
+    pending: std::vec::IntoIter<Vec<Value>>,
+}
+
+impl PageCursor {
+    fn into_row_stream(self) -> RowStream {
+        futures::stream::unfold(self, |mut cursor| async move {
+            loop {
+                if let Some(row) = cursor.pending.next() {
+                    return Some((Ok(row), cursor));
+                }
+                let url = cursor.next_uri.take()?;
+                match cursor.api.send(cursor.api.authed_get(&url)).await {
+                    Ok(mut page) => {
+                        if let Some(err) = page.error {
+                            cursor.next_uri = None;
+                            return Some((Err(DriverError::QueryFailed(err.message)), cursor));
+                        }
+                        cursor.pending = page.data.take().unwrap_or_default().into_iter();
+                        cursor.next_uri = page.next_uri.take();
+                    }
+                    Err(e) => {
+                        cursor.next_uri = None;
+                        return Some((Err(e), cursor));
+                    }
+                }
+            }
+        })
+        .boxed()
     }
 }
 

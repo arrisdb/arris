@@ -13,13 +13,13 @@ use crate::drivers::sql_builder::SqlBuilder;
 use crate::drivers::{DatabaseDriver, PaginationStrategy};
 use crate::{
     ConnectionConfig, DriverError, ExplainMode, MutationResult, PlanAttribute, PlanNode,
-    PlanResult, QueryLanguage, QueryResult, QueryValue, RowDelete, RowInsert, SchemaNode,
-    TableRef,
+    PlanResult, QueryLanguage, QueryResult, QueryStream, QueryValue, RowDelete, RowInsert,
+    SchemaNode, TableRef,
 };
 
 use api::TrinoApi;
 use schema::{build_trino_schema, build_trino_schema_tree};
-use values::response_to_query_result;
+use values::{response_to_query_result, row_chunk_stream};
 
 pub struct TrinoDriver {
     api: Mutex<Option<TrinoApi>>,
@@ -147,6 +147,28 @@ impl DatabaseDriver for TrinoDriver {
                 ..Default::default()
             })
         }
+    }
+
+    async fn run_query_stream(
+        &self,
+        text: &str,
+        params: &[QueryValue],
+        language: QueryLanguage,
+    ) -> Result<QueryStream> {
+        // Only row-returning statements stream; DML/DDL yield an update count and
+        // fall back to the materialized path.
+        if !self.looks_like_select(text) {
+            return Ok(QueryStream::from_materialized(
+                self.run_query(text, params, language).await?,
+            ));
+        }
+        // Clone the handle out of the guard so the paging task runs lock-free.
+        let api = {
+            let guard = self.api.lock().await;
+            guard.as_ref().ok_or(DriverError::NotConnected)?.clone()
+        };
+        let (columns, rows) = api.open_row_stream(text).await?;
+        Ok(QueryStream::Rows(row_chunk_stream(columns, rows)))
     }
 
     async fn explain_query(
