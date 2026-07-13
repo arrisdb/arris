@@ -81,6 +81,53 @@ describe("ChartNode", () => {
     expect(sql).toContain("FROM sales");
   });
 
+  it("defaults the top-bar title to the bound query's name", () => {
+    useCanvasStore.getState().ensureBoard(TAB, "");
+    useCanvasStore
+      .getState()
+      .addComponent(TAB, makeComponent({ kind: "query", id: "q", title: "Sales" }));
+    useCanvasStore.getState().addComponent(
+      TAB,
+      makeComponent({
+        kind: "chart",
+        id: "c",
+        sourceQueryId: "q",
+        spec: { kind: "bar", xColumn: "x", yColumns: ["y"] },
+      }),
+    );
+    render(
+      <ReactFlowProvider>
+        <ChartNode {...nodeProps("c")} />
+      </ReactFlowProvider>,
+    );
+    expect(screen.getByText("Sales")).toBeTruthy();
+  });
+
+  it("shows the source run error in the bottom status bar", () => {
+    useCanvasStore.getState().ensureBoard(TAB, "");
+    useCanvasStore
+      .getState()
+      .addComponent(TAB, makeComponent({ kind: "query", id: "q", title: "Sales" }));
+    useCanvasStore.getState().addComponent(
+      TAB,
+      makeComponent({
+        kind: "chart",
+        id: "c",
+        sourceQueryId: "q",
+        spec: { kind: "bar", xColumn: "x", yColumns: ["y"] },
+      }),
+    );
+    useCanvasStore
+      .getState()
+      .setRun(TAB, "q", { error: "query engine error: No field named device" });
+    render(
+      <ReactFlowProvider>
+        <ChartNode {...nodeProps("c")} />
+      </ReactFlowProvider>,
+    );
+    expect(screen.getByTestId("chart-node-error").textContent).toContain("No field named device");
+  });
+
   it("does not query when the source has not produced a result", () => {
     useCanvasStore.getState().ensureBoard(TAB, "");
     useCanvasStore

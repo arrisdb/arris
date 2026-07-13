@@ -34,7 +34,7 @@ function ChartSectionBody({
 
   return (
     <>
-      <div className="mdbc-pane-form">
+      <div className="mdbc-pane-form mdbc-canvas-chart-source">
         <span className="mdbc-pane-label">Source query</span>
         <Select
           value={component.sourceQueryId ?? ""}
@@ -48,8 +48,7 @@ function ChartSectionBody({
           type="number"
           min={1}
           className="mdbc-pane-input"
-          value={component.maxRows ?? ""}
-          placeholder={`Default (${DEFAULT_CHART_MAX_ROWS})`}
+          value={component.maxRows ?? DEFAULT_CHART_MAX_ROWS}
           onChange={(e) => {
             const n = Number(e.target.value);
             onChange({ maxRows: e.target.value === "" || n <= 0 ? undefined : n });

@@ -12,6 +12,7 @@ import type {
   CurveType,
   LegendPosition,
   LineStyle,
+  NumberFormat,
   SortOrder,
   StackMode,
   YAxisScale,
@@ -122,6 +123,8 @@ function buildChartEditorViewModel(args: {
     onChangeXMin: (value: string) => patchStyle({ xMin: numberOrUndefined(value) }),
     onChangeXTickInterval: (value: string) => patchStyle({ xTickInterval: numberOrUndefined(value) }),
     onChangeYAxisScale: (value: YAxisScale) => patchStyle({ yScale: value }),
+    onChangeYNumberFormat: (value: NumberFormat) =>
+      patchStyle({ yNumberFormat: value === "default" ? undefined : value }),
     onChangeYAxisTitle: (value: string) => patchStyle({ yAxisTitle: value || undefined }),
     onChangeYMax: (value: string) => patchStyle({ yMax: numberOrUndefined(value) }),
     onChangeYMin: (value: string) => patchStyle({ yMin: numberOrUndefined(value) }),

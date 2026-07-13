@@ -331,6 +331,7 @@ type BarOrientation = "vertical" | "horizontal";
 type LegendPosition = "top" | "bottom" | "left" | "right";
 type CurveType = "linear" | "monotone" | "step" | "natural";
 type YAxisScale = "linear" | "log";
+type NumberFormat = "default" | "compact" | "scientific";
 type SortOrder = "none" | "asc" | "desc";
 type AggFn = "none" | "sum" | "avg" | "min" | "max" | "count";
 
@@ -350,6 +351,9 @@ interface ChartStyle {
   xLabelAngle?: number;
   yLabelAngle?: number;
   yScale?: YAxisScale;
+  // How Y-axis tick numbers render: "compact" abbreviates large values
+  // (10000000000 -> 10B) so they stay readable; "scientific" uses 1E10.
+  yNumberFormat?: NumberFormat;
   showDataLabels?: boolean;
   stackMode?: StackMode;
   barOrientation?: BarOrientation;
@@ -667,6 +671,7 @@ export type {
   LegendPosition,
   CurveType,
   YAxisScale,
+  NumberFormat,
   SortOrder,
   AggFn,
   ChartStyle,

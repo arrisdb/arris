@@ -51,6 +51,14 @@ describe("buildChartEditorViewModel", () => {
     );
   });
 
+  it("sets a Y-axis number format, mapping 'default' back to undefined", () => {
+    const { vm, writeSpec } = setup();
+    vm.onChangeYNumberFormat("compact");
+    expect(writeSpec).toHaveBeenCalledWith({ ...BASE, style: { yNumberFormat: "compact" } });
+    vm.onChangeYNumberFormat("default");
+    expect(writeSpec).toHaveBeenCalledWith({ ...BASE, style: { yNumberFormat: undefined } });
+  });
+
   it("delegates reset to the supplied resetSpec", () => {
     const { vm, resetSpec } = setup();
     vm.onClickReset();

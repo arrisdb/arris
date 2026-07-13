@@ -76,6 +76,13 @@ describe("ChartSection", () => {
     expect(lastCall.spec.title).toBeUndefined();
   });
 
+  it("shows the default max rows as the field value, not a placeholder", () => {
+    const { getByTestId } = render(
+      <ChartSection tabId={TAB} component={chart} onChange={vi.fn()} />,
+    );
+    expect((getByTestId("chart-max-rows") as HTMLInputElement).value).toBe("1000");
+  });
+
   it("edits the per-chart max rows", () => {
     const onChange = vi.fn();
     const { getByTestId } = render(

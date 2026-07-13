@@ -8,6 +8,7 @@ import type {
   CurveType,
   LegendPosition,
   LineStyle,
+  NumberFormat,
   SortOrder,
   StackMode,
   YAxisScale,
@@ -51,6 +52,7 @@ interface ChartEditorPanelViewModel {
   onChangeXMin: (value: string) => void;
   onChangeXTickInterval: (value: string) => void;
   onChangeYAxisScale: (value: YAxisScale) => void;
+  onChangeYNumberFormat: (value: NumberFormat) => void;
   onChangeYAxisTitle: (value: string) => void;
   onChangeYMax: (value: string) => void;
   onChangeYMin: (value: string) => void;
@@ -90,6 +92,7 @@ export type {
   CurveType,
   LegendPosition,
   LineStyle,
+  NumberFormat,
   SectionProps,
   SortOrder,
   StackMode,

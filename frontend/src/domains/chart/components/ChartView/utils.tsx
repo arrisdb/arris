@@ -38,10 +38,12 @@ import type {
   ChartStyle,
   CurveType,
   LegendPosition,
+  NumberFormat,
   SortOrder,
 } from "@shared";
 import type { ColumnSpec, QueryResult } from "@domains/results";
 import {
+  AXIS_NUMBER_FRACTION_DIGITS,
   CARTESIAN_SERIES_KINDS,
   DEFAULT_PALETTE,
   TOOLTIP_STYLE,
@@ -67,6 +69,21 @@ function strokeDasharray(style: ChartStyle | undefined): string | undefined {
   if (!style?.lineStyle || style.lineStyle === "solid") return undefined;
   if (style.lineStyle === "dashed") return "8 4";
   return "2 2";
+}
+
+// A Recharts tick formatter for the chosen number format, or undefined for the
+// default (Recharts' own formatting). "compact" abbreviates large magnitudes
+// (10000000000 -> 10B) so a tall Y axis stays readable; "scientific" -> 1E10.
+function axisTickFormatter(
+  format: NumberFormat | undefined,
+): ((value: number) => string) | undefined {
+  if (!format || format === "default") return undefined;
+  const notation = format === "compact" ? "compact" : "scientific";
+  const nf = new Intl.NumberFormat(undefined, {
+    notation,
+    maximumFractionDigits: AXIS_NUMBER_FRACTION_DIGITS,
+  });
+  return (value: number) => (Number.isFinite(value) ? nf.format(value) : String(value));
 }
 
 function chartFontScale(uiFontSize: number): ChartFontScale {
@@ -433,6 +450,8 @@ function buildAxes(spec: ChartSpec, fonts: ChartFontScale) {
   const yAxisDomain = yAxisDomainFor(spec);
   if (yAxisDomain) yAxisProps.domain = yAxisDomain;
   if (style?.yScale === "log") yAxisProps.scale = "log";
+  const yTickFormatter = axisTickFormatter(style?.yNumberFormat);
+  if (yTickFormatter) yAxisProps.tickFormatter = yTickFormatter;
   if (isHorizontal) {
     yAxisProps.dataKey = spec.xColumn;
     yAxisProps.type = "category" as const;
@@ -925,6 +944,7 @@ function chartEmptyMessage(
 }
 
 export {
+  axisTickFormatter,
   barSegmentRadius,
   cartesianSeries,
   chartEmptyMessage,

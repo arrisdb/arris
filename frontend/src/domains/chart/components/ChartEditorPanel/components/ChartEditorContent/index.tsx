@@ -15,6 +15,7 @@ import {
   LEGEND_POSITIONS,
   LINE_STYLE_KINDS,
   LINE_STYLES,
+  NUMBER_FORMATS,
   SERIES_COLUMN_KINDS,
   SORT_OPTIONS,
   STACK_KINDS,
@@ -245,6 +246,18 @@ function AxesSection({ pane }: { pane: ChartEditorPanelViewModel }) {
             label={scale === "linear" ? "Linear" : "Log"}
             active={(style?.yScale ?? "linear") === scale}
             onClick={() => pane.onChangeYAxisScale(scale)}
+          />
+        ))}
+      </div>
+
+      <label className="mdbc-pane-label">Y-axis number format</label>
+      <div className="mdbc-inline-row with-margin">
+        {NUMBER_FORMATS.map((format) => (
+          <ToggleBtn
+            key={format.value}
+            label={format.label}
+            active={(style?.yNumberFormat ?? "default") === format.value}
+            onClick={() => pane.onChangeYNumberFormat(format.value)}
           />
         ))}
       </div>

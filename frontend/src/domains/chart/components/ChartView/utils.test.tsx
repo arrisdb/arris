@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import type { ChartSpec } from "@shared";
 import type { QueryResult } from "@domains/results";
 import {
+  axisTickFormatter,
   barSegmentRadius,
   cartesianSeries,
   chartImageFilename,
@@ -452,5 +453,24 @@ describe("yAxisDomainFor", () => {
     expect(
       yAxisDomainFor({ kind: "bar", xColumn: "x", yColumns: ["y"], style: { yMin: 10 } }),
     ).toEqual([10, "auto"]);
+  });
+});
+
+describe("axisTickFormatter", () => {
+  it("returns undefined for the default (Recharts' own formatting)", () => {
+    expect(axisTickFormatter(undefined)).toBeUndefined();
+    expect(axisTickFormatter("default")).toBeUndefined();
+  });
+
+  it("abbreviates large magnitudes in compact mode", () => {
+    const fmt = axisTickFormatter("compact");
+    expect(fmt).toBeDefined();
+    expect(fmt?.(10_000_000_000)).toBe("10B");
+    expect(fmt?.(1_500_000)).toBe("1.5M");
+  });
+
+  it("uses scientific notation when selected", () => {
+    const fmt = axisTickFormatter("scientific");
+    expect(fmt?.(10_000_000_000)).toBe("1E10");
   });
 });

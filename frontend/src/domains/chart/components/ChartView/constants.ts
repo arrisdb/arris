@@ -19,7 +19,11 @@ const TOOLTIP_STYLE = {
 // meaningless when every series is the same measure.
 const CARTESIAN_SERIES_KINDS = new Set(["bar", "line", "area"]);
 
+// Significant digits kept when abbreviating axis tick numbers.
+const AXIS_NUMBER_FRACTION_DIGITS = 1;
+
 export {
+  AXIS_NUMBER_FRACTION_DIGITS,
   CARTESIAN_SERIES_KINDS,
   DEFAULT_PALETTE,
   TOOLTIP_STYLE,
