@@ -40,7 +40,9 @@ services:
   dynamodb:
     image: amazon/dynamodb-local:latest
     container_name: arris-dynamodb
-    command: ["-jar", "DynamoDBLocal.jar", "-sharedDb", "-inMemory"]
+    # -Xmx raises the JVM heap so the in-memory store holds the 1M-row
+    # events_large streaming fixture without an OutOfMemory on default heap.
+    command: ["-Xmx2048m", "-jar", "DynamoDBLocal.jar", "-sharedDb", "-inMemory"]
     ports:
       - "8000:8000"
 
@@ -58,6 +60,18 @@ services:
     entrypoint: ["/bin/sh", "/init/dynamodb-init.sh"]
     volumes:
       - ./initdb/dynamodb-init.sh:/init/dynamodb-init.sh:ro
+
+  # One-shot large seeder: fills `events_large` with 1M rows (concurrent
+  # BatchWriteItem) to exercise the streaming query path. Separate from the small
+  # init so the canonical sample tables come up fast.
+  dynamodb-seed-large:
+    image: python:3-slim
+    container_name: arris-dynamodb-seed-large
+    depends_on:
+      - dynamodb
+    command: ["sh", "-c", "pip install --quiet boto3 && python /seed/dynamodb-seed-large.py"]
+    volumes:
+      - ./initdb/dynamodb-seed-large.py:/seed/dynamodb-seed-large.py:ro
 
   # ---------------------------------------------------------------------------
   # SSL-enabled Postgres for exercising the connection SSL Mode + cert fields.
