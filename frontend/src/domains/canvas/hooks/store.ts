@@ -173,22 +173,6 @@ function withPreviewTable(doc: CanvasDoc, queryId: string): CanvasDoc {
   };
 }
 
-/// Keep a viewer's inbound binding arrow in sync with its `sourceQueryId`: drop
-/// the edge from the previous source and add one from the new source. Any other
-/// arrow (manual relationship, query-to-query dependency) is left untouched.
-function reconcileBindingEdge(
-  edges: CanvasEdge[],
-  targetId: string,
-  prevSource: string | null,
-  nextSource: string | null,
-): CanvasEdge[] {
-  if (prevSource === nextSource) return edges;
-  const kept = edges.filter((e) => !(e.target === targetId && e.source === prevSource));
-  if (!nextSource) return kept;
-  if (kept.some((e) => e.source === nextSource && e.target === targetId)) return kept;
-  return [...kept, makeEdge(nextSource, targetId)];
-}
-
 /// Replace the doc of one board, leaving its runtime results in place.
 function withDoc(
   boards: Record<string, BoardState>,
@@ -221,19 +205,12 @@ const useCanvasStore = create<CanvasStore>((set, get) => ({
 
   updateComponent: (tabId, id, patch) =>
     set((s) => ({
-      boards: withDoc(s.boards, tabId, (doc) => {
-        const components = doc.components.map((c) =>
+      boards: withDoc(s.boards, tabId, (doc) => ({
+        ...doc,
+        components: doc.components.map((c) =>
           c.id === id ? ({ ...c, ...patch } as CanvasComponent) : c,
-        );
-        // Binding a viewer to a query (via the properties picker) draws the arrow
-        // that the run-time preview-table path draws automatically.
-        if (!("sourceQueryId" in patch)) return { ...doc, components };
-        const prev = doc.components.find((c) => c.id === id);
-        const prevSource =
-          prev && (prev.kind === "table" || prev.kind === "chart") ? prev.sourceQueryId : null;
-        const nextSource = (patch as { sourceQueryId?: string | null }).sourceQueryId ?? null;
-        return { ...doc, components, edges: reconcileBindingEdge(doc.edges, id, prevSource, nextSource) };
-      }),
+        ),
+      })),
     })),
 
   removeComponent: (tabId, id) =>

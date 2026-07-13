@@ -89,10 +89,26 @@ function toFlowNodes(
   }));
 }
 
+/// Every table/chart bound to a query gets a derived query->viewer arrow, so the
+/// relationship always shows even for a viewer bound before any edge was
+/// persisted. A persisted edge for the same pair wins (dedup by source->target).
+function bindingEdges(edges: CanvasEdge[], components: CanvasComponent[]): CanvasEdge[] {
+  const seen = new Set(edges.map((e) => `${e.source}->${e.target}`));
+  const derived: CanvasEdge[] = [];
+  for (const c of components) {
+    if ((c.kind === "table" || c.kind === "chart") && c.sourceQueryId) {
+      const key = `${c.sourceQueryId}->${c.id}`;
+      if (!seen.has(key)) derived.push({ id: `bind-${c.id}`, source: c.sourceQueryId, target: c.id });
+    }
+  }
+  return derived;
+}
+
 /// Map board arrows to ReactFlow edges: a floating edge that anchors to each
-/// object's border, with an arrowhead at the target end.
-function toFlowEdges(edges: CanvasEdge[]): Edge[] {
-  return edges.map((e) => ({
+/// object's border, with an arrowhead at the target end. Persisted edges plus the
+/// derived query->viewer binding arrows.
+function toFlowEdges(edges: CanvasEdge[], components: CanvasComponent[]): Edge[] {
+  return [...edges, ...bindingEdges(edges, components)].map((e) => ({
     id: e.id,
     source: e.source,
     target: e.target,

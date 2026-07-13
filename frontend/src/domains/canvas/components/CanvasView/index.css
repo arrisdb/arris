@@ -466,6 +466,14 @@
   display: flex;
 }
 
+/* The reused row-detail pane fills the detail column (its own border-left is
+   redundant with the wrapper's). */
+.mdbc-canvas-table-detail .mdbc-row-detail {
+  flex: 1 1 auto;
+  min-width: 0;
+  border-left: none;
+}
+
 /* Empty state: centered logo with the prompt below it (larger than a caption). */
 .mdbc-canvas-table-empty,
 .mdbc-canvas-table-running {
@@ -500,8 +508,10 @@
   color: var(--m-fg-3);
 }
 
-.mdbc-canvas-result-pager .mdbc-btn {
-  padding: 1px 8px;
+.mdbc-canvas-result-pager-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
 }
 
 /* ── chart object ─────────────────────────────────────────────────────────── */

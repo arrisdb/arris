@@ -16,12 +16,6 @@ function formatTimestamp(epochMs: number | undefined): string {
   return `${date} ${time}`;
 }
 
-// Total page count for a full row total, never below one (an empty result still
-// shows "Page 1/1").
-function pageCountFor(totalRows: number, pageSize: number): number {
-  return Math.max(1, Math.ceil(totalRows / pageSize));
-}
-
 // Single-column sort cycle on a header click: unsorted -> asc -> desc -> unsorted.
 // The grid is one page at a time, so one active sort key is enough.
 function nextSortClauses(
@@ -38,25 +32,26 @@ interface TableStatusInput {
   totalRows: number;
   columnCount: number;
   pageIndex: number;
-  pageCount: number;
+  /// The 1-based index of the last row shown on the current page.
+  rangeEnd: number;
   endedAt: number | undefined;
 }
 
-// The footer summary: "N rows · M columns · Page P/Q · YYYY-MM-DD HH:MM:SS".
+// The footer summary: "Page P · X of N rows · M columns · YYYY-MM-DD HH:MM:SS".
 // The timestamp segment is dropped until the source has settled.
 function tableStatusSummary({
   totalRows,
   columnCount,
   pageIndex,
-  pageCount,
+  rangeEnd,
   endedAt,
 }: TableStatusInput): string {
-  const rows = `${totalRows.toLocaleString()} row${totalRows === 1 ? "" : "s"}`;
+  const page = `Page ${pageIndex + 1}`;
+  const rows = `${rangeEnd.toLocaleString()} of ${totalRows.toLocaleString()} row${totalRows === 1 ? "" : "s"}`;
   const cols = `${columnCount} column${columnCount === 1 ? "" : "s"}`;
-  const page = `Page ${pageIndex + 1}/${pageCount}`;
   const stamp = formatTimestamp(endedAt);
-  return [rows, cols, page, ...(stamp ? [stamp] : [])].join(" · ");
+  return [page, rows, cols, ...(stamp ? [stamp] : [])].join(" · ");
 }
 
-export { formatTimestamp, nextSortClauses, pageCountFor, tableStatusSummary };
+export { formatTimestamp, nextSortClauses, tableStatusSummary };
 export type { TableStatusInput };

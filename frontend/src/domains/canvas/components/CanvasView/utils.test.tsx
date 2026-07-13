@@ -100,9 +100,30 @@ describe("buildNodeMenuItems", () => {
 
 describe("toFlowEdges", () => {
   it("maps source and target as a floating, arrowheaded edge", () => {
-    const [edge] = toFlowEdges([{ id: "e", source: "a", target: "b" }]);
+    const [edge] = toFlowEdges([{ id: "e", source: "a", target: "b" }], []);
     expect(edge).toMatchObject({ id: "e", source: "a", target: "b", type: "floating" });
     expect(edge.markerEnd).toBeTruthy();
+  });
+
+  it("derives a binding arrow for every bound table/chart", () => {
+    const components = [
+      makeComponent({ kind: "query", id: "q" }),
+      makeComponent({ kind: "table", id: "tbl", sourceQueryId: "q" }),
+      makeComponent({ kind: "table", id: "unbound" }),
+    ];
+    const edges = toFlowEdges([], components);
+    expect(edges).toHaveLength(1);
+    expect(edges[0]).toMatchObject({ source: "q", target: "tbl", type: "floating" });
+  });
+
+  it("does not duplicate a binding arrow already persisted", () => {
+    const components = [
+      makeComponent({ kind: "query", id: "q" }),
+      makeComponent({ kind: "table", id: "tbl", sourceQueryId: "q" }),
+    ];
+    const edges = toFlowEdges([{ id: "e", source: "q", target: "tbl" }], components);
+    expect(edges).toHaveLength(1);
+    expect(edges[0].id).toBe("e");
   });
 });
 

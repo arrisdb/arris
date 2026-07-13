@@ -36,24 +36,6 @@ describe("useCanvasStore", () => {
     expect(get().boards[TAB].doc.components).toHaveLength(0);
   });
 
-  it("draws, moves, and clears a binding arrow as a viewer's source changes", () => {
-    get().ensureBoard(TAB, "");
-    get().addComponent(TAB, makeComponent({ kind: "query", id: "q", title: "Sales" }));
-    get().addComponent(TAB, makeComponent({ kind: "query", id: "q2", title: "Costs" }));
-    get().addComponent(TAB, makeComponent({ kind: "table", id: "tbl" }));
-    expect(get().boards[TAB].doc.edges).toHaveLength(0);
-
-    // Binding via the properties picker draws the arrow.
-    get().updateComponent(TAB, "tbl", { sourceQueryId: "q" });
-    expect(get().boards[TAB].doc.edges).toMatchObject([{ source: "q", target: "tbl" }]);
-
-    // Rebinding moves it; unbinding removes it.
-    get().updateComponent(TAB, "tbl", { sourceQueryId: "q2" });
-    expect(get().boards[TAB].doc.edges).toMatchObject([{ source: "q2", target: "tbl" }]);
-    get().updateComponent(TAB, "tbl", { sourceQueryId: null });
-    expect(get().boards[TAB].doc.edges).toHaveLength(0);
-  });
-
   it("removing an object also drops its edges and run state", () => {
     get().ensureBoard(TAB, "");
     get().addComponent(TAB, makeComponent({ kind: "query", id: "q1", sql: "s" }));

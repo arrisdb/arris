@@ -689,6 +689,18 @@
   font-size: var(--m-fs-sm);
   color: var(--m-fg);
 }
+
+/* The find (search) bar uses the canonical app search input: shorter, standard
+   control radius (not the filter builder's pill), so it matches inputs elsewhere. */
+.mdbc-filter-builder.search {
+  padding: 2px 8px;
+}
+
+.mdbc-filter-builder .mdbc-search.mdbc-filter-search {
+  flex: 1;
+  min-width: 200px;
+  margin: 0;
+}
 .mdbc-filter-builder .mdbc-filter-input input {
   flex: 1;
   background: transparent;

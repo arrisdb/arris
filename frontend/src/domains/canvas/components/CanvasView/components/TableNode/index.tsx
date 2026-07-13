@@ -27,7 +27,7 @@ import {
   NOOP,
   TABLE_PAGE_ROWS,
 } from "./constants";
-import { nextSortClauses, pageCountFor, tableStatusSummary } from "./utils";
+import { nextSortClauses, tableStatusSummary } from "./utils";
 
 /// A data table bound to a query by `sourceQueryId`: it reuses the results-pane
 /// grid (gridlines, sort, in-view search, JSON row detail, export) read-only and
@@ -123,7 +123,7 @@ function TableNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
   if (!component || component.kind !== "table") return null;
 
   const pageIndex = Math.floor(offset / pageSize);
-  const pageCount = pageCountFor(total, pageSize);
+  const rangeEnd = Math.min(offset + visibleRows.length, total);
   const canPrev = !streaming && offset > 0;
   const canNext = !streaming && offset + pageSize < total;
   const hasResult = !streaming && !!page;
@@ -299,27 +299,31 @@ function TableNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
                 totalRows: total,
                 columnCount: page?.columns.length ?? 0,
                 pageIndex,
-                pageCount,
+                rangeEnd,
                 endedAt: sourceRun?.endedAt,
               })}
             </span>
-            <span>
-              <button
-                type="button"
-                className="mdbc-btn"
-                disabled={!canPrev}
-                onClick={() => goto(offset - pageSize)}
-              >
-                Prev
-              </button>{" "}
-              <button
-                type="button"
-                className="mdbc-btn"
-                disabled={!canNext}
-                onClick={() => goto(offset + pageSize)}
-              >
-                Next
-              </button>
+            <span className="mdbc-canvas-result-pager-nav">
+              <Tooltip label="Previous page">
+                <IconButton
+                  icon="chevronLeft"
+                  label="Previous page"
+                  variant="ghost"
+                  disabled={!canPrev}
+                  onClick={() => goto(offset - pageSize)}
+                  data-testid="table-prev-page"
+                />
+              </Tooltip>
+              <Tooltip label="Next page">
+                <IconButton
+                  icon="chevronRight"
+                  label="Next page"
+                  variant="ghost"
+                  disabled={!canNext}
+                  onClick={() => goto(offset + pageSize)}
+                  data-testid="table-next-page"
+                />
+              </Tooltip>
             </span>
           </div>
         ) : null}
