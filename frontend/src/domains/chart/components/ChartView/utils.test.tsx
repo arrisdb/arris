@@ -3,6 +3,7 @@ import type { ChartSpec } from "@shared";
 import type { QueryResult } from "@domains/results";
 import {
   axisTickFormatter,
+  cartesianMargin,
   yValueFormatter,
   barSegmentRadius,
   cartesianSeries,
@@ -473,6 +474,16 @@ describe("axisTickFormatter", () => {
   it("uses scientific notation when selected", () => {
     const fmt = axisTickFormatter("scientific");
     expect(fmt?.(10_000_000_000)).toBe("1E10");
+  });
+});
+
+describe("cartesianMargin", () => {
+  it("uses the wider default horizontal padding so labels are not clipped", () => {
+    expect(cartesianMargin(undefined)).toEqual({ top: 5, right: 16, bottom: 5, left: 16 });
+  });
+
+  it("applies an explicit horizontal padding to both sides", () => {
+    expect(cartesianMargin({ plotPaddingX: 48 })).toEqual({ top: 5, right: 48, bottom: 5, left: 48 });
   });
 });
 

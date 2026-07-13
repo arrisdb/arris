@@ -129,6 +129,7 @@ function buildChartEditorViewModel(args: {
       patchStyle({ xNumberFormat: value === "default" ? undefined : value }),
     onChangeYLabelAngle: (value: number) => patchStyle({ yLabelAngle: value }),
     onChangeYAxisWidth: (value: string) => patchStyle({ yAxisWidth: numberOrUndefined(value) }),
+    onChangePlotPaddingX: (value: string) => patchStyle({ plotPaddingX: numberOrUndefined(value) }),
     onChangeYDecimals: (value: string) => patchStyle({ yDecimals: numberOrUndefined(value) }),
     onChangeYAllowDecimals: (value: boolean) =>
       patchStyle({ yAllowDecimals: value ? undefined : false }),

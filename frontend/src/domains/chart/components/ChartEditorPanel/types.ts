@@ -56,6 +56,7 @@ interface ChartEditorPanelViewModel {
   onChangeXNumberFormat: (value: NumberFormat) => void;
   onChangeYLabelAngle: (value: number) => void;
   onChangeYAxisWidth: (value: string) => void;
+  onChangePlotPaddingX: (value: string) => void;
   onChangeYDecimals: (value: string) => void;
   onChangeYAllowDecimals: (value: boolean) => void;
   onChangeYTickCount: (value: string) => void;

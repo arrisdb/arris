@@ -363,6 +363,9 @@ interface ChartStyle {
   ySuffix?: string;
   // Reserved pixel width for the Y axis so long tick labels are not clipped.
   yAxisWidth?: number;
+  // Left/right plot margin (px) so axis labels have breathing room and are not
+  // clipped at the container edge.
+  plotPaddingX?: number;
   // Whether the Y axis may place ticks at fractional values (default true).
   yAllowDecimals?: boolean;
   // Suggested number of Y-axis ticks (Recharts treats it as a hint).

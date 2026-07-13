@@ -322,6 +322,16 @@ function AxesSection({ pane }: { pane: ChartEditorPanelViewModel }) {
         onChange={(event) => pane.onChangeYAxisWidth(event.target.value)}
       />
 
+      <label className="mdbc-pane-label">Horizontal padding</label>
+      <input
+        className="mdbc-pane-input"
+        type="number"
+        min={0}
+        placeholder="Default (16)"
+        value={style?.plotPaddingX ?? ""}
+        onChange={(event) => pane.onChangePlotPaddingX(event.target.value)}
+      />
+
       <label className="mdbc-pane-label">Y tick count</label>
       <input
         className="mdbc-pane-input"

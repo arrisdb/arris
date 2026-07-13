@@ -81,6 +81,14 @@ describe("buildChartEditorViewModel", () => {
     expect(writeSpec).toHaveBeenCalledWith({ ...BASE, style: { yAllowDecimals: undefined } });
   });
 
+  it("writes a horizontal plot padding, clearing it when emptied", () => {
+    const { vm, writeSpec } = setup();
+    vm.onChangePlotPaddingX("40");
+    expect(writeSpec).toHaveBeenCalledWith({ ...BASE, style: { plotPaddingX: 40 } });
+    vm.onChangePlotPaddingX("");
+    expect(writeSpec).toHaveBeenCalledWith({ ...BASE, style: { plotPaddingX: undefined } });
+  });
+
   it("delegates reset to the supplied resetSpec", () => {
     const { vm, resetSpec } = setup();
     vm.onClickReset();

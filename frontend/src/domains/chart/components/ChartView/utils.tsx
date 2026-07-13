@@ -46,6 +46,8 @@ import {
   AXIS_NUMBER_FRACTION_DIGITS,
   CARTESIAN_SERIES_KINDS,
   DEFAULT_PALETTE,
+  DEFAULT_PLOT_PADDING_X,
+  PLOT_PADDING_Y,
   TOOLTIP_STYLE,
 } from "./constants";
 import type {
@@ -442,6 +444,13 @@ function toKpiData(
   };
 }
 
+// Left/right plot margin so long axis labels are not clipped at the container
+// edge; overridable via `plotPaddingX`. Top/bottom stay at the small default.
+function cartesianMargin(style: ChartStyle | undefined) {
+  const x = style?.plotPaddingX ?? DEFAULT_PLOT_PADDING_X;
+  return { top: PLOT_PADDING_Y, right: x, bottom: PLOT_PADDING_Y, left: x };
+}
+
 function buildAxes(spec: ChartSpec, fonts: ChartFontScale) {
   const style = spec.style;
   const showGrid = style?.showGrid !== false;
@@ -552,7 +561,7 @@ function renderBarChart(spec: ChartSpec, data: DataDispatch, fonts: ChartFontSca
   const stackId = stacked ? "a" : undefined;
   const count = data.cartesianSeries.length;
   return (
-    <BarChart data={data.cartesian} layout={isHorizontal ? "vertical" : "horizontal"}>
+    <BarChart data={data.cartesian} layout={isHorizontal ? "vertical" : "horizontal"} margin={cartesianMargin(style)}>
       {buildAxes(spec, fonts)}
       {data.cartesianSeries.map((column, index) => (
         <Bar
@@ -574,7 +583,7 @@ function renderLineChart(spec: ChartSpec, data: DataDispatch, fonts: ChartFontSc
   const strokeWidth = style?.strokeWidth ?? 2;
   const dash = strokeDasharray(style);
   return (
-    <LineChart data={data.cartesian}>
+    <LineChart data={data.cartesian} margin={cartesianMargin(style)}>
       {buildAxes(spec, fonts)}
       {data.cartesianSeries.map((column, index) => (
         <Line
@@ -602,7 +611,7 @@ function renderAreaChart(spec: ChartSpec, data: DataDispatch, fonts: ChartFontSc
   const stackId = stacked ? "a" : undefined;
   const stackOffset = style?.stackMode === "percent" ? "expand" : undefined;
   return (
-    <AreaChart data={data.cartesian} stackOffset={stackOffset}>
+    <AreaChart data={data.cartesian} stackOffset={stackOffset} margin={cartesianMargin(style)}>
       {buildAxes(spec, fonts)}
       {data.cartesianSeries.map((column, index) => (
         <Area
@@ -728,7 +737,7 @@ function renderComboChart(spec: ChartSpec, data: DataDispatch, fonts: ChartFontS
   const strokeWidth = style?.strokeWidth ?? 2;
   const dash = strokeDasharray(style);
   return (
-    <ComposedChart data={data.cartesian}>
+    <ComposedChart data={data.cartesian} margin={cartesianMargin(style)}>
       {buildAxes(spec, fonts)}
       <YAxis yAxisId="right" orientation="right" stroke="rgb(var(--m-overlay-rgb) / 0.4)" fontSize={fonts.axis} />
       {data.cartesianSeries.map((column, index) =>
@@ -758,7 +767,7 @@ function renderComboChart(spec: ChartSpec, data: DataDispatch, fonts: ChartFontS
 function renderHistogramChart(spec: ChartSpec, data: DataDispatch, fonts: ChartFontScale): ReactElement {
   const style = spec.style;
   return (
-    <BarChart data={data.histogram} barGap={0} barCategoryGap={0}>
+    <BarChart data={data.histogram} barGap={0} barCategoryGap={0} margin={cartesianMargin(style)}>
       <CartesianGrid stroke="rgb(var(--m-overlay-rgb) / 0.05)" strokeDasharray="3 3" />
       <XAxis dataKey="bin" stroke="rgb(var(--m-overlay-rgb) / 0.4)" fontSize={fonts.histogramTick} angle={-45} textAnchor="end" height={50} />
       <YAxis stroke="rgb(var(--m-overlay-rgb) / 0.4)" fontSize={fonts.axis} />
@@ -977,6 +986,7 @@ function chartEmptyMessage(
 
 export {
   axisTickFormatter,
+  cartesianMargin,
   yValueFormatter,
   barSegmentRadius,
   cartesianSeries,
