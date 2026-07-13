@@ -433,12 +433,30 @@
   border-bottom: 1px solid var(--m-sep);
 }
 
-/* The grid, its toolbar, and the footer are content, not drag handles: keep the
-   normal cursor over them (only the title bar drags the node). */
-.mdbc-canvas-table-toolbar,
-.mdbc-canvas-table-body,
-.mdbc-canvas-result-pager {
+/* The grid is content, so it keeps the normal cursor; the toolbar and footer
+   bars are drag handles like the title, so they inherit the node's grab cursor. */
+.mdbc-canvas-table-body {
   cursor: default;
+}
+
+/* Cell header: the bound query's name, truncated to leave room for the tools. */
+.mdbc-canvas-table-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--m-fs-xs);
+  font-weight: 600;
+  color: var(--m-fg-2);
+  padding-left: 4px;
+}
+
+/* Export-in-progress status in the footer: label plus a cancel button. */
+.mdbc-canvas-table-downloading {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--m-fg-2);
 }
 
 /* The grid area reuses the results-pane grid (.mdbc-table); it fills the node

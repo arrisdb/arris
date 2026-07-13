@@ -1,7 +1,7 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { NodeProps } from "reactflow";
 import type { QueryResult } from "@shared";
-import { IconButton, Spinner, Tooltip } from "@shared/ui";
+import { IconButton, Tooltip } from "@shared/ui";
 import { Icon } from "@shared/ui/Icon";
 import {
   ResultsDataTable,
@@ -43,6 +43,8 @@ function TableNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
   const sourceRun = sourceId ? board?.runs[sourceId] : undefined;
   const sourceTitle =
     source?.kind === "query" && source.title ? sanitizeCellTitle(source.title) : undefined;
+  // Display name of the bound query, shown as the cell header.
+  const sourceName = source?.kind === "query" ? source.title || source.id : undefined;
   const pageSize = (component?.kind === "table" && component.previewRows) || TABLE_PAGE_ROWS;
 
   const sourceResult = sourceRun?.result;
@@ -58,7 +60,11 @@ function TableNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchIndex, setSearchIndex] = useState(0);
+  const [downloading, setDownloading] = useState(false);
   const exportMenuRef = useRef<HTMLDivElement>(null);
+  // Cooperative cancel for an in-flight export: the full-result fetch can't be
+  // aborted mid-flight, but this skips writing the file once it resolves.
+  const exportCancelledRef = useRef(false);
 
   // A new source result resets paging, sort and selection to the first page.
   useEffect(() => {
@@ -154,11 +160,22 @@ function TableNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
   async function onExportAll(format: ExportFormat) {
     if (!page) return;
     setShowExportMenu(false);
-    const full = sourceTitle
-      ? await fetchCanvasCellPageIPC(tabId, sourceTitle, 0, Math.max(total, page.rows.length))
-      : null;
-    const out = full ?? page;
-    await exportResults(out.columns, out.rows, format);
+    setDownloading(true);
+    exportCancelledRef.current = false;
+    try {
+      const full = sourceTitle
+        ? await fetchCanvasCellPageIPC(tabId, sourceTitle, 0, Math.max(total, page.rows.length))
+        : null;
+      if (exportCancelledRef.current) return;
+      const out = full ?? page;
+      await exportResults(out.columns, out.rows, format);
+    } finally {
+      setDownloading(false);
+    }
+  }
+  function onCancelDownload() {
+    exportCancelledRef.current = true;
+    setDownloading(false);
   }
 
   const detailRow =
@@ -177,6 +194,7 @@ function TableNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
         ) : null}
         {sourceId ? (
           <div className="mdbc-canvas-table-toolbar">
+            <span className="mdbc-canvas-table-title" title={sourceName}>{sourceName}</span>
             <div className="mdbc-flex-spacer" />
             <Tooltip label="Refresh">
               <IconButton
@@ -207,7 +225,7 @@ function TableNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
                   label="Download"
                   variant="ghost"
                   active={showExportMenu}
-                  disabled={!hasResult}
+                  disabled={!hasResult || downloading}
                   onClick={() => setShowExportMenu((open) => !open)}
                   data-testid="table-download-btn"
                 />
@@ -260,7 +278,11 @@ function TableNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
             <div className="mdbc-canvas-result-error">{sourceRun.error}</div>
           ) : streaming ? (
             <div className="mdbc-canvas-table-running">
-              <Spinner size={EMPTY_LOGO_SIZE} />
+              <Icon
+                name="database"
+                size={EMPTY_LOGO_SIZE}
+                className="mdbc-canvas-table-empty-logo mdbc-spin"
+              />
               <span>Running…</span>
             </div>
           ) : page ? (
@@ -300,15 +322,28 @@ function TableNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
         </div>
         {hasResult ? (
           <div className="mdbc-canvas-result-pager">
-            <span>
-              {tableStatusSummary({
-                totalRows: total,
-                columnCount: page?.columns.length ?? 0,
-                pageIndex,
-                rangeEnd,
-                endedAt: sourceRun?.endedAt,
-              })}
-            </span>
+            {downloading ? (
+              <span className="mdbc-canvas-table-downloading">
+                Downloading…
+                <IconButton
+                  icon="x"
+                  label="Cancel download"
+                  variant="ghost"
+                  onClick={onCancelDownload}
+                  data-testid="table-cancel-download"
+                />
+              </span>
+            ) : (
+              <span>
+                {tableStatusSummary({
+                  totalRows: total,
+                  columnCount: page?.columns.length ?? 0,
+                  pageIndex,
+                  rangeEnd,
+                  endedAt: sourceRun?.endedAt,
+                })}
+              </span>
+            )}
             <span className="mdbc-canvas-result-pager-nav">
               <Tooltip label="Previous page">
                 <IconButton

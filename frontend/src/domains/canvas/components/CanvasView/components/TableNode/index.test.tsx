@@ -158,8 +158,45 @@ describe("TableNode", () => {
     useCanvasStore.getState().setRun(TAB, "q", { result: manyRows(3), running: true });
     renderNode("tbl");
     expect(screen.getByText("Running…")).toBeTruthy();
+    // Spinning database icon, matching the results viewer's running state.
+    expect(document.querySelector(".mdbc-canvas-table-running .mdbc-spin")).toBeTruthy();
     expect(document.querySelector(".mdbc-table")).toBeNull();
     expect(screen.queryByRole("button", { name: "Next page" })).toBeNull();
+  });
+
+  it("shows the bound query name as the cell header", () => {
+    useCanvasStore.getState().setRun(TAB, "q", { result: RESULT, totalRows: 1 });
+    renderNode("tbl");
+    expect(screen.getByText("Sales")).toBeTruthy();
+  });
+
+  it("shows a cancellable downloading status and disables the download button", async () => {
+    vi.mocked(exportResults).mockClear();
+    seedBound({ previewRows: 2 });
+    useCanvasStore.getState().setRun(TAB, "q", { result: manyRows(2), totalRows: 5 });
+    let resolveFetch: (r: QueryResult) => void = () => {};
+    vi.mocked(fetchCanvasCellPageIPC).mockReturnValueOnce(
+      new Promise<QueryResult>((resolve) => {
+        resolveFetch = resolve;
+      }),
+    );
+    renderNode("tbl");
+
+    fireEvent.click(screen.getByRole("button", { name: "Download" }));
+    fireEvent.click(screen.getByTestId("table-export-csv"));
+
+    // While the full-result fetch is in flight: status shown, download disabled.
+    expect(await screen.findByText("Downloading…")).toBeTruthy();
+    expect((screen.getByRole("button", { name: "Download" }) as HTMLButtonElement).disabled).toBe(true);
+
+    // Cancelling clears the status and skips the file write even once the fetch lands.
+    fireEvent.click(screen.getByRole("button", { name: "Cancel download" }));
+    expect(screen.queryByText("Downloading…")).toBeNull();
+    resolveFetch(manyRows(5));
+    await waitFor(() =>
+      expect((screen.getByRole("button", { name: "Download" }) as HTMLButtonElement).disabled).toBe(false),
+    );
+    expect(vi.mocked(exportResults)).not.toHaveBeenCalled();
   });
 
   it("refreshes by re-running the source query", () => {
