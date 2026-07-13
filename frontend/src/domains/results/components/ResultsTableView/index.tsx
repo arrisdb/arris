@@ -234,6 +234,7 @@ function ResultsTableView({ tabId: tabIdProp, global: isGlobal = false }: { tabI
   const {
     commitEdit,
     commitFilterDraft,
+    exportAllRows,
     onAddInsert,
     pinQuery,
     rerunOriginalQuery,
@@ -424,6 +425,7 @@ function ResultsTableView({ tabId: tabIdProp, global: isGlobal = false }: { tabI
       chartMode={chartMode}
       canExportChart={canExportChart}
       onExportChartPng={onExportChartPng}
+      onExportAll={exportAllRows}
       onClose={hideBottomPane}
       currentPage={currentPage}
       exportMenuRef={exportMenuRef}

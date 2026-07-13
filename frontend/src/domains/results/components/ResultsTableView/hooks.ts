@@ -14,7 +14,7 @@ import {
   runFederationQueryIPC,
   runQueryIPC,
 } from "./ipc";
-import { buildBatchForTab, extractIpcError, type EditingSnapshot } from "./utils";
+import { buildBatchForTab, exportResults, extractIpcError, type EditingSnapshot, type ExportFormat } from "./utils";
 import type { ChartSpec } from "@shared";
 import { reconcileChartSpec } from "@domains/chart";
 
@@ -282,6 +282,22 @@ function useResultsTableActions({
     }
   }
 
+  async function exportAllRows(format: ExportFormat) {
+    if (!result) return;
+    const sql = activeRun?.sqlSnapshot ?? tab?.text;
+    // Re-run the query with no pagination (page_size/page omitted => full result)
+    // so the file holds every row, not just the visible page. Fall back to the
+    // current page when the query can't be re-run (no connection/sql).
+    if (!sql || (!tab?.connectionId && !tab?.isFederation)) {
+      await exportResults(result.columns, result.rows, format);
+      return;
+    }
+    const full = tab.isFederation
+      ? await runFederationQueryIPC(sql)
+      : await runQueryIPC(tab.connectionId!, sql, [], queryLanguageForEditorKind(tab.kind));
+    await exportResults(full.columns, full.rows, format);
+  }
+
   async function upload() {
     if (!tab || !tabId || !result) return;
     if (!tab.tableRef) {
@@ -407,6 +423,7 @@ function useResultsTableActions({
   return {
     commitEdit,
     commitFilterDraft,
+    exportAllRows,
     onAddInsert,
     pinQuery,
     rerunOriginalQuery,

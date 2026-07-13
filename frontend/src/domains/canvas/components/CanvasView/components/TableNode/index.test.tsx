@@ -11,6 +11,12 @@ vi.mock("../../../../ipc", () => ({
   cancelCanvasCellIPC: vi.fn(),
 }));
 
+// Keep the real results components; stub only the file-writing export helper.
+vi.mock("@domains/results", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@domains/results")>()),
+  exportResults: vi.fn(),
+}));
+
 // Deterministic virtualizer: render every visible row (jsdom has no layout).
 vi.mock("@tanstack/react-virtual", () => ({
   useVirtualizer: (opts: { count: number }) => ({
@@ -26,6 +32,8 @@ vi.mock("@tanstack/react-virtual", () => ({
     scrollToIndex: () => undefined,
   }),
 }));
+
+import { exportResults } from "@domains/results";
 
 import { useCanvasStore } from "../../../../hooks";
 import { makeComponent } from "../../../../utils";
@@ -177,5 +185,24 @@ describe("TableNode", () => {
     expect(screen.queryByText(/Select a row to inspect/)).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "JSON detail" }));
     expect(screen.getByText(/Select a row to inspect/)).toBeTruthy();
+  });
+
+  it("downloads every row, not just the visible page", async () => {
+    vi.mocked(exportResults).mockClear();
+    seedBound({ previewRows: 2 });
+    // The page holds 2 rows; the full cached result has 5.
+    useCanvasStore.getState().setRun(TAB, "q", { result: manyRows(2), totalRows: 5 });
+    vi.mocked(fetchCanvasCellPageIPC).mockResolvedValueOnce(manyRows(5));
+    renderNode("tbl");
+
+    fireEvent.click(screen.getByRole("button", { name: "Download" }));
+    fireEvent.click(screen.getByTestId("table-export-csv"));
+
+    // Fetches the WHOLE cached result (offset 0, limit = total), then exports it.
+    await waitFor(() =>
+      expect(fetchCanvasCellPageIPC).toHaveBeenCalledWith(TAB, "sales", 0, 5),
+    );
+    await waitFor(() => expect(vi.mocked(exportResults)).toHaveBeenCalled());
+    expect(vi.mocked(exportResults).mock.calls[0][1]).toHaveLength(5);
   });
 });

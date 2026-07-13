@@ -11,7 +11,7 @@ import {
   findVisibleMatches,
   visibleRowsForResult,
 } from "@domains/results";
-import type { ResultSortClause, SelectedCell } from "@domains/results";
+import type { ExportFormat, ResultSortClause, SelectedCell } from "@domains/results";
 
 import { useCanvasStore } from "../../../../hooks";
 import { sanitizeCellTitle } from "../../../../utils";
@@ -148,6 +148,18 @@ function TableNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
     setSearchIndex(next);
     setSelectedCell(searchMatches[next]);
   }
+  // Download every row, not just the visible page: the full result is already
+  // cached in the backend, so fetch it all in one page and let exportResults
+  // convert it to CSV/JSON. Falls back to the current page if the fetch fails.
+  async function onExportAll(format: ExportFormat) {
+    if (!page) return;
+    setShowExportMenu(false);
+    const full = sourceTitle
+      ? await fetchCanvasCellPageIPC(tabId, sourceTitle, 0, Math.max(total, page.rows.length))
+      : null;
+    const out = full ?? page;
+    await exportResults(out.columns, out.rows, format);
+  }
 
   const detailRow =
     selectedCell !== null && page
@@ -204,20 +216,14 @@ function TableNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
                 <div className="mdbc-query-popover compact" data-testid="table-export-menu">
                   <button
                     className="mdbc-btn ghost menu-item"
-                    onClick={() => {
-                      setShowExportMenu(false);
-                      exportResults(page.columns, page.rows, "csv");
-                    }}
+                    onClick={() => onExportAll("csv")}
                     data-testid="table-export-csv"
                   >
                     Export as CSV
                   </button>
                   <button
                     className="mdbc-btn ghost menu-item"
-                    onClick={() => {
-                      setShowExportMenu(false);
-                      exportResults(page.columns, page.rows, "json");
-                    }}
+                    onClick={() => onExportAll("json")}
                     data-testid="table-export-json"
                   >
                     Export as JSON
