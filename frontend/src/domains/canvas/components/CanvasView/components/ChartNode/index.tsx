@@ -56,6 +56,11 @@ function ChartNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
 
   const [agg, setAgg] = useState<ChartData>({ loading: false });
 
+  // The backend registers the source cell's queryable table only once its full
+  // result has drained (signalled by `totalRows`); querying earlier, on the first
+  // page, hits an unregistered table ("table not found"). Wait for the settle.
+  const sourceSettled = sourceResult !== undefined && sourceRun?.totalRows !== undefined;
+
   // Persist the reconciled spec so the properties pane reflects the valid columns.
   useEffect(() => {
     if (!spec || !effectiveSpec) return;
@@ -65,8 +70,8 @@ function ChartNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
   }, [tabId, id, spec, effectiveSpec, updateComponent]);
 
   useEffect(() => {
-    // Aggregate only once the source has produced a result to read from.
-    if (!query || !sourceResult) {
+    // Aggregate only once the source's full result is registered and queryable.
+    if (!query || !sourceSettled) {
       setAgg({ loading: false });
       return;
     }
@@ -84,7 +89,7 @@ function ChartNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
     return () => {
       cancelled = true;
     };
-  }, [tabId, query, sourceResult]);
+  }, [tabId, query, sourceSettled]);
 
   if (!component || component.kind !== "chart") return null;
 

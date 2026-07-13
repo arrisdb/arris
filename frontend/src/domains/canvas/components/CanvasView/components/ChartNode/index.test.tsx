@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import { ReactFlowProvider } from "reactflow";
 import type { NodeProps } from "reactflow";
 
@@ -206,6 +206,45 @@ describe("ChartNode", () => {
     await waitFor(() =>
       expect(screen.getByTestId("chart-node-status").textContent).toContain("up to 250 rows sampled"),
     );
+  });
+
+  it("waits for the source's full result to settle before querying the cache", async () => {
+    useCanvasStore.getState().ensureBoard(TAB, "");
+    useCanvasStore
+      .getState()
+      .addComponent(TAB, makeComponent({ kind: "query", id: "q", title: "Sales" }));
+    useCanvasStore.getState().addComponent(
+      TAB,
+      makeComponent({
+        kind: "chart",
+        id: "c",
+        sourceQueryId: "q",
+        spec: { kind: "bar", xColumn: "event_type", yColumns: ["amount"], aggregation: "sum" },
+      }),
+    );
+    const result = {
+      columns: [
+        { name: "event_type", type_hint: "text" },
+        { name: "amount", type_hint: "int" },
+      ],
+      rows: [],
+      elapsed: 0,
+    };
+    // Early page: the first page is in, but the full result has not drained yet
+    // (no totalRows), so the cell's table is not registered.
+    useCanvasStore.getState().setRun(TAB, "q", { result, running: true });
+    render(
+      <ReactFlowProvider>
+        <ChartNode {...nodeProps("c")} />
+      </ReactFlowProvider>,
+    );
+    expect(queryCanvasCacheIPC).not.toHaveBeenCalled();
+
+    // The drain completes: totals land and the table becomes queryable.
+    act(() => {
+      useCanvasStore.getState().setRun(TAB, "q", { result, totalRows: 1000, running: false });
+    });
+    await waitFor(() => expect(queryCanvasCacheIPC).toHaveBeenCalled());
   });
 
   it("does not query when the source has not produced a result", () => {
