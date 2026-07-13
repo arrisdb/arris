@@ -111,8 +111,8 @@ describe("QueryNode", () => {
       running: true,
     });
     renderNode("q");
-    expect(screen.getByText(/first 1 rows · loading all…/)).toBeTruthy();
-    expect(screen.queryByText("Running…")).toBeNull();
+    expect(screen.getByText("loading all rows…")).toBeTruthy();
+    expect(screen.queryByText(/first/)).toBeNull();
     expect(screen.getByRole("button", { name: "Cancel" })).toBeTruthy();
   });
 

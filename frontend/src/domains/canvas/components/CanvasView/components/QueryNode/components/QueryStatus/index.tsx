@@ -1,7 +1,7 @@
 import { Spinner } from "@shared/ui";
 
 import type { QueryRunState } from "../../../../../../types";
-import { runResultSummary, runStreamingSummary } from "../../utils";
+import { runResultSummary } from "../../utils";
 import { SPINNER_SIZE } from "./constants";
 import { useLiveElapsed } from "./hooks";
 import { formatElapsed, formatRunTimestamp } from "./utils";
@@ -22,7 +22,7 @@ function QueryStatus({ run }: { run: QueryRunState | undefined }) {
         <Spinner size={SPINNER_SIZE} />
         <span className="mdbc-canvas-run-elapsed">{formatElapsed(liveMs ?? 0)}</span>
         {run.result && (
-          <span className="mdbc-canvas-result-empty">{runStreamingSummary(run.result)}</span>
+          <span className="mdbc-canvas-result-empty">loading all rows…</span>
         )}
       </span>
     );

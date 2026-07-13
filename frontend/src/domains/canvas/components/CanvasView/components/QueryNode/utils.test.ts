@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { QueryResult } from "@shared";
 
-import { runResultSummary, runStreamingSummary } from "./utils";
+import { runResultSummary } from "./utils";
 
 function result(rows: number, cols: number): QueryResult {
   return {
@@ -39,15 +39,5 @@ describe("runResultSummary", () => {
     expect(runResultSummary(result(100, 1), 0, false)).toBe(
       "100+ rows · 1 column",
     );
-  });
-});
-
-describe("runStreamingSummary", () => {
-  it("labels the early page while the full result streams in", () => {
-    const r = {
-      columns: [{ name: "n", type: "number" }],
-      rows: Array.from({ length: 1500 }, () => [{ kind: "int", value: 1 }]),
-    } as unknown as QueryResult;
-    expect(runStreamingSummary(r)).toBe("first 1,500 rows · loading all…");
   });
 });

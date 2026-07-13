@@ -143,12 +143,6 @@ function queryEditorExtensions(input: QueryEditorExtensionsInput): Extension[] {
   ];
 }
 
-// Status while the early page is shown and the full result still streams in.
-function runStreamingSummary(result: QueryResult): string {
-  const rows = result.rows.length;
-  return `first ${rows.toLocaleString()} rows · loading all…`;
-}
-
 // One-line status for a finished run: the FULL row count (the cell shows no rows
 // inline, a bound table does, so the page size is irrelevant here). A trailing
 // "+" marks a run the ingestion byte budget truncated.
@@ -169,6 +163,5 @@ export {
   buildCanvasSqlSupport,
   queryEditorExtensions,
   runResultSummary,
-  runStreamingSummary,
 };
 export type { CanvasSqlSupportInput };
