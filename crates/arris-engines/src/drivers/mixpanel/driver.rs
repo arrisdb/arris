@@ -2,8 +2,8 @@ use std::time::Instant;
 
 use async_trait::async_trait;
 use crate::{
-    ColumnSpec, ConnectionConfig, DatabaseKind, DriverError, ExplainMode, MutationResult,
-    PlanResult, QueryLanguage, QueryResult, QueryValue, RowDelete, RowInsert, SchemaNode,
+    ConnectionConfig, DatabaseKind, DriverError, ExplainMode, MutationResult, PlanResult,
+    QueryLanguage, QueryResult, QueryStream, QueryValue, RowDelete, RowInsert, SchemaNode,
     TableRef,
 };
 use crate::drivers::errors::Result;
@@ -141,41 +141,11 @@ impl DatabaseDriver for MixpanelDriver {
             all_rows.truncate(limit);
         }
 
-        let columns: Vec<ColumnSpec> = if all_rows.is_empty() {
-            sql_parser::resolve_column_names(&parsed_query)
-                .into_iter()
-                .map(|name| ColumnSpec {
-                    name,
-                    type_hint: "text".into(),
-                })
-                .collect()
-        } else {
-            all_rows[0]
-                .iter()
-                .map(|(name, val)| {
-                    let hint = match val {
-                        QueryValue::Int(_) => "bigint",
-                        QueryValue::Double(_) => "double",
-                        QueryValue::Bool(_) => "boolean",
-                        _ => "text",
-                    };
-                    ColumnSpec {
-                        name: name.clone(),
-                        type_hint: hint.into(),
-                    }
-                })
-                .collect()
-        };
-
-        let col_names: Vec<&str> = columns.iter().map(|c| c.name.as_str()).collect();
+        let columns = query::build_columns(&parsed_query, &all_rows);
+        let col_names: Vec<String> = columns.iter().map(|c| c.name.clone()).collect();
         let rows: Vec<Vec<QueryValue>> = all_rows
             .iter()
-            .map(|row| {
-                col_names
-                    .iter()
-                    .map(|name| row.get(*name).cloned().unwrap_or(QueryValue::Null))
-                    .collect()
-            })
+            .map(|row| query::project_row(row, &col_names))
             .collect();
 
         Ok(QueryResult {
@@ -185,6 +155,37 @@ impl DatabaseDriver for MixpanelDriver {
             elapsed: started.elapsed().as_secs_f64(),
             ..Default::default()
         })
+    }
+
+    async fn run_query_stream(
+        &self,
+        text: &str,
+        params: &[QueryValue],
+        language: QueryLanguage,
+    ) -> Result<QueryStream> {
+        let parsed_query =
+            sql_parser::parse(text).map_err(|e| DriverError::QueryFailed(e.to_string()))?;
+        let has_agg = !parsed_query.group_by.is_empty()
+            || parsed_query
+                .columns
+                .iter()
+                .any(|c| matches!(c, ColumnSelection::Aggregation(..)));
+
+        // Aggregation and ORDER BY collapse or reorder the whole result, so they
+        // need the buffered path; a plain projection with WHERE/LIMIT streams.
+        if has_agg || !parsed_query.order_by.is_empty() {
+            return Ok(QueryStream::from_materialized(
+                self.run_query(text, params, language).await?,
+            ));
+        }
+
+        let guard = self.inner.lock().await;
+        let inner = guard.as_ref().ok_or(DriverError::NotConnected)?;
+        let url = api::build_export_url(inner, &parsed_query, parsed_query.limit)?;
+        let resp = api::send_export_stream(inner, url).await?;
+        Ok(QueryStream::Rows(
+            query::stream_export(resp, &parsed_query).await?,
+        ))
     }
 
     fn pagination_strategy(&self) -> crate::PaginationStrategy {

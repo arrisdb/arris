@@ -16,35 +16,29 @@ pub(super) struct Inner {
     pub(super) password: String,
 }
 
-pub(super) async fn execute_export(
+// The export endpoint caps returned events with `limit`, so push the query's
+// LIMIT down to Mixpanel rather than downloading the full history. Only safe when
+// no ORDER BY / aggregation reorders the result (see the caller's guard).
+pub(super) fn build_export_url(
     inner: &Inner,
     parsed_query: &sql_parser::MixpanelQuery,
     api_limit: Option<usize>,
-) -> Result<Vec<BTreeMap<String, QueryValue>>> {
+) -> Result<String> {
     let mut url = format!(
         "{EXPORT_BASE_URL}?project_id={}&from_date={}&to_date={}",
         inner.project_id, parsed_query.from_date, parsed_query.to_date,
     );
-
-    // The export endpoint caps returned events with `limit`, so push the query's
-    // LIMIT down to Mixpanel rather than downloading the full history and slicing
-    // in memory. Only safe when no ORDER BY / aggregation reorders the result.
     if let Some(limit) = api_limit {
         url.push_str(&format!("&limit={limit}"));
     }
-
     if !parsed_query.event_filter.is_empty() {
         let json_array = serde_json::to_string(&parsed_query.event_filter)
             .map_err(|e| DriverError::QueryFailed(e.to_string()))?;
         url.push_str(&format!(
             "&event={}",
-            percent_encoding::utf8_percent_encode(
-                &json_array,
-                percent_encoding::NON_ALPHANUMERIC
-            )
+            percent_encoding::utf8_percent_encode(&json_array, percent_encoding::NON_ALPHANUMERIC)
         ));
     }
-
     if let Some(where_expr) = &parsed_query.where_expression {
         let mp_where = sql_parser::build_mixpanel_where(where_expr);
         url.push_str(&format!(
@@ -52,7 +46,33 @@ pub(super) async fn execute_export(
             percent_encoding::utf8_percent_encode(&mp_where, percent_encoding::NON_ALPHANUMERIC)
         ));
     }
+    Ok(url)
+}
 
+// Parse one JSONL export line into a row map; None for blank or malformed lines.
+pub(super) fn parse_export_line(line: &str) -> Option<BTreeMap<String, QueryValue>> {
+    if line.is_empty() {
+        return None;
+    }
+    let obj = serde_json::from_str::<serde_json::Value>(line).ok()?;
+    let mut row = BTreeMap::new();
+    if let Some(event_name) = obj.get("event").and_then(|v| v.as_str()) {
+        row.insert("event".into(), QueryValue::Text(event_name.into()));
+    }
+    if let Some(props) = obj.get("properties").and_then(|v| v.as_object()) {
+        for (key, value) in props {
+            row.insert(key.clone(), query::json_to_query_value(value));
+        }
+    }
+    Some(row)
+}
+
+pub(super) async fn execute_export(
+    inner: &Inner,
+    parsed_query: &sql_parser::MixpanelQuery,
+    api_limit: Option<usize>,
+) -> Result<Vec<BTreeMap<String, QueryValue>>> {
+    let url = build_export_url(inner, parsed_query, api_limit)?;
     let resp = inner
         .client
         .get(&url)
@@ -75,29 +95,29 @@ pub(super) async fn execute_export(
         .text()
         .await
         .map_err(|e| DriverError::QueryFailed(format!("Failed to read response: {e}")))?;
-    let mut rows: Vec<BTreeMap<String, QueryValue>> = Vec::new();
+    Ok(text.lines().filter_map(parse_export_line).collect())
+}
 
-    for line in text.lines() {
-        if line.is_empty() {
-            continue;
-        }
-        let Ok(obj) = serde_json::from_str::<serde_json::Value>(line) else {
-            continue;
-        };
+// Send the export request for streaming: no total timeout (a large export can run
+// past any fixed deadline), body consumed lazily by the caller's byte stream.
+pub(super) async fn send_export_stream(inner: &Inner, url: String) -> Result<reqwest::Response> {
+    let resp = inner
+        .client
+        .get(&url)
+        .basic_auth(&inner.username, Some(&inner.password))
+        .header("Accept", "text/plain")
+        .send()
+        .await
+        .map_err(|e| DriverError::QueryFailed(format!("Mixpanel export request failed: {e}")))?;
 
-        let mut row = BTreeMap::new();
-        if let Some(event_name) = obj.get("event").and_then(|v| v.as_str()) {
-            row.insert("event".into(), QueryValue::Text(event_name.into()));
-        }
-        if let Some(props) = obj.get("properties").and_then(|v| v.as_object()) {
-            for (key, value) in props {
-                row.insert(key.clone(), query::json_to_query_value(value));
-            }
-        }
-        rows.push(row);
+    let status = resp.status().as_u16();
+    if status != 200 {
+        let body = resp.text().await.unwrap_or_default();
+        return Err(DriverError::QueryFailed(format!(
+            "Mixpanel export failed (HTTP {status}): {body}"
+        )));
     }
-
-    Ok(rows)
+    Ok(resp)
 }
 
 async fn fetch_event_names(inner: &Inner) -> Vec<String> {
