@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { ReactFlowProvider } from "reactflow";
 import type { NodeProps } from "reactflow";
 
@@ -245,6 +245,33 @@ describe("ChartNode", () => {
       useCanvasStore.getState().setRun(TAB, "q", { result, totalRows: 1000, running: false });
     });
     await waitFor(() => expect(queryCanvasCacheIPC).toHaveBeenCalled());
+  });
+
+  it("re-runs the bound source query when the refresh button is clicked", () => {
+    useCanvasStore.getState().ensureBoard(TAB, "");
+    useCanvasStore
+      .getState()
+      .addComponent(TAB, makeComponent({ kind: "query", id: "q", title: "Sales" }));
+    useCanvasStore.getState().addComponent(
+      TAB,
+      makeComponent({
+        kind: "chart",
+        id: "c",
+        sourceQueryId: "q",
+        spec: { kind: "bar", xColumn: "x", yColumns: ["y"] },
+      }),
+    );
+    const runSpy = vi
+      .spyOn(useCanvasStore.getState(), "runQueryComponent")
+      .mockResolvedValue(undefined);
+    render(
+      <ReactFlowProvider>
+        <ChartNode {...nodeProps("c")} />
+      </ReactFlowProvider>,
+    );
+    fireEvent.click(screen.getByLabelText("Refresh"));
+    expect(runSpy).toHaveBeenCalledWith(TAB, "q");
+    runSpy.mockRestore();
   });
 
   it("does not query when the source has not produced a result", () => {

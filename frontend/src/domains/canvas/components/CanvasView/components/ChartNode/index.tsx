@@ -2,6 +2,7 @@ import { memo, useEffect, useMemo, useState } from "react";
 import type { NodeProps } from "reactflow";
 import type { ChartSpec, QueryResult } from "@shared";
 import { ChartView, reconcileChartSpec } from "@domains/chart";
+import { IconButton } from "@shared/ui/IconButton";
 
 import { useCanvasStore } from "../../../../hooks";
 import { DEFAULT_CHART_MAX_ROWS } from "../../../../constants";
@@ -26,6 +27,7 @@ function ChartNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
   const { tabId } = data;
   const board = useCanvasStore((s) => s.boards[tabId]);
   const updateComponent = useCanvasStore((s) => s.updateComponent);
+  const runQueryComponent = useCanvasStore((s) => s.runQueryComponent);
   const component = board?.doc.components.find((c) => c.id === id);
   const chart = component?.kind === "chart" ? component : undefined;
   const source = chart?.sourceQueryId
@@ -118,6 +120,18 @@ function ChartNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
       <div className={`mdbc-canvas-node mdbc-canvas-chart nowheel${selected ? " selected" : ""}`}>
         <div className="mdbc-canvas-node-head">
           <span className="mdbc-canvas-node-title">{title}</span>
+          {chart?.sourceQueryId && (
+            <div className="mdbc-canvas-node-head-right">
+              <IconButton
+                icon="refreshCw"
+                label="Refresh"
+                size={14}
+                className="mdbc-canvas-run"
+                disabled={sourceRun?.running}
+                onClick={() => void runQueryComponent(tabId, chart.sourceQueryId!)}
+              />
+            </div>
+          )}
         </div>
         <div className="mdbc-canvas-chart-body">
           <ChartView
