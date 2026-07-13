@@ -1,13 +1,17 @@
 import { memo, useEffect, useMemo, useState } from "react";
 import type { NodeProps } from "reactflow";
-import type { QueryResult } from "@shared";
-import { ChartView } from "@domains/chart";
+import type { ChartSpec, QueryResult } from "@shared";
+import { ChartView, reconcileChartSpec } from "@domains/chart";
+import { IconButton } from "@shared/ui/IconButton";
 
 import { useCanvasStore } from "../../../../hooks";
+import { DEFAULT_CHART_MAX_ROWS } from "../../../../constants";
 import { buildChartQuery, sanitizeCellTitle } from "../../../../utils";
 import { queryCanvasCacheIPC } from "../../../../ipc";
 import type { CanvasNodeData } from "../../types";
 import { CanvasResizer } from "../CanvasResizer";
+import { CHART_FALLBACK_TITLE } from "./constants";
+import { chartStatusSummary } from "./utils";
 
 /// The aggregated (or sampled) result the chart renders, fetched from the source
 /// cell's FULL cached result over IPC. Independent of the source's 500-row page.
@@ -22,6 +26,8 @@ interface ChartData {
 function ChartNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
   const { tabId } = data;
   const board = useCanvasStore((s) => s.boards[tabId]);
+  const updateComponent = useCanvasStore((s) => s.updateComponent);
+  const runQueryComponent = useCanvasStore((s) => s.runQueryComponent);
   const component = board?.doc.components.find((c) => c.id === id);
   const chart = component?.kind === "chart" ? component : undefined;
   const source = chart?.sourceQueryId
@@ -30,20 +36,44 @@ function ChartNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
   const sourceRun = chart?.sourceQueryId ? board?.runs[chart.sourceQueryId] : undefined;
   const sourceTitle =
     source?.kind === "query" && source.title ? sanitizeCellTitle(source.title) : undefined;
+  // Human-readable name of the bound query, used as the default cell title.
+  const sourceName = source?.kind === "query" ? source.title || source.id : undefined;
   const spec = chart?.spec;
   const maxRows = chart?.maxRows;
+  const sourceResult = sourceRun?.result;
+
+  // Drop axis/series columns that the source no longer has (e.g. after the chart
+  // was re-pointed to a different query), so a stale column never reaches the SQL
+  // as `SUM("missing")`. Empty axes degrade to ChartView's "Customize chart" state
+  // instead of a hard schema error.
+  const effectiveSpec = useMemo(
+    () => (spec && sourceResult ? reconcileChartSpec(spec, sourceResult) : spec),
+    [spec, sourceResult],
+  );
 
   const query = useMemo(
-    () => (spec && sourceTitle ? buildChartQuery(spec, sourceTitle, maxRows) : null),
-    [spec, sourceTitle, maxRows],
+    () => (effectiveSpec && sourceTitle ? buildChartQuery(effectiveSpec, sourceTitle, maxRows) : null),
+    [effectiveSpec, sourceTitle, maxRows],
   );
 
   const [agg, setAgg] = useState<ChartData>({ loading: false });
-  const sourceResult = sourceRun?.result;
+
+  // The backend registers the source cell's queryable table only once its full
+  // result has drained (signalled by `totalRows`); querying earlier, on the first
+  // page, hits an unregistered table ("table not found"). Wait for the settle.
+  const sourceSettled = sourceResult !== undefined && sourceRun?.totalRows !== undefined;
+
+  // Persist the reconciled spec so the properties pane reflects the valid columns.
+  useEffect(() => {
+    if (!spec || !effectiveSpec) return;
+    if (JSON.stringify(effectiveSpec) !== JSON.stringify(spec)) {
+      updateComponent(tabId, id, { spec: effectiveSpec as ChartSpec });
+    }
+  }, [tabId, id, spec, effectiveSpec, updateComponent]);
 
   useEffect(() => {
-    // Aggregate only once the source has produced a result to read from.
-    if (!query || !sourceResult) {
+    // Aggregate only once the source's full result is registered and queryable.
+    if (!query || !sourceSettled) {
       setAgg({ loading: false });
       return;
     }
@@ -61,32 +91,65 @@ function ChartNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
     return () => {
       cancelled = true;
     };
-  }, [tabId, query, sourceResult]);
+  }, [tabId, query, sourceSettled]);
 
   if (!component || component.kind !== "chart") return null;
 
   // The backend already aggregated, so turn ChartView's client-side aggregation
   // off; a sampled (raw) query keeps the spec as-is for the client mappers.
-  const renderSpec = query?.aggregated ? { ...component.spec, aggregation: "none" as const } : component.spec;
+  const drawSpec = effectiveSpec ?? component.spec;
+  const renderSpec = query?.aggregated ? { ...drawSpec, aggregation: "none" as const } : drawSpec;
+
+  // Title bar defaults to the bound query's name; the error surfaces in the
+  // bottom status bar (red) rather than as the chart body's empty message.
+  const title = component.title || sourceName || CHART_FALLBACK_TITLE;
+  const error = sourceRun?.error ?? agg.error;
+
+  // Fall back to the source's result when the chart has nothing to plot yet (no
+  // measure picked), so ChartView shows "Configure the chart..." instead of the
+  // "Run a query" state even though the source already ran.
+  const viewResult = agg.result ?? (query ? undefined : sourceResult);
+  const sampleCap = maxRows && maxRows > 0 ? maxRows : DEFAULT_CHART_MAX_ROWS;
+  const status = sourceResult
+    ? chartStatusSummary(agg.result?.rows.length, sampleCap, sourceRun?.endedAt)
+    : null;
 
   return (
     <>
       <CanvasResizer tabId={tabId} id={id} visible={selected} />
       <div className={`mdbc-canvas-node mdbc-canvas-chart nowheel${selected ? " selected" : ""}`}>
-        {component.title ? (
-          <div className="mdbc-canvas-node-head">
-            <span className="mdbc-canvas-node-title">{component.title}</span>
-          </div>
-        ) : null}
+        <div className="mdbc-canvas-node-head">
+          <span className="mdbc-canvas-node-title">{title}</span>
+          {chart?.sourceQueryId && (
+            <div className="mdbc-canvas-node-head-right">
+              <IconButton
+                icon="refreshCw"
+                label="Refresh"
+                size={14}
+                className="mdbc-canvas-run"
+                disabled={sourceRun?.running}
+                onClick={() => void runQueryComponent(tabId, chart.sourceQueryId!)}
+              />
+            </div>
+          )}
+        </div>
         <div className="mdbc-canvas-chart-body">
           <ChartView
             spec={renderSpec}
-            result={agg.result}
+            result={viewResult}
             isRunning={sourceRun?.running || agg.loading}
-            error={sourceRun?.error ?? agg.error}
             onEdit={() => {}}
           />
         </div>
+        {error ? (
+          <div className="mdbc-canvas-chart-status error" data-testid="chart-node-error">
+            {error}
+          </div>
+        ) : status ? (
+          <div className="mdbc-canvas-chart-status" data-testid="chart-node-status">
+            {status}
+          </div>
+        ) : null}
       </div>
     </>
   );

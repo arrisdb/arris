@@ -2,6 +2,9 @@ import { describe, it, expect } from "vitest";
 import type { ChartSpec } from "@shared";
 import type { QueryResult } from "@domains/results";
 import {
+  axisTickFormatter,
+  cartesianMargin,
+  yValueFormatter,
   barSegmentRadius,
   cartesianSeries,
   chartImageFilename,
@@ -452,5 +455,56 @@ describe("yAxisDomainFor", () => {
     expect(
       yAxisDomainFor({ kind: "bar", xColumn: "x", yColumns: ["y"], style: { yMin: 10 } }),
     ).toEqual([10, "auto"]);
+  });
+});
+
+describe("axisTickFormatter", () => {
+  it("returns undefined for the default (Recharts' own formatting)", () => {
+    expect(axisTickFormatter(undefined)).toBeUndefined();
+    expect(axisTickFormatter("default")).toBeUndefined();
+  });
+
+  it("abbreviates large magnitudes in compact mode", () => {
+    const fmt = axisTickFormatter("compact");
+    expect(fmt).toBeDefined();
+    expect(fmt?.(10_000_000_000)).toBe("10B");
+    expect(fmt?.(1_500_000)).toBe("1.5M");
+  });
+
+  it("uses scientific notation when selected", () => {
+    const fmt = axisTickFormatter("scientific");
+    expect(fmt?.(10_000_000_000)).toBe("1E10");
+  });
+});
+
+describe("cartesianMargin", () => {
+  it("uses the wider default horizontal padding so labels are not clipped", () => {
+    expect(cartesianMargin(undefined)).toEqual({ top: 5, right: 16, bottom: 5, left: 16 });
+  });
+
+  it("applies an explicit horizontal padding to both sides", () => {
+    expect(cartesianMargin({ plotPaddingX: 48 })).toEqual({ top: 5, right: 48, bottom: 5, left: 48 });
+  });
+});
+
+describe("yValueFormatter", () => {
+  it("returns undefined when no Y formatting is configured", () => {
+    expect(yValueFormatter(undefined)).toBeUndefined();
+    expect(yValueFormatter({ yNumberFormat: "default" })).toBeUndefined();
+  });
+
+  it("combines compact notation with a prefix and suffix", () => {
+    const fmt = yValueFormatter({ yNumberFormat: "compact", yPrefix: "$", ySuffix: "/mo" });
+    expect(fmt?.(10_000_000_000)).toBe("$10B/mo");
+  });
+
+  it("applies fixed decimals even without a notation change", () => {
+    const fmt = yValueFormatter({ yDecimals: 2, yPrefix: "$" });
+    expect(fmt?.(1234)).toBe("$1,234.00");
+  });
+
+  it("passes non-numeric values through untouched", () => {
+    const fmt = yValueFormatter({ ySuffix: "%" });
+    expect(fmt?.("n/a" as unknown as number)).toBe("n/a");
   });
 });

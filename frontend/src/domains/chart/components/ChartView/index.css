@@ -30,6 +30,9 @@
 .mdbc-chart-empty-label {
   font-size: var(--m-fs-sm);
 }
+.mdbc-chart-empty-icon.spinning {
+  animation: mdbc-spin 1s linear infinite;
+}
 .mdbc-chart-kpi-body {
   display: flex;
   flex-direction: column;

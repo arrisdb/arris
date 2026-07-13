@@ -47,12 +47,25 @@ describe("ChartView", () => {
 
   it("prompts to customize when spec has no x/y", () => {
     render(<ChartView spec={undefined} result={RESULT} onEdit={vi.fn()} />);
-    expect(screen.getByTestId("chart-view-empty").textContent).toContain("Customize chart");
+    expect(screen.getByTestId("chart-view-empty").textContent).toContain("Configure the chart to view the data");
   });
 
   it("shows running state", () => {
     render(<ChartView spec={SPEC} result={undefined} isRunning onEdit={vi.fn()} />);
     expect(screen.getByTestId("chart-view-empty").textContent).toContain("Running");
+  });
+
+  it("spins the empty-state icon while running", () => {
+    const { container } = render(
+      <ChartView spec={SPEC} result={undefined} isRunning onEdit={vi.fn()} />,
+    );
+    expect(container.querySelector(".mdbc-chart-empty-icon.spinning")).toBeTruthy();
+  });
+
+  it("does not spin the empty-state icon when idle", () => {
+    const { container } = render(<ChartView spec={undefined} result={RESULT} onEdit={vi.fn()} />);
+    expect(container.querySelector(".mdbc-chart-empty-icon.spinning")).toBeNull();
+    expect(container.querySelector(".mdbc-chart-empty-icon")).toBeTruthy();
   });
 
   it("shows error state", () => {

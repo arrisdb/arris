@@ -200,6 +200,14 @@
   border-width: 1.5px;
 }
 
+/* The visible edge stays a hairline, but the grabbable strip extends 12px to
+   either side so width/height are easy to drag from the edge. */
+.mdbc-canvas-resize-line::before {
+  content: "";
+  position: absolute;
+  inset: -12px;
+}
+
 .mdbc-canvas-resize-handle {
   width: 16px;
   height: 16px;
@@ -207,6 +215,15 @@
   background: #fff;
   border: 2px solid var(--m-accent);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+/* The visible dot stays 16px, but the grabbable area extends 20px past it on
+   every side so the pointer catches the corner without pixel-hunting. */
+.mdbc-canvas-resize-handle::before {
+  content: "";
+  position: absolute;
+  inset: -20px;
+  border-radius: 50%;
 }
 
 /* ── object node base ─────────────────────────────────────────────────────── */
@@ -546,6 +563,22 @@
   flex: 1 1 auto;
   min-height: 0;
   position: relative;
+}
+
+/* Bottom status bar: the sample-size and last-refresh readout (muted), or the
+   query/chart error in red (.error). Wraps long schema-error text. */
+.mdbc-canvas-chart-status {
+  flex: 0 0 auto;
+  padding: 6px 10px;
+  border-top: 1px solid var(--m-sep);
+  font-size: var(--m-fs-xs);
+  color: var(--m-fg-3);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.mdbc-canvas-chart-status.error {
+  color: var(--m-red);
 }
 
 /* ── sticky note ──────────────────────────────────────────────────────────── */

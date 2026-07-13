@@ -38,12 +38,16 @@ import type {
   ChartStyle,
   CurveType,
   LegendPosition,
+  NumberFormat,
   SortOrder,
 } from "@shared";
 import type { ColumnSpec, QueryResult } from "@domains/results";
 import {
+  AXIS_NUMBER_FRACTION_DIGITS,
   CARTESIAN_SERIES_KINDS,
   DEFAULT_PALETTE,
+  DEFAULT_PLOT_PADDING_X,
+  PLOT_PADDING_Y,
   TOOLTIP_STYLE,
 } from "./constants";
 import type {
@@ -67,6 +71,48 @@ function strokeDasharray(style: ChartStyle | undefined): string | undefined {
   if (!style?.lineStyle || style.lineStyle === "solid") return undefined;
   if (style.lineStyle === "dashed") return "8 4";
   return "2 2";
+}
+
+// A Recharts tick formatter for the chosen number format, or undefined for the
+// default (Recharts' own formatting). "compact" abbreviates large magnitudes
+// (10000000000 -> 10B) so a tall Y axis stays readable; "scientific" -> 1E10.
+// Non-numeric ticks (category axes) pass through untouched.
+function axisTickFormatter(
+  format: NumberFormat | undefined,
+): ((value: number) => string) | undefined {
+  if (!format || format === "default") return undefined;
+  const notation = format === "compact" ? "compact" : "scientific";
+  const nf = new Intl.NumberFormat(undefined, {
+    notation,
+    maximumFractionDigits: AXIS_NUMBER_FRACTION_DIGITS,
+  });
+  return (value: number) => (Number.isFinite(value) ? nf.format(value) : String(value));
+}
+
+// The Y-value formatter shared by the axis ticks, the tooltip, and the data
+// labels, combining number notation, fixed decimals, and a prefix/suffix. Returns
+// undefined when nothing is customized (so Recharts' own formatting stands).
+function yValueFormatter(
+  style: ChartStyle | undefined,
+): ((value: number) => string) | undefined {
+  const format = style?.yNumberFormat;
+  const decimals = style?.yDecimals;
+  const prefix = style?.yPrefix ?? "";
+  const suffix = style?.ySuffix ?? "";
+  const notationSet = !!format && format !== "default";
+  if (!notationSet && decimals == null && !prefix && !suffix) return undefined;
+
+  const options: Intl.NumberFormatOptions = {
+    notation: format === "compact" ? "compact" : format === "scientific" ? "scientific" : "standard",
+  };
+  if (decimals != null) {
+    options.minimumFractionDigits = decimals;
+    options.maximumFractionDigits = decimals;
+  } else if (notationSet) {
+    options.maximumFractionDigits = AXIS_NUMBER_FRACTION_DIGITS;
+  }
+  const nf = new Intl.NumberFormat(undefined, options);
+  return (value: number) => (Number.isFinite(value) ? `${prefix}${nf.format(value)}${suffix}` : String(value));
 }
 
 function chartFontScale(uiFontSize: number): ChartFontScale {
@@ -398,6 +444,13 @@ function toKpiData(
   };
 }
 
+// Left/right plot margin so long axis labels are not clipped at the container
+// edge; overridable via `plotPaddingX`. Top/bottom stay at the small default.
+function cartesianMargin(style: ChartStyle | undefined) {
+  const x = style?.plotPaddingX ?? DEFAULT_PLOT_PADDING_X;
+  return { top: PLOT_PADDING_Y, right: x, bottom: PLOT_PADDING_Y, left: x };
+}
+
 function buildAxes(spec: ChartSpec, fonts: ChartFontScale) {
   const style = spec.style;
   const showGrid = style?.showGrid !== false;
@@ -415,6 +468,8 @@ function buildAxes(spec: ChartSpec, fonts: ChartFontScale) {
   if (style?.xAxisTitle) {
     xAxisProps.label = { value: style.xAxisTitle, position: "insideBottom", offset: -5, fontSize: fonts.axis, fill: "rgb(var(--m-overlay-rgb) / 0.5)" };
   }
+  const xTickFormatter = axisTickFormatter(style?.xNumberFormat);
+  if (xTickFormatter) xAxisProps.tickFormatter = xTickFormatter;
   const xAxisDomain = xDomain(style);
   if (xAxisDomain) {
     xAxisProps.domain = xAxisDomain;
@@ -433,6 +488,11 @@ function buildAxes(spec: ChartSpec, fonts: ChartFontScale) {
   const yAxisDomain = yAxisDomainFor(spec);
   if (yAxisDomain) yAxisProps.domain = yAxisDomain;
   if (style?.yScale === "log") yAxisProps.scale = "log";
+  const yFmt = yValueFormatter(style);
+  if (yFmt) yAxisProps.tickFormatter = yFmt;
+  if (style?.yAxisWidth != null) yAxisProps.width = style.yAxisWidth;
+  if (style?.yAllowDecimals === false) yAxisProps.allowDecimals = false;
+  if (style?.yTickCount != null) yAxisProps.tickCount = style.yTickCount;
   if (isHorizontal) {
     yAxisProps.dataKey = spec.xColumn;
     yAxisProps.type = "category" as const;
@@ -443,7 +503,7 @@ function buildAxes(spec: ChartSpec, fonts: ChartFontScale) {
       {showGrid && <CartesianGrid stroke="rgb(var(--m-overlay-rgb) / 0.05)" strokeDasharray="3 3" />}
       <XAxis {...xAxisProps} />
       <YAxis {...yAxisProps} />
-      <Tooltip contentStyle={TOOLTIP_STYLE} />
+      <Tooltip contentStyle={TOOLTIP_STYLE} formatter={yFmt} />
       {showLegend && <Legend {...legendProps(style?.legendPosition)} />}
       {style?.referenceLineY != null && (
         <ReferenceLine y={style.referenceLineY} stroke="rgb(var(--m-overlay-rgb) / 0.3)" strokeDasharray="6 3" />
@@ -501,7 +561,7 @@ function renderBarChart(spec: ChartSpec, data: DataDispatch, fonts: ChartFontSca
   const stackId = stacked ? "a" : undefined;
   const count = data.cartesianSeries.length;
   return (
-    <BarChart data={data.cartesian} layout={isHorizontal ? "vertical" : "horizontal"}>
+    <BarChart data={data.cartesian} layout={isHorizontal ? "vertical" : "horizontal"} margin={cartesianMargin(style)}>
       {buildAxes(spec, fonts)}
       {data.cartesianSeries.map((column, index) => (
         <Bar
@@ -511,7 +571,7 @@ function renderBarChart(spec: ChartSpec, data: DataDispatch, fonts: ChartFontSca
           radius={barSegmentRadius(index, count, stacked, isHorizontal)}
           stackId={stackId}
         >
-          {style?.showDataLabels && <LabelList dataKey={column} fontSize={fonts.dataLabel} fill="rgb(var(--m-overlay-rgb) / 0.7)" />}
+          {style?.showDataLabels && <LabelList dataKey={column} fontSize={fonts.dataLabel} fill="rgb(var(--m-overlay-rgb) / 0.7)" formatter={yValueFormatter(style)} />}
         </Bar>
       ))}
     </BarChart>
@@ -523,7 +583,7 @@ function renderLineChart(spec: ChartSpec, data: DataDispatch, fonts: ChartFontSc
   const strokeWidth = style?.strokeWidth ?? 2;
   const dash = strokeDasharray(style);
   return (
-    <LineChart data={data.cartesian}>
+    <LineChart data={data.cartesian} margin={cartesianMargin(style)}>
       {buildAxes(spec, fonts)}
       {data.cartesianSeries.map((column, index) => (
         <Line
@@ -535,7 +595,7 @@ function renderLineChart(spec: ChartSpec, data: DataDispatch, fonts: ChartFontSc
           strokeDasharray={dash}
           dot={false}
         >
-          {style?.showDataLabels && <LabelList dataKey={column} fontSize={fonts.dataLabel} fill="rgb(var(--m-overlay-rgb) / 0.7)" />}
+          {style?.showDataLabels && <LabelList dataKey={column} fontSize={fonts.dataLabel} fill="rgb(var(--m-overlay-rgb) / 0.7)" formatter={yValueFormatter(style)} />}
         </Line>
       ))}
     </LineChart>
@@ -551,7 +611,7 @@ function renderAreaChart(spec: ChartSpec, data: DataDispatch, fonts: ChartFontSc
   const stackId = stacked ? "a" : undefined;
   const stackOffset = style?.stackMode === "percent" ? "expand" : undefined;
   return (
-    <AreaChart data={data.cartesian} stackOffset={stackOffset}>
+    <AreaChart data={data.cartesian} stackOffset={stackOffset} margin={cartesianMargin(style)}>
       {buildAxes(spec, fonts)}
       {data.cartesianSeries.map((column, index) => (
         <Area
@@ -565,7 +625,7 @@ function renderAreaChart(spec: ChartSpec, data: DataDispatch, fonts: ChartFontSc
           strokeDasharray={dash}
           stackId={stackId}
         >
-          {style?.showDataLabels && <LabelList dataKey={column} fontSize={fonts.dataLabel} fill="rgb(var(--m-overlay-rgb) / 0.7)" />}
+          {style?.showDataLabels && <LabelList dataKey={column} fontSize={fonts.dataLabel} fill="rgb(var(--m-overlay-rgb) / 0.7)" formatter={yValueFormatter(style)} />}
         </Area>
       ))}
     </AreaChart>
@@ -590,7 +650,7 @@ function renderPieChart(spec: ChartSpec, data: DataDispatch, fonts: ChartFontSca
           <Cell key={index} fill={getColor(style, index)} />
         ))}
       </Pie>
-      <Tooltip contentStyle={TOOLTIP_STYLE} />
+      <Tooltip contentStyle={TOOLTIP_STYLE} formatter={yValueFormatter(style)} />
       {showLegend && <Legend {...legendProps(style?.legendPosition)} />}
     </PieChart>
   );
@@ -616,7 +676,7 @@ function renderDonutChart(spec: ChartSpec, data: DataDispatch, fonts: ChartFontS
           <Cell key={index} fill={getColor(style, index)} />
         ))}
       </Pie>
-      <Tooltip contentStyle={TOOLTIP_STYLE} />
+      <Tooltip contentStyle={TOOLTIP_STYLE} formatter={yValueFormatter(style)} />
       {showLegend && <Legend {...legendProps(style?.legendPosition)} />}
     </PieChart>
   );
@@ -647,10 +707,10 @@ function renderScatterChart(spec: ChartSpec, data: DataDispatch, fonts: ChartFon
         scale={style?.yScale === "log" ? "log" : undefined}
         label={style?.yAxisTitle ? { value: style.yAxisTitle, angle: -90, position: "insideLeft", fontSize: fonts.axis, fill: "rgb(var(--m-overlay-rgb) / 0.5)" } : undefined}
       />
-      <Tooltip contentStyle={TOOLTIP_STYLE} />
+      <Tooltip contentStyle={TOOLTIP_STYLE} formatter={yValueFormatter(style)} />
       {showLegend && <Legend {...legendProps(style?.legendPosition)} />}
       <Scatter data={data.scatter} fill={getColor(style, 0)}>
-        {style?.showDataLabels && <LabelList dataKey="y" fontSize={fonts.dataLabel} fill="rgb(var(--m-overlay-rgb) / 0.7)" />}
+        {style?.showDataLabels && <LabelList dataKey="y" fontSize={fonts.dataLabel} fill="rgb(var(--m-overlay-rgb) / 0.7)" formatter={yValueFormatter(style)} />}
       </Scatter>
     </ScatterChart>
   );
@@ -665,7 +725,7 @@ function renderBubbleChart(spec: ChartSpec, data: DataDispatch, fonts: ChartFont
       <XAxis dataKey="x" type="number" name={spec.xColumn} stroke="rgb(var(--m-overlay-rgb) / 0.4)" fontSize={fonts.axis} domain={xDomain(style)} />
       <YAxis dataKey="y" type="number" name={spec.yColumns[0]} stroke="rgb(var(--m-overlay-rgb) / 0.4)" fontSize={fonts.axis} domain={yDomain(style)} />
       <ZAxis dataKey="z" range={[20, 400]} name={spec.zColumn ?? "size"} />
-      <Tooltip contentStyle={TOOLTIP_STYLE} />
+      <Tooltip contentStyle={TOOLTIP_STYLE} formatter={yValueFormatter(style)} />
       {showLegend && <Legend {...legendProps(style?.legendPosition)} />}
       <Scatter data={data.scatter} fill={getColor(style, 0)} fillOpacity={0.6} />
     </ScatterChart>
@@ -677,13 +737,13 @@ function renderComboChart(spec: ChartSpec, data: DataDispatch, fonts: ChartFontS
   const strokeWidth = style?.strokeWidth ?? 2;
   const dash = strokeDasharray(style);
   return (
-    <ComposedChart data={data.cartesian}>
+    <ComposedChart data={data.cartesian} margin={cartesianMargin(style)}>
       {buildAxes(spec, fonts)}
       <YAxis yAxisId="right" orientation="right" stroke="rgb(var(--m-overlay-rgb) / 0.4)" fontSize={fonts.axis} />
       {data.cartesianSeries.map((column, index) =>
         index === 0 ? (
           <Bar key={column} dataKey={column} fill={getColor(style, index)} radius={4}>
-            {style?.showDataLabels && <LabelList dataKey={column} fontSize={fonts.dataLabel} fill="rgb(var(--m-overlay-rgb) / 0.7)" />}
+            {style?.showDataLabels && <LabelList dataKey={column} fontSize={fonts.dataLabel} fill="rgb(var(--m-overlay-rgb) / 0.7)" formatter={yValueFormatter(style)} />}
           </Bar>
         ) : (
           <Line
@@ -696,7 +756,7 @@ function renderComboChart(spec: ChartSpec, data: DataDispatch, fonts: ChartFontS
             dot={false}
             yAxisId="right"
           >
-            {style?.showDataLabels && <LabelList dataKey={column} fontSize={fonts.dataLabel} fill="rgb(var(--m-overlay-rgb) / 0.7)" />}
+            {style?.showDataLabels && <LabelList dataKey={column} fontSize={fonts.dataLabel} fill="rgb(var(--m-overlay-rgb) / 0.7)" formatter={yValueFormatter(style)} />}
           </Line>
         ),
       )}
@@ -707,11 +767,11 @@ function renderComboChart(spec: ChartSpec, data: DataDispatch, fonts: ChartFontS
 function renderHistogramChart(spec: ChartSpec, data: DataDispatch, fonts: ChartFontScale): ReactElement {
   const style = spec.style;
   return (
-    <BarChart data={data.histogram} barGap={0} barCategoryGap={0}>
+    <BarChart data={data.histogram} barGap={0} barCategoryGap={0} margin={cartesianMargin(style)}>
       <CartesianGrid stroke="rgb(var(--m-overlay-rgb) / 0.05)" strokeDasharray="3 3" />
       <XAxis dataKey="bin" stroke="rgb(var(--m-overlay-rgb) / 0.4)" fontSize={fonts.histogramTick} angle={-45} textAnchor="end" height={50} />
       <YAxis stroke="rgb(var(--m-overlay-rgb) / 0.4)" fontSize={fonts.axis} />
-      <Tooltip contentStyle={TOOLTIP_STYLE} />
+      <Tooltip contentStyle={TOOLTIP_STYLE} formatter={yValueFormatter(style)} />
       <Bar dataKey="count" fill={getColor(style, 0)}>
         {style?.showDataLabels && <LabelList dataKey="count" fontSize={fonts.dataLabel} fill="rgb(var(--m-overlay-rgb) / 0.7)" />}
       </Bar>
@@ -730,7 +790,7 @@ function renderRadarChart(spec: ChartSpec, data: DataDispatch, fonts: ChartFontS
       {spec.yColumns.map((column, index) => (
         <Radar key={column} name={column} dataKey={column} stroke={getColor(style, index)} fill={getColor(style, index)} fillOpacity={0.2} />
       ))}
-      <Tooltip contentStyle={TOOLTIP_STYLE} />
+      <Tooltip contentStyle={TOOLTIP_STYLE} formatter={yValueFormatter(style)} />
       {showLegend && <Legend {...legendProps(style?.legendPosition)} />}
     </RadarChart>
   );
@@ -770,7 +830,7 @@ function renderFunnelChart(spec: ChartSpec, data: DataDispatch, fonts: ChartFont
   const showLegend = style?.showLegend === true;
   return (
     <FunnelChart>
-      <Tooltip contentStyle={TOOLTIP_STYLE} />
+      <Tooltip contentStyle={TOOLTIP_STYLE} formatter={yValueFormatter(style)} />
       {showLegend && <Legend {...legendProps(style?.legendPosition)} />}
       <Funnel dataKey="value" data={data.funnel} isAnimationActive>
         {data.funnel.map((entry, index) => (
@@ -918,13 +978,16 @@ function chartEmptyMessage(
   if (error) return error;
   if (!result) return "Run a query to see a chart";
   if (!spec || !spec.kind || !spec.xColumn || spec.yColumns.length === 0) {
-    return "Customize chart";
+    return "Configure the chart to view the data";
   }
   if (!hasData) return "No data";
   return null;
 }
 
 export {
+  axisTickFormatter,
+  cartesianMargin,
+  yValueFormatter,
   barSegmentRadius,
   cartesianSeries,
   chartEmptyMessage,

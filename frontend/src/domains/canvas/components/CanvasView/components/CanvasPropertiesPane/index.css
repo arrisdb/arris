@@ -53,6 +53,14 @@
   opacity: 0.45;
 }
 
+/* The chart cell's source/max-rows block sits above the shared chart-editor
+   sections; a rule below it separates it from the first (Data) section, matching
+   the dividers between the sections themselves. */
+.mdbc-canvas-chart-source {
+  padding-bottom: 10px;
+  border-bottom: 0.5px solid var(--m-sep);
+}
+
 /* Small colour swatch, matching the chart editor's series-colour blob: a compact
    square, not a full-width bar. */
 .mdbc-canvas-color {

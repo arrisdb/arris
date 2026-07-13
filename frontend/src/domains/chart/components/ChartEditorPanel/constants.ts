@@ -7,6 +7,7 @@ import type {
   CurveType,
   LegendPosition,
   LineStyle,
+  NumberFormat,
   SortOrder,
   StackMode,
   YAxisScale,
@@ -90,6 +91,12 @@ const LEGEND_POSITIONS: LegendPosition[] = ["top", "bottom", "left", "right"];
 const STACK_MODES: StackMode[] = ["none", "stacked", "percent"];
 const Y_AXIS_SCALES: YAxisScale[] = ["linear", "log"];
 
+const NUMBER_FORMATS: ChartEditorOption<NumberFormat>[] = [
+  { value: "default", label: "Default" },
+  { value: "compact", label: "Compact" },
+  { value: "scientific", label: "Scientific" },
+];
+
 export {
   AGGREGATIONS,
   AGGREGATION_KINDS,
@@ -105,6 +112,7 @@ export {
   LEGEND_POSITIONS,
   LINE_STYLE_KINDS,
   LINE_STYLES,
+  NUMBER_FORMATS,
   SORT_OPTIONS,
   STACK_KINDS,
   STACK_MODES,

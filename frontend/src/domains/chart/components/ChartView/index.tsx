@@ -12,7 +12,12 @@ function ChartView(props: ChartViewProps) {
       <div className="mdbc-chart-view" ref={props.containerRef}>
         <div className="mdbc-chart-view-body">
           <div className="mdbc-chart-empty" data-testid="chart-view-empty">
-            <Icon name="barChart" size={32} color="var(--m-fg-3, #555)" />
+            <Icon
+              name="barChart"
+              size={32}
+              color="var(--m-fg-3, #555)"
+              className={props.isRunning ? "mdbc-chart-empty-icon spinning" : "mdbc-chart-empty-icon"}
+            />
             <span className="mdbc-chart-empty-label">{emptyMessage}</span>
             {canCustomize && (
               <button
