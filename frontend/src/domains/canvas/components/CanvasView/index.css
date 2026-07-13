@@ -200,6 +200,14 @@
   border-width: 1.5px;
 }
 
+/* The visible edge stays a hairline, but the grabbable strip extends 6px to
+   either side so width/height are easy to drag from the edge. */
+.mdbc-canvas-resize-line::before {
+  content: "";
+  position: absolute;
+  inset: -6px;
+}
+
 .mdbc-canvas-resize-handle {
   width: 16px;
   height: 16px;
