@@ -23,7 +23,7 @@ function chartStatusSummary(
   endedAt: number | undefined,
 ): string {
   const cap = `up to ${sampleCap.toLocaleString()} rows sampled`;
-  const base = plotted != null ? `${plotted.toLocaleString()} plotted · ${cap}` : cap;
+  const base = plotted != null ? `${plotted.toLocaleString()} data points · ${cap}` : cap;
   const ts = formatRefreshedAt(endedAt);
   return ts ? `${base} · ${ts}` : base;
 }

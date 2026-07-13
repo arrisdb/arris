@@ -9,7 +9,7 @@ describe("chartStatusSummary", () => {
 
   it("includes the plotted count and the refresh timestamp", () => {
     const summary = chartStatusSummary(50, 1000, 1_700_000_000_000);
-    expect(summary).toContain("50 plotted · up to 1,000 rows sampled · ");
+    expect(summary).toContain("50 data points · up to 1,000 rows sampled · ");
     expect(summary).toMatch(/\d{4}-\d\d-\d\d \d\d:\d\d:\d\d$/);
   });
 });
