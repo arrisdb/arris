@@ -1,7 +1,7 @@
 import { memo, useEffect, useMemo, useState } from "react";
 import type { NodeProps } from "reactflow";
-import type { QueryResult } from "@shared";
-import { ChartView } from "@domains/chart";
+import type { ChartSpec, QueryResult } from "@shared";
+import { ChartView, reconcileChartSpec } from "@domains/chart";
 
 import { useCanvasStore } from "../../../../hooks";
 import { buildChartQuery, sanitizeCellTitle } from "../../../../utils";
@@ -23,6 +23,7 @@ interface ChartData {
 function ChartNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
   const { tabId } = data;
   const board = useCanvasStore((s) => s.boards[tabId]);
+  const updateComponent = useCanvasStore((s) => s.updateComponent);
   const component = board?.doc.components.find((c) => c.id === id);
   const chart = component?.kind === "chart" ? component : undefined;
   const source = chart?.sourceQueryId
@@ -35,14 +36,31 @@ function ChartNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
   const sourceName = source?.kind === "query" ? source.title || source.id : undefined;
   const spec = chart?.spec;
   const maxRows = chart?.maxRows;
+  const sourceResult = sourceRun?.result;
+
+  // Drop axis/series columns that the source no longer has (e.g. after the chart
+  // was re-pointed to a different query), so a stale column never reaches the SQL
+  // as `SUM("missing")`. Empty axes degrade to ChartView's "Customize chart" state
+  // instead of a hard schema error.
+  const effectiveSpec = useMemo(
+    () => (spec && sourceResult ? reconcileChartSpec(spec, sourceResult) : spec),
+    [spec, sourceResult],
+  );
 
   const query = useMemo(
-    () => (spec && sourceTitle ? buildChartQuery(spec, sourceTitle, maxRows) : null),
-    [spec, sourceTitle, maxRows],
+    () => (effectiveSpec && sourceTitle ? buildChartQuery(effectiveSpec, sourceTitle, maxRows) : null),
+    [effectiveSpec, sourceTitle, maxRows],
   );
 
   const [agg, setAgg] = useState<ChartData>({ loading: false });
-  const sourceResult = sourceRun?.result;
+
+  // Persist the reconciled spec so the properties pane reflects the valid columns.
+  useEffect(() => {
+    if (!spec || !effectiveSpec) return;
+    if (JSON.stringify(effectiveSpec) !== JSON.stringify(spec)) {
+      updateComponent(tabId, id, { spec: effectiveSpec as ChartSpec });
+    }
+  }, [tabId, id, spec, effectiveSpec, updateComponent]);
 
   useEffect(() => {
     // Aggregate only once the source has produced a result to read from.
@@ -70,7 +88,8 @@ function ChartNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
 
   // The backend already aggregated, so turn ChartView's client-side aggregation
   // off; a sampled (raw) query keeps the spec as-is for the client mappers.
-  const renderSpec = query?.aggregated ? { ...component.spec, aggregation: "none" as const } : component.spec;
+  const drawSpec = effectiveSpec ?? component.spec;
+  const renderSpec = query?.aggregated ? { ...drawSpec, aggregation: "none" as const } : drawSpec;
 
   // Title bar defaults to the bound query's name; the error surfaces in the
   // bottom status bar (red) rather than as the chart body's empty message.
