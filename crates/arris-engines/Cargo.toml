@@ -23,7 +23,7 @@ duckdb = ["dep:duckdb"]
 oracle = ["dep:oracle-rs"]
 elasticsearch = ["dep:reqwest"]
 bigquery = ["dep:gcp-bigquery-client"]
-snowflake = ["dep:reqwest"]
+snowflake = ["dep:reqwest", "dep:flate2"]
 trino = ["dep:reqwest"]
 clickhouse = ["dep:clickhouse"]
 dynamodb = ["dep:aws-config", "dep:aws-sdk-dynamodb"]
@@ -101,6 +101,9 @@ async-stream = { version = "0.3", optional = true }
 # drivers: kafka + mixpanel + elasticsearch (shared reqwest)
 rdkafka = { version = "0.39", features = ["cmake-build", "ssl-vendored"], optional = true }
 reqwest = { workspace = true, optional = true, features = ["stream"] }
+
+# drivers: snowflake - gunzip out-of-line result chunks (pure-Rust miniz_oxide backend)
+flate2 = { version = "1.0", optional = true }
 
 # drivers: redis
 redis = { version = "1.2", features = ["tokio-rustls-comp", "connection-manager"], optional = true }
