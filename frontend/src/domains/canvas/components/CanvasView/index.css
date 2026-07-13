@@ -200,12 +200,12 @@
   border-width: 1.5px;
 }
 
-/* The visible edge stays a hairline, but the grabbable strip extends 6px to
+/* The visible edge stays a hairline, but the grabbable strip extends 12px to
    either side so width/height are easy to drag from the edge. */
 .mdbc-canvas-resize-line::before {
   content: "";
   position: absolute;
-  inset: -6px;
+  inset: -12px;
 }
 
 .mdbc-canvas-resize-handle {
@@ -217,12 +217,12 @@
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
 }
 
-/* The visible dot stays 16px, but the grabbable area extends 10px past it on
+/* The visible dot stays 16px, but the grabbable area extends 20px past it on
    every side so the pointer catches the corner without pixel-hunting. */
 .mdbc-canvas-resize-handle::before {
   content: "";
   position: absolute;
-  inset: -10px;
+  inset: -20px;
   border-radius: 50%;
 }
 
