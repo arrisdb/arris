@@ -433,6 +433,14 @@
   border-bottom: 1px solid var(--m-sep);
 }
 
+/* The grid, its toolbar, and the footer are content, not drag handles: keep the
+   normal cursor over them (only the title bar drags the node). */
+.mdbc-canvas-table-toolbar,
+.mdbc-canvas-table-body,
+.mdbc-canvas-result-pager {
+  cursor: default;
+}
+
 /* The grid area reuses the results-pane grid (.mdbc-table); it fills the node
    frame below the toolbar, above the pager. `nowheel` keeps scrolling in the
    grid from panning the board. */
