@@ -43,6 +43,16 @@
   width: 120px;
 }
 
+/* A disabled field (e.g. Limit while "Select all rows" is on) reads clearly as
+   inactive: dimmed and non-interactive, its caption dimmed to match. */
+.mdbc-pane-form .mdbc-pane-input:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.mdbc-pane-label.mdbc-pane-label-disabled {
+  opacity: 0.45;
+}
+
 /* Small colour swatch, matching the chart editor's series-colour blob: a compact
    square, not a full-width bar. */
 .mdbc-canvas-color {

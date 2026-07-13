@@ -48,6 +48,12 @@ describe("QueryNode", () => {
     expect(container.querySelector(".cm-content")?.textContent).toContain("select 1");
   });
 
+  it("renders a line-number gutter like the console editor", () => {
+    seed(makeComponent({ kind: "query", id: "q", sql: "select 1\nfrom t", connectionId: "c" }));
+    const { container } = renderNode("q");
+    expect(container.querySelector(".cm-lineNumbers")).toBeTruthy();
+  });
+
   it("writes editor edits back to the store", () => {
     seed(makeComponent({ kind: "query", id: "q", sql: "select 1", connectionId: "c" }));
     const { container } = renderNode("q");

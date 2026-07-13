@@ -189,6 +189,11 @@ interface QueryRunState {
   totalRows?: number;
   /// False when the ingestion byte budget truncated the run ("N+ rows").
   complete?: boolean;
+  /// Wall-clock start of the run (epoch ms); drives the live elapsed timer.
+  startedAt?: number;
+  /// Wall-clock finish (epoch ms); set once the run settles. `endedAt - startedAt`
+  /// is the total execution time, and `endedAt` is the last-execution timestamp.
+  endedAt?: number;
 }
 
 // ── agent canvas spec (the `arris-canvas` JSON the agent emits) ───────────────

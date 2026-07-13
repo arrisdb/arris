@@ -10,6 +10,7 @@ export type { EditorHandle } from "./utils/ui/setup";
 export { buildSqlSchema, deriveSchemaScoping } from "./utils/autocomplete/sqlSchema";
 export { editorCompletionExtensions, editorLanguageExtensions } from "./utils/dialects/registry";
 export { sqlSemanticHighlight } from "./utils/ui/sqlSemanticHighlight";
+export { indentGuidesExtension } from "./utils/ui/indentGuides";
 export {
   SCHEMA_NODE_POINTER_DROP_EVENT,
   beginSchemaNodePointerDrag,

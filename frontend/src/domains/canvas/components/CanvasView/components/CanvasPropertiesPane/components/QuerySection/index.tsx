@@ -35,7 +35,11 @@ function QuerySection({ component, onChange }: SectionProps) {
         onChange={(v) => onChange({ connectionId: v })}
         data-testid="query-connection-select"
       />
-      <span className="mdbc-pane-label">Limit</span>
+      <span
+        className={`mdbc-pane-label${component.selectAll ? " mdbc-pane-label-disabled" : ""}`}
+      >
+        Limit
+      </span>
       <input
         type="number"
         className="mdbc-pane-input"

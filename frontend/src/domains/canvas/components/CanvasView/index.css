@@ -276,7 +276,6 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 120px;
 }
 
 .mdbc-canvas-head-sep {
@@ -288,6 +287,7 @@
 
 .mdbc-canvas-run {
   flex: 0 0 auto;
+  cursor: pointer;
 }
 
 /* ── text object ──────────────────────────────────────────────────────────── */
@@ -366,6 +366,14 @@
   box-sizing: border-box;
   overflow: hidden;
   background: var(--m-bg-editor);
+  /* Text caret over the editor, not the board's pan/grab cursor. */
+  cursor: text;
+}
+
+.mdbc-canvas-sql .cm-editor,
+.mdbc-canvas-sql .cm-scroller,
+.mdbc-canvas-sql .cm-content {
+  cursor: text;
 }
 
 .mdbc-canvas-sql .cm-editor {
@@ -429,6 +437,20 @@
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+}
+
+/* Running row: spinner, live elapsed timer, then the streaming row count. */
+.mdbc-canvas-query-running {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--m-fs-xs);
+  color: var(--m-fg-3);
+}
+
+.mdbc-canvas-run-elapsed {
+  font-variant-numeric: tabular-nums;
+  color: var(--m-fg-2);
 }
 
 /* ── table object ─────────────────────────────────────────────────────────── */

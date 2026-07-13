@@ -186,6 +186,41 @@ describe("useCanvasStore", () => {
     expect(run.totalRows).toBe(7);
   });
 
+  it("stamps startedAt/endedAt on a settled run for total time + timestamp", async () => {
+    vi.mocked(runCanvasCellIPC).mockResolvedValue([
+      { id: "c1", result: { columns: [], rows: [], elapsed: 0 }, totalRows: 3, complete: true },
+    ]);
+    get().ensureBoard(TAB, "");
+    get().addComponent(
+      TAB,
+      makeComponent({ kind: "query", id: "c1", sql: "select 1", connectionId: "c" }),
+    );
+    await get().runQueryComponent(TAB, "c1");
+    const run = get().boards[TAB].runs.c1;
+    expect(typeof run.startedAt).toBe("number");
+    expect(typeof run.endedAt).toBe("number");
+    expect(run.endedAt!).toBeGreaterThanOrEqual(run.startedAt!);
+  });
+
+  it("carries startedAt through the ingest event and stamps endedAt on it", async () => {
+    vi.mocked(runCanvasCellIPC).mockResolvedValue([
+      { id: "c1", result: { columns: [], rows: [], elapsed: 0 } },
+    ]);
+    get().ensureBoard(TAB, "");
+    get().addComponent(
+      TAB,
+      makeComponent({ kind: "query", id: "c1", sql: "select 1", connectionId: "c" }),
+    );
+    await get().runQueryComponent(TAB, "c1");
+    const started = get().boards[TAB].runs.c1.startedAt;
+    expect(typeof started).toBe("number");
+    expect(get().boards[TAB].runs.c1.endedAt).toBeUndefined();
+    get().applyIngestDone(TAB, "c1", 42, true);
+    const run = get().boards[TAB].runs.c1;
+    expect(run.startedAt).toBe(started);
+    expect(typeof run.endedAt).toBe("number");
+  });
+
   it("applyIngestDone keeps event totals when it beats the run response", async () => {
     get().ensureBoard(TAB, "");
     get().addComponent(
