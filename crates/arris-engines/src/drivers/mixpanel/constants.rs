@@ -18,6 +18,12 @@ pub const MAX_PROPERTY_FETCHES: usize = 50;
 pub const SCHEMA_SAMPLE_LIMIT: usize = 1000;
 pub const SCHEMA_SAMPLE_DAYS: i64 = 30;
 
+// Query-result column type hints, inferred from the first row's cell value.
+pub const TYPE_HINT_BIGINT: &str = "bigint";
+pub const TYPE_HINT_DOUBLE: &str = "double";
+pub const TYPE_HINT_BOOLEAN: &str = "boolean";
+pub const TYPE_HINT_TEXT: &str = "text";
+
 // The export endpoint requires an explicit from_date/to_date window and rejects
 // any from_date earlier than 2011-07-10 (HTTP 400). Anchoring to that floor
 // expresses "unlimited" unless a WHERE clause on `time` narrows the range.
