@@ -390,7 +390,13 @@ const useCanvasStore = create<CanvasStore>((set, get) => ({
   applyIngestDone: (tabId, id, totalRows, complete) => {
     const run = get().boards[tabId]?.runs[id];
     if (!run) return;
-    get().setRun(tabId, id, { ...run, totalRows, complete, running: false });
+    get().setRun(tabId, id, {
+      ...run,
+      totalRows,
+      complete,
+      running: false,
+      endedAt: Date.now(),
+    });
   },
 
   runQueryComponent: async (tabId, id) => {
@@ -413,19 +419,23 @@ const useCanvasStore = create<CanvasStore>((set, get) => ({
         limit: c.selectAll ? null : (c.limit ?? DEFAULT_QUERY_LIMIT),
       }));
     const queryId = cellQueryId(tabId, id);
-    get().setRun(tabId, id, { running: true });
+    get().setRun(tabId, id, { running: true, startedAt: Date.now() });
     try {
       const runs = await runCanvasCellIPC(tabId, id, cells, queryId);
+      const now = Date.now();
       // Apply each executed cell's outcome (target + its upstream dependencies).
+      // `startedAt` is carried from the running snapshot; `endedAt` stamps the
+      // settle so the status can show total time + last-execution timestamp.
       for (const r of runs) {
+        const prev = get().boards[tabId]?.runs[r.id];
+        const startedAt = prev?.startedAt;
         if (r.error) {
-          get().setRun(tabId, r.id, { error: r.error });
+          get().setRun(tabId, r.id, { error: r.error, startedAt, endedAt: now });
           continue;
         }
         if (r.totalRows === undefined) {
           // Early page: totals arrive via `canvas://cell-ingested`. Keep the
           // spinner unless the event already landed.
-          const prev = get().boards[tabId]?.runs[r.id];
           const settled = prev?.running === false && prev.totalRows !== undefined;
           get().setRun(
             tabId,
@@ -436,8 +446,10 @@ const useCanvasStore = create<CanvasStore>((set, get) => ({
                   totalRows: prev.totalRows,
                   complete: prev.complete,
                   running: false,
+                  startedAt,
+                  endedAt: prev.endedAt ?? now,
                 }
-              : { result: r.result, running: true },
+              : { result: r.result, running: true, startedAt },
           );
           continue;
         }
@@ -445,6 +457,8 @@ const useCanvasStore = create<CanvasStore>((set, get) => ({
           result: r.result,
           totalRows: r.totalRows,
           complete: r.complete,
+          startedAt,
+          endedAt: now,
         });
       }
       const targetOk = runs.some((r) => r.id === id && r.result);
@@ -457,7 +471,13 @@ const useCanvasStore = create<CanvasStore>((set, get) => ({
         }),
       }));
     } catch (e) {
-      get().setRun(tabId, id, { running: false, error: errToString(e) });
+      const startedAt = get().boards[tabId]?.runs[id]?.startedAt;
+      get().setRun(tabId, id, {
+        running: false,
+        error: errToString(e),
+        startedAt,
+        endedAt: Date.now(),
+      });
     }
   },
 

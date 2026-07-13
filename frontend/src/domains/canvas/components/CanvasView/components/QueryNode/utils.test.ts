@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { QueryResult } from "@shared";
 
-import { runResultSummary, runStreamingSummary } from "./utils";
+import { runResultSummary } from "./utils";
 
 function result(rows: number, cols: number): QueryResult {
   return {
@@ -23,31 +23,21 @@ describe("runResultSummary", () => {
     expect(runResultSummary(result(1, 1))).toBe("1 row · 1 column");
   });
 
-  it("shows first N of M when the full result is larger than the page", () => {
+  it("reports the full total when it is larger than the page", () => {
     expect(runResultSummary(result(500, 4), 12345, true)).toBe(
-      "first 500 of 12345 rows · 4 columns",
+      "12345 rows · 4 columns",
     );
   });
 
   it("appends a plus when the ingestion budget truncated the run", () => {
     expect(runResultSummary(result(500, 4), 9000, false)).toBe(
-      "first 500 of 9000+ rows · 4 columns",
+      "9000+ rows · 4 columns",
     );
   });
 
   it("never reports a total smaller than the visible page", () => {
     expect(runResultSummary(result(100, 1), 0, false)).toBe(
-      "first 100 of 100+ rows · 1 column",
+      "100+ rows · 1 column",
     );
-  });
-});
-
-describe("runStreamingSummary", () => {
-  it("labels the early page while the full result streams in", () => {
-    const r = {
-      columns: [{ name: "n", type: "number" }],
-      rows: Array.from({ length: 1500 }, () => [{ kind: "int", value: 1 }]),
-    } as unknown as QueryResult;
-    expect(runStreamingSummary(r)).toBe("first 1,500 rows · loading all…");
   });
 });

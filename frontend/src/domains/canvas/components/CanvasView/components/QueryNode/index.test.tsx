@@ -48,6 +48,12 @@ describe("QueryNode", () => {
     expect(container.querySelector(".cm-content")?.textContent).toContain("select 1");
   });
 
+  it("renders a line-number gutter like the console editor", () => {
+    seed(makeComponent({ kind: "query", id: "q", sql: "select 1\nfrom t", connectionId: "c" }));
+    const { container } = renderNode("q");
+    expect(container.querySelector(".cm-lineNumbers")).toBeTruthy();
+  });
+
   it("writes editor edits back to the store", () => {
     seed(makeComponent({ kind: "query", id: "q", sql: "select 1", connectionId: "c" }));
     const { container } = renderNode("q");
@@ -105,8 +111,8 @@ describe("QueryNode", () => {
       running: true,
     });
     renderNode("q");
-    expect(screen.getByText(/first 1 rows · loading all…/)).toBeTruthy();
-    expect(screen.queryByText("Running…")).toBeNull();
+    expect(screen.getByText("loading all rows…")).toBeTruthy();
+    expect(screen.queryByText(/first/)).toBeNull();
     expect(screen.getByRole("button", { name: "Cancel" })).toBeTruthy();
   });
 

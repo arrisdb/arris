@@ -6,7 +6,7 @@ import {
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { syntaxHighlighting } from "@codemirror/language";
 import { type Extension } from "@codemirror/state";
-import { drawSelection, EditorView, keymap, placeholder } from "@codemirror/view";
+import { drawSelection, EditorView, keymap, lineNumbers, placeholder } from "@codemirror/view";
 
 import { arrisHighlight } from "@shared/ui/utils/codeHighlight";
 import {
@@ -14,6 +14,7 @@ import {
   deriveSchemaScoping,
   editorCompletionExtensions,
   editorLanguageExtensions,
+  indentGuidesExtension,
 } from "@domains/editor";
 import type { DatabaseKind, QueryResult, SchemaNode } from "@shared";
 
@@ -33,6 +34,13 @@ const theme = EditorView.theme(
     ".cm-cursor, .cm-dropCursor": { borderLeftColor: "var(--m-accent, #7c8cff)" },
     ".cm-scroller": { fontFamily: "var(--m-font-editor, var(--m-font-mono))", lineHeight: "1.5" },
     ".cm-line": { padding: "0" },
+    ".cm-gutters": {
+      backgroundColor: "transparent",
+      border: "none",
+      color: "var(--m-fg-3)",
+    },
+    ".cm-lineNumbers .cm-gutterElement": { padding: "0 4px 0 8px", minWidth: "20px" },
+    ".cm-activeLineGutter": { backgroundColor: "transparent" },
     ".cm-tooltip": {
       background: "var(--m-bg-surface)",
       border: "0.5px solid var(--m-sep)",
@@ -105,6 +113,8 @@ function queryEditorExtensions(input: QueryEditorExtensionsInput): Extension[] {
   return [
     history(),
     drawSelection(),
+    lineNumbers(),
+    indentGuidesExtension(),
     // `support` always carries the SQL language (plus schema completion once the
     // schema loads), so no standalone `sql()` is added here.
     support,
@@ -133,14 +143,9 @@ function queryEditorExtensions(input: QueryEditorExtensionsInput): Extension[] {
   ];
 }
 
-// Status while the early page is shown and the full result still streams in.
-function runStreamingSummary(result: QueryResult): string {
-  const rows = result.rows.length;
-  return `first ${rows.toLocaleString()} rows · loading all…`;
-}
-
-// One-line status for a finished run: "first N of M rows" past one page, with
-// a trailing "+" when the ingestion byte budget truncated the run.
+// One-line status for a finished run: the FULL row count (the cell shows no rows
+// inline, a bound table does, so the page size is irrelevant here). A trailing
+// "+" marks a run the ingestion byte budget truncated.
 function runResultSummary(
   result: QueryResult,
   totalRows?: number,
@@ -151,16 +156,12 @@ function runResultSummary(
   const columnsPart = `${cols} column${cols === 1 ? "" : "s"}`;
   const truncated = complete === false;
   const total = Math.max(totalRows ?? rows, rows);
-  if (truncated || total > rows) {
-    return `first ${rows} of ${total}${truncated ? "+" : ""} rows · ${columnsPart}`;
-  }
-  return `${rows} row${rows === 1 ? "" : "s"} · ${columnsPart}`;
+  return `${total}${truncated ? "+" : ""} row${total === 1 ? "" : "s"} · ${columnsPart}`;
 }
 
 export {
   buildCanvasSqlSupport,
   queryEditorExtensions,
   runResultSummary,
-  runStreamingSummary,
 };
 export type { CanvasSqlSupportInput };
