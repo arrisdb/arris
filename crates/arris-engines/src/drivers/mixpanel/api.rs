@@ -9,6 +9,10 @@ use super::constants::{
 use super::query;
 use super::sql_parser;
 
+// Cheap to clone: `reqwest::Client` is Arc-backed (shares the connection pool),
+// the rest are small Strings. Cloned out of the guard so network I/O never holds
+// the connection mutex (a long query would otherwise starve the schema browser).
+#[derive(Clone)]
 pub(super) struct Inner {
     pub(super) client: reqwest::Client,
     pub(super) project_id: String,

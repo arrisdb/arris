@@ -27,6 +27,13 @@ impl MixpanelDriver {
             inner: Mutex::new(None),
         }
     }
+
+    // Clone the connection handle out of the guard so network I/O runs lock-free;
+    // holding the mutex across a request would serialize queries and schema loads.
+    async fn connected_inner(&self) -> Result<api::Inner> {
+        let guard = self.inner.lock().await;
+        Ok(guard.as_ref().ok_or(DriverError::NotConnected)?.clone())
+    }
 }
 
 #[async_trait]
@@ -86,9 +93,8 @@ impl DatabaseDriver for MixpanelDriver {
     }
 
     async fn list_schemas(&self) -> Result<Vec<SchemaNode>> {
-        let guard = self.inner.lock().await;
-        let inner = guard.as_ref().ok_or(DriverError::NotConnected)?;
-        let discovered = api::discover_events(inner).await;
+        let inner = self.connected_inner().await?;
+        let discovered = api::discover_events(&inner).await;
         Ok(schema::build_schema_tree(&discovered))
     }
 
@@ -103,8 +109,7 @@ impl DatabaseDriver for MixpanelDriver {
         _params: &[QueryValue],
         _language: QueryLanguage,
     ) -> Result<QueryResult> {
-        let guard = self.inner.lock().await;
-        let inner = guard.as_ref().ok_or(DriverError::NotConnected)?;
+        let inner = self.connected_inner().await?;
 
         let started = Instant::now();
         let parsed_query = sql_parser::parse(text)
@@ -121,7 +126,7 @@ impl DatabaseDriver for MixpanelDriver {
         let api_limit = parsed_query
             .limit
             .filter(|_| !has_agg && parsed_query.order_by.is_empty());
-        let mut all_rows = api::execute_export(inner, &parsed_query, api_limit).await?;
+        let mut all_rows = api::execute_export(&inner, &parsed_query, api_limit).await?;
 
         if let Some(where_expr) = &parsed_query.where_expression {
             all_rows.retain(|row| sql_parser::evaluate(where_expr, row));
@@ -179,10 +184,9 @@ impl DatabaseDriver for MixpanelDriver {
             ));
         }
 
-        let guard = self.inner.lock().await;
-        let inner = guard.as_ref().ok_or(DriverError::NotConnected)?;
-        let url = api::build_export_url(inner, &parsed_query, parsed_query.limit)?;
-        let resp = api::send_export_stream(inner, url).await?;
+        let inner = self.connected_inner().await?;
+        let url = api::build_export_url(&inner, &parsed_query, parsed_query.limit)?;
+        let resp = api::send_export_stream(&inner, url).await?;
         Ok(QueryStream::Rows(
             query::stream_export(resp, &parsed_query).await?,
         ))
