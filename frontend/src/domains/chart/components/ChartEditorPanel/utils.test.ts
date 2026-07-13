@@ -59,6 +59,28 @@ describe("buildChartEditorViewModel", () => {
     expect(writeSpec).toHaveBeenCalledWith({ ...BASE, style: { yNumberFormat: undefined } });
   });
 
+  it("sets an X-axis number format, mapping 'default' back to undefined", () => {
+    const { vm, writeSpec } = setup();
+    vm.onChangeXNumberFormat("compact");
+    expect(writeSpec).toHaveBeenCalledWith({ ...BASE, style: { xNumberFormat: "compact" } });
+  });
+
+  it("writes a Y prefix and clears it when emptied", () => {
+    const { vm, writeSpec } = setup();
+    vm.onChangeYPrefix("$");
+    expect(writeSpec).toHaveBeenCalledWith({ ...BASE, style: { yPrefix: "$" } });
+    vm.onChangeYPrefix("");
+    expect(writeSpec).toHaveBeenCalledWith({ ...BASE, style: { yPrefix: undefined } });
+  });
+
+  it("maps the allow-decimals toggle to false only when unchecked", () => {
+    const { vm, writeSpec } = setup();
+    vm.onChangeYAllowDecimals(false);
+    expect(writeSpec).toHaveBeenCalledWith({ ...BASE, style: { yAllowDecimals: false } });
+    vm.onChangeYAllowDecimals(true);
+    expect(writeSpec).toHaveBeenCalledWith({ ...BASE, style: { yAllowDecimals: undefined } });
+  });
+
   it("delegates reset to the supplied resetSpec", () => {
     const { vm, resetSpec } = setup();
     vm.onClickReset();

@@ -53,6 +53,14 @@ interface ChartEditorPanelViewModel {
   onChangeXTickInterval: (value: string) => void;
   onChangeYAxisScale: (value: YAxisScale) => void;
   onChangeYNumberFormat: (value: NumberFormat) => void;
+  onChangeXNumberFormat: (value: NumberFormat) => void;
+  onChangeYLabelAngle: (value: number) => void;
+  onChangeYAxisWidth: (value: string) => void;
+  onChangeYDecimals: (value: string) => void;
+  onChangeYAllowDecimals: (value: boolean) => void;
+  onChangeYTickCount: (value: string) => void;
+  onChangeYPrefix: (value: string) => void;
+  onChangeYSuffix: (value: string) => void;
   onChangeYAxisTitle: (value: string) => void;
   onChangeYMax: (value: string) => void;
   onChangeYMin: (value: string) => void;

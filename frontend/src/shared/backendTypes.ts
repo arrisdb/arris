@@ -351,9 +351,22 @@ interface ChartStyle {
   xLabelAngle?: number;
   yLabelAngle?: number;
   yScale?: YAxisScale;
-  // How Y-axis tick numbers render: "compact" abbreviates large values
-  // (10000000000 -> 10B) so they stay readable; "scientific" uses 1E10.
+  // How Y-axis numbers render (axis ticks, tooltip, and data labels alike):
+  // "compact" abbreviates large values (10000000000 -> 10B) so they stay
+  // readable; "scientific" uses 1E10. Same option for the X axis.
   yNumberFormat?: NumberFormat;
+  xNumberFormat?: NumberFormat;
+  // Fixed decimal places for Y numbers (overrides the format's default rounding).
+  yDecimals?: number;
+  // Text wrapped around each formatted Y number, e.g. prefix "$" or suffix "%".
+  yPrefix?: string;
+  ySuffix?: string;
+  // Reserved pixel width for the Y axis so long tick labels are not clipped.
+  yAxisWidth?: number;
+  // Whether the Y axis may place ticks at fractional values (default true).
+  yAllowDecimals?: boolean;
+  // Suggested number of Y-axis ticks (Recharts treats it as a hint).
+  yTickCount?: number;
   showDataLabels?: boolean;
   stackMode?: StackMode;
   barOrientation?: BarOrientation;

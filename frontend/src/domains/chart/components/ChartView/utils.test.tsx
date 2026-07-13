@@ -3,6 +3,7 @@ import type { ChartSpec } from "@shared";
 import type { QueryResult } from "@domains/results";
 import {
   axisTickFormatter,
+  yValueFormatter,
   barSegmentRadius,
   cartesianSeries,
   chartImageFilename,
@@ -472,5 +473,27 @@ describe("axisTickFormatter", () => {
   it("uses scientific notation when selected", () => {
     const fmt = axisTickFormatter("scientific");
     expect(fmt?.(10_000_000_000)).toBe("1E10");
+  });
+});
+
+describe("yValueFormatter", () => {
+  it("returns undefined when no Y formatting is configured", () => {
+    expect(yValueFormatter(undefined)).toBeUndefined();
+    expect(yValueFormatter({ yNumberFormat: "default" })).toBeUndefined();
+  });
+
+  it("combines compact notation with a prefix and suffix", () => {
+    const fmt = yValueFormatter({ yNumberFormat: "compact", yPrefix: "$", ySuffix: "/mo" });
+    expect(fmt?.(10_000_000_000)).toBe("$10B/mo");
+  });
+
+  it("applies fixed decimals even without a notation change", () => {
+    const fmt = yValueFormatter({ yDecimals: 2, yPrefix: "$" });
+    expect(fmt?.(1234)).toBe("$1,234.00");
+  });
+
+  it("passes non-numeric values through untouched", () => {
+    const fmt = yValueFormatter({ ySuffix: "%" });
+    expect(fmt?.("n/a" as unknown as number)).toBe("n/a");
   });
 });

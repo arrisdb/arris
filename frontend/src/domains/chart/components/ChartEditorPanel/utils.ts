@@ -125,6 +125,16 @@ function buildChartEditorViewModel(args: {
     onChangeYAxisScale: (value: YAxisScale) => patchStyle({ yScale: value }),
     onChangeYNumberFormat: (value: NumberFormat) =>
       patchStyle({ yNumberFormat: value === "default" ? undefined : value }),
+    onChangeXNumberFormat: (value: NumberFormat) =>
+      patchStyle({ xNumberFormat: value === "default" ? undefined : value }),
+    onChangeYLabelAngle: (value: number) => patchStyle({ yLabelAngle: value }),
+    onChangeYAxisWidth: (value: string) => patchStyle({ yAxisWidth: numberOrUndefined(value) }),
+    onChangeYDecimals: (value: string) => patchStyle({ yDecimals: numberOrUndefined(value) }),
+    onChangeYAllowDecimals: (value: boolean) =>
+      patchStyle({ yAllowDecimals: value ? undefined : false }),
+    onChangeYTickCount: (value: string) => patchStyle({ yTickCount: numberOrUndefined(value) }),
+    onChangeYPrefix: (value: string) => patchStyle({ yPrefix: value || undefined }),
+    onChangeYSuffix: (value: string) => patchStyle({ ySuffix: value || undefined }),
     onChangeYAxisTitle: (value: string) => patchStyle({ yAxisTitle: value || undefined }),
     onChangeYMax: (value: string) => patchStyle({ yMax: numberOrUndefined(value) }),
     onChangeYMin: (value: string) => patchStyle({ yMin: numberOrUndefined(value) }),

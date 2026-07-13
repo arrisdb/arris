@@ -238,6 +238,18 @@ function AxesSection({ pane }: { pane: ChartEditorPanelViewModel }) {
         ))}
       </div>
 
+      <label className="mdbc-pane-label">Y-label angle</label>
+      <div className="mdbc-inline-row with-margin">
+        {LABEL_ANGLES.map((angle) => (
+          <ToggleBtn
+            key={angle}
+            label={`${angle}°`}
+            active={(style?.yLabelAngle ?? 0) === angle}
+            onClick={() => pane.onChangeYLabelAngle(angle)}
+          />
+        ))}
+      </div>
+
       <label className="mdbc-pane-label">Y-axis scale</label>
       <div className="mdbc-inline-row with-margin">
         {Y_AXIS_SCALES.map((scale) => (
@@ -260,6 +272,76 @@ function AxesSection({ pane }: { pane: ChartEditorPanelViewModel }) {
             onClick={() => pane.onChangeYNumberFormat(format.value)}
           />
         ))}
+      </div>
+
+      <label className="mdbc-pane-label">X-axis number format</label>
+      <div className="mdbc-inline-row with-margin">
+        {NUMBER_FORMATS.map((format) => (
+          <ToggleBtn
+            key={format.value}
+            label={format.label}
+            active={(style?.xNumberFormat ?? "default") === format.value}
+            onClick={() => pane.onChangeXNumberFormat(format.value)}
+          />
+        ))}
+      </div>
+
+      <label className="mdbc-pane-label">Y decimals</label>
+      <input
+        className="mdbc-pane-input"
+        type="number"
+        min={0}
+        placeholder="Auto"
+        value={style?.yDecimals ?? ""}
+        onChange={(event) => pane.onChangeYDecimals(event.target.value)}
+      />
+
+      <label className="mdbc-pane-label">Y prefix / suffix</label>
+      <div className="mdbc-range-row">
+        <input
+          className="mdbc-pane-input compact"
+          placeholder="$"
+          value={style?.yPrefix ?? ""}
+          onChange={(event) => pane.onChangeYPrefix(event.target.value)}
+        />
+        <input
+          className="mdbc-pane-input compact"
+          placeholder="%"
+          value={style?.ySuffix ?? ""}
+          onChange={(event) => pane.onChangeYSuffix(event.target.value)}
+        />
+      </div>
+
+      <label className="mdbc-pane-label">Y-axis width</label>
+      <input
+        className="mdbc-pane-input"
+        type="number"
+        min={0}
+        placeholder="Auto"
+        value={style?.yAxisWidth ?? ""}
+        onChange={(event) => pane.onChangeYAxisWidth(event.target.value)}
+      />
+
+      <label className="mdbc-pane-label">Y tick count</label>
+      <input
+        className="mdbc-pane-input"
+        type="number"
+        min={0}
+        placeholder="Auto"
+        value={style?.yTickCount ?? ""}
+        onChange={(event) => pane.onChangeYTickCount(event.target.value)}
+      />
+
+      <div className="mdbc-check-row-group">
+        <label className="mdbc-check-row">
+          <input
+            type="checkbox"
+            className="mdbc-checkbox"
+            checked={style?.yAllowDecimals !== false}
+            onChange={(event) => pane.onChangeYAllowDecimals(event.target.checked)}
+          />
+          Allow decimal ticks
+        </label>
       </div>
     </Section>
   );
