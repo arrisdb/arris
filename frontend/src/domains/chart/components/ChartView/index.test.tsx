@@ -55,6 +55,19 @@ describe("ChartView", () => {
     expect(screen.getByTestId("chart-view-empty").textContent).toContain("Running");
   });
 
+  it("spins the empty-state icon while running", () => {
+    const { container } = render(
+      <ChartView spec={SPEC} result={undefined} isRunning onEdit={vi.fn()} />,
+    );
+    expect(container.querySelector(".mdbc-chart-empty-icon.spinning")).toBeTruthy();
+  });
+
+  it("does not spin the empty-state icon when idle", () => {
+    const { container } = render(<ChartView spec={undefined} result={RESULT} onEdit={vi.fn()} />);
+    expect(container.querySelector(".mdbc-chart-empty-icon.spinning")).toBeNull();
+    expect(container.querySelector(".mdbc-chart-empty-icon")).toBeTruthy();
+  });
+
   it("shows error state", () => {
     render(<ChartView spec={SPEC} result={undefined} error="boom" onEdit={vi.fn()} />);
     expect(screen.getByTestId("chart-view-empty").textContent).toContain("boom");
