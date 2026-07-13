@@ -1,15 +1,16 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { NodeProps } from "reactflow";
-import type { QueryResult } from "@shared";
+import type { QueryResult, QueryValue } from "@shared";
 import { IconButton, Tooltip } from "@shared/ui";
 import { Icon } from "@shared/ui/Icon";
 import {
   ResultsDataTable,
   ResultsSearchBar,
   RowDetailPane,
-  exportResults,
   findVisibleMatches,
+  pickExportPath,
   visibleRowsForResult,
+  writeExport,
 } from "@domains/results";
 import type { ExportFormat, ResultSortClause, SelectedCell } from "@domains/results";
 
@@ -22,6 +23,7 @@ import {
   EMPTY_DELETED_ROWS,
   EMPTY_EDITS,
   EMPTY_INSERTS,
+  DOWNLOAD_CHUNK_ROWS,
   EMPTY_LOGO_SIZE,
   EMPTY_STAGED_KEYS,
   NOOP,
@@ -61,6 +63,7 @@ function TableNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchIndex, setSearchIndex] = useState(0);
   const [downloading, setDownloading] = useState(false);
+  const [downloadPct, setDownloadPct] = useState(0);
   const exportMenuRef = useRef<HTMLDivElement>(null);
   // Cooperative cancel for an in-flight export: the full-result fetch can't be
   // aborted mid-flight, but this skips writing the file once it resolves.
@@ -160,15 +163,33 @@ function TableNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
   async function onExportAll(format: ExportFormat) {
     if (!page) return;
     setShowExportMenu(false);
+    // Pick the destination FIRST, before any fetching, so the save dialog opens
+    // right away rather than after the rows are gathered.
+    const path = await pickExportPath(format);
+    if (!path) return;
+    if (!sourceTitle) {
+      await writeExport(path, page.columns, page.rows, format);
+      return;
+    }
     setDownloading(true);
+    setDownloadPct(0);
     exportCancelledRef.current = false;
     try {
-      const full = sourceTitle
-        ? await fetchCanvasCellPageIPC(tabId, sourceTitle, 0, Math.max(total, page.rows.length))
-        : null;
+      // Fetch the full result in chunks so progress is a real fetched/total ratio
+      // and cancelling stops between chunks.
+      const target = Math.max(total, page.rows.length);
+      const rows: QueryValue[][] = [];
+      let columns = page.columns;
+      for (let offset = 0; offset < target; offset += DOWNLOAD_CHUNK_ROWS) {
+        if (exportCancelledRef.current) return;
+        const chunk = await fetchCanvasCellPageIPC(tabId, sourceTitle, offset, DOWNLOAD_CHUNK_ROWS);
+        if (!chunk || chunk.rows.length === 0) break;
+        columns = chunk.columns;
+        rows.push(...chunk.rows);
+        setDownloadPct(Math.min(100, Math.round((rows.length / target) * 100)));
+      }
       if (exportCancelledRef.current) return;
-      const out = full ?? page;
-      await exportResults(out.columns, out.rows, format);
+      await writeExport(path, columns, rows, format);
     } finally {
       setDownloading(false);
     }
@@ -281,7 +302,7 @@ function TableNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
               <Icon
                 name="database"
                 size={EMPTY_LOGO_SIZE}
-                className="mdbc-canvas-table-empty-logo mdbc-spin"
+                className="mdbc-results-loading-logo mdbc-spin"
               />
               <span>Running…</span>
             </div>
@@ -324,7 +345,7 @@ function TableNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
           <div className="mdbc-canvas-result-pager">
             {downloading ? (
               <span className="mdbc-canvas-table-downloading">
-                Downloading…
+                Downloading… {downloadPct}%
                 <IconButton
                   icon="x"
                   label="Cancel download"

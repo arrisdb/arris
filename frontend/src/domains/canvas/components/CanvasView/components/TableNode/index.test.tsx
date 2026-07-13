@@ -11,10 +11,11 @@ vi.mock("../../../../ipc", () => ({
   cancelCanvasCellIPC: vi.fn(),
 }));
 
-// Keep the real results components; stub only the file-writing export helper.
+// Keep the real results components; stub only the file-picking/writing helpers.
 vi.mock("@domains/results", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@domains/results")>()),
-  exportResults: vi.fn(),
+  pickExportPath: vi.fn(() => Promise.resolve("/tmp/results.out")),
+  writeExport: vi.fn(),
 }));
 
 // Deterministic virtualizer: render every visible row (jsdom has no layout).
@@ -33,11 +34,12 @@ vi.mock("@tanstack/react-virtual", () => ({
   }),
 }));
 
-import { exportResults } from "@domains/results";
+import { pickExportPath, writeExport } from "@domains/results";
 
 import { useCanvasStore } from "../../../../hooks";
 import { makeComponent } from "../../../../utils";
 import { fetchCanvasCellPageIPC } from "../../../../ipc";
+import { DOWNLOAD_CHUNK_ROWS } from "./constants";
 import type { CanvasNodeData } from "../../types";
 import { TableNode } from "./index";
 
@@ -170,8 +172,8 @@ describe("TableNode", () => {
     expect(screen.getByText("Sales")).toBeTruthy();
   });
 
-  it("shows a cancellable downloading status and disables the download button", async () => {
-    vi.mocked(exportResults).mockClear();
+  it("shows a cancellable download progress status and disables the download button", async () => {
+    vi.mocked(writeExport).mockClear();
     seedBound({ previewRows: 2 });
     useCanvasStore.getState().setRun(TAB, "q", { result: manyRows(2), totalRows: 5 });
     let resolveFetch: (r: QueryResult) => void = () => {};
@@ -185,18 +187,18 @@ describe("TableNode", () => {
     fireEvent.click(screen.getByRole("button", { name: "Download" }));
     fireEvent.click(screen.getByTestId("table-export-csv"));
 
-    // While the full-result fetch is in flight: status shown, download disabled.
-    expect(await screen.findByText("Downloading…")).toBeTruthy();
+    // A chunk fetch is in flight: progress status shown, download disabled.
+    expect(await screen.findByText(/Downloading… \d+%/)).toBeTruthy();
     expect((screen.getByRole("button", { name: "Download" }) as HTMLButtonElement).disabled).toBe(true);
 
     // Cancelling clears the status and skips the file write even once the fetch lands.
     fireEvent.click(screen.getByRole("button", { name: "Cancel download" }));
-    expect(screen.queryByText("Downloading…")).toBeNull();
+    expect(screen.queryByText(/Downloading/)).toBeNull();
     resolveFetch(manyRows(5));
     await waitFor(() =>
       expect((screen.getByRole("button", { name: "Download" }) as HTMLButtonElement).disabled).toBe(false),
     );
-    expect(vi.mocked(exportResults)).not.toHaveBeenCalled();
+    expect(vi.mocked(writeExport)).not.toHaveBeenCalled();
   });
 
   it("refreshes by re-running the source query", () => {
@@ -224,8 +226,9 @@ describe("TableNode", () => {
     expect(screen.getByText(/Select a row to inspect/)).toBeTruthy();
   });
 
-  it("downloads every row, not just the visible page", async () => {
-    vi.mocked(exportResults).mockClear();
+  it("downloads every row in chunks after picking the destination first", async () => {
+    vi.mocked(writeExport).mockClear();
+    vi.mocked(pickExportPath).mockClear();
     seedBound({ previewRows: 2 });
     // The page holds 2 rows; the full cached result has 5.
     useCanvasStore.getState().setRun(TAB, "q", { result: manyRows(2), totalRows: 5 });
@@ -235,11 +238,12 @@ describe("TableNode", () => {
     fireEvent.click(screen.getByRole("button", { name: "Download" }));
     fireEvent.click(screen.getByTestId("table-export-csv"));
 
-    // Fetches the WHOLE cached result (offset 0, limit = total), then exports it.
+    // Destination picked before any fetch, then the full result is paged in.
+    await waitFor(() => expect(vi.mocked(pickExportPath)).toHaveBeenCalled());
     await waitFor(() =>
-      expect(fetchCanvasCellPageIPC).toHaveBeenCalledWith(TAB, "sales", 0, 5),
+      expect(fetchCanvasCellPageIPC).toHaveBeenCalledWith(TAB, "sales", 0, DOWNLOAD_CHUNK_ROWS),
     );
-    await waitFor(() => expect(vi.mocked(exportResults)).toHaveBeenCalled());
-    expect(vi.mocked(exportResults).mock.calls[0][1]).toHaveLength(5);
+    await waitFor(() => expect(vi.mocked(writeExport)).toHaveBeenCalled());
+    expect(vi.mocked(writeExport).mock.calls[0][2]).toHaveLength(5);
   });
 });

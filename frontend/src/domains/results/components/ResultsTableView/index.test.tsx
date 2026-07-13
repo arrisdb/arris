@@ -21,6 +21,8 @@ vi.mock("./ipc", () => ({
 vi.mock("./utils", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./utils")>()),
   exportResults: vi.fn(),
+  pickExportPath: vi.fn(() => Promise.resolve("/tmp/results.out")),
+  writeExport: vi.fn(),
 }));
 
 // Stub the chart body so chart-mode tests don't pull in recharts' SVG layout
@@ -54,7 +56,7 @@ import { useSettingsStore } from "@shared/settings";
 import { useDbtStore } from "@domains/dbt/hooks";
 import { useSqlMeshStore } from "@domains/sqlmesh/hooks";
 import { runQueryIPC, runFederationQueryIPC, primaryKeyIPC, applyMutationsIPC } from "./ipc";
-import { exportResults } from "./utils";
+import { exportResults, pickExportPath, writeExport } from "./utils";
 import type { QueryResult } from "./types";
 
 function tabWithResult(): EditorTab {
@@ -121,6 +123,9 @@ beforeEach(() => {
   vi.mocked(primaryKeyIPC).mockReset();
   vi.mocked(applyMutationsIPC).mockReset();
   vi.mocked(exportResults).mockReset();
+  vi.mocked(writeExport).mockReset();
+  vi.mocked(pickExportPath).mockReset();
+  vi.mocked(pickExportPath).mockResolvedValue("/tmp/results.out");
 });
 
 describe("ResultsTableView", () => {
@@ -1349,8 +1354,14 @@ describe("ResultsTableView", () => {
     expect(call[4]).toBeUndefined();
     expect(call[5]).toBeUndefined();
     await waitFor(() =>
-      expect(vi.mocked(exportResults)).toHaveBeenCalledWith(full.columns, full.rows, "csv"),
+      expect(vi.mocked(writeExport)).toHaveBeenCalledWith(
+        "/tmp/results.out",
+        full.columns,
+        full.rows,
+        "csv",
+      ),
     );
+    expect(vi.mocked(pickExportPath)).toHaveBeenCalled();
     expect(screen.queryByTestId("results-export-menu")).toBeNull();
   });
 
@@ -1365,7 +1376,12 @@ describe("ResultsTableView", () => {
     fireEvent.click(screen.getByTestId("results-download-btn"));
     fireEvent.click(screen.getByTestId("export-json-btn"));
     await waitFor(() =>
-      expect(vi.mocked(exportResults)).toHaveBeenCalledWith(full.columns, full.rows, "json"),
+      expect(vi.mocked(writeExport)).toHaveBeenCalledWith(
+        "/tmp/results.out",
+        full.columns,
+        full.rows,
+        "json",
+      ),
     );
   });
 

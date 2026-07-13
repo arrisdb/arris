@@ -8,7 +8,7 @@ export { ResultsDataTable } from "./components/ResultsTableView/components/Resul
 export { ResultsSearchBar } from "./components/ResultsTableView/components/ResultsSearchBar";
 export { RowDetailPane } from "./components/RowDetailPane";
 export { RunHistoryChips } from "./components/RunHistoryChips";
-export { exportResults, findVisibleMatches, visibleRowsForResult } from "./components/ResultsTableView/utils";
+export { exportResults, findVisibleMatches, pickExportPath, visibleRowsForResult, writeExport } from "./components/ResultsTableView/utils";
 export type { ExportFormat } from "./components/ResultsTableView/utils";
 export type { ResultSortClause, SelectedCell, VisibleResultRow } from "./components/ResultsTableView/types";
 export {
