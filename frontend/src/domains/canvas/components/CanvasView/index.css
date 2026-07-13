@@ -384,12 +384,6 @@
   overflow: auto;
 }
 
-.mdbc-canvas-result {
-  flex: 1 1 auto;
-  overflow: auto;
-  padding: 0;
-}
-
 .mdbc-canvas-result-empty,
 .mdbc-canvas-result-error {
   padding: 8px 10px;
@@ -400,32 +394,6 @@
 .mdbc-canvas-result-error {
   color: var(--m-red);
   white-space: pre-wrap;
-}
-
-.mdbc-canvas-result-table {
-  border-collapse: collapse;
-  width: 100%;
-  font-size: var(--m-fs-xs);
-  font-family: var(--m-font-mono);
-}
-
-.mdbc-canvas-result-table th,
-.mdbc-canvas-result-table td {
-  border-bottom: 1px solid var(--m-sep);
-  padding: 3px 8px;
-  text-align: left;
-  white-space: nowrap;
-  max-width: 220px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.mdbc-canvas-result-table th {
-  position: sticky;
-  top: 0;
-  background: var(--m-bg-surface);
-  color: var(--m-fg-2);
-  font-weight: 600;
 }
 
 /* One-line run status under the query editor. The query object no longer shows
@@ -455,14 +423,70 @@
 
 /* ── table object ─────────────────────────────────────────────────────────── */
 
-/* The table object reuses the shared .mdbc-canvas-result* grid; the result area
-   fills the node frame below the optional title, above the pager. */
-.mdbc-canvas-table .mdbc-canvas-result {
-  flex: 1 1 auto;
-  min-height: 0;
+/* Compact toolbar above the grid: refresh, find, download, JSON detail. */
+.mdbc-canvas-table-toolbar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 6px;
+  border-bottom: 1px solid var(--m-sep);
 }
 
-/* Pager footer: page range on the left, prev/next on the right. Matches the
+/* The grid area reuses the results-pane grid (.mdbc-table); it fills the node
+   frame below the toolbar, above the pager. `nowheel` keeps scrolling in the
+   grid from panning the board. */
+.mdbc-canvas-table-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  overflow: hidden;
+}
+
+/* Grid + optional row-detail split; the grid flexes, the detail is fixed-share. */
+.mdbc-canvas-table-grid {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+}
+
+.mdbc-canvas-table-grid .mdbc-results-table-scroll {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.mdbc-canvas-table-grid.with-detail .mdbc-results-table-scroll {
+  flex: 1 1 60%;
+}
+
+.mdbc-canvas-table-detail {
+  flex: 1 1 40%;
+  min-width: 0;
+  border-left: 1px solid var(--m-sep);
+  display: flex;
+}
+
+/* Empty state: centered logo with the prompt below it (larger than a caption). */
+.mdbc-canvas-table-empty,
+.mdbc-canvas-table-running {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: var(--m-fg-3);
+}
+
+.mdbc-canvas-table-empty-logo {
+  color: var(--m-fg-4);
+}
+
+.mdbc-canvas-table-empty-text {
+  font-size: var(--m-fs-sm);
+}
+
+/* Pager footer: status on the left, prev/next on the right. Matches the
    10px sidebar inset used elsewhere. */
 .mdbc-canvas-result-pager {
   flex: 0 0 auto;

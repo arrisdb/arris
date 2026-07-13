@@ -11,6 +11,22 @@ vi.mock("../../../../ipc", () => ({
   cancelCanvasCellIPC: vi.fn(),
 }));
 
+// Deterministic virtualizer: render every visible row (jsdom has no layout).
+vi.mock("@tanstack/react-virtual", () => ({
+  useVirtualizer: (opts: { count: number }) => ({
+    getVirtualItems: () =>
+      Array.from({ length: opts.count }, (_, i) => ({
+        index: i,
+        start: i * 24,
+        end: (i + 1) * 24,
+        key: i,
+      })),
+    getTotalSize: () => opts.count * 24,
+    measureElement: () => undefined,
+    scrollToIndex: () => undefined,
+  }),
+}));
+
 import { useCanvasStore } from "../../../../hooks";
 import { makeComponent } from "../../../../utils";
 import { fetchCanvasCellPageIPC } from "../../../../ipc";
@@ -21,8 +37,8 @@ const TAB = "tab-1";
 
 const RESULT: QueryResult = {
   columns: [
-    { name: "month", type: "text" },
-    { name: "total", type: "number" },
+    { name: "month", type_hint: "text" },
+    { name: "total", type_hint: "int" },
   ],
   rows: [
     [
@@ -34,7 +50,7 @@ const RESULT: QueryResult = {
 
 const manyRows = (n: number): QueryResult =>
   ({
-    columns: [{ name: "n", type: "number" }],
+    columns: [{ name: "n", type_hint: "int" }],
     rows: Array.from({ length: n }, (_, i) => [{ kind: "int", value: i }]),
   }) as unknown as QueryResult;
 
@@ -49,46 +65,35 @@ function renderNode(id: string) {
   );
 }
 
+function seedBound(extra: Record<string, unknown> = {}) {
+  useCanvasStore.setState({ boards: {} });
+  useCanvasStore.getState().ensureBoard(TAB, "");
+  useCanvasStore
+    .getState()
+    .addComponent(TAB, makeComponent({ kind: "query", id: "q", title: "Sales" }));
+  useCanvasStore
+    .getState()
+    .addComponent(TAB, makeComponent({ kind: "table", id: "tbl", sourceQueryId: "q", ...extra }));
+}
+
 describe("TableNode", () => {
   beforeEach(() => {
     vi.mocked(fetchCanvasCellPageIPC).mockClear();
-    useCanvasStore.setState({ boards: {} });
-    useCanvasStore.getState().ensureBoard(TAB, "");
-    useCanvasStore
-      .getState()
-      .addComponent(TAB, makeComponent({ kind: "table", id: "tbl", sourceQueryId: "q" }));
+    seedBound();
   });
 
-  it("renders the source query's result rows", () => {
-    useCanvasStore.getState().setRun(TAB, "q", { result: RESULT });
-    renderNode("tbl");
+  it("renders the source query's result rows in the reused grid", () => {
+    useCanvasStore.getState().setRun(TAB, "q", { result: RESULT, totalRows: 1 });
+    const { container } = renderNode("tbl");
+    expect(container.querySelector(".mdbc-table")).toBeTruthy();
     expect(screen.getByText("month")).toBeTruthy();
     expect(screen.getByText("total")).toBeTruthy();
     expect(screen.getByText("Jan")).toBeTruthy();
-    expect(screen.getByText("10")).toBeTruthy();
   });
 
   it("prompts to run the source query when it has no result yet", () => {
     renderNode("tbl");
     expect(screen.getByText(/Run the source query/)).toBeTruthy();
-  });
-
-  it("surfaces the source query's error", () => {
-    useCanvasStore.getState().setRun(TAB, "q", { error: "boom" });
-    renderNode("tbl");
-    expect(screen.getByText("boom")).toBeTruthy();
-  });
-
-  it("caps the rendered rows at the table's previewRows", () => {
-    useCanvasStore.setState({ boards: {} });
-    useCanvasStore.getState().ensureBoard(TAB, "");
-    useCanvasStore
-      .getState()
-      .addComponent(TAB, makeComponent({ kind: "table", id: "tbl", sourceQueryId: "q", previewRows: 2 }));
-    useCanvasStore.getState().setRun(TAB, "q", { result: manyRows(5) });
-    renderNode("tbl");
-    // Header row + 2 capped body rows = 3 <tr>.
-    expect(document.querySelectorAll(".mdbc-canvas-result-table tr").length).toBe(3);
   });
 
   it("prompts to pick a source when the table is unbound", () => {
@@ -99,22 +104,32 @@ describe("TableNode", () => {
     expect(screen.getByText(/Pick a source query/)).toBeTruthy();
   });
 
+  it("surfaces the source query's error", () => {
+    useCanvasStore.getState().setRun(TAB, "q", { error: "boom" });
+    renderNode("tbl");
+    expect(screen.getByText("boom")).toBeTruthy();
+  });
+
+  it("caps the rendered rows at the table's previewRows", () => {
+    seedBound({ previewRows: 2 });
+    useCanvasStore.getState().setRun(TAB, "q", { result: manyRows(5), totalRows: 5 });
+    renderNode("tbl");
+    expect(document.querySelectorAll(".mdbc-table td.rownum").length).toBe(2);
+  });
+
+  it("shows a footer with the total rows, columns, page and refresh timestamp", () => {
+    seedBound({ previewRows: 2 });
+    const endedAt = new Date(2026, 6, 12, 23, 17, 34).getTime();
+    useCanvasStore.getState().setRun(TAB, "q", { result: manyRows(2), totalRows: 5, endedAt });
+    renderNode("tbl");
+    expect(screen.getByText(/5 rows · 1 column · Page 1\/3 · 2026-07-12 23:17:34/)).toBeTruthy();
+  });
+
   it("pages through the full cached result from the backend", async () => {
-    useCanvasStore.setState({ boards: {} });
-    useCanvasStore.getState().ensureBoard(TAB, "");
-    useCanvasStore
-      .getState()
-      .addComponent(TAB, makeComponent({ kind: "query", id: "q", title: "Sales" }));
-    useCanvasStore
-      .getState()
-      .addComponent(TAB, makeComponent({ kind: "table", id: "tbl", sourceQueryId: "q", previewRows: 2 }));
-    // Page held 2 rows; the full result has 5.
+    seedBound({ previewRows: 2 });
     useCanvasStore.getState().setRun(TAB, "q", { result: manyRows(2), totalRows: 5 });
     vi.mocked(fetchCanvasCellPageIPC).mockResolvedValueOnce(manyRows(2));
     renderNode("tbl");
-
-    // Pager reports the first page against the full total.
-    expect(screen.getByText("1-2 of 5")).toBeTruthy();
 
     fireEvent.click(screen.getByText("Next"));
     await waitFor(() =>
@@ -122,34 +137,45 @@ describe("TableNode", () => {
     );
   });
 
-  it("shows no pager when the whole result fits one page", () => {
+  it("disables paging when the whole result fits one page", () => {
     useCanvasStore.getState().setRun(TAB, "q", { result: RESULT, totalRows: 1 });
     renderNode("tbl");
-    expect(screen.queryByText("Next")).toBeNull();
-  });
-
-  it("renders the early page while the source is still streaming", () => {
-    useCanvasStore.setState({ boards: {} });
-    useCanvasStore.getState().ensureBoard(TAB, "");
-    useCanvasStore
-      .getState()
-      .addComponent(TAB, makeComponent({ kind: "table", id: "tbl", sourceQueryId: "q", previewRows: 2 }));
-    // Early page landed; totals still streaming in (no totalRows yet).
-    useCanvasStore.getState().setRun(TAB, "q", { result: manyRows(3), running: true });
-    renderNode("tbl");
-
-    expect(screen.queryByText("Running…")).toBeNull();
-    // Header + 2 capped body rows are visible immediately.
-    expect(document.querySelectorAll(".mdbc-canvas-result-table tr").length).toBe(3);
-    // Total unknown until ingest completes; paging waits for the cache.
-    expect(screen.getByText("1-2 of …")).toBeTruthy();
     expect((screen.getByText("Next") as HTMLButtonElement).disabled).toBe(true);
     expect((screen.getByText("Prev") as HTMLButtonElement).disabled).toBe(true);
   });
 
-  it("shows Running… while streaming before the early page arrives", () => {
-    useCanvasStore.getState().setRun(TAB, "q", { running: true });
+  it("shows a spinner and no data while the source is streaming", () => {
+    seedBound({ previewRows: 2 });
+    // Early page landed, but the run is still streaming: no partial grid is shown.
+    useCanvasStore.getState().setRun(TAB, "q", { result: manyRows(3), running: true });
     renderNode("tbl");
     expect(screen.getByText("Running…")).toBeTruthy();
+    expect(document.querySelector(".mdbc-table")).toBeNull();
+    expect(screen.queryByText("Next")).toBeNull();
+  });
+
+  it("refreshes by re-running the source query", () => {
+    const run = vi.fn();
+    useCanvasStore.getState().setRun(TAB, "q", { result: RESULT, totalRows: 1 });
+    useCanvasStore.setState({ runQueryComponent: run } as never);
+    renderNode("tbl");
+    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    expect(run).toHaveBeenCalledWith(TAB, "q");
+  });
+
+  it("toggles the in-view search bar", () => {
+    useCanvasStore.getState().setRun(TAB, "q", { result: RESULT, totalRows: 1 });
+    renderNode("tbl");
+    expect(screen.queryByTestId("results-search-bar")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Find in results" }));
+    expect(screen.getByTestId("results-search-bar")).toBeTruthy();
+  });
+
+  it("toggles the JSON row-detail pane", () => {
+    useCanvasStore.getState().setRun(TAB, "q", { result: RESULT, totalRows: 1 });
+    renderNode("tbl");
+    expect(screen.queryByText(/Select a row to inspect/)).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "JSON detail" }));
+    expect(screen.getByText(/Select a row to inspect/)).toBeTruthy();
   });
 });
