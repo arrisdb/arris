@@ -21,6 +21,8 @@ vi.mock("./ipc", () => ({
 vi.mock("./utils", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./utils")>()),
   exportResults: vi.fn(),
+  pickExportPath: vi.fn(() => Promise.resolve("/tmp/results.out")),
+  writeExport: vi.fn(),
 }));
 
 // Stub the chart body so chart-mode tests don't pull in recharts' SVG layout
@@ -54,7 +56,7 @@ import { useSettingsStore } from "@shared/settings";
 import { useDbtStore } from "@domains/dbt/hooks";
 import { useSqlMeshStore } from "@domains/sqlmesh/hooks";
 import { runQueryIPC, runFederationQueryIPC, primaryKeyIPC, applyMutationsIPC } from "./ipc";
-import { exportResults } from "./utils";
+import { exportResults, pickExportPath, writeExport } from "./utils";
 import type { QueryResult } from "./types";
 
 function tabWithResult(): EditorTab {
@@ -121,6 +123,9 @@ beforeEach(() => {
   vi.mocked(primaryKeyIPC).mockReset();
   vi.mocked(applyMutationsIPC).mockReset();
   vi.mocked(exportResults).mockReset();
+  vi.mocked(writeExport).mockReset();
+  vi.mocked(pickExportPath).mockReset();
+  vi.mocked(pickExportPath).mockResolvedValue("/tmp/results.out");
 });
 
 describe("ResultsTableView", () => {
@@ -1333,28 +1338,51 @@ describe("ResultsTableView", () => {
     expect(screen.getByTestId("export-json-btn")).toBeTruthy();
   });
 
-  it("calls exportResults with csv format", () => {
+  it("exports every row by re-running the query unpaginated (csv)", async () => {
+    const full = {
+      columns: [{ name: "id", type_hint: "int" }],
+      rows: [[{ kind: "int", value: 1 }], [{ kind: "int", value: 2 }], [{ kind: "int", value: 3 }]],
+      elapsed: 0,
+    } as unknown as QueryResult;
+    vi.mocked(runQueryIPC).mockResolvedValue(full);
     render(<ResultsTableView />);
     fireEvent.click(screen.getByTestId("results-download-btn"));
     fireEvent.click(screen.getByTestId("export-csv-btn"));
-    expect(vi.mocked(exportResults)).toHaveBeenCalledWith(
-      expect.any(Array),
-      expect.any(Array),
-      "csv",
+    await waitFor(() => expect(vi.mocked(runQueryIPC)).toHaveBeenCalled());
+    // Re-run with no page_size/page => the full result, not the visible page.
+    const call = vi.mocked(runQueryIPC).mock.calls[0];
+    expect(call[4]).toBeUndefined();
+    expect(call[5]).toBeUndefined();
+    await waitFor(() =>
+      expect(vi.mocked(writeExport)).toHaveBeenCalledWith(
+        "/tmp/results.out",
+        full.columns,
+        full.rows,
+        "csv",
+      ),
     );
+    expect(vi.mocked(pickExportPath)).toHaveBeenCalled();
     expect(screen.queryByTestId("results-export-menu")).toBeNull();
   });
 
-  it("calls exportResults with json format", () => {
+  it("exports every row by re-running the query unpaginated (json)", async () => {
+    const full = {
+      columns: [{ name: "id", type_hint: "int" }],
+      rows: [[{ kind: "int", value: 1 }], [{ kind: "int", value: 2 }]],
+      elapsed: 0,
+    } as unknown as QueryResult;
+    vi.mocked(runQueryIPC).mockResolvedValue(full);
     render(<ResultsTableView />);
     fireEvent.click(screen.getByTestId("results-download-btn"));
     fireEvent.click(screen.getByTestId("export-json-btn"));
-    expect(vi.mocked(exportResults)).toHaveBeenCalledWith(
-      expect.any(Array),
-      expect.any(Array),
-      "json",
+    await waitFor(() =>
+      expect(vi.mocked(writeExport)).toHaveBeenCalledWith(
+        "/tmp/results.out",
+        full.columns,
+        full.rows,
+        "json",
+      ),
     );
-    expect(screen.queryByTestId("results-export-menu")).toBeNull();
   });
 
   it("disables chart PNG export until the chart is configured", () => {

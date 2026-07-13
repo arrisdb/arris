@@ -4,9 +4,13 @@
 // consumers (chart) and the shell/stores import through this barrel.
 export { ResultsTableView } from "./components/ResultsTableView";
 export { ResultsFooterBar } from "./components/ResultsTableView/components/ResultsFooterBar";
+export { ResultsDataTable } from "./components/ResultsTableView/components/ResultsDataTable";
+export { ResultsSearchBar } from "./components/ResultsTableView/components/ResultsSearchBar";
+export { RowDetailPane } from "./components/RowDetailPane";
 export { RunHistoryChips } from "./components/RunHistoryChips";
-export { exportResults } from "./components/ResultsTableView/utils";
+export { exportResults, findVisibleMatches, pickExportPath, visibleRowsForResult, writeExport } from "./components/ResultsTableView/utils";
 export type { ExportFormat } from "./components/ResultsTableView/utils";
+export type { ResultSortClause, SelectedCell, VisibleResultRow } from "./components/ResultsTableView/types";
 export {
   flattenRuns,
   selectActiveRun,

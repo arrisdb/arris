@@ -1,4 +1,5 @@
 import type { ReactNode, RefObject } from "react";
+import type { ExportFormat } from "./utils";
 
 type QueryValueKind =
   | "null"
@@ -178,6 +179,7 @@ interface ResultsToolbarProps {
   onClickUpload: () => void;
   canExportChart: boolean;
   onClose: () => void;
+  onExportAll: (format: ExportFormat) => void | Promise<void>;
   onExportChartPng: () => void;
   onPageSizeChange: (pageSize: number) => void;
   onPreviousPage: () => void;

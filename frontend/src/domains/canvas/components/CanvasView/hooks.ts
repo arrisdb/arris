@@ -64,7 +64,7 @@ function useCanvas(tab: EditorTab) {
     () => toFlowNodes(components, tabId),
     [components, tabId],
   );
-  const rfEdges = useMemo(() => toFlowEdges(edges), [edges]);
+  const rfEdges = useMemo(() => toFlowEdges(edges, components), [edges, components]);
 
   const [rfNodes, setRfNodes] = useState<Node<CanvasNodeData>[]>(flowNodes);
 

@@ -2,7 +2,6 @@ import { PAGE_SIZES } from "../../constants";
 import type { ResultsToolbarProps } from "../../types";
 import { IconButton, Select, Tooltip } from "@shared/ui";
 import { RunHistoryChips } from "../../../RunHistoryChips";
-import { exportResults } from "../../utils";
 
 function ResultsToolbar({
   browseEditable,
@@ -22,6 +21,7 @@ function ResultsToolbar({
   onClickTableMode,
   onClickUpload,
   onClose,
+  onExportAll,
   onExportChartPng,
   onNextPage,
   onPageSizeChange,
@@ -188,7 +188,7 @@ function ResultsToolbar({
               className="mdbc-btn ghost menu-item"
               onClick={() => {
                 setExportMenuOpen(false);
-                if (result) exportResults(result.columns, result.rows, "csv");
+                onExportAll("csv");
               }}
               data-testid="export-csv-btn"
             >
@@ -198,7 +198,7 @@ function ResultsToolbar({
               className="mdbc-btn ghost menu-item"
               onClick={() => {
                 setExportMenuOpen(false);
-                if (result) exportResults(result.columns, result.rows, "json");
+                onExportAll("json");
               }}
               data-testid="export-json-btn"
             >

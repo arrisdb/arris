@@ -283,28 +283,39 @@ function buildBatchForTab(
   return { updates, inserts, deletes };
 }
 
+// Prompt for the destination FIRST (before any heavy fetch/conversion), so the
+// save dialog opens immediately rather than after the rows are gathered. Returns
+// null when the user cancels.
+async function pickExportPath(format: ExportFormat): Promise<string | null> {
+  const extension = format === "csv" ? "csv" : "json";
+  return save({
+    title: `Export as ${format.toUpperCase()}`,
+    defaultPath: `results.${extension}`,
+    filters: [{ name: format.toUpperCase(), extensions: [extension] }],
+  });
+}
+
+// Convert the rows to the chosen format and write them to an already-chosen path.
+async function writeExport(
+  filePath: string,
+  columns: ColumnSpec[],
+  rows: QueryValue[][],
+  format: ExportFormat,
+): Promise<void> {
+  const content = format === "csv" ? resultToCsv(columns, rows) : resultToJson(columns, rows);
+  await writeTextFile(filePath, content);
+}
+
+// Pick a destination then write the rows. For callers that already hold every
+// row; callers that must fetch first should pick the path, fetch, then write.
 async function exportResults(
   columns: ColumnSpec[],
   rows: QueryValue[][],
   format: ExportFormat,
 ): Promise<void> {
-  const extension = format === "csv" ? "csv" : "json";
-  const filePath = await save({
-    title: `Export as ${format.toUpperCase()}`,
-    defaultPath: `results.${extension}`,
-    filters: [
-      {
-        name: format.toUpperCase(),
-        extensions: [extension],
-      },
-    ],
-  });
+  const filePath = await pickExportPath(format);
   if (!filePath) return;
-  const content =
-    format === "csv"
-      ? resultToCsv(columns, rows)
-      : resultToJson(columns, rows);
-  await writeTextFile(filePath, content);
+  await writeExport(filePath, columns, rows, format);
 }
 
 // Equality guard for the results pane's tab subscription. Editor keystrokes
@@ -333,6 +344,8 @@ export {
   copyTextForSelectedCell,
   deletedRowsForTab,
   exportResults,
+  pickExportPath,
+  writeExport,
   extractIpcError,
   findVisibleMatches,
   insertsForTab,

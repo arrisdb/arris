@@ -14,13 +14,14 @@ function ResultsSearchBar({
   onClose,
 }: ResultsSearchBarProps) {
   return (
-    <div className="mdbc-filter-builder" data-testid="results-search-bar">
+    <div className="mdbc-filter-builder search" data-testid="results-search-bar">
       <span className="mdbc-runs-label">Find</span>
-      <label className="mdbc-filter-input">
-        <span className="glyph">
+      <label className="mdbc-search sm mdbc-filter-search">
+        <span className="mdbc-search-icon">
           <Icon name="search" size={12} />
         </span>
         <input
+          className="mdbc-search-input"
           autoFocus
           value={query}
           onChange={(event) => setQuery(event.target.value)}
