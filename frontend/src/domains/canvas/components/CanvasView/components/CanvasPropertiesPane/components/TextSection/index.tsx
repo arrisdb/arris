@@ -2,7 +2,7 @@ import { Icon } from "@shared/ui/Icon";
 
 import { DEFAULT_TEXT_BG, DEFAULT_TEXT_COLOR } from "../../constants";
 import type { SectionProps } from "../../types";
-import { ALIGN_OPTIONS, STYLE_TOGGLES, TOGGLE_ICON_SIZE } from "./constants";
+import { ALIGN_OPTIONS, STYLE_TOGGLES, TOGGLE_ICON_SIZE, TOGGLE_ICON_STROKE } from "./constants";
 
 /// Text-specific controls: font size, run styles (bold/italic/underline/strike),
 /// alignment, and text/background colour. All write into the object's `style`,
@@ -38,7 +38,7 @@ function TextSection({ component, onChange }: SectionProps) {
               aria-pressed={!!style[t.key]}
               onClick={() => onChange({ style: { ...style, [t.key]: !style[t.key] } })}
             >
-              <Icon name={t.icon} size={TOGGLE_ICON_SIZE} />
+              <Icon name={t.icon} size={TOGGLE_ICON_SIZE} strokeWidth={TOGGLE_ICON_STROKE} />
             </button>
           ))}
         </div>

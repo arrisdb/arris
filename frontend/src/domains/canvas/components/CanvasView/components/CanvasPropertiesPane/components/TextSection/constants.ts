@@ -18,8 +18,10 @@ const ALIGN_OPTIONS: { value: TextAlign; icon: IconName; title: string }[] = [
   { value: "right", icon: "alignRight", title: "Align right" },
 ];
 
-/// Icon size for the compact segmented toggles.
-const TOGGLE_ICON_SIZE = 14;
+/// Size + a slightly heavier stroke for the compact segmented toggles so the
+/// letter-shaped glyphs (B/I/U/S) read crisply at small sizes.
+const TOGGLE_ICON_SIZE = 15;
+const TOGGLE_ICON_STROKE = 1.9;
 
-export { ALIGN_OPTIONS, STYLE_TOGGLES, TOGGLE_ICON_SIZE };
+export { ALIGN_OPTIONS, STYLE_TOGGLES, TOGGLE_ICON_SIZE, TOGGLE_ICON_STROKE };
 export type { TextStyleToggle };
