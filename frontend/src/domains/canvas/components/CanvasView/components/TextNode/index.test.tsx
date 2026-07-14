@@ -45,17 +45,39 @@ describe("TextNode", () => {
     });
   });
 
-  it("applies font size, colour, bold, and alignment from the object style", () => {
+  it("applies font size, colours, run styles, and alignment from the object style", () => {
     seed(makeComponent({ kind: "text", id: "t", text: "x" }));
     useCanvasStore.getState().updateComponent(TAB, "t", {
-      style: { fontSize: 22, color: "#ff0000", bold: true, align: "center" },
+      style: {
+        fontSize: 22,
+        color: "#ff0000",
+        backgroundColor: "#00ff00",
+        bold: true,
+        italic: true,
+        underline: true,
+        strike: true,
+        align: "center",
+      },
     });
     const { container } = renderNode("t");
     const input = container.querySelector("textarea") as HTMLTextAreaElement;
     expect(input.classList.contains("bold")).toBe(true);
+    expect(input.classList.contains("italic")).toBe(true);
     expect(input.classList.contains("align-center")).toBe(true);
     expect(input.style.getPropertyValue("--canvas-text-fs")).toBe("22px");
     expect(input.style.getPropertyValue("--canvas-text-color")).toBe("#ff0000");
+    expect(input.style.getPropertyValue("--canvas-text-bg")).toBe("#00ff00");
+    // Underline + strike both feed the single text-decoration var.
+    expect(input.style.getPropertyValue("--canvas-text-decoration")).toBe("underline line-through");
+  });
+
+  it("leaves the background transparent and decoration off when unset", () => {
+    seed(makeComponent({ kind: "text", id: "t", text: "x" }));
+    const { container } = renderNode("t");
+    const input = container.querySelector("textarea") as HTMLTextAreaElement;
+    expect(input.style.getPropertyValue("--canvas-text-bg")).toBe("transparent");
+    expect(input.style.getPropertyValue("--canvas-text-decoration")).toBe("none");
+    expect(input.classList.contains("italic")).toBe(false);
   });
 
   it("is read-only and draggable until double-clicked, then editable", () => {

@@ -1,13 +1,11 @@
-import { DEFAULT_TEXT_COLOR } from "../../constants";
-import type { TextAlign } from "../../../../../../types";
+import { DEFAULT_TEXT_BG, DEFAULT_TEXT_COLOR } from "../../constants";
 import type { SectionProps } from "../../types";
+import { ALIGN_OPTIONS, STYLE_TOGGLES } from "./constants";
+import { SegmentedIconRow } from "./components/SegmentedIconRow";
 
-const ALIGNS: TextAlign[] = ["left", "center", "right"];
-const ALIGN_LABEL: Record<TextAlign, string> = { left: "L", center: "C", right: "R" };
-
-/// Text-specific controls: font size, bold toggle, alignment, and colour. All
-/// write into the object's `style`, which the TextNode renderer consumes. Each
-/// control sits in a label-left row.
+/// Text-specific controls: font size, run styles (bold/italic/underline/strike),
+/// alignment, and text/background colour. All write into the object's `style`,
+/// which the TextNode renderer consumes. Each control sits in a label-left row.
 function TextSection({ component, onChange }: SectionProps) {
   if (component.kind !== "text") return null;
   const style = component.style ?? {};
@@ -26,38 +24,36 @@ function TextSection({ component, onChange }: SectionProps) {
           }
         />
       </label>
+      <SegmentedIconRow
+        label="Style"
+        options={STYLE_TOGGLES}
+        isActive={(id) => !!style[id]}
+        onSelect={(id) => onChange({ style: { ...style, [id]: !style[id] } })}
+      />
+      <SegmentedIconRow
+        label="Align"
+        options={ALIGN_OPTIONS}
+        isActive={(id) => align === id}
+        onSelect={(id) => onChange({ style: { ...style, align: id } })}
+      />
       <div className="mdbc-canvas-prop-row">
-        <span className="mdbc-pane-label">Align</span>
-        <div className="mdbc-segmented mdbc-segmented-compact">
-          <button
-            type="button"
-            className={style.bold ? "active" : ""}
-            title="Bold"
-            onClick={() => onChange({ style: { ...style, bold: !style.bold } })}
-          >
-            B
-          </button>
-          {ALIGNS.map((a) => (
-            <button
-              key={a}
-              type="button"
-              className={align === a ? "active" : ""}
-              title={`Align ${a}`}
-              onClick={() => onChange({ style: { ...style, align: a } })}
-            >
-              {ALIGN_LABEL[a]}
-            </button>
-          ))}
-        </div>
-      </div>
-      <div className="mdbc-canvas-prop-row">
-        <span className="mdbc-pane-label">Colour</span>
+        <span className="mdbc-pane-label">Text colour</span>
         <input
           type="color"
           className="mdbc-canvas-color"
           value={style.color ?? DEFAULT_TEXT_COLOR}
           onChange={(e) => onChange({ style: { ...style, color: e.target.value } })}
-          aria-label="Colour"
+          aria-label="Text colour"
+        />
+      </div>
+      <div className="mdbc-canvas-prop-row">
+        <span className="mdbc-pane-label">Background</span>
+        <input
+          type="color"
+          className="mdbc-canvas-color"
+          value={style.backgroundColor ?? DEFAULT_TEXT_BG}
+          onChange={(e) => onChange({ style: { ...style, backgroundColor: e.target.value } })}
+          aria-label="Background colour"
         />
       </div>
     </div>
