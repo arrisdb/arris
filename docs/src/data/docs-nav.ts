@@ -53,7 +53,7 @@ const docsNav: NavGroup[] = [
   {
     title: "Canvas",
     items: [
-      { label: "Overview", href: "/canvas", badge: "New" },
+      { label: "Overview", href: "/canvas" },
     ],
   },
   {
