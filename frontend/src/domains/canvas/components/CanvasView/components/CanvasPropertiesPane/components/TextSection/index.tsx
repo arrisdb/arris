@@ -1,5 +1,4 @@
 import { Icon } from "@shared/ui/Icon";
-import { ColorField } from "@shared/ui/ColorField";
 
 import { DEFAULT_TEXT_BG, DEFAULT_TEXT_COLOR } from "../../constants";
 import type { SectionProps } from "../../types";
@@ -64,21 +63,22 @@ function TextSection({ component, onChange }: SectionProps) {
       </div>
       <div className="mdbc-canvas-prop-row">
         <span className="mdbc-pane-label">Text colour</span>
-        <ColorField
-          label="Text colour"
-          value={style.color}
-          defaultColor={DEFAULT_TEXT_COLOR}
-          onChange={(color) => onChange({ style: { ...style, color } })}
+        <input
+          type="color"
+          className="mdbc-canvas-color"
+          value={style.color ?? DEFAULT_TEXT_COLOR}
+          onChange={(e) => onChange({ style: { ...style, color: e.target.value } })}
+          aria-label="Text colour"
         />
       </div>
       <div className="mdbc-canvas-prop-row">
         <span className="mdbc-pane-label">Background</span>
-        <ColorField
-          label="Background colour"
-          value={style.backgroundColor}
-          defaultColor={DEFAULT_TEXT_BG}
-          allowNone
-          onChange={(backgroundColor) => onChange({ style: { ...style, backgroundColor } })}
+        <input
+          type="color"
+          className="mdbc-canvas-color"
+          value={style.backgroundColor ?? DEFAULT_TEXT_BG}
+          onChange={(e) => onChange({ style: { ...style, backgroundColor: e.target.value } })}
+          aria-label="Background colour"
         />
       </div>
     </div>

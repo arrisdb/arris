@@ -3,8 +3,6 @@ export type { ChatRole } from "./AgentChat";
 export { Btn } from "./Btn";
 export { Card } from "./Card";
 export { Chip } from "./Chip";
-export { ColorField } from "./ColorField";
-export type { ColorFieldProps } from "./ColorField";
 export { Field } from "./Field";
 export { FormRow } from "./FormRow";
 export { IconButton } from "./IconButton";
