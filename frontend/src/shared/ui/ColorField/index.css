@@ -12,6 +12,7 @@
   padding: 0;
   border: 0.5px solid var(--m-sep);
   border-radius: var(--m-r-control);
+  background: var(--cf-swatch, transparent);
   cursor: pointer;
 }
 .mdbc-colorfield-swatch.is-none,
@@ -26,12 +27,14 @@
   background-color: var(--m-bg-surface);
 }
 
-/* Popover: a small floating panel below the swatch. */
+/* Popover: a small floating panel, portaled to the body and positioned in
+   viewport coordinates so it escapes the pane's overflow and stacking clip. */
 .mdbc-colorfield-pop {
-  position: absolute;
-  top: calc(100% + 6px);
-  right: 0;
-  z-index: 20;
+  position: fixed;
+  top: var(--cf-top);
+  left: var(--cf-left);
+  width: var(--cf-width);
+  z-index: 1000;
   display: flex;
   flex-direction: column;
   gap: 8px;

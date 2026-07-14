@@ -2,15 +2,19 @@ import { useEffect } from "react";
 import type { RefObject } from "react";
 
 /// Close an open popover on an outside click or Escape. No-op while closed.
+/// Takes every ref that counts as "inside" (the trigger and the portaled
+/// popover), so a click within any of them keeps it open.
 function usePopoverDismiss(
-  ref: RefObject<HTMLElement>,
+  refs: RefObject<HTMLElement>[],
   open: boolean,
   onClose: () => void,
 ): void {
   useEffect(() => {
     if (!open) return;
     const onPointerDown = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+      const target = e.target as Node;
+      if (refs.some((r) => r.current?.contains(target))) return;
+      onClose();
     };
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -21,7 +25,7 @@ function usePopoverDismiss(
       document.removeEventListener("mousedown", onPointerDown);
       document.removeEventListener("keydown", onKeyDown);
     };
-  }, [ref, open, onClose]);
+  }, [refs, open, onClose]);
 }
 
 export { usePopoverDismiss };

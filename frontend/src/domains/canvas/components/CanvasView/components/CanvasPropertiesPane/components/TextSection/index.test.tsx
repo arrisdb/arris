@@ -73,7 +73,7 @@ describe("TextSection", () => {
       <TextSection tabId="t" component={comp} onChange={onChange} />,
     );
     fireEvent.click(getByLabelText("Background colour"));
-    fireEvent.click(getByLabelText("No fill"));
+    fireEvent.click(getByLabelText("Transparent"));
     expect(onChange).toHaveBeenCalledWith({ style: { backgroundColor: undefined } });
   });
 
@@ -83,7 +83,7 @@ describe("TextSection", () => {
       <TextSection tabId="t" component={comp} onChange={vi.fn()} />,
     );
     fireEvent.click(getByLabelText("Text colour"));
-    expect(queryByLabelText("No fill")).toBeNull();
+    expect(queryByLabelText("Transparent")).toBeNull();
   });
 
   it("renders nothing for a non-text object", () => {

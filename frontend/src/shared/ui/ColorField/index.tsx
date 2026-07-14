@@ -1,6 +1,9 @@
-import { useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
+import type { CSSProperties } from "react";
+import { createPortal } from "react-dom";
 import { HexColorInput, HexColorPicker } from "react-colorful";
 
+import { POPOVER_GAP, POPOVER_WIDTH, VIEWPORT_PAD } from "./constants";
 import { usePopoverDismiss } from "./hooks";
 import "./index.css";
 
@@ -18,45 +21,69 @@ interface ColorFieldProps {
 /// An in-app colour picker (deliberately NOT the native `<input type=color>`,
 /// whose OS panel can't report a transparent / no-fill selection). A swatch
 /// opens a popover with a hue/saturation surface, a hex field, and an optional
-/// "None" swatch so transparent is a real, detectable choice.
+/// "None" swatch so transparent is a real, detectable choice. The popover is
+/// portaled to the body so it escapes the pane's overflow/stacking clip.
 function ColorField({ value, onChange, label, defaultColor, allowNone = false }: ColorFieldProps) {
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  usePopoverDismiss(ref, open, () => setOpen(false));
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  const triggerRef = useRef<HTMLDivElement>(null);
+  const popRef = useRef<HTMLDivElement>(null);
+  usePopoverDismiss([triggerRef, popRef], open, () => setOpen(false));
+
+  useLayoutEffect(() => {
+    if (!open || !triggerRef.current) return;
+    const r = triggerRef.current.getBoundingClientRect();
+    const left = Math.max(VIEWPORT_PAD, r.right - POPOVER_WIDTH);
+    setPos({ top: r.bottom + POPOVER_GAP, left });
+  }, [open]);
+
+  // A none-able field with no value reads as transparent (checker); otherwise
+  // the swatch previews the effective colour (the default when nothing is set).
+  const swatch = value ?? (allowNone ? undefined : defaultColor);
+
+  const popStyle = {
+    "--cf-top": `${pos?.top ?? 0}px`,
+    "--cf-left": `${pos?.left ?? 0}px`,
+    "--cf-width": `${POPOVER_WIDTH}px`,
+  } as CSSProperties;
+  const swatchStyle = swatch ? ({ "--cf-swatch": swatch } as CSSProperties) : undefined;
 
   return (
-    <div className="mdbc-colorfield" ref={ref}>
+    <div className="mdbc-colorfield" ref={triggerRef}>
       <button
         type="button"
-        className={value ? "mdbc-colorfield-swatch" : "mdbc-colorfield-swatch is-none"}
-        style={value ? { background: value } : undefined}
+        className={swatch ? "mdbc-colorfield-swatch" : "mdbc-colorfield-swatch is-none"}
+        style={swatchStyle}
         aria-label={label}
         title={label}
         onClick={() => setOpen((o) => !o)}
       />
-      {open && (
-        <div className="mdbc-colorfield-pop">
-          {allowNone && (
-            <button
-              type="button"
-              className={value ? "mdbc-colorfield-none" : "mdbc-colorfield-none active"}
-              aria-label="No fill"
-              onClick={() => onChange(undefined)}
-            >
-              <span className="mdbc-colorfield-none-swatch" />
-              None
-            </button>
-          )}
-          <HexColorPicker color={value ?? defaultColor} onChange={onChange} />
-          <HexColorInput
-            className="mdbc-colorfield-hex"
-            color={value ?? defaultColor}
-            onChange={onChange}
-            prefixed
-            aria-label={`${label} hex`}
-          />
-        </div>
-      )}
+      {open &&
+        pos &&
+        createPortal(
+          <div ref={popRef} className="mdbc-colorfield-pop" style={popStyle}>
+            <HexColorPicker color={value ?? defaultColor} onChange={onChange} />
+            <HexColorInput
+              className="mdbc-colorfield-hex"
+              color={value ?? defaultColor}
+              onChange={onChange}
+              prefixed
+              aria-label={`${label} hex`}
+            />
+            {allowNone && (
+              <button
+                type="button"
+                className={value ? "mdbc-colorfield-none" : "mdbc-colorfield-none active"}
+                aria-label="Transparent"
+                onClick={() => onChange(undefined)}
+              >
+                <span className="mdbc-colorfield-none-swatch" />
+                Transparent
+              </button>
+            )}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }
