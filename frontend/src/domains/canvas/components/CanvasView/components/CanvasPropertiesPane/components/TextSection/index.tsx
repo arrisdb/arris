@@ -1,8 +1,7 @@
-import { Icon } from "@shared/ui/Icon";
-
 import { DEFAULT_TEXT_BG, DEFAULT_TEXT_COLOR } from "../../constants";
 import type { SectionProps } from "../../types";
-import { ALIGN_OPTIONS, STYLE_TOGGLES, TOGGLE_ICON_SIZE, TOGGLE_ICON_STROKE } from "./constants";
+import { ALIGN_OPTIONS, STYLE_TOGGLES } from "./constants";
+import { SegmentedIconRow } from "./components/SegmentedIconRow";
 
 /// Text-specific controls: font size, run styles (bold/italic/underline/strike),
 /// alignment, and text/background colour. All write into the object's `style`,
@@ -25,42 +24,18 @@ function TextSection({ component, onChange }: SectionProps) {
           }
         />
       </label>
-      <div className="mdbc-canvas-prop-row">
-        <span className="mdbc-pane-label">Style</span>
-        <div className="mdbc-segmented mdbc-segmented-compact mdbc-segmented-icon">
-          {STYLE_TOGGLES.map((t) => (
-            <button
-              key={t.key}
-              type="button"
-              className={style[t.key] ? "active" : ""}
-              title={t.title}
-              aria-label={t.title}
-              aria-pressed={!!style[t.key]}
-              onClick={() => onChange({ style: { ...style, [t.key]: !style[t.key] } })}
-            >
-              <Icon name={t.icon} size={TOGGLE_ICON_SIZE} strokeWidth={TOGGLE_ICON_STROKE} />
-            </button>
-          ))}
-        </div>
-      </div>
-      <div className="mdbc-canvas-prop-row">
-        <span className="mdbc-pane-label">Align</span>
-        <div className="mdbc-segmented mdbc-segmented-compact mdbc-segmented-icon">
-          {ALIGN_OPTIONS.map((a) => (
-            <button
-              key={a.value}
-              type="button"
-              className={align === a.value ? "active" : ""}
-              title={a.title}
-              aria-label={a.title}
-              aria-pressed={align === a.value}
-              onClick={() => onChange({ style: { ...style, align: a.value } })}
-            >
-              <Icon name={a.icon} size={TOGGLE_ICON_SIZE} />
-            </button>
-          ))}
-        </div>
-      </div>
+      <SegmentedIconRow
+        label="Style"
+        options={STYLE_TOGGLES}
+        isActive={(id) => !!style[id]}
+        onSelect={(id) => onChange({ style: { ...style, [id]: !style[id] } })}
+      />
+      <SegmentedIconRow
+        label="Align"
+        options={ALIGN_OPTIONS}
+        isActive={(id) => align === id}
+        onSelect={(id) => onChange({ style: { ...style, align: id } })}
+      />
       <div className="mdbc-canvas-prop-row">
         <span className="mdbc-pane-label">Text colour</span>
         <input

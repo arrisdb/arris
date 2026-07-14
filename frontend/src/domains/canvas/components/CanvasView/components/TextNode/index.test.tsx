@@ -63,19 +63,20 @@ describe("TextNode", () => {
     const input = container.querySelector("textarea") as HTMLTextAreaElement;
     expect(input.classList.contains("bold")).toBe(true);
     expect(input.classList.contains("italic")).toBe(true);
-    expect(input.classList.contains("underline")).toBe(true);
-    expect(input.classList.contains("strike")).toBe(true);
     expect(input.classList.contains("align-center")).toBe(true);
     expect(input.style.getPropertyValue("--canvas-text-fs")).toBe("22px");
     expect(input.style.getPropertyValue("--canvas-text-color")).toBe("#ff0000");
     expect(input.style.getPropertyValue("--canvas-text-bg")).toBe("#00ff00");
+    // Underline + strike both feed the single text-decoration var.
+    expect(input.style.getPropertyValue("--canvas-text-decoration")).toBe("underline line-through");
   });
 
-  it("leaves the background transparent when unset", () => {
+  it("leaves the background transparent and decoration off when unset", () => {
     seed(makeComponent({ kind: "text", id: "t", text: "x" }));
     const { container } = renderNode("t");
     const input = container.querySelector("textarea") as HTMLTextAreaElement;
     expect(input.style.getPropertyValue("--canvas-text-bg")).toBe("transparent");
+    expect(input.style.getPropertyValue("--canvas-text-decoration")).toBe("none");
     expect(input.classList.contains("italic")).toBe(false);
   });
 

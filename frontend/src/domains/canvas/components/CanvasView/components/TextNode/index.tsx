@@ -27,11 +27,18 @@ function TextNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
   const style = component.style ?? {};
   const align = style.align ?? "left";
   // Text styling rides CSS custom properties (the inline-style guard allows only
-  // `--`-prefixed props); weight/style/decoration + alignment ride classes.
+  // `--`-prefixed props); weight/style + alignment ride classes. Underline and
+  // strike both drive `text-decoration`, so they join into one var to avoid a
+  // combinatorial set of `.underline.strike`-style selectors.
+  const decoration =
+    [style.underline && "underline", style.strike && "line-through"]
+      .filter(Boolean)
+      .join(" ") || "none";
   const css = {
     "--canvas-text-fs": `${style.fontSize ?? 16}px`,
     "--canvas-text-color": style.color ?? "var(--m-fg)",
     "--canvas-text-bg": style.backgroundColor ?? "transparent",
+    "--canvas-text-decoration": decoration,
   } as CSSProperties;
   const classes = [
     "nowheel",
@@ -39,8 +46,6 @@ function TextNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
     `align-${align}`,
     style.bold && "bold",
     style.italic && "italic",
-    style.underline && "underline",
-    style.strike && "strike",
     editing && "nodrag",
   ]
     .filter(Boolean)
