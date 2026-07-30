@@ -54,10 +54,13 @@ pub type PlanRefs = HashMap<usize, Arc<dyn ExecutionPlan>>;
 pub struct PlanDag;
 
 impl PlanDag {
-    pub fn build_dag(plan: &Arc<dyn ExecutionPlan>) -> (Vec<DagNode>, PlanRefs) {
+    pub fn build_dag(
+        plan: &Arc<dyn ExecutionPlan>,
+        connections: &[String],
+    ) -> (Vec<DagNode>, PlanRefs) {
         let mut nodes = Vec::new();
         let mut plan_refs = HashMap::new();
-        Self::walk(plan, &mut nodes, &mut plan_refs);
+        Self::walk(plan, &mut nodes, &mut plan_refs, connections);
         (nodes, plan_refs)
     }
 
@@ -97,10 +100,19 @@ impl PlanDag {
         node_type == DagNodeType::Result
     }
 
-    fn federated_connection(plan: &dyn ExecutionPlan) -> Option<String> {
-        let display = Self::plan_display(plan);
-        let at = display.find(FEDERATION_EXEC_NAME_KEY)? + FEDERATION_EXEC_NAME_KEY.len();
-        display[at..].split_whitespace().next().map(str::to_string)
+    fn federated_connection(plan: &dyn ExecutionPlan, connections: &[String]) -> Option<String> {
+        Self::connection_in_display(&Self::plan_display(plan), connections)
+    }
+
+    /// The exec exposes its connection only in its display text, and a name may
+    /// hold spaces, so match the known names rather than guess where one ends.
+    /// Longest wins: one connection name can prefix another.
+    fn connection_in_display(display: &str, connections: &[String]) -> Option<String> {
+        connections
+            .iter()
+            .filter(|name| display.contains(&format!("{FEDERATION_EXEC_NAME_KEY}{name}")))
+            .max_by_key(|name| name.len())
+            .cloned()
     }
 
     fn classify_node(name: &str) -> DagNodeType {
@@ -158,7 +170,7 @@ impl PlanDag {
         re_at.replace_all(s, "").to_string()
     }
 
-    fn label_for_node(plan: &dyn ExecutionPlan) -> String {
+    fn label_for_node(plan: &dyn ExecutionPlan, connections: &[String]) -> String {
         let name = plan.name();
         if name == "FederatedExec" {
             if let Some(fed) = plan.downcast_ref::<FederatedExec>() {
@@ -167,7 +179,7 @@ impl PlanDag {
         }
         // A pushed-down subplan may cover several tables, so it names its connection.
         if name == FEDERATION_EXEC_NAME {
-            if let Some(conn) = Self::federated_connection(plan) {
+            if let Some(conn) = Self::federated_connection(plan, connections) {
                 return format!("Scan: {conn}");
             }
         }
@@ -254,11 +266,12 @@ impl PlanDag {
         plan: &Arc<dyn ExecutionPlan>,
         nodes: &mut Vec<DagNode>,
         plan_refs: &mut PlanRefs,
+        connections: &[String],
     ) -> Vec<usize> {
         if Self::should_collapse(plan.as_ref()) {
             let mut child_ids = Vec::new();
             for child in plan.children() {
-                child_ids.extend(Self::walk(child, nodes, plan_refs));
+                child_ids.extend(Self::walk(child, nodes, plan_refs, connections));
             }
             return child_ids;
         }
@@ -266,14 +279,14 @@ impl PlanDag {
         let name = plan.name();
         let mut child_ids = Vec::new();
         for child in plan.children() {
-            child_ids.extend(Self::walk(child, nodes, plan_refs));
+            child_ids.extend(Self::walk(child, nodes, plan_refs, connections));
         }
 
         let id = nodes.len();
         nodes.push(DagNode {
             id,
             node_type: Self::classify_node(name),
-            label: Self::label_for_node(plan.as_ref()),
+            label: Self::label_for_node(plan.as_ref(), connections),
             children: child_ids,
             status: DagNodeStatus::Waiting,
             metrics: None,
@@ -357,10 +370,51 @@ mod tests {
         }
     }
 
+    fn names(list: &[&str]) -> Vec<String> {
+        list.iter().map(|s| s.to_string()).collect()
+    }
+
+    #[test]
+    fn connection_in_display_keeps_a_name_holding_spaces() {
+        let display = "VirtualExecutionPlan name=prod bigquery \
+                       compute_context=prod bigquery base_sql=SELECT 1";
+        assert_eq!(
+            PlanDag::connection_in_display(display, &names(&["test_postgres", "prod bigquery"])),
+            Some("prod bigquery".to_string())
+        );
+    }
+
+    #[test]
+    fn connection_in_display_prefers_the_longest_matching_name() {
+        let display = "VirtualExecutionPlan name=prod bigquery compute_context=prod bigquery";
+        assert_eq!(
+            PlanDag::connection_in_display(display, &names(&["prod", "prod bigquery"])),
+            Some("prod bigquery".to_string())
+        );
+    }
+
+    #[test]
+    fn connection_in_display_matches_the_shorter_name_when_it_is_the_one_used() {
+        let display = "VirtualExecutionPlan name=prod compute_context=prod base_sql=SELECT 1";
+        assert_eq!(
+            PlanDag::connection_in_display(display, &names(&["prod", "prod bigquery"])),
+            Some("prod".to_string())
+        );
+    }
+
+    #[test]
+    fn connection_in_display_reports_nothing_for_an_unknown_name() {
+        let display = "VirtualExecutionPlan name=other compute_context=other";
+        assert_eq!(
+            PlanDag::connection_in_display(display, &names(&["prod"])),
+            None
+        );
+    }
+
     #[test]
     fn single_scan_produces_one_node() {
         let scan = MockExec::new("FederatedExec", vec![]);
-        let (dag, _) = PlanDag::build_dag(&scan);
+        let (dag, _) = PlanDag::build_dag(&scan, &[]);
         assert_eq!(dag.len(), 1);
         assert_eq!(dag[0].node_type, DagNodeType::Scan);
         assert_eq!(dag[0].status, DagNodeStatus::Waiting);
@@ -372,7 +426,7 @@ mod tests {
         let left = MockExec::new("FederatedExec", vec![]);
         let right = MockExec::new("FederatedExec", vec![]);
         let join = MockExec::new("HashJoinExec", vec![left, right]);
-        let (dag, _) = PlanDag::build_dag(&join);
+        let (dag, _) = PlanDag::build_dag(&join, &[]);
         assert_eq!(dag.len(), 3);
         let join_node = &dag[2];
         assert_eq!(join_node.node_type, DagNodeType::Join);
@@ -387,7 +441,7 @@ mod tests {
         let coalesce = MockExec::new("CoalesceBatchesExec", vec![scan]);
         let repartition = MockExec::new("RepartitionExec", vec![coalesce]);
         let top = MockExec::new("ProjectionExec", vec![repartition]);
-        let (dag, _) = PlanDag::build_dag(&top);
+        let (dag, _) = PlanDag::build_dag(&top, &[]);
         assert_eq!(dag.len(), 2);
         assert_eq!(dag[0].node_type, DagNodeType::Scan);
         assert_eq!(dag[1].node_type, DagNodeType::Projection);
@@ -398,7 +452,7 @@ mod tests {
     fn aggregate_classified_correctly() {
         let scan = MockExec::new("FederatedExec", vec![]);
         let agg = MockExec::new("AggregateExec", vec![scan]);
-        let (dag, _) = PlanDag::build_dag(&agg);
+        let (dag, _) = PlanDag::build_dag(&agg, &[]);
         assert_eq!(dag.len(), 2);
         assert_eq!(dag[1].node_type, DagNodeType::Aggregate);
     }
@@ -407,7 +461,7 @@ mod tests {
     fn sort_classified_correctly() {
         let scan = MockExec::new("FederatedExec", vec![]);
         let sort = MockExec::new("SortExec", vec![scan]);
-        let (dag, _) = PlanDag::build_dag(&sort);
+        let (dag, _) = PlanDag::build_dag(&sort, &[]);
         assert_eq!(dag.len(), 2);
         assert_eq!(dag[1].node_type, DagNodeType::Sort);
     }
@@ -416,7 +470,7 @@ mod tests {
     fn scan_node_sources_extracts_names() {
         let scan = MockExec::new("FederatedExec", vec![]);
         let top = MockExec::new("ProjectionExec", vec![scan]);
-        let (dag, _) = PlanDag::build_dag(&top);
+        let (dag, _) = PlanDag::build_dag(&top, &[]);
         let sources = PlanDag::scan_node_sources(&dag);
         assert_eq!(sources.len(), 1);
         assert_eq!(sources[0].0, 0);
@@ -430,7 +484,7 @@ mod tests {
         let coalesce = MockExec::new("CoalesceBatchesExec", vec![join]);
         let agg = MockExec::new("AggregateExec", vec![coalesce]);
         let sort = MockExec::new("SortExec", vec![agg]);
-        let (dag, _) = PlanDag::build_dag(&sort);
+        let (dag, _) = PlanDag::build_dag(&sort, &[]);
         assert_eq!(dag.len(), 5);
         let names: Vec<_> = dag.iter().map(|n| &n.node_type).collect();
         assert_eq!(names, vec![

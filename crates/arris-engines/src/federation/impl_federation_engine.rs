@@ -249,7 +249,8 @@ impl FederationEngine {
             .await
             .map_err(|e| FederationError::Engine(e.to_string()))?;
 
-        let (dag, plan_refs) = PlanDag::build_dag(&plan);
+        let connection_names: Vec<String> = self.adapters.keys().cloned().collect();
+        let (dag, plan_refs) = PlanDag::build_dag(&plan, &connection_names);
 
         {
             let mut map = node_id_map.lock().unwrap();
@@ -1363,6 +1364,76 @@ mod tests {
             running_count >= 2,
             "expected at least 2 Running events (one per scan)"
         );
+    }
+
+    /// A scan node's id is keyed off its label, which is read out of the federation
+    /// exec's display. A spaced name used to truncate, so both scans collided on the
+    /// same key and one of them never received an event.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn progress_reaches_a_scan_whose_connection_name_holds_a_space() {
+        use super::ProgressEvent;
+        use super::{DagNode, DagNodeStatus, DagNodeType};
+
+        let mut adapters: HashMap<String, Arc<dyn ScanAdapter>> = HashMap::new();
+        adapters.insert(
+            "prod bigquery".into(),
+            Arc::new(MockAdapter::new(orders_result())),
+        );
+        adapters.insert("prod".into(), Arc::new(MockAdapter::new(users_result())));
+
+        let engine = FederationEngine::new(adapters);
+        let dag_capture: Arc<std::sync::Mutex<Vec<DagNode>>> =
+            Arc::new(std::sync::Mutex::new(Vec::new()));
+        let events: Arc<std::sync::Mutex<Vec<ProgressEvent>>> =
+            Arc::new(std::sync::Mutex::new(Vec::new()));
+
+        let dag_clone = dag_capture.clone();
+        let events_clone = events.clone();
+        let callback: ProgressCallback = Arc::new(move |e| {
+            events_clone.lock().unwrap().push(e);
+        });
+
+        engine
+            .execute_with_progress(
+                "SELECT u.name, o.total FROM prod.public.users u \
+                 JOIN `prod bigquery`.mydb.orders o ON u.id = o.user_id",
+                None,
+                |dag| {
+                    dag_clone.lock().unwrap().extend_from_slice(dag);
+                },
+                callback,
+            )
+            .await
+            .unwrap();
+
+        let dag = dag_capture.lock().unwrap();
+        let scans: Vec<&DagNode> = dag
+            .iter()
+            .filter(|n| n.node_type == DagNodeType::Scan)
+            .collect();
+        assert_eq!(scans.len(), 2);
+        assert!(
+            scans.iter().any(|n| n.label.contains("prod bigquery")),
+            "no scan kept the spaced name: {:?}",
+            scans.iter().map(|n| &n.label).collect::<Vec<_>>()
+        );
+
+        // Truncating the spaced name collapsed both scans onto one key, so the
+        // distinct-id count is what catches it.
+        let evts = events.lock().unwrap();
+        let running: std::collections::HashSet<usize> = evts
+            .iter()
+            .filter(|e| e.status == DagNodeStatus::Running)
+            .map(|e| e.node_id)
+            .collect();
+        for scan in &scans {
+            assert!(
+                running.contains(&scan.id),
+                "no Running event for scan {} ({})",
+                scan.id,
+                scan.label
+            );
+        }
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
