@@ -9,13 +9,14 @@ use datafusion::physical_plan::{PhysicalExpr, SendableRecordBatchStream};
 use datafusion::sql::unparser::dialect::{
     BigQueryDialect, Dialect, DuckDBDialect, MySqlDialect, PostgreSqlDialect, SqliteDialect,
 };
-use datafusion_federation::sql::SQLExecutor;
+use datafusion_federation::sql::{AstAnalyzer, SQLExecutor};
 
 use crate::drivers::common::ArrowChunkBuilder;
 use crate::{DatabaseKind, QueryResult};
 
 use super::ScanAdapter;
 use super::constants::EXECUTOR_CATALOG_UNSUPPORTED;
+use super::impl_derived_table_aliaser::DerivedTableAliaser;
 use super::impl_federated_table_provider::NodeIdMap;
 use super::impl_metrics_stream::{MetricsStream, ProgressCallback};
 
@@ -106,6 +107,10 @@ impl SQLExecutor for DriverSqlExecutor {
 
     fn dialect(&self) -> Arc<dyn Dialect> {
         Self::dialect_for(self.kind)
+    }
+
+    fn ast_analyzer(&self) -> Option<AstAnalyzer> {
+        Some(Box::new(|statement| Ok(DerivedTableAliaser::apply(statement))))
     }
 
     fn execute(

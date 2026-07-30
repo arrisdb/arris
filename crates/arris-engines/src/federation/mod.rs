@@ -1,5 +1,6 @@
 mod constants;
 mod errors;
+mod impl_derived_table_aliaser;
 mod impl_driver_sql_executor;
 mod impl_federated_table_provider;
 mod impl_federation_engine;

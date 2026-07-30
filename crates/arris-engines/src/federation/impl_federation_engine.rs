@@ -753,6 +753,7 @@ mod tests {
     struct MockAdapter {
         result: QueryResult,
         kind: DatabaseKind,
+        seen: Option<Arc<Mutex<Vec<String>>>>,
     }
 
     impl MockAdapter {
@@ -760,7 +761,16 @@ mod tests {
             Self {
                 result,
                 kind: DatabaseKind::Postgres,
+                seen: None,
             }
+        }
+
+        fn recording(
+            result: QueryResult,
+            kind: DatabaseKind,
+            seen: Arc<Mutex<Vec<String>>>,
+        ) -> Self {
+            Self { result, kind, seen: Some(seen) }
         }
 
         /// Returns the SQL stripped of quoting and schema, plus the bare table.
@@ -783,6 +793,9 @@ mod tests {
         }
 
         async fn scan_with_sql(&self, sql: &str) -> crate::drivers::errors::Result<QueryResult> {
+            if let Some(seen) = &self.seen {
+                seen.lock().unwrap().push(sql.to_string());
+            }
             let (local_sql, table) = Self::localize(sql);
             let schema = FederatedExec::infer_schema_from_result(&self.result);
             let batch = FederatedExec::query_result_to_record_batch(&self.result, &schema)
@@ -1141,6 +1154,85 @@ mod tests {
         assert_eq!(result.rows.len(), 2);
         assert_eq!(result.rows[0][1], QueryValue::Null);
         assert_eq!(result.rows[1][1], QueryValue::Text("hello".into()));
+    }
+
+
+
+
+
+
+    /// Pushed SQL, minus the schema probe the engine issues per table.
+    async fn pushed_sql_for(query: &str) -> Vec<String> {
+        let pk_rows = QueryResult::new(
+            vec![ColumnSpec::new("pk", "int4")],
+            vec![vec![QueryValue::Int(1)], vec![QueryValue::Int(2)]],
+        );
+        let seen = Arc::new(Mutex::new(Vec::new()));
+        let mut adapters: HashMap<String, Arc<dyn ScanAdapter>> = HashMap::new();
+        adapters.insert("test_postgres".into(), Arc::new(MockAdapter::new(pk_rows.clone())));
+        adapters.insert(
+            "prod_bigquery".into(),
+            Arc::new(MockAdapter::recording(pk_rows, DatabaseKind::Bigquery, seen.clone())),
+        );
+        FederationEngine::new(adapters).execute(query).await.unwrap();
+        let pushed = seen.lock().unwrap().clone();
+        pushed.into_iter().filter(|s| !s.contains("LIMIT 1")).collect()
+    }
+
+    /// Every derived table in `sql` carries an alias, so its inner qualifiers
+    /// stay in scope. Unaliased ones drew `Unrecognized name` from BigQuery.
+    fn assert_every_derived_table_is_aliased(sql: &str) {
+        use std::ops::ControlFlow;
+
+        use datafusion::sql::sqlparser::ast::{TableFactor, Visit, Visitor};
+        use datafusion::sql::sqlparser::dialect::GenericDialect;
+        use datafusion::sql::sqlparser::parser::Parser;
+
+        struct FindUnaliased;
+        impl Visitor for FindUnaliased {
+            type Break = ();
+            fn pre_visit_table_factor(&mut self, factor: &TableFactor) -> ControlFlow<()> {
+                match factor {
+                    TableFactor::Derived { alias: None, .. } => ControlFlow::Break(()),
+                    _ => ControlFlow::Continue(()),
+                }
+            }
+        }
+
+        for statement in Parser::parse_sql(&GenericDialect {}, sql).unwrap() {
+            assert!(
+                statement.visit(&mut FindUnaliased).is_continue(),
+                "derived table without an alias in: {sql}"
+            );
+        }
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn pushed_down_subquery_binds_its_own_alias() {
+        let pushed = pushed_sql_for(
+            "SELECT COUNT(DISTINCT a.pk) FROM test_postgres.public.table_a AS a \
+             WHERE a.pk NOT IN (SELECT DISTINCT b.pk FROM prod_bigquery.test_dataset.table_b AS b)",
+        )
+        .await;
+
+        assert_eq!(pushed.len(), 1, "{pushed:?}");
+        assert!(pushed[0].contains("`table_b`"), "{}", pushed[0]);
+        assert_every_derived_table_is_aliased(&pushed[0]);
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn aggregates_push_down_without_a_derived_table() {
+        for query in [
+            "SELECT COUNT(*) FROM prod_bigquery.test_dataset.table_b",
+            "SELECT COUNT(*) FROM prod_bigquery.test_dataset.table_b AS b",
+            "SELECT COUNT(*) FROM prod_bigquery.test_dataset.table_b WHERE pk > 1",
+            "SELECT pk, COUNT(*) FROM prod_bigquery.test_dataset.table_b GROUP BY pk",
+        ] {
+            let pushed = pushed_sql_for(query).await;
+            assert_eq!(pushed.len(), 1, "{query}: {pushed:?}");
+            assert!(pushed[0].contains("count("), "{query}: {}", pushed[0]);
+            assert_every_derived_table_is_aliased(&pushed[0]);
+        }
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
