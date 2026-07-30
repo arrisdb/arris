@@ -51,6 +51,19 @@ describe("findSourceRanges", () => {
   it("returns nothing when there are no sources", () => {
     expect(findSourceRanges("SELECT a.b.c", [])).toEqual([]);
   });
+
+  it("tints a backtick-quoted source name, quotes included", () => {
+    const doc = "SELECT * FROM `my conn`.public.orders";
+    const ranges = findSourceRanges(doc, ["my conn"]);
+    expect(substrings(doc, ranges)).toEqual(["`my conn`"]);
+    expect(ranges[0].name).toBe("my conn");
+  });
+
+  it("ignores a quoted segment that is not the leading one", () => {
+    const doc = "SELECT * FROM pg.`my conn`.orders";
+    const ranges = findSourceRanges(doc, ["pg", "my conn"]);
+    expect(substrings(doc, ranges)).toEqual(["pg"]);
+  });
 });
 
 describe("colorForConnectionId", () => {

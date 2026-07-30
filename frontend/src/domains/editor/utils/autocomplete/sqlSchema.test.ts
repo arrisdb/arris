@@ -356,6 +356,21 @@ describe("buildFederatedSqlSchema", () => {
     });
   });
 
+  it("backticks a connection name that is not a plain identifier", () => {
+    const pg: SchemaNode[] = [
+      {
+        name: "public",
+        kind: "schema",
+        path: "public",
+        children: [tbl("orders", "table", [{ name: "id", detail: "int" }])],
+      },
+    ];
+
+    expect(buildFederatedSqlSchema([{ name: "prod-db eu", schema: pg }])).toEqual({
+      "`prod-db eu`.public.orders": [{ name: "id", type: "int" }],
+    });
+  });
+
   it("emits a 2-part conn.name for container-less Redis keys / Kafka topics", () => {
     const redis: SchemaNode[] = [
       {
@@ -378,7 +393,8 @@ describe("buildFederatedSqlSchema", () => {
       ]),
     ).toEqual({
       // Redis keeps the db node as its immediate container; keys are columnless.
-      "cache.db0.home:key": [],
+      // The colon is not identifier-legal, so the key segment comes back quoted.
+      "cache.db0.`home:key`": [],
       // A top-level Kafka topic has no container, so the reference is 2-part.
       "stream.events": [{ name: "amount", type: "double" }],
     });

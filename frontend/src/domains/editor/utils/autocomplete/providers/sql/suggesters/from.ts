@@ -2,6 +2,7 @@ import { startCompletion, type Completion } from "@codemirror/autocomplete";
 import type { EditorView } from "@codemirror/view";
 
 import { sessionTracker } from "../../../data/usageTracker";
+import { isQuotedSegment, splitFederationRef } from "../../../../federationRefs";
 import { buildFromJoinCompletions } from "../dbtRefs";
 import { buildSqlMeshFromJoinCompletions } from "../sqlmeshRefs";
 import type { SqlSituation } from "../situation";
@@ -20,9 +21,11 @@ function suggestFrom(
 
   const drillApply = (name: string) =>
     (view: EditorView, _completion: Completion, from: number, to: number) => {
+      // Case-folding a quoted name would change which connection it points at.
+      const inserted = isQuotedSegment(name) ? name : caseId(name);
       view.dispatch({
-        changes: { from, to, insert: caseId(name) + "." },
-        selection: { anchor: from + caseId(name).length + 1 },
+        changes: { from, to, insert: inserted + "." },
+        selection: { anchor: from + inserted.length + 1 },
       });
       startCompletion(view);
     };
@@ -41,7 +44,7 @@ function suggestFrom(
       // federation (every `prod_redis.orders:NNN` key, every source's tables).
       // Picking a container inserts `name.` and re-triggers completion to drill
       // into just that container's tables.
-      const containers = [...new Set(tables.map((t) => t.split(".")[0]))];
+      const containers = [...new Set(tables.map((t) => splitFederationRef(t)[0]))];
       for (const name of containers) {
         options.push({
           label: name,

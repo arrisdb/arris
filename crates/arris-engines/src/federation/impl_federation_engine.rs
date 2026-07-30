@@ -22,8 +22,10 @@ use datafusion::sql::TableReference;
 use datafusion_federation::sql::{RemoteTableRef, SQLFederationProvider, SQLTableSource};
 use datafusion_federation::{FederatedQueryPlanner, FederatedTableProviderAdaptor};
 
+use super::constants::NO_REFERENCES_FOUND;
 use super::errors::*;
 use super::impl_driver_sql_executor::DriverSqlExecutor;
+use super::impl_federation_ref_rewriter::FederationRefRewriter;
 use super::impl_federated_table_provider::{FederatedExec, FederatedTableProvider, NodeIdMap};
 use super::impl_metrics_stream::{ProgressCallback, ProgressEvent};
 use super::impl_plan_dag::{DagNode, DagNodeStatus, DagNodeType, PlanDag};
@@ -55,12 +57,7 @@ impl FederationEngine {
         cancel_token: Option<&CancellationToken>,
     ) -> Result<QueryResult, FederationError> {
         let start = Instant::now();
-        let refs = Self::parse_federated_refs(sql);
-        if refs.is_empty() {
-            return Err(FederationError::InvalidReference(
-                "no connection.table references found in SQL".into(),
-            ));
-        }
+        let (rewritten, refs) = Self::rewrite(sql)?;
 
         let ctx = Self::create_session_context()?;
 
@@ -71,8 +68,6 @@ impl FederationEngine {
                 .cloned()
                 .collect::<Vec<_>>()
         };
-
-        let mut rewritten = sql.to_string();
 
         for fref in &unique_refs {
             let conn_lower = fref.connection.to_lowercase();
@@ -110,16 +105,12 @@ impl FederationEngine {
 
             let schema = FederatedExec::infer_schema_from_result(&probe);
 
-            let alias = fref.local_alias();
             let provider =
                 FederatedTableProvider::new(schema.clone(), adapter.clone(), fref.clone());
             let provider = Self::table_provider_for(adapter, fref, schema, provider, None);
 
-            ctx.register_table(&alias, provider)
+            ctx.register_table(TableReference::bare(fref.dotted_name()), provider)
                 .map_err(|e| FederationError::Engine(e.to_string()))?;
-
-            let dotted = fref.dotted_name();
-            rewritten = rewritten.replace(&dotted, &alias);
         }
 
         let df = ctx
@@ -185,12 +176,7 @@ impl FederationEngine {
         progress: ProgressCallback,
     ) -> Result<QueryResult, FederationError> {
         let start = Instant::now();
-        let refs = Self::parse_federated_refs(sql);
-        if refs.is_empty() {
-            return Err(FederationError::InvalidReference(
-                "no connection.table references found in SQL".into(),
-            ));
-        }
+        let (rewritten, refs) = Self::rewrite(sql)?;
 
         let ctx = Self::create_session_context()?;
         let node_id_map: NodeIdMap = Arc::new(Mutex::new(HashMap::new()));
@@ -202,8 +188,6 @@ impl FederationEngine {
                 .cloned()
                 .collect::<Vec<_>>()
         };
-
-        let mut rewritten = sql.to_string();
 
         for fref in &unique_refs {
             let conn_lower = fref.connection.to_lowercase();
@@ -240,7 +224,6 @@ impl FederationEngine {
             })?;
 
             let schema = FederatedExec::infer_schema_from_result(&probe);
-            let alias = fref.local_alias();
             let provider =
                 FederatedTableProvider::new(schema.clone(), adapter.clone(), fref.clone())
                     .with_progress(progress.clone(), node_id_map.clone());
@@ -252,11 +235,8 @@ impl FederationEngine {
                 Some((progress.clone(), node_id_map.clone())),
             );
 
-            ctx.register_table(&alias, provider)
+            ctx.register_table(TableReference::bare(fref.dotted_name()), provider)
                 .map_err(|e| FederationError::Engine(e.to_string()))?;
-
-            let dotted = fref.dotted_name();
-            rewritten = rewritten.replace(&dotted, &alias);
         }
 
         let df = ctx
@@ -269,7 +249,8 @@ impl FederationEngine {
             .await
             .map_err(|e| FederationError::Engine(e.to_string()))?;
 
-        let (dag, plan_refs) = PlanDag::build_dag(&plan);
+        let connection_names: Vec<String> = self.adapters.keys().cloned().collect();
+        let (dag, plan_refs) = PlanDag::build_dag(&plan, &connection_names);
 
         {
             let mut map = node_id_map.lock().unwrap();
@@ -382,7 +363,20 @@ impl FederationEngine {
     }
 
     pub fn parse_refs(sql: &str) -> Vec<FederationRef> {
-        Self::parse_federated_refs(sql)
+        FederationRefRewriter::parse(sql).unwrap_or_default()
+    }
+
+    /// Aliases every federated reference and reports the refs, so the caller knows
+    /// which tables to register before handing the query to DataFusion.
+    fn rewrite(sql: &str) -> Result<(String, Vec<FederationRef>), FederationError> {
+        let (rewritten, refs) = FederationRefRewriter::apply(sql)
+            .map_err(|e| FederationError::Engine(e.to_string()))?;
+        if refs.is_empty() {
+            return Err(FederationError::InvalidReference(
+                NO_REFERENCES_FOUND.into(),
+            ));
+        }
+        Ok((rewritten, refs))
     }
 
     pub fn scan_sql(
@@ -674,64 +668,6 @@ impl FederationEngine {
         }
     }
 
-    fn parse_federated_refs(sql: &str) -> Vec<FederationRef> {
-        let chars: Vec<char> = sql.chars().collect();
-        let mut out = Vec::new();
-        let mut i = 0usize;
-
-        while i < chars.len() {
-            // Skip whitespace and commas.
-            while i < chars.len() && (chars[i].is_whitespace() || chars[i] == ',') {
-                i += 1;
-            }
-            if i >= chars.len() {
-                break;
-            }
-            // Read a token.
-            let start = i;
-            while i < chars.len() && !chars[i].is_whitespace() && chars[i] != ',' {
-                i += 1;
-            }
-            let token: String = chars[start..i].iter().collect();
-            let upper = token.to_ascii_uppercase();
-            if upper == "FROM" || upper == "JOIN" {
-                // Skip whitespace.
-                while i < chars.len() && chars[i].is_whitespace() {
-                    i += 1;
-                }
-                // Read dotted identifier.
-                let id_start = i;
-                while i < chars.len()
-                    && (chars[i].is_alphanumeric() || chars[i] == '_' || chars[i] == '.')
-                {
-                    i += 1;
-                }
-                let dotted: String = chars[id_start..i].iter().collect();
-                if let Some(parsed) = Self::parse_dotted(&dotted) {
-                    out.push(parsed);
-                }
-            }
-        }
-
-        out
-    }
-
-    fn parse_dotted(s: &str) -> Option<FederationRef> {
-        let parts: Vec<&str> = s.split('.').collect();
-        match parts.len() {
-            2 => Some(FederationRef {
-                connection: parts[0].to_owned(),
-                schema: None,
-                table: parts[1].to_owned(),
-            }),
-            3 => Some(FederationRef {
-                connection: parts[0].to_owned(),
-                schema: Some(parts[1].to_owned()),
-                table: parts[2].to_owned(),
-            }),
-            _ => None,
-        }
-    }
 }
 
 impl Engine for FederationEngine {
@@ -941,62 +877,20 @@ mod tests {
         _assert(&engine);
     }
 
-    // ---- Parser tests (from parser.rs) ----
-
     #[test]
-    fn parses_two_part_reference() {
-        let r = FederationEngine::parse_federated_refs("SELECT * FROM pg.users");
-        assert_eq!(r.len(), 1);
-        assert_eq!(r[0].connection, "pg");
-        assert_eq!(r[0].schema, None);
-        assert_eq!(r[0].table, "users");
-    }
-
-    #[test]
-    fn parses_three_part_reference() {
-        let r = FederationEngine::parse_federated_refs("SELECT * FROM pg.public.users");
-        assert_eq!(r.len(), 1);
-        assert_eq!(r[0].connection, "pg");
-        assert_eq!(r[0].schema.as_deref(), Some("public"));
-        assert_eq!(r[0].table, "users");
-    }
-
-    #[test]
-    fn parses_join_clause() {
-        let r = FederationEngine::parse_federated_refs(
-            "SELECT * FROM pg.public.users JOIN mongo.test.events ON pg.public.users.id = mongo.test.events.user_id",
-        );
-        let conns: Vec<&str> = r.iter().map(|x| x.connection.as_str()).collect();
-        assert!(conns.contains(&"pg"));
-        assert!(conns.contains(&"mongo"));
-    }
-
-    #[test]
-    fn ignores_single_part_table_names() {
-        let r = FederationEngine::parse_federated_refs("SELECT * FROM users");
-        assert!(r.is_empty());
-    }
-
-    #[test]
-    fn local_alias_double_underscore_separator() {
+    fn dotted_name_joins_the_segments_verbatim() {
         let r = FederationRef {
-            connection: "pg".into(),
+            connection: "my prod-db".into(),
             schema: Some("public".into()),
-            table: "users".into(),
+            table: "order items".into(),
         };
-        assert_eq!(r.local_alias(), "pg__public__users");
+        assert_eq!(r.dotted_name(), "my prod-db.public.order items");
         let r2 = FederationRef {
             connection: "mongo".into(),
             schema: None,
             table: "events".into(),
         };
-        assert_eq!(r2.local_alias(), "mongo__events");
-    }
-
-    #[test]
-    fn case_insensitive_keywords() {
-        let r = FederationEngine::parse_federated_refs("select * from pg.users join ms.orders on 1=1");
-        assert_eq!(r.len(), 2);
+        assert_eq!(r2.dotted_name(), "mongo.events");
     }
 
     // ---- Engine execution tests (from engine.rs) ----
@@ -1016,6 +910,40 @@ mod tests {
         assert_eq!(result.rows.len(), 2);
         assert_eq!(result.columns[0].name, "id");
         assert_eq!(result.columns[1].name, "name");
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn select_from_a_backtick_quoted_connection_name() {
+        let mut adapters: HashMap<String, Arc<dyn ScanAdapter>> = HashMap::new();
+        adapters.insert("my prod-db".into(), Arc::new(MockAdapter::new(users_result())));
+
+        let engine = FederationEngine::new(adapters);
+        let result = engine
+            .execute("SELECT * FROM `my prod-db`.public.users")
+            .await
+            .unwrap();
+
+        assert_eq!(result.rows.len(), 2);
+        assert_eq!(result.columns[0].name, "id");
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn joins_two_connections_whose_names_slug_alike() {
+        let mut adapters: HashMap<String, Arc<dyn ScanAdapter>> = HashMap::new();
+        adapters.insert("my db".into(), Arc::new(MockAdapter::new(users_result())));
+        adapters.insert("my-db".into(), Arc::new(MockAdapter::new(orders_result())));
+
+        let engine = FederationEngine::new(adapters);
+        let result = engine
+            .execute(
+                "SELECT u.name, o.total FROM `my db`.public.users u \
+                 JOIN `my-db`.mydb.orders o ON u.id = o.user_id ORDER BY o.total DESC",
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(result.columns.len(), 2);
+        assert!(!result.rows.is_empty());
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -1436,6 +1364,76 @@ mod tests {
             running_count >= 2,
             "expected at least 2 Running events (one per scan)"
         );
+    }
+
+    /// A scan node's id is keyed off its label, which is read out of the federation
+    /// exec's display. A spaced name used to truncate, so both scans collided on the
+    /// same key and one of them never received an event.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn progress_reaches_a_scan_whose_connection_name_holds_a_space() {
+        use super::ProgressEvent;
+        use super::{DagNode, DagNodeStatus, DagNodeType};
+
+        let mut adapters: HashMap<String, Arc<dyn ScanAdapter>> = HashMap::new();
+        adapters.insert(
+            "prod bigquery".into(),
+            Arc::new(MockAdapter::new(orders_result())),
+        );
+        adapters.insert("prod".into(), Arc::new(MockAdapter::new(users_result())));
+
+        let engine = FederationEngine::new(adapters);
+        let dag_capture: Arc<std::sync::Mutex<Vec<DagNode>>> =
+            Arc::new(std::sync::Mutex::new(Vec::new()));
+        let events: Arc<std::sync::Mutex<Vec<ProgressEvent>>> =
+            Arc::new(std::sync::Mutex::new(Vec::new()));
+
+        let dag_clone = dag_capture.clone();
+        let events_clone = events.clone();
+        let callback: ProgressCallback = Arc::new(move |e| {
+            events_clone.lock().unwrap().push(e);
+        });
+
+        engine
+            .execute_with_progress(
+                "SELECT u.name, o.total FROM prod.public.users u \
+                 JOIN `prod bigquery`.mydb.orders o ON u.id = o.user_id",
+                None,
+                |dag| {
+                    dag_clone.lock().unwrap().extend_from_slice(dag);
+                },
+                callback,
+            )
+            .await
+            .unwrap();
+
+        let dag = dag_capture.lock().unwrap();
+        let scans: Vec<&DagNode> = dag
+            .iter()
+            .filter(|n| n.node_type == DagNodeType::Scan)
+            .collect();
+        assert_eq!(scans.len(), 2);
+        assert!(
+            scans.iter().any(|n| n.label.contains("prod bigquery")),
+            "no scan kept the spaced name: {:?}",
+            scans.iter().map(|n| &n.label).collect::<Vec<_>>()
+        );
+
+        // Truncating the spaced name collapsed both scans onto one key, so the
+        // distinct-id count is what catches it.
+        let evts = events.lock().unwrap();
+        let running: std::collections::HashSet<usize> = evts
+            .iter()
+            .filter(|e| e.status == DagNodeStatus::Running)
+            .map(|e| e.node_id)
+            .collect();
+        for scan in &scans {
+            assert!(
+                running.contains(&scan.id),
+                "no Running event for scan {} ({})",
+                scan.id,
+                scan.label
+            );
+        }
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

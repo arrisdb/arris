@@ -8,6 +8,8 @@ import type { Extension } from "@codemirror/state";
 import { RangeSetBuilder, StateField } from "@codemirror/state";
 import { Decoration, type DecorationSet, EditorView } from "@codemirror/view";
 
+import { findFederationSegments, unquoteFederationSegment } from "../federationRefs";
+
 interface SourceColor {
   name: string;
   color: string;
@@ -32,8 +34,6 @@ const SOURCE_PALETTE = [
   "#f6c177",
 ] as const;
 
-const IDENTIFIER_RE = /[A-Za-z_][A-Za-z0-9_]*/g;
-
 // djb2 string hash → stable non-negative integer.
 function hashString(s: string): number {
   let h = 5381;
@@ -53,22 +53,17 @@ function findSourceRanges(doc: string, sourceNames: string[]): SourceRange[] {
   for (const name of sourceNames) canonical.set(name.toLowerCase(), name);
 
   const ranges: SourceRange[] = [];
-  IDENTIFIER_RE.lastIndex = 0;
-  let match: RegExpExecArray | null;
-  while ((match = IDENTIFIER_RE.exec(doc)) !== null) {
-    const token = match[0];
-    const start = match.index;
-    const end = start + token.length;
+  for (const { value, from, to } of findFederationSegments(doc)) {
     // Must be the leading segment of a dotted ref: directly followed by a dot.
-    if (doc[end] !== ".") continue;
+    if (doc[to] !== ".") continue;
     // Must not itself be a non-leading segment (preceded by a dot).
-    if (start > 0 && doc[start - 1] === ".") continue;
+    if (from > 0 && doc[from - 1] === ".") continue;
     // Defensive: token boundary already excludes adjacent identifier chars, but
     // guard against an identifier char immediately before just in case.
-    if (start > 0 && isIdentifierChar(doc[start - 1])) continue;
-    const name = canonical.get(token.toLowerCase());
+    if (from > 0 && isIdentifierChar(doc[from - 1])) continue;
+    const name = canonical.get(unquoteFederationSegment(value).toLowerCase());
     if (!name) continue;
-    ranges.push({ from: start, to: end, name });
+    ranges.push({ from, to, name });
   }
   return ranges;
 }
