@@ -57,7 +57,8 @@ jupyter-zmq-client = { version = "1.0.0", default-features = false, features = [
 tempfile = "3.27"
 sha2 = "0.10"
 gix = { version = "0.85", default-features = false, features = ["max-performance-safe", "sha1"] }
-datafusion = "52.2"
+datafusion = "54.1"
+datafusion-federation = { version = "0.5.5", features = ["sql"] }
 futures = "0.3"
 regex-lite = "0.1"
 # encrypted on-disk spill of cached cell results (in-memory per-session key)

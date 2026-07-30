@@ -1,4 +1,3 @@
-use std::any::Any;
 use std::fmt;
 use std::sync::Arc;
 
@@ -62,14 +61,28 @@ impl FederatedTableProvider {
         self.node_id_map = Some(node_id_map);
         self
     }
+
+    /// `COUNT(*)` asks for no columns, which the SQL builder would widen to
+    /// `SELECT *`; one real column is enough to carry the row count.
+    fn pushed_down_columns(
+        schema: &SchemaRef,
+        projection: Option<&Vec<usize>>,
+    ) -> Option<Vec<String>> {
+        let indices = projection?;
+        if indices.is_empty() {
+            return schema.fields().first().map(|f| vec![f.name().clone()]);
+        }
+        Some(
+            indices
+                .iter()
+                .map(|&i| schema.field(i).name().clone())
+                .collect(),
+        )
+    }
 }
 
 #[async_trait::async_trait]
 impl TableProvider for FederatedTableProvider {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
     fn schema(&self) -> SchemaRef {
         self.schema.clone()
     }
@@ -87,12 +100,7 @@ impl TableProvider for FederatedTableProvider {
     ) -> datafusion::error::Result<Arc<dyn ExecutionPlan>> {
         let projected_schema = project_schema(&self.schema, projection)?;
 
-        let select_columns: Option<Vec<String>> = projection.map(|indices| {
-            indices
-                .iter()
-                .map(|&i| self.schema.field(i).name().clone())
-                .collect()
-        });
+        let select_columns = Self::pushed_down_columns(&self.schema, projection);
 
         Ok(Arc::new(FederatedExec::new(
             projected_schema,
@@ -131,7 +139,7 @@ pub(crate) struct FederatedExec {
     select_columns: Option<Vec<String>>,
     filters: Vec<Expr>,
     limit: Option<usize>,
-    properties: PlanProperties,
+    properties: Arc<PlanProperties>,
     progress: Option<ProgressCallback>,
     node_id_map: Option<NodeIdMap>,
 }
@@ -164,7 +172,7 @@ impl FederatedExec {
             select_columns,
             filters,
             limit,
-            properties,
+            properties: Arc::new(properties),
             progress,
             node_id_map,
         }
@@ -245,10 +253,6 @@ impl fmt::Display for FederatedExec {
 impl ExecutionPlan for FederatedExec {
     fn name(&self) -> &str {
         "FederatedExec"
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self
     }
 
     fn schema(&self) -> SchemaRef {
@@ -337,17 +341,54 @@ impl ExecutionPlan for FederatedExec {
         }
     }
 
-    fn properties(&self) -> &PlanProperties {
+    fn properties(&self) -> &Arc<PlanProperties> {
         &self.properties
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use datafusion::arrow::datatypes::Schema;
+    use datafusion::arrow::datatypes::{DataType, Field, Schema};
 
     use super::*;
     use crate::{ColumnSpec, QueryValue};
+
+    fn two_field_schema() -> SchemaRef {
+        Arc::new(Schema::new(vec![
+            Field::new("pk", DataType::Utf8, true),
+            Field::new("payload", DataType::Utf8, true),
+        ]))
+    }
+
+    #[test]
+    fn empty_projection_asks_for_one_column_not_all() {
+        let cols = FederatedTableProvider::pushed_down_columns(&two_field_schema(), Some(&vec![]));
+        assert_eq!(cols, Some(vec!["pk".to_string()]));
+    }
+
+    #[test]
+    fn empty_projection_on_columnless_schema_falls_back_to_star() {
+        let schema: SchemaRef = Arc::new(Schema::empty());
+        // `None` is what the SQL builder turns into `SELECT *`.
+        assert_eq!(
+            FederatedTableProvider::pushed_down_columns(&schema, Some(&vec![])),
+            None
+        );
+    }
+
+    #[test]
+    fn explicit_projection_maps_indices_to_names() {
+        let cols = FederatedTableProvider::pushed_down_columns(&two_field_schema(), Some(&vec![1]));
+        assert_eq!(cols, Some(vec!["payload".to_string()]));
+    }
+
+    #[test]
+    fn absent_projection_stays_absent() {
+        assert_eq!(
+            FederatedTableProvider::pushed_down_columns(&two_field_schema(), None),
+            None
+        );
+    }
 
     #[test]
     fn zero_column_projection_preserves_row_count() {

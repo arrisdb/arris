@@ -15,7 +15,15 @@ use datafusion::prelude::*;
 use futures::StreamExt;
 use tokio_util::sync::CancellationToken;
 
+use datafusion::arrow::datatypes::SchemaRef;
+use datafusion::catalog::TableProvider;
+use datafusion::execution::session_state::SessionStateBuilder;
+use datafusion::sql::TableReference;
+use datafusion_federation::sql::{RemoteTableRef, SQLFederationProvider, SQLTableSource};
+use datafusion_federation::{FederatedQueryPlanner, FederatedTableProviderAdaptor};
+
 use super::errors::*;
+use super::impl_driver_sql_executor::DriverSqlExecutor;
 use super::impl_federated_table_provider::{FederatedExec, FederatedTableProvider, NodeIdMap};
 use super::impl_metrics_stream::{ProgressCallback, ProgressEvent};
 use super::impl_plan_dag::{DagNode, DagNodeStatus, DagNodeType, PlanDag};
@@ -103,9 +111,11 @@ impl FederationEngine {
             let schema = FederatedExec::infer_schema_from_result(&probe);
 
             let alias = fref.local_alias();
-            let provider = FederatedTableProvider::new(schema, adapter.clone(), fref.clone());
+            let provider =
+                FederatedTableProvider::new(schema.clone(), adapter.clone(), fref.clone());
+            let provider = Self::table_provider_for(adapter, fref, schema, provider, None);
 
-            ctx.register_table(&alias, Arc::new(provider))
+            ctx.register_table(&alias, provider)
                 .map_err(|e| FederationError::Engine(e.to_string()))?;
 
             let dotted = fref.dotted_name();
@@ -231,10 +241,18 @@ impl FederationEngine {
 
             let schema = FederatedExec::infer_schema_from_result(&probe);
             let alias = fref.local_alias();
-            let provider = FederatedTableProvider::new(schema, adapter.clone(), fref.clone())
-                .with_progress(progress.clone(), node_id_map.clone());
+            let provider =
+                FederatedTableProvider::new(schema.clone(), adapter.clone(), fref.clone())
+                    .with_progress(progress.clone(), node_id_map.clone());
+            let provider = Self::table_provider_for(
+                adapter,
+                fref,
+                schema,
+                provider,
+                Some((progress.clone(), node_id_map.clone())),
+            );
 
-            ctx.register_table(&alias, Arc::new(provider))
+            ctx.register_table(&alias, provider)
                 .map_err(|e| FederationError::Engine(e.to_string()))?;
 
             let dotted = fref.dotted_name();
@@ -454,7 +472,48 @@ impl FederationEngine {
             .map_err(|e| FederationError::Engine(e.to_string()))?;
         let mut config = SessionConfig::new();
         config.options_mut().optimizer.prefer_hash_join = false;
-        Ok(SessionContext::new_with_config_rt(config, runtime))
+        // These two are what push a single-source subplan into the source.
+        let state = SessionStateBuilder::new()
+            .with_config(config)
+            .with_runtime_env(runtime)
+            .with_optimizer_rules(datafusion_federation::default_optimizer_rules())
+            .with_query_planner(Arc::new(FederatedQueryPlanner::new()))
+            .with_default_features()
+            .build();
+        Ok(SessionContext::new_with_state(state))
+    }
+
+    /// The adaptor pushes whole single-source subplans down, falling back to
+    /// `provider` when the optimizer declines to federate.
+    fn table_provider_for(
+        adapter: &Arc<dyn ScanAdapter>,
+        source: &FederationRef,
+        schema: SchemaRef,
+        provider: FederatedTableProvider,
+        progress: Option<(ProgressCallback, NodeIdMap)>,
+    ) -> Arc<dyn TableProvider> {
+        let kind = adapter.database_kind();
+        if !DriverSqlExecutor::supports_subplan_pushdown(kind) {
+            return Arc::new(provider);
+        }
+        let executor = DriverSqlExecutor::new(adapter.clone(), source.connection.clone(), kind);
+        let executor = Arc::new(match progress {
+            Some((callback, map)) => executor.with_progress(callback, map),
+            None => executor,
+        });
+        let remote = match source.schema.as_deref().filter(|s| !s.is_empty()) {
+            Some(schema_name) => TableReference::partial(schema_name, source.table.as_str()),
+            None => TableReference::bare(source.table.as_str()),
+        };
+        let table_source = Arc::new(SQLTableSource::new_with_schema(
+            Arc::new(SQLFederationProvider::new(executor)),
+            RemoteTableRef::from(remote),
+            schema,
+        ));
+        Arc::new(FederatedTableProviderAdaptor::new_with_provider(
+            table_source,
+            Arc::new(provider),
+        ))
     }
 
     fn schema_to_column_specs(batch: &RecordBatch) -> Vec<ColumnSpec> {
@@ -689,9 +748,12 @@ mod tests {
 
     // ---- Test helpers ----
 
+    /// Executes the SQL it is handed: pushdown means the double can no longer
+    /// replay one canned result.
     struct MockAdapter {
         result: QueryResult,
         kind: DatabaseKind,
+        seen: Option<Arc<Mutex<Vec<String>>>>,
     }
 
     impl MockAdapter {
@@ -699,7 +761,28 @@ mod tests {
             Self {
                 result,
                 kind: DatabaseKind::Postgres,
+                seen: None,
             }
+        }
+
+        fn recording(
+            result: QueryResult,
+            kind: DatabaseKind,
+            seen: Arc<Mutex<Vec<String>>>,
+        ) -> Self {
+            Self { result, kind, seen: Some(seen) }
+        }
+
+        /// Returns the SQL stripped of quoting and schema, plus the bare table.
+        fn localize(sql: &str) -> (String, String) {
+            let unquoted = sql.replace(['"', '`'], "");
+            let qualified = regex_lite::Regex::new(r"(?i)\bFROM\s+([\w.]+)")
+                .expect("valid FROM regex")
+                .captures(&unquoted)
+                .map(|c| c[1].to_string())
+                .unwrap_or_default();
+            let bare = qualified.rsplit('.').next().unwrap_or_default().to_string();
+            (unquoted.replace(&qualified, &bare), bare)
         }
     }
 
@@ -709,8 +792,34 @@ mod tests {
             Ok(self.result.clone())
         }
 
-        async fn scan_with_sql(&self, _sql: &str) -> crate::drivers::errors::Result<QueryResult> {
-            Ok(self.result.clone())
+        async fn scan_with_sql(&self, sql: &str) -> crate::drivers::errors::Result<QueryResult> {
+            if let Some(seen) = &self.seen {
+                seen.lock().unwrap().push(sql.to_string());
+            }
+            let (local_sql, table) = Self::localize(sql);
+            let schema = FederatedExec::infer_schema_from_result(&self.result);
+            let batch = FederatedExec::query_result_to_record_batch(&self.result, &schema)
+                .map_err(DriverError::QueryFailed)?;
+            let ctx = SessionContext::new();
+            ctx.register_batch(&table, batch)
+                .map_err(|e| DriverError::QueryFailed(e.to_string()))?;
+            let batches = ctx
+                .sql(&local_sql)
+                .await
+                .map_err(|e| DriverError::QueryFailed(e.to_string()))?
+                .collect()
+                .await
+                .map_err(|e| DriverError::QueryFailed(e.to_string()))?;
+
+            let mut columns = Vec::new();
+            let mut rows = Vec::new();
+            for b in &batches {
+                if columns.is_empty() {
+                    columns = FederationEngine::schema_to_column_specs(b);
+                }
+                FederationEngine::append_batch_rows(b, &mut rows);
+            }
+            Ok(QueryResult::new(columns, rows))
         }
 
         fn database_kind(&self) -> DatabaseKind {
@@ -1045,6 +1154,85 @@ mod tests {
         assert_eq!(result.rows.len(), 2);
         assert_eq!(result.rows[0][1], QueryValue::Null);
         assert_eq!(result.rows[1][1], QueryValue::Text("hello".into()));
+    }
+
+
+
+
+
+
+    /// Pushed SQL, minus the schema probe the engine issues per table.
+    async fn pushed_sql_for(query: &str) -> Vec<String> {
+        let pk_rows = QueryResult::new(
+            vec![ColumnSpec::new("pk", "int4")],
+            vec![vec![QueryValue::Int(1)], vec![QueryValue::Int(2)]],
+        );
+        let seen = Arc::new(Mutex::new(Vec::new()));
+        let mut adapters: HashMap<String, Arc<dyn ScanAdapter>> = HashMap::new();
+        adapters.insert("test_postgres".into(), Arc::new(MockAdapter::new(pk_rows.clone())));
+        adapters.insert(
+            "prod_bigquery".into(),
+            Arc::new(MockAdapter::recording(pk_rows, DatabaseKind::Bigquery, seen.clone())),
+        );
+        FederationEngine::new(adapters).execute(query).await.unwrap();
+        let pushed = seen.lock().unwrap().clone();
+        pushed.into_iter().filter(|s| !s.contains("LIMIT 1")).collect()
+    }
+
+    /// Every derived table in `sql` carries an alias, so its inner qualifiers
+    /// stay in scope. Unaliased ones drew `Unrecognized name` from BigQuery.
+    fn assert_every_derived_table_is_aliased(sql: &str) {
+        use std::ops::ControlFlow;
+
+        use datafusion::sql::sqlparser::ast::{TableFactor, Visit, Visitor};
+        use datafusion::sql::sqlparser::dialect::GenericDialect;
+        use datafusion::sql::sqlparser::parser::Parser;
+
+        struct FindUnaliased;
+        impl Visitor for FindUnaliased {
+            type Break = ();
+            fn pre_visit_table_factor(&mut self, factor: &TableFactor) -> ControlFlow<()> {
+                match factor {
+                    TableFactor::Derived { alias: None, .. } => ControlFlow::Break(()),
+                    _ => ControlFlow::Continue(()),
+                }
+            }
+        }
+
+        for statement in Parser::parse_sql(&GenericDialect {}, sql).unwrap() {
+            assert!(
+                statement.visit(&mut FindUnaliased).is_continue(),
+                "derived table without an alias in: {sql}"
+            );
+        }
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn pushed_down_subquery_binds_its_own_alias() {
+        let pushed = pushed_sql_for(
+            "SELECT COUNT(DISTINCT a.pk) FROM test_postgres.public.table_a AS a \
+             WHERE a.pk NOT IN (SELECT DISTINCT b.pk FROM prod_bigquery.test_dataset.table_b AS b)",
+        )
+        .await;
+
+        assert_eq!(pushed.len(), 1, "{pushed:?}");
+        assert!(pushed[0].contains("`table_b`"), "{}", pushed[0]);
+        assert_every_derived_table_is_aliased(&pushed[0]);
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn aggregates_push_down_without_a_derived_table() {
+        for query in [
+            "SELECT COUNT(*) FROM prod_bigquery.test_dataset.table_b",
+            "SELECT COUNT(*) FROM prod_bigquery.test_dataset.table_b AS b",
+            "SELECT COUNT(*) FROM prod_bigquery.test_dataset.table_b WHERE pk > 1",
+            "SELECT pk, COUNT(*) FROM prod_bigquery.test_dataset.table_b GROUP BY pk",
+        ] {
+            let pushed = pushed_sql_for(query).await;
+            assert_eq!(pushed.len(), 1, "{query}: {pushed:?}");
+            assert!(pushed[0].contains("count("), "{query}: {}", pushed[0]);
+            assert_every_derived_table_is_aliased(&pushed[0]);
+        }
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
