@@ -48,12 +48,20 @@ import Screenshot from "../../components/docs/Screenshot/Screenshot.astro";
   </p>
 
   <ul>
-    <li><strong>Parses</strong> &mdash; the SQL is scanned for dotted table references to work out which connection each table belongs to.</li>
-    <li><strong>Registers</strong> &mdash; each referenced table is registered with a DataFusion session as a custom table provider backed by that connection's native driver.</li>
-    <li><strong>Pushes down</strong> &mdash; column projections, <code>WHERE</code> filters, and row limits are translated back into SQL and pushed to each source, so only the needed rows and columns are pulled.</li>
-    <li><strong>Executes</strong> &mdash; DataFusion streams the source rows as Arrow batches and runs the full query, performing the joins, aggregations, and sorting locally with its vectorized operators.</li>
-    <li><strong>Returns</strong> &mdash; the result is shown in the same results grid as any other query.</li>
+    <li><strong>Parses</strong> - the SQL is scanned for dotted table references to work out which connection each table belongs to.</li>
+    <li><strong>Registers</strong> - each referenced table is registered with a DataFusion session as a custom table provider backed by that connection's native driver.</li>
+    <li><strong>Pushes down</strong> - the largest slice of the query that touches only one connection is handed to that connection. Where Arris can write SQL back in the source's own dialect, that slice is a whole subplan: its joins, filters, aggregates, and sorts run at the source and only the subplan's result crosses the wire. Every other source gets per-table pushdown of column projections, <code>WHERE</code> filters, and row limits.</li>
+    <li><strong>Executes</strong> - DataFusion streams what comes back as Arrow batches and runs whatever is left, the cross-connection joins, aggregations, and sorting, with its vectorized operators.</li>
+    <li><strong>Returns</strong> - the result is shown in the same results grid as any other query.</li>
   </ul>
+
+  <p>
+    Subplan pushdown applies to <strong>PostgreSQL</strong>, <strong>Redshift</strong>,
+    <strong>MySQL</strong>, <strong>MariaDB</strong>, <strong>SQLite</strong>,
+    <strong>DuckDB</strong>, and <strong>BigQuery</strong>. Every other source stays on per-table
+    pushdown, which is a difference in how much work the source does, not in what you can write:
+    the same query runs either way.
+  </p>
 
   <h2 id="writing">Writing a cross-source query</h2>
 
@@ -99,6 +107,14 @@ import Screenshot from "../../components/docs/Screenshot/Screenshot.astro";
     aggregate, sort, and the final result, with each node's status updating as the query runs.
   </p>
 
+  <p>
+    A subplan that was pushed into its source collapses to a single scan node named after the
+    connection (<code>Scan: prod postgres</code>), because the source ran that whole slice and
+    returned one result. A table read that was not pushed down names the table instead
+    (<code>Scan: prod postgres.public.orders</code>). Fewer nodes in the graph than operators in
+    your SQL means more of the query ran at the source.
+  </p>
+
   <Screenshot
     src="/screenshots/cross-source-plan.png"
     alt="The Arris execution plan graph for a cross-source query: two Scan nodes (Postgres customers and MongoDB orders) feeding Sort, Inner Join, and Projection nodes, each showing row count and elapsed time"
@@ -112,10 +128,10 @@ import Screenshot from "../../components/docs/Screenshot/Screenshot.astro";
   </p>
 
   <ul>
-    <li><strong>Read-only sources</strong> &mdash; a cross-source query only reads from its sources; it never writes back to them.</li>
-    <li><strong>Data volume</strong> &mdash; source rows are streamed into memory (DataFusion can spill to disk under pressure). Queries that scan very large tables may be slow or memory-heavy, so filter at the source with <code>WHERE</code> clauses.</li>
-    <li><strong>Transactions</strong> &mdash; a cross-source query does not run in a distributed transaction. Each source is read at a point in time and may not be perfectly consistent with the others.</li>
-    <li><strong>Engine-specific features</strong> &mdash; DataFusion executes the final SQL, so engine-specific functions (for example Postgres <code>array_agg</code>) only work if DataFusion has an equivalent.</li>
+    <li><strong>Read-only sources</strong> - a cross-source query only reads from its sources; it never writes back to them.</li>
+    <li><strong>Data volume</strong> - whatever a source does not compute itself is streamed into memory (DataFusion can spill to disk under pressure). Queries that pull very large tables across connections may be slow or memory-heavy, so filter at the source with <code>WHERE</code> clauses.</li>
+    <li><strong>Transactions</strong> - a cross-source query does not run in a distributed transaction. Each source is read at a point in time and may not be perfectly consistent with the others.</li>
+    <li><strong>Engine-specific features</strong> - DataFusion plans the query, so engine-specific functions (for example Postgres <code>array_agg</code>) only work if DataFusion has an equivalent, even when the work ends up running at the source.</li>
   </ul>
 
   <Callout type="note" title="DataFusion SQL dialect">
