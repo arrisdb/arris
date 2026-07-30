@@ -8,6 +8,9 @@ import type { Extension } from "@codemirror/state";
 import { RangeSetBuilder, StateField } from "@codemirror/state";
 import { Decoration, type DecorationSet, EditorView } from "@codemirror/view";
 
+import { unquoteFederationSegment } from "../federationRefs";
+import { LEADING_SEGMENT_RE } from "../federationRefs/constants";
+
 interface SourceColor {
   name: string;
   color: string;
@@ -32,7 +35,7 @@ const SOURCE_PALETTE = [
   "#f6c177",
 ] as const;
 
-const IDENTIFIER_RE = /[A-Za-z_][A-Za-z0-9_]*/g;
+
 
 // djb2 string hash → stable non-negative integer.
 function hashString(s: string): number {
@@ -53,9 +56,9 @@ function findSourceRanges(doc: string, sourceNames: string[]): SourceRange[] {
   for (const name of sourceNames) canonical.set(name.toLowerCase(), name);
 
   const ranges: SourceRange[] = [];
-  IDENTIFIER_RE.lastIndex = 0;
+  LEADING_SEGMENT_RE.lastIndex = 0;
   let match: RegExpExecArray | null;
-  while ((match = IDENTIFIER_RE.exec(doc)) !== null) {
+  while ((match = LEADING_SEGMENT_RE.exec(doc)) !== null) {
     const token = match[0];
     const start = match.index;
     const end = start + token.length;
@@ -66,7 +69,7 @@ function findSourceRanges(doc: string, sourceNames: string[]): SourceRange[] {
     // Defensive: token boundary already excludes adjacent identifier chars, but
     // guard against an identifier char immediately before just in case.
     if (start > 0 && isIdentifierChar(doc[start - 1])) continue;
-    const name = canonical.get(token.toLowerCase());
+    const name = canonical.get(unquoteFederationSegment(token).toLowerCase());
     if (!name) continue;
     ranges.push({ from: start, to: end, name });
   }

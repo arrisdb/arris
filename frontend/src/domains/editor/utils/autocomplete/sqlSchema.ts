@@ -12,6 +12,8 @@ import {
 } from "@codemirror/lang-sql";
 import type { DatabaseKind, SchemaNode } from "@shared";
 
+import { federationRefKey } from "../federationRefs";
+
 type SqlSchemaColumn = { name: string; type?: string };
 type SqlSchemaDict = Record<string, SqlSchemaColumn[]>;
 
@@ -27,17 +29,9 @@ function buildSqlSchema(nodes: SchemaNode[]): SqlSchemaDict {
   return dict;
 }
 
-// The federation engine parses a FROM reference as `connection.table` or
-// `connection.schema.table` (at most three parts; see `federation::parse_dotted`,
-// which returns `None` for 4+ parts, and registers each table as
-// `connection__schema__table`). A deeper source tree (MSSQL `database.schema.table`)
-// must therefore collapse to the table's IMMEDIATE container only: emitting the
-// grandparent database level would produce a 4-part reference the parser rejects and
-// the query breaks, while emitting a bare `connection.table` drops the schema
-// qualifier. So register exactly ONE canonical key per table (`connection` + the
-// nearest enclosing schema/database container (if any) + table) instead of every
-// progressively-qualified suffix `buildSqlSchema` produces for native single-source
-// completion.
+// Federation reads at most three parts, so a deeper tree (MSSQL
+// `database.schema.table`) collapses to the table's immediate container: one
+// canonical key per table, not every qualified suffix `buildSqlSchema` emits.
 function buildFederatedSqlSchema(
   sources: { name: string; schema: SchemaNode[] | undefined }[],
 ): SqlSchemaDict {
@@ -67,9 +61,9 @@ function walkFederated(
         : n.children
             .filter((c) => c.kind === "column")
             .map((c) => ({ name: c.name, type: c.detail }));
-      const key = container
-        ? `${connection}.${container}.${n.name}`
-        : `${connection}.${n.name}`;
+      const key = federationRefKey(
+        container ? [connection, container, n.name] : [connection, n.name],
+      );
       dict[key] = cols;
     }
     // The nearest schema/database becomes the immediate container; deeper nesting
