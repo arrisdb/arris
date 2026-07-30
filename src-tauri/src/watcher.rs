@@ -10,14 +10,18 @@ use std::path::Path;
 use std::sync::Mutex;
 use std::time::Duration;
 
-use notify_debouncer_full::notify::{RecommendedWatcher, RecursiveMode, Result as NotifyResult};
-use notify_debouncer_full::{new_debouncer, DebounceEventResult, Debouncer, RecommendedCache};
+use notify_debouncer_full::notify::{
+    Config, RecommendedWatcher, RecursiveMode, Result as NotifyResult,
+};
+use notify_debouncer_full::{new_debouncer_opt, DebounceEventResult, Debouncer, NoCache};
 
 /// Coalesce bursts of filesystem events (an editor save or a git operation
 /// touches many files at once) into a single notification.
 const DEBOUNCE: Duration = Duration::from_millis(250);
 
-type ProjectDebouncer = Debouncer<RecommendedWatcher, RecommendedCache>;
+/// `NoCache`: the default file-id cache stats the whole tree on `watch`, and
+/// only buys rename stitching that `start`'s handler never reads.
+type ProjectDebouncer = Debouncer<RecommendedWatcher, NoCache>;
 
 /// Directories whose churn must never drive a refresh: `.git` (git rewrites its
 /// index on every status read) and `.arris` (our own project-data dir, where the
@@ -49,7 +53,7 @@ impl ProjectWatcher {
     where
         F: Fn() + Send + 'static,
     {
-        let mut debouncer = new_debouncer(DEBOUNCE, None, move |result: DebounceEventResult| {
+        let handler = move |result: DebounceEventResult| {
             // Fire only when something outside the internal-churn dirs changed
             // (see `IGNORED_DIRS`). Both `.git` and `.arris` are rewritten as a
             // side effect of the refresh itself, so reacting to them loops
@@ -65,7 +69,14 @@ impl ProjectWatcher {
                     on_change();
                 }
             }
-        })?;
+        };
+        let mut debouncer = new_debouncer_opt::<_, RecommendedWatcher, NoCache>(
+            DEBOUNCE,
+            None,
+            handler,
+            NoCache::new(),
+            Config::default(),
+        )?;
         debouncer.watch(root, RecursiveMode::Recursive)?;
         *self.debouncer.lock().unwrap() = Some(debouncer);
         Ok(())
@@ -172,6 +183,31 @@ mod tests {
             wait_for(&hits, 1),
             "worktree change did not trigger a refresh"
         );
+
+        watcher.stop();
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn fires_on_rename_without_the_file_id_cache() {
+        let dir = unique_dir("rename");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("before.txt"), "x").unwrap();
+
+        let hits = Arc::new(AtomicUsize::new(0));
+        let watcher = ProjectWatcher::default();
+        let cb = hits.clone();
+        watcher
+            .start(&dir, move || {
+                cb.fetch_add(1, Ordering::SeqCst);
+            })
+            .unwrap();
+
+        std::thread::sleep(Duration::from_millis(300));
+        std::fs::rename(dir.join("before.txt"), dir.join("after.txt")).unwrap();
+
+        assert!(wait_for(&hits, 1), "watcher did not fire on rename");
 
         watcher.stop();
         let _ = std::fs::remove_dir_all(&dir);

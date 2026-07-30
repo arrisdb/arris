@@ -1,7 +1,7 @@
 import { useConnectionsStore } from "@domains/connection";
 import { useFederationProgressStore, useResultsTableStore, useRunHistoryStore } from "@domains/results";
 import { usePinnedQueriesStore } from "@domains/pinnedQueries";
-import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent } from "react";
+import { Fragment, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -1979,7 +1979,9 @@ function PaneGroupView({ groupId }: { groupId: string }) {
       />
       {groupTabs.filter(t => t.tabType === "terminal").map(t => (
         <div key={t.id} className={`mdbc-tab-content${t.id === activeId ? "" : " hidden"}`}>
-          <TerminalView tabId={t.id} />
+          <Suspense fallback={null}>
+            <TerminalView tabId={t.id} />
+          </Suspense>
         </div>
       ))}
       <EditorTabRouter

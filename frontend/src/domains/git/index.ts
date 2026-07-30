@@ -2,11 +2,21 @@ import { registerPane } from "@shared";
 import { registerTabView } from "@shared";
 import type { EditorTab } from "@shell/types";
 import { useSettingsStore } from "@shared/settings";
+import { lazy } from "react";
 import { GitChangesPane } from "./components/GitChangesPane";
-import { GitDiffView } from "./components/GitDiffView";
-import { CommitDiffView } from "./components/CommitDiffView";
-import { GitHistoryView } from "./components/GitHistoryView";
-import { GitConflictView } from "./components/GitConflictView";
+
+const GitDiffView = lazy(() =>
+  import("./components/GitDiffView").then((m) => ({ default: m.GitDiffView })),
+);
+const CommitDiffView = lazy(() =>
+  import("./components/CommitDiffView").then((m) => ({ default: m.CommitDiffView })),
+);
+const GitHistoryView = lazy(() =>
+  import("./components/GitHistoryView").then((m) => ({ default: m.GitHistoryView })),
+);
+const GitConflictView = lazy(() =>
+  import("./components/GitConflictView").then((m) => ({ default: m.GitConflictView })),
+);
 
 function registerGitPane(): void {
   registerPane({

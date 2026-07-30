@@ -110,7 +110,7 @@ function useAppBootstrap(
       appPreferencesLoadIPC().catch(() => null),
       takePendingLaunchIPC().catch(() => null),
     ])
-      .then(async ([connections, preferences, pendingLaunch]) => {
+      .then(([connections, preferences, pendingLaunch]) => {
         setConnections(connections);
         // Restore only carries the connected-status snapshot, not a schema fetch,
         // so eagerly load schemas for already-connected connections; otherwise the
@@ -118,7 +118,9 @@ function useAppBootstrap(
         useConnectionsStore.getState().hydrateConnectedSchemas();
         if (preferences) useSettingsStore.getState().hydrate(preferences);
         hydrated.current = true;
-        await openPendingLaunchOrReopenLast(pendingLaunch);
+        // Not awaited: openProject flips `loading` synchronously, so bootstrap
+        // can end here and paint the loading screen instead of a blank window.
+        void openPendingLaunchOrReopenLast(pendingLaunch);
         setBootstrapping(false);
       })
       .catch((error) => {

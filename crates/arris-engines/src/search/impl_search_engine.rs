@@ -84,19 +84,29 @@ impl SearchEngine {
                 continue;
             }
 
-            if path.is_dir() {
+            let Ok(file_type) = entry.file_type() else { continue };
+            if file_type.is_dir() {
                 Self::walk_dir(root, &path, out);
                 continue;
             }
 
-            if !path.is_file() {
+            // A symlink's dirent type says nothing about its target, so it is
+            // the one case worth a stat.
+            let meta = if file_type.is_symlink() {
+                let Ok(meta) = fs::metadata(&path) else { continue };
+                if meta.is_dir() {
+                    Self::walk_dir(root, &path, out);
+                    continue;
+                }
+                meta
+            } else {
+                let Ok(meta) = entry.metadata() else { continue };
+                meta
+            };
+
+            if !meta.is_file() {
                 continue;
             }
-
-            let meta = match fs::metadata(&path) {
-                Ok(m) => m,
-                Err(_) => continue,
-            };
 
             if meta.len() > MAX_FILE_SIZE {
                 continue;

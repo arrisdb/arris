@@ -1,9 +1,13 @@
 import { registerPane } from "@shared";
 import { registerTabView } from "@shared";
 import type { EditorTab } from "@shell/types";
+import { lazy } from "react";
 import { NotebookSection } from "./components/NotebookSection";
-import { NotebookView } from "./components/NotebookView";
 import { serializeNotebook, parseNotebook } from "./components/NotebookView/utils/nbformat";
+
+const NotebookView = lazy(() =>
+  import("./components/NotebookView").then((m) => ({ default: m.NotebookView })),
+);
 
 // Stacked under the left rail's files/project view, below the consoles section.
 function registerNotebookSection(): void {

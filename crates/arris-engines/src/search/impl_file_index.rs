@@ -65,9 +65,13 @@ impl FileIndex {
         let scanned_map: HashMap<&str, &ScannedFile> =
             scanned.iter().map(|f| (f.path.as_str(), f)).collect();
 
+        // One transaction: SQLite otherwise fsyncs per statement, and a fresh
+        // index is one INSERT per line.
+        let tx = self.db.transaction()?;
+
         // Load existing DB entries
         let existing: Vec<(i64, String, u64)> = {
-            let mut stmt = self.db.prepare("SELECT id, path, mtime_ns FROM files")?;
+            let mut stmt = tx.prepare("SELECT id, path, mtime_ns FROM files")?;
             stmt.query_map([], |row| {
                 Ok((row.get(0)?, row.get(1)?, row.get::<_, i64>(2)? as u64))
             })?
@@ -80,44 +84,36 @@ impl FileIndex {
             .map(|(id, path, mtime)| (path.as_str(), (*id, *mtime)))
             .collect();
 
-        // Delete removed files
-        for (id, path, _) in &existing {
-            if !scanned_map.contains_key(path.as_str()) {
-                self.db
-                    .execute("DELETE FROM files WHERE id = ?1", params![id])?;
+        {
+            let mut delete_file = tx.prepare("DELETE FROM files WHERE id = ?1")?;
+            let mut insert_file =
+                tx.prepare("INSERT INTO files (path, mtime_ns, size) VALUES (?1, ?2, ?3)")?;
+            let mut insert_line = tx
+                .prepare("INSERT INTO lines (file_id, line_num, content) VALUES (?1, ?2, ?3)")?;
+
+            for (id, path, _) in &existing {
+                if !scanned_map.contains_key(path.as_str()) {
+                    delete_file.execute(params![id])?;
+                }
             }
-        }
 
-        // Upsert changed/new files
-        for sf in &scanned {
-            let needs_update = match existing_map.get(sf.path.as_str()) {
-                Some((_, old_mtime)) => *old_mtime != sf.mtime_ns,
-                None => true,
-            };
-
-            if needs_update {
-                // Delete old entry if exists
-                self.db
-                    .execute("DELETE FROM files WHERE path = ?1", params![sf.path])?;
-
-                // Insert new file
-                self.db.execute(
-                    "INSERT INTO files (path, mtime_ns, size) VALUES (?1, ?2, ?3)",
-                    params![sf.path, sf.mtime_ns as i64, sf.size as i64],
-                )?;
-                let file_id = self.db.last_insert_rowid();
-
-                // Insert lines
-                {
-                    let mut insert_line = self.db.prepare(
-                        "INSERT INTO lines (file_id, line_num, content) VALUES (?1, ?2, ?3)",
-                    )?;
-                    for (i, line) in sf.lines.iter().enumerate() {
-                        insert_line.execute(params![file_id, (i + 1) as i64, line])?;
+            for sf in &scanned {
+                if let Some((id, old_mtime)) = existing_map.get(sf.path.as_str()) {
+                    if *old_mtime == sf.mtime_ns {
+                        continue;
                     }
+                    delete_file.execute(params![id])?;
+                }
+
+                insert_file.execute(params![sf.path, sf.mtime_ns as i64, sf.size as i64])?;
+                let file_id = tx.last_insert_rowid();
+                for (i, line) in sf.lines.iter().enumerate() {
+                    insert_line.execute(params![file_id, (i + 1) as i64, line])?;
                 }
             }
         }
+
+        tx.commit()?;
 
         // Refresh file_paths
         self.file_paths = self.load_file_paths()?;
@@ -473,6 +469,34 @@ mod tests {
 
         let stats = idx.stats().unwrap();
         assert_eq!(stats.file_count, 2);
+    }
+
+    #[test]
+    fn rebuild_replaces_an_edited_files_lines() {
+        let tmp = setup_test_dir();
+        let mut idx = FileIndex::open(tmp.path().to_path_buf()).unwrap();
+        assert!(!idx.search_content("hello", 10).unwrap().is_empty());
+
+        std::thread::sleep(std::time::Duration::from_millis(10));
+        fs::write(tmp.path().join("main.rs"), "fn main() {\n    goodbye();\n}\n").unwrap();
+        idx.rebuild().unwrap();
+
+        assert_eq!(idx.stats().unwrap().file_count, 3);
+        assert!(idx.search_content("hello", 10).unwrap().is_empty());
+        assert!(!idx.search_content("goodbye", 10).unwrap().is_empty());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn scan_follows_a_symlinked_directory() {
+        let tmp = setup_test_dir();
+        let linked = TempDir::new().unwrap();
+        fs::write(linked.path().join("linked.rs"), "pub fn linked() {}\n").unwrap();
+        std::os::unix::fs::symlink(linked.path(), tmp.path().join("vendor")).unwrap();
+
+        let mut idx = FileIndex::open(tmp.path().to_path_buf()).unwrap();
+        assert_eq!(idx.stats().unwrap().file_count, 4);
+        assert!(!idx.search_files("linked", 10).is_empty());
     }
 
     #[test]

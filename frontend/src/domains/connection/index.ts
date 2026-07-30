@@ -1,10 +1,14 @@
 import { registerPane } from "@shared";
 import { registerTabView } from "@shared";
 import type { EditorTab } from "@shell/types";
+import { lazy } from "react";
 import { CombinedConnectionsTree } from "./components/CombinedConnectionsTree";
-import { DefinitionTabView } from "./components/DefinitionTabView";
 import { DatabaseKindIcon, kindStyle } from "./utils/databaseKindIcon";
 import { useConnectionsStore, useSchemaUiStore } from "./hooks";
+
+const DefinitionTabView = lazy(() =>
+  import("./components/DefinitionTabView").then((m) => ({ default: m.DefinitionTabView })),
+);
 
 // The connections tree is the right rail's default: lowest priority and always
 // eligible, so it shows whenever no higher-priority pane (agent, chart editor,
