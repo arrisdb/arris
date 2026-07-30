@@ -35,11 +35,48 @@ const EXPECTED_DOCS_PAGES = [
   "querying/results/index.html",
   "querying/command-logs/index.html",
   "querying/cross-source/index.html",
+  "canvas/index.html",
+  "git/version-control/index.html",
   "analytics-engineering/dbt/index.html",
   "analytics-engineering/sqlmesh/index.html",
   "ai/agent/index.html",
   "reference/shortcuts/index.html",
   "reference/debug-logs/index.html",
+];
+
+// Every kind the app ships a driver for gets a page.
+const EXPECTED_DATA_SOURCE_PAGES = [
+  "bigquery",
+  "clickhouse",
+  "duckdb",
+  "dynamodb",
+  "elasticsearch",
+  "kafka",
+  "mariadb",
+  "mixpanel",
+  "mongodb",
+  "mssql",
+  "mysql",
+  "oracle",
+  "postgres",
+  "redis",
+  "redshift",
+  "snowflake",
+  "sqlite",
+  "starrocks",
+  "trino",
+];
+
+// Sources whose whole single-connection subplan is unparsed back to their own
+// SQL dialect (`DriverSqlExecutor::supports_subplan_pushdown`).
+const SUBPLAN_PUSHDOWN_SOURCES = [
+  "PostgreSQL",
+  "Redshift",
+  "MySQL",
+  "MariaDB",
+  "SQLite",
+  "DuckDB",
+  "BigQuery",
 ];
 
 beforeAll(() => {
@@ -57,6 +94,17 @@ describe("docs build output", () => {
     "produces %s",
     (page) => {
       expect(existsSync(join(DIST, page))).toBe(true);
+    }
+  );
+});
+
+describe("data source pages", () => {
+  it.each(EXPECTED_DATA_SOURCE_PAGES)(
+    "produces a page for %s",
+    (kind) => {
+      expect(
+        existsSync(join(DIST, `supported-data-sources/${kind}/index.html`))
+      ).toBe(true);
     }
   );
 });
@@ -195,6 +243,30 @@ describe("docs output content", () => {
       "utf-8"
     );
     expect(html).toContain("DuckDB");
+  });
+
+  it("federation page names every subplan-pushdown source", () => {
+    const html = readFileSync(
+      join(DIST, "querying/cross-source/index.html"),
+      "utf-8"
+    );
+    for (const source of SUBPLAN_PUSHDOWN_SOURCES) {
+      expect(html).toContain(source);
+    }
+  });
+
+  it("federation page documents backtick-quoted references", () => {
+    const html = readFileSync(
+      join(DIST, "querying/cross-source/index.html"),
+      "utf-8"
+    );
+    expect(html).toContain("backtick");
+  });
+
+  it("canvas is not announced as a new feature", () => {
+    const html = readFileSync(join(DIST, "index.html"), "utf-8");
+    expect(html).not.toMatch(/New in this release/i);
+    expect(html).not.toMatch(/New: a board/i);
   });
 
   it("AI page mentions configurable providers", () => {
