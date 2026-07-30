@@ -209,6 +209,7 @@ dependencies = [
  "clickhouse",
  "dashmap",
  "datafusion",
+ "datafusion-federation",
  "directories",
  "dirs",
  "duckdb",
@@ -2438,6 +2439,19 @@ dependencies = [
  "datafusion-common",
  "indexmap 2.14.0",
  "itertools",
+]
+
+[[package]]
+name = "datafusion-federation"
+version = "0.5.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f31c9f6439e96c06a56d6fe8ff33bdf9d74a7336d4e6937e6862699df2596187"
+dependencies = [
+ "arrow-json",
+ "async-stream",
+ "async-trait",
+ "datafusion",
+ "futures",
 ]
 
 [[package]]

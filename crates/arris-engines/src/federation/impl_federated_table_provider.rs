@@ -62,9 +62,8 @@ impl FederatedTableProvider {
         self
     }
 
-    /// Column list to push into the scan SQL. `COUNT(*)` asks for an empty
-    /// projection, which the SQL builder would widen to `SELECT *`; ask for one
-    /// real column instead, since only the row count is read back.
+    /// `COUNT(*)` asks for no columns, which the SQL builder would widen to
+    /// `SELECT *`; one real column is enough to carry the row count.
     fn pushed_down_columns(
         schema: &SchemaRef,
         projection: Option<&Vec<usize>>,

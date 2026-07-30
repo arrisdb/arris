@@ -4,6 +4,7 @@ use std::sync::Arc;
 use datafusion::physical_plan::{DisplayFormatType, ExecutionPlan};
 use serde::{Deserialize, Serialize};
 
+use super::constants::{FEDERATION_EXEC_NAME, FEDERATION_EXEC_NAME_KEY};
 use super::impl_federated_table_provider::FederatedExec;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
@@ -96,6 +97,12 @@ impl PlanDag {
         node_type == DagNodeType::Result
     }
 
+    fn federated_connection(plan: &dyn ExecutionPlan) -> Option<String> {
+        let display = Self::plan_display(plan);
+        let at = display.find(FEDERATION_EXEC_NAME_KEY)? + FEDERATION_EXEC_NAME_KEY.len();
+        display[at..].split_whitespace().next().map(str::to_string)
+    }
+
     fn classify_node(name: &str) -> DagNodeType {
         if name.contains("Join") {
             DagNodeType::Join
@@ -107,7 +114,7 @@ impl PlanDag {
             DagNodeType::Filter
         } else if name.contains("Projection") {
             DagNodeType::Projection
-        } else if name == "FederatedExec" {
+        } else if name == "FederatedExec" || name == FEDERATION_EXEC_NAME {
             DagNodeType::Scan
         } else {
             DagNodeType::Result
@@ -156,6 +163,12 @@ impl PlanDag {
         if name == "FederatedExec" {
             if let Some(fed) = plan.downcast_ref::<FederatedExec>() {
                 return format!("Scan: {}", fed.source().dotted_name());
+            }
+        }
+        // A pushed-down subplan may cover several tables, so it names its connection.
+        if name == FEDERATION_EXEC_NAME {
+            if let Some(conn) = Self::federated_connection(plan) {
+                return format!("Scan: {conn}");
             }
         }
 
