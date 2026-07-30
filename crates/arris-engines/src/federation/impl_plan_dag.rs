@@ -154,7 +154,7 @@ impl PlanDag {
     fn label_for_node(plan: &dyn ExecutionPlan) -> String {
         let name = plan.name();
         if name == "FederatedExec" {
-            if let Some(fed) = plan.as_any().downcast_ref::<FederatedExec>() {
+            if let Some(fed) = plan.downcast_ref::<FederatedExec>() {
                 return format!("Scan: {}", fed.source().dotted_name());
             }
         }
@@ -281,7 +281,6 @@ mod tests {
         DisplayAs, DisplayFormatType, PlanProperties, SendableRecordBatchStream,
     };
     use datafusion::execution::TaskContext;
-    use std::any::Any;
     use std::fmt;
 
     fn test_schema() -> SchemaRef {
@@ -301,13 +300,13 @@ mod tests {
         name: &'static str,
         children: Vec<Arc<dyn ExecutionPlan>>,
         schema: SchemaRef,
-        properties: PlanProperties,
+        properties: Arc<PlanProperties>,
     }
 
     impl MockExec {
         fn new(name: &'static str, children: Vec<Arc<dyn ExecutionPlan>>) -> Arc<dyn ExecutionPlan> {
             let schema = test_schema();
-            let properties = test_properties(schema.clone());
+            let properties = Arc::new(test_properties(schema.clone()));
             Arc::new(Self { name, children, schema, properties })
         }
     }
@@ -328,9 +327,6 @@ mod tests {
         fn name(&self) -> &str {
             self.name
         }
-        fn as_any(&self) -> &dyn Any {
-            self
-        }
         fn schema(&self) -> SchemaRef {
             self.schema.clone()
         }
@@ -343,7 +339,7 @@ mod tests {
         fn execute(&self, _partition: usize, _context: Arc<TaskContext>) -> datafusion::error::Result<SendableRecordBatchStream> {
             unimplemented!()
         }
-        fn properties(&self) -> &PlanProperties {
+        fn properties(&self) -> &Arc<PlanProperties> {
             &self.properties
         }
     }

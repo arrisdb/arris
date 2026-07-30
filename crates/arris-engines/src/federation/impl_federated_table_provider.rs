@@ -1,4 +1,3 @@
-use std::any::Any;
 use std::fmt;
 use std::sync::Arc;
 
@@ -85,10 +84,6 @@ impl FederatedTableProvider {
 
 #[async_trait::async_trait]
 impl TableProvider for FederatedTableProvider {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
     fn schema(&self) -> SchemaRef {
         self.schema.clone()
     }
@@ -145,7 +140,7 @@ pub(crate) struct FederatedExec {
     select_columns: Option<Vec<String>>,
     filters: Vec<Expr>,
     limit: Option<usize>,
-    properties: PlanProperties,
+    properties: Arc<PlanProperties>,
     progress: Option<ProgressCallback>,
     node_id_map: Option<NodeIdMap>,
 }
@@ -178,7 +173,7 @@ impl FederatedExec {
             select_columns,
             filters,
             limit,
-            properties,
+            properties: Arc::new(properties),
             progress,
             node_id_map,
         }
@@ -259,10 +254,6 @@ impl fmt::Display for FederatedExec {
 impl ExecutionPlan for FederatedExec {
     fn name(&self) -> &str {
         "FederatedExec"
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self
     }
 
     fn schema(&self) -> SchemaRef {
@@ -351,7 +342,7 @@ impl ExecutionPlan for FederatedExec {
         }
     }
 
-    fn properties(&self) -> &PlanProperties {
+    fn properties(&self) -> &Arc<PlanProperties> {
         &self.properties
     }
 }
