@@ -4,6 +4,7 @@ mod impl_derived_table_aliaser;
 mod impl_driver_sql_executor;
 mod impl_federated_table_provider;
 mod impl_federation_engine;
+mod impl_federation_ref_rewriter;
 mod impl_filter_translator;
 mod impl_metrics_stream;
 mod impl_plan_dag;

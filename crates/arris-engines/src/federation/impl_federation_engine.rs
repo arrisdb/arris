@@ -22,8 +22,10 @@ use datafusion::sql::TableReference;
 use datafusion_federation::sql::{RemoteTableRef, SQLFederationProvider, SQLTableSource};
 use datafusion_federation::{FederatedQueryPlanner, FederatedTableProviderAdaptor};
 
+use super::constants::NO_REFERENCES_FOUND;
 use super::errors::*;
 use super::impl_driver_sql_executor::DriverSqlExecutor;
+use super::impl_federation_ref_rewriter::FederationRefRewriter;
 use super::impl_federated_table_provider::{FederatedExec, FederatedTableProvider, NodeIdMap};
 use super::impl_metrics_stream::{ProgressCallback, ProgressEvent};
 use super::impl_plan_dag::{DagNode, DagNodeStatus, DagNodeType, PlanDag};
@@ -55,12 +57,7 @@ impl FederationEngine {
         cancel_token: Option<&CancellationToken>,
     ) -> Result<QueryResult, FederationError> {
         let start = Instant::now();
-        let refs = Self::parse_federated_refs(sql);
-        if refs.is_empty() {
-            return Err(FederationError::InvalidReference(
-                "no connection.table references found in SQL".into(),
-            ));
-        }
+        let (rewritten, refs) = Self::rewrite(sql)?;
 
         let ctx = Self::create_session_context()?;
 
@@ -71,8 +68,6 @@ impl FederationEngine {
                 .cloned()
                 .collect::<Vec<_>>()
         };
-
-        let mut rewritten = sql.to_string();
 
         for fref in &unique_refs {
             let conn_lower = fref.connection.to_lowercase();
@@ -117,9 +112,6 @@ impl FederationEngine {
 
             ctx.register_table(&alias, provider)
                 .map_err(|e| FederationError::Engine(e.to_string()))?;
-
-            let dotted = fref.dotted_name();
-            rewritten = rewritten.replace(&dotted, &alias);
         }
 
         let df = ctx
@@ -185,12 +177,7 @@ impl FederationEngine {
         progress: ProgressCallback,
     ) -> Result<QueryResult, FederationError> {
         let start = Instant::now();
-        let refs = Self::parse_federated_refs(sql);
-        if refs.is_empty() {
-            return Err(FederationError::InvalidReference(
-                "no connection.table references found in SQL".into(),
-            ));
-        }
+        let (rewritten, refs) = Self::rewrite(sql)?;
 
         let ctx = Self::create_session_context()?;
         let node_id_map: NodeIdMap = Arc::new(Mutex::new(HashMap::new()));
@@ -202,8 +189,6 @@ impl FederationEngine {
                 .cloned()
                 .collect::<Vec<_>>()
         };
-
-        let mut rewritten = sql.to_string();
 
         for fref in &unique_refs {
             let conn_lower = fref.connection.to_lowercase();
@@ -254,9 +239,6 @@ impl FederationEngine {
 
             ctx.register_table(&alias, provider)
                 .map_err(|e| FederationError::Engine(e.to_string()))?;
-
-            let dotted = fref.dotted_name();
-            rewritten = rewritten.replace(&dotted, &alias);
         }
 
         let df = ctx
@@ -382,7 +364,20 @@ impl FederationEngine {
     }
 
     pub fn parse_refs(sql: &str) -> Vec<FederationRef> {
-        Self::parse_federated_refs(sql)
+        FederationRefRewriter::parse(sql).unwrap_or_default()
+    }
+
+    /// Aliases every federated reference and reports the refs, so the caller knows
+    /// which tables to register before handing the query to DataFusion.
+    fn rewrite(sql: &str) -> Result<(String, Vec<FederationRef>), FederationError> {
+        let (rewritten, refs) = FederationRefRewriter::apply(sql)
+            .map_err(|e| FederationError::Engine(e.to_string()))?;
+        if refs.is_empty() {
+            return Err(FederationError::InvalidReference(
+                NO_REFERENCES_FOUND.into(),
+            ));
+        }
+        Ok((rewritten, refs))
     }
 
     pub fn scan_sql(
@@ -674,64 +669,6 @@ impl FederationEngine {
         }
     }
 
-    fn parse_federated_refs(sql: &str) -> Vec<FederationRef> {
-        let chars: Vec<char> = sql.chars().collect();
-        let mut out = Vec::new();
-        let mut i = 0usize;
-
-        while i < chars.len() {
-            // Skip whitespace and commas.
-            while i < chars.len() && (chars[i].is_whitespace() || chars[i] == ',') {
-                i += 1;
-            }
-            if i >= chars.len() {
-                break;
-            }
-            // Read a token.
-            let start = i;
-            while i < chars.len() && !chars[i].is_whitespace() && chars[i] != ',' {
-                i += 1;
-            }
-            let token: String = chars[start..i].iter().collect();
-            let upper = token.to_ascii_uppercase();
-            if upper == "FROM" || upper == "JOIN" {
-                // Skip whitespace.
-                while i < chars.len() && chars[i].is_whitespace() {
-                    i += 1;
-                }
-                // Read dotted identifier.
-                let id_start = i;
-                while i < chars.len()
-                    && (chars[i].is_alphanumeric() || chars[i] == '_' || chars[i] == '.')
-                {
-                    i += 1;
-                }
-                let dotted: String = chars[id_start..i].iter().collect();
-                if let Some(parsed) = Self::parse_dotted(&dotted) {
-                    out.push(parsed);
-                }
-            }
-        }
-
-        out
-    }
-
-    fn parse_dotted(s: &str) -> Option<FederationRef> {
-        let parts: Vec<&str> = s.split('.').collect();
-        match parts.len() {
-            2 => Some(FederationRef {
-                connection: parts[0].to_owned(),
-                schema: None,
-                table: parts[1].to_owned(),
-            }),
-            3 => Some(FederationRef {
-                connection: parts[0].to_owned(),
-                schema: Some(parts[1].to_owned()),
-                table: parts[2].to_owned(),
-            }),
-            _ => None,
-        }
-    }
 }
 
 impl Engine for FederationEngine {
@@ -941,41 +878,7 @@ mod tests {
         _assert(&engine);
     }
 
-    // ---- Parser tests (from parser.rs) ----
-
-    #[test]
-    fn parses_two_part_reference() {
-        let r = FederationEngine::parse_federated_refs("SELECT * FROM pg.users");
-        assert_eq!(r.len(), 1);
-        assert_eq!(r[0].connection, "pg");
-        assert_eq!(r[0].schema, None);
-        assert_eq!(r[0].table, "users");
-    }
-
-    #[test]
-    fn parses_three_part_reference() {
-        let r = FederationEngine::parse_federated_refs("SELECT * FROM pg.public.users");
-        assert_eq!(r.len(), 1);
-        assert_eq!(r[0].connection, "pg");
-        assert_eq!(r[0].schema.as_deref(), Some("public"));
-        assert_eq!(r[0].table, "users");
-    }
-
-    #[test]
-    fn parses_join_clause() {
-        let r = FederationEngine::parse_federated_refs(
-            "SELECT * FROM pg.public.users JOIN mongo.test.events ON pg.public.users.id = mongo.test.events.user_id",
-        );
-        let conns: Vec<&str> = r.iter().map(|x| x.connection.as_str()).collect();
-        assert!(conns.contains(&"pg"));
-        assert!(conns.contains(&"mongo"));
-    }
-
-    #[test]
-    fn ignores_single_part_table_names() {
-        let r = FederationEngine::parse_federated_refs("SELECT * FROM users");
-        assert!(r.is_empty());
-    }
+    // ---- Alias tests ----
 
     #[test]
     fn local_alias_double_underscore_separator() {
@@ -994,9 +897,35 @@ mod tests {
     }
 
     #[test]
-    fn case_insensitive_keywords() {
-        let r = FederationEngine::parse_federated_refs("select * from pg.users join ms.orders on 1=1");
-        assert_eq!(r.len(), 2);
+    fn local_alias_is_a_bare_identifier_for_any_name() {
+        let r = FederationRef {
+            connection: "2 prod-db".into(),
+            schema: None,
+            table: "order items".into(),
+        };
+        let alias = r.local_alias();
+        assert!(alias.starts_with("_2_prod_db__order_items__"), "{alias}");
+        assert!(
+            alias
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '_'),
+            "{alias}"
+        );
+    }
+
+    #[test]
+    fn local_alias_separates_names_that_slug_alike() {
+        let spaced = FederationRef {
+            connection: "my conn".into(),
+            schema: None,
+            table: "t".into(),
+        };
+        let hyphened = FederationRef {
+            connection: "my-conn".into(),
+            schema: None,
+            table: "t".into(),
+        };
+        assert_ne!(spaced.local_alias(), hyphened.local_alias());
     }
 
     // ---- Engine execution tests (from engine.rs) ----
