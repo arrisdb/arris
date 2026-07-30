@@ -1,35 +1,43 @@
 use std::ops::ControlFlow;
 
-use datafusion::sql::sqlparser::ast::{Ident, ObjectName, ObjectNamePart, Statement, VisitMut, VisitorMut};
+use datafusion::sql::sqlparser::ast::{
+    Ident, ObjectName, ObjectNamePart, Statement, VisitMut, VisitorMut,
+};
 use datafusion::sql::sqlparser::dialect::GenericDialect;
 use datafusion::sql::sqlparser::parser::{Parser, ParserError};
 
-use super::constants::STATEMENT_SEPARATOR;
+use super::constants::{IDENT_QUOTE, STATEMENT_SEPARATOR};
 use super::types::FederationRef;
 
-/// Swaps every `connection.table` / `connection.schema.table` relation for the
-/// bare alias its provider is registered under, reporting the refs it replaced.
+/// Collapses every `connection.table` / `connection.schema.table` relation into
+/// one quoted identifier, the name its provider is registered under.
 pub(super) struct FederationRefRewriter {
     refs: Vec<FederationRef>,
 }
 
 impl FederationRefRewriter {
     pub(super) fn apply(sql: &str) -> Result<(String, Vec<FederationRef>), ParserError> {
-        let mut statements = Parser::parse_sql(&GenericDialect {}, sql)?;
-        let mut rewriter = Self { refs: Vec::new() };
-        for statement in &mut statements {
-            let _ = statement.visit(&mut rewriter);
-        }
+        let (statements, refs) = Self::visit(sql)?;
         let rewritten = statements
             .iter()
             .map(Statement::to_string)
             .collect::<Vec<_>>()
             .join(STATEMENT_SEPARATOR);
-        Ok((rewritten, rewriter.refs))
+        Ok((rewritten, refs))
     }
 
+    /// Skips rendering: callers that only want the refs pay for the parse alone.
     pub(super) fn parse(sql: &str) -> Result<Vec<FederationRef>, ParserError> {
-        Self::apply(sql).map(|(_, refs)| refs)
+        Self::visit(sql).map(|(_, refs)| refs)
+    }
+
+    fn visit(sql: &str) -> Result<(Vec<Statement>, Vec<FederationRef>), ParserError> {
+        let mut statements = Parser::parse_sql(&GenericDialect {}, sql)?;
+        let mut rewriter = Self { refs: Vec::new() };
+        for statement in &mut statements {
+            let _ = statement.visit(&mut rewriter);
+        }
+        Ok((statements, rewriter.refs))
     }
 
     /// Quoting is the parser's job, so `Ident::value` is already the raw name.
@@ -62,7 +70,7 @@ impl VisitorMut for FederationRefRewriter {
         let Some(reference) = Self::to_ref(relation) else {
             return ControlFlow::Continue(());
         };
-        *relation = ObjectName::from(Ident::new(reference.local_alias()));
+        *relation = ObjectName::from(Ident::with_quote(IDENT_QUOTE, reference.dotted_name()));
         self.refs.push(reference);
         ControlFlow::Continue(())
     }
@@ -165,10 +173,11 @@ mod tests {
     }
 
     #[test]
-    fn rewrites_a_quoted_reference_to_a_bare_alias() {
-        let out = rewrite("SELECT * FROM `my conn`.public.users");
-        assert!(!out.contains('`'), "{out}");
-        assert!(out.starts_with("SELECT * FROM my_conn__public__users__"), "{out}");
+    fn collapses_a_reference_into_one_quoted_identifier() {
+        assert_eq!(
+            rewrite("SELECT * FROM `my conn`.public.users"),
+            "SELECT * FROM `my conn.public.users`"
+        );
     }
 
     #[test]
@@ -181,8 +190,8 @@ mod tests {
     #[test]
     fn leaves_a_matching_string_literal_untouched() {
         let out = rewrite("SELECT 'pg.users' AS note FROM pg.users");
-        assert!(out.contains("'pg.users'"));
-        assert!(out.contains("FROM pg__users"));
+        assert!(out.contains("'pg.users'"), "{out}");
+        assert!(out.contains("FROM `pg.users`"), "{out}");
     }
 
     #[test]

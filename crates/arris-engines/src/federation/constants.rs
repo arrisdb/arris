@@ -11,11 +11,9 @@ pub(super) const EXECUTOR_CATALOG_UNSUPPORTED: &str =
 /// Separates the segments of a federated ref (`connection.schema.table`).
 pub(super) const REF_SEPARATOR: char = '.';
 
-/// What a name's non-identifier chars collapse to in the local alias.
-pub(super) const IDENT_UNDERSCORE: char = '_';
-
-/// Joins a ref's segments into the table name it is registered under.
-pub(super) const ALIAS_SEPARATOR: &str = "__";
+/// Quotes a rewritten relation, so a registered name holding a space or dot
+/// survives the trip back through the SQL parser.
+pub(super) const IDENT_QUOTE: char = '`';
 
 /// Rejoins the rendered statements of a multi-statement query.
 pub(super) const STATEMENT_SEPARATOR: &str = "; ";

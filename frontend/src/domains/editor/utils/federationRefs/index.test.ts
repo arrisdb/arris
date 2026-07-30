@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   federationRefKey,
+  findFederationSegments,
   quoteFederationSegment,
   splitFederationRef,
   unquoteFederationSegment,
@@ -59,6 +60,22 @@ describe("splitFederationRef", () => {
 
   it("does not split on a dot inside a doubled-backtick name", () => {
     expect(splitFederationRef("`we``ird.name`.t")).toEqual(["`we``ird.name`", "t"]);
+  });
+});
+
+describe("findFederationSegments", () => {
+  it("reports each segment with the range it occupies", () => {
+    const doc = "FROM `my conn`.users";
+    expect(findFederationSegments(doc)).toEqual([
+      { value: "FROM", from: 0, to: 4 },
+      { value: "`my conn`", from: 5, to: 14 },
+      { value: "users", from: 15, to: 20 },
+    ]);
+  });
+
+  it("does not leak regex state between calls", () => {
+    const doc = "`my conn`.users";
+    expect(findFederationSegments(doc)).toEqual(findFederationSegments(doc));
   });
 });
 

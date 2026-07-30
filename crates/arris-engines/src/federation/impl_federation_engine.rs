@@ -105,12 +105,11 @@ impl FederationEngine {
 
             let schema = FederatedExec::infer_schema_from_result(&probe);
 
-            let alias = fref.local_alias();
             let provider =
                 FederatedTableProvider::new(schema.clone(), adapter.clone(), fref.clone());
             let provider = Self::table_provider_for(adapter, fref, schema, provider, None);
 
-            ctx.register_table(&alias, provider)
+            ctx.register_table(TableReference::bare(fref.dotted_name()), provider)
                 .map_err(|e| FederationError::Engine(e.to_string()))?;
         }
 
@@ -225,7 +224,6 @@ impl FederationEngine {
             })?;
 
             let schema = FederatedExec::infer_schema_from_result(&probe);
-            let alias = fref.local_alias();
             let provider =
                 FederatedTableProvider::new(schema.clone(), adapter.clone(), fref.clone())
                     .with_progress(progress.clone(), node_id_map.clone());
@@ -237,7 +235,7 @@ impl FederationEngine {
                 Some((progress.clone(), node_id_map.clone())),
             );
 
-            ctx.register_table(&alias, provider)
+            ctx.register_table(TableReference::bare(fref.dotted_name()), provider)
                 .map_err(|e| FederationError::Engine(e.to_string()))?;
         }
 
@@ -878,54 +876,20 @@ mod tests {
         _assert(&engine);
     }
 
-    // ---- Alias tests ----
-
     #[test]
-    fn local_alias_double_underscore_separator() {
+    fn dotted_name_joins_the_segments_verbatim() {
         let r = FederationRef {
-            connection: "pg".into(),
+            connection: "my prod-db".into(),
             schema: Some("public".into()),
-            table: "users".into(),
+            table: "order items".into(),
         };
-        assert_eq!(r.local_alias(), "pg__public__users");
+        assert_eq!(r.dotted_name(), "my prod-db.public.order items");
         let r2 = FederationRef {
             connection: "mongo".into(),
             schema: None,
             table: "events".into(),
         };
-        assert_eq!(r2.local_alias(), "mongo__events");
-    }
-
-    #[test]
-    fn local_alias_is_a_bare_identifier_for_any_name() {
-        let r = FederationRef {
-            connection: "2 prod-db".into(),
-            schema: None,
-            table: "order items".into(),
-        };
-        let alias = r.local_alias();
-        assert!(alias.starts_with("_2_prod_db__order_items__"), "{alias}");
-        assert!(
-            alias
-                .chars()
-                .all(|c| c.is_ascii_alphanumeric() || c == '_'),
-            "{alias}"
-        );
-    }
-
-    #[test]
-    fn local_alias_separates_names_that_slug_alike() {
-        let spaced = FederationRef {
-            connection: "my conn".into(),
-            schema: None,
-            table: "t".into(),
-        };
-        let hyphened = FederationRef {
-            connection: "my-conn".into(),
-            schema: None,
-            table: "t".into(),
-        };
-        assert_ne!(spaced.local_alias(), hyphened.local_alias());
+        assert_eq!(r2.dotted_name(), "mongo.events");
     }
 
     // ---- Engine execution tests (from engine.rs) ----

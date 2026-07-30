@@ -1,4 +1,5 @@
-import { BARE_SEGMENT_RE, QUOTE, SEGMENT_SEPARATOR } from "./constants";
+import { BARE_SEGMENT_RE, QUOTE, SEGMENT_SEPARATOR, SEGMENT_TOKEN_RE } from "./constants";
+import type { FederationSegment } from "./types";
 
 // Backticks a segment the SQL parser would otherwise choke on, doubling any it holds.
 function quoteFederationSegment(name: string): string {
@@ -15,33 +16,19 @@ function unquoteFederationSegment(segment: string): string {
   return segment.slice(1, -1).split(QUOTE + QUOTE).join(QUOTE);
 }
 
-// Splits on dots outside backticks, keeping each segment exactly as written, so a
-// quoted name holding a dot stays one segment.
+// Segments as written, quotes kept, so a quoted name holding a dot stays one segment.
 function splitFederationRef(ref: string): string[] {
-  const segments: string[] = [];
-  let current = "";
-  let quoted = false;
-  for (let i = 0; i < ref.length; i++) {
-    const ch = ref[i];
-    if (ch === QUOTE) {
-      if (quoted && ref[i + 1] === QUOTE) {
-        current += QUOTE + QUOTE;
-        i++;
-        continue;
-      }
-      quoted = !quoted;
-      current += ch;
-      continue;
-    }
-    if (ch === SEGMENT_SEPARATOR && !quoted) {
-      segments.push(current);
-      current = "";
-      continue;
-    }
-    current += ch;
-  }
-  segments.push(current);
-  return segments;
+  return [...ref.matchAll(SEGMENT_TOKEN_RE)].map((m) => m[0]);
+}
+
+// Every segment in free text, with its range. `matchAll` clones the regex, so the
+// shared `lastIndex` never leaks between callers.
+function findFederationSegments(text: string): FederationSegment[] {
+  return [...text.matchAll(SEGMENT_TOKEN_RE)].map((m) => ({
+    value: m[0],
+    from: m.index,
+    to: m.index + m[0].length,
+  }));
 }
 
 function federationRefKey(segments: string[]): string {
@@ -50,8 +37,13 @@ function federationRefKey(segments: string[]): string {
 
 export {
   federationRefKey,
+  findFederationSegments,
   isQuotedSegment,
   quoteFederationSegment,
   splitFederationRef,
   unquoteFederationSegment,
+};
+
+export type {
+  FederationSegment,
 };
