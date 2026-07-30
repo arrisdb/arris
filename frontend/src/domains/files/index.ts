@@ -1,3 +1,4 @@
+import { lazy } from "react";
 import { registerPane } from "@shared";
 import { registerTabView } from "@shared";
 import type { EditorTab } from "@shell/types";
@@ -6,8 +7,11 @@ import { FileSearchPopover } from "./components/FileSearchPopover";
 import { FileTreeView } from "./components/FileTreeView";
 import { EmptyProjectPane } from "./components/EmptyProjectPane";
 import { ProjectFilesPane } from "./components/ProjectFilesPane";
-import { MediaView } from "./components/MediaView";
 import { fileKindForName, findProjectRoot, openPickedFile } from "./components/FileTreeView/utils";
+
+const MediaView = lazy(() =>
+  import("./components/MediaView").then((m) => ({ default: m.MediaView })),
+);
 
 function registerFilesPane(): void {
   registerPane({

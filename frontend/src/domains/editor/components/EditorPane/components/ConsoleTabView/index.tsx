@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { Suspense, useMemo } from "react";
 import { IconButton, SectionedSelect, Select, Tooltip } from "@shared/ui";
 import { ContextMenu } from "@shared/ui/ContextMenu";
 import { DatabaseKindIcon } from "@domains/connection";
@@ -533,7 +533,9 @@ function ConsoleTabView({
             <>
               <div className="mdbc-pane-sep" />
               <div className="mdbc-tab-content">
-                <LineageContainer onClose={() => setShowLineage(() => false)} />
+                <Suspense fallback={null}>
+                  <LineageContainer onClose={() => setShowLineage(() => false)} />
+                </Suspense>
               </div>
             </>
           )}

@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { useTabView } from "@shared";
 import { CsvTableView } from "../CsvTableView";
 import { ConsoleTabView } from "../ConsoleTabView";
@@ -20,7 +21,12 @@ function EditorTabRouter({
 
   if (registered) {
     const RegisteredView = registered.Component;
-    const element = <RegisteredView activeTab={activeTab} />;
+    // Contributions are code-split; a null fallback avoids a spinner flash.
+    const element = (
+      <Suspense fallback={null}>
+        <RegisteredView activeTab={activeTab} />
+      </Suspense>
+    );
     return registered.wrap === false
       ? element
       : <div className="mdbc-tab-content">{element}</div>;

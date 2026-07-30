@@ -201,6 +201,40 @@ describe("App bootstrapping — no welcome screen flash", () => {
     expect(screen.queryByTestId("welcome-screen")).toBeNull();
   });
 
+  it("paints the loading screen while the reopened project is still opening", async () => {
+    // Regression: bootstrap used to await the whole project open, leaving the
+    // window blank for its full duration instead of showing the loading screen.
+    useRecentsStore.setState({
+      recents: [{ path: "/proj/shop", name: "shop", kind: "folder", openedAt: Date.now() }],
+    });
+    let resolveOpen: (result: unknown) => void = () => {};
+    vi.mocked(openProjectIPC).mockImplementationOnce(
+      () => new Promise((resolve) => { resolveOpen = resolve; }) as never,
+    );
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("project-loading-screen")).toBeTruthy();
+    });
+    expect(screen.queryByTestId("welcome-screen")).toBeNull();
+    expect(screen.queryByTestId("content-view")).toBeNull();
+
+    await act(async () => {
+      resolveOpen({
+        root: "/proj/shop",
+        connections: [],
+        tabs: [],
+        federationTabs: [],
+        paneLayout: { layout: null, focusedPaneGroupId: null },
+      });
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("content-view")).toBeTruthy();
+    });
+  });
+
   it("opens the launch path once under StrictMode, never falling back to reopen-last", async () => {
     // Regression: StrictMode double-invokes the bootstrap effect. The launch
     // path is consume-once, so a second run would see null and wrongly reopen

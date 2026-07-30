@@ -3,11 +3,16 @@ import { registerTabView } from "@shared";
 import { listenAppEventIPC } from "@shell/ipc";
 import type { EditorTab } from "@shell/types";
 
-import { CanvasView } from "./components/CanvasView";
+import { lazy } from "react";
 import { CanvasSection } from "./components/CanvasSection";
 import { CANVAS_CELL_INGESTED_EVENT } from "./constants";
 import { useCanvasStore } from "./hooks";
 import type { CellIngestedEvent } from "./types";
+
+// reactflow is heavy; keep it out of the startup bundle.
+const CanvasView = lazy(() =>
+  import("./components/CanvasView").then((m) => ({ default: m.CanvasView })),
+);
 
 /// Register the canvas thinkboard tab view so a tab with `tabType: "canvas"`
 /// renders the board. Called once at app startup from the shell.

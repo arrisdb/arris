@@ -182,6 +182,25 @@ describe("useProjectStore — openProject", () => {
     expect(useProjectStore.getState().activeProjectPath).toBeNull();
   });
 
+  it("opens the workspace before the folder tree resolves", async () => {
+    useFilesStore.getState().clear();
+    let resolveTree: (tree: unknown) => void = () => {};
+    vi.mocked(listFolderTreeIPC).mockImplementationOnce(
+      () => new Promise((resolve) => { resolveTree = resolve; }) as never,
+    );
+
+    const open = useProjectStore.getState().openProject("/projects/myapp");
+    await vi.waitFor(() => {
+      expect(useProjectStore.getState().activeProjectPath).toBe("/projects/myapp");
+    });
+    expect(useProjectStore.getState().loading).toBe(false);
+    expect(useFilesStore.getState().rootPath).toBeNull();
+
+    resolveTree(mockTree);
+    await open;
+    expect(useFilesStore.getState().rootPath).toBe("/projects/myapp");
+  });
+
   it("still sets activeProjectPath if listFolderTree fails", async () => {
     vi.mocked(listFolderTreeIPC).mockRejectedValue(new Error("no fs"));
     await useProjectStore.getState().openProject("/projects/myapp");

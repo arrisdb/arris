@@ -57,17 +57,28 @@ const useProjectStore = create<ProjectState>((set) => ({
       usePinnedQueriesStore.getState().hydrate().catch(() => {});
       useRunHistoryStore.getState().hydrate().catch(() => {});
 
-      // Load file tree (non-blocking side effects fire after)
+      const name = path.split("/").pop() || path;
+      useRecentsStore.getState().add({
+        path,
+        name,
+        kind: "folder",
+        openedAt: Date.now(),
+      });
+
+      // Show the workspace before the file tree lands: the walk shells out to
+      // git check-ignore and would otherwise hold the whole open on screen.
+      set({ activeProjectPath: path, loading: false });
+
+      // Neither needs the tree, so start them alongside the walk, not after it.
+      openFileIndexIPC(path).catch(() => {});
+      useGitStore.getState().refreshFromRepo(path).catch(() => {});
+
       const tree = await listFolderTreeIPC(
         path,
         useSettingsStore.getState().fileTreeSkipDirs,
       ).catch(() => null);
       if (tree) {
         useFilesStore.getState().setTree(path, tree);
-
-        // Fire-and-forget
-        openFileIndexIPC(path).catch(() => {});
-        useGitStore.getState().refreshFromRepo(path).catch(() => {});
 
         // Discover ALL dbt/sqlmesh project roots so multi-project workspaces
         // expose every project in the pane dropdown; the first is loaded active.
@@ -83,17 +94,6 @@ const useProjectStore = create<ProjectState>((set) => ({
           useSqlMeshStore.getState().loadFromPath(sqlMeshRoots[0]).catch(() => {});
         }
       }
-
-      // Track in recents
-      const name = path.split("/").pop() || path;
-      useRecentsStore.getState().add({
-        path,
-        name,
-        kind: "folder",
-        openedAt: Date.now(),
-      });
-
-      set({ activeProjectPath: path, loading: false });
     } catch (e) {
       set({ loading: false });
       throw e;
