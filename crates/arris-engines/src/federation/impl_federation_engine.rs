@@ -948,6 +948,40 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn select_from_a_backtick_quoted_connection_name() {
+        let mut adapters: HashMap<String, Arc<dyn ScanAdapter>> = HashMap::new();
+        adapters.insert("my prod-db".into(), Arc::new(MockAdapter::new(users_result())));
+
+        let engine = FederationEngine::new(adapters);
+        let result = engine
+            .execute("SELECT * FROM `my prod-db`.public.users")
+            .await
+            .unwrap();
+
+        assert_eq!(result.rows.len(), 2);
+        assert_eq!(result.columns[0].name, "id");
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn joins_two_connections_whose_names_slug_alike() {
+        let mut adapters: HashMap<String, Arc<dyn ScanAdapter>> = HashMap::new();
+        adapters.insert("my db".into(), Arc::new(MockAdapter::new(users_result())));
+        adapters.insert("my-db".into(), Arc::new(MockAdapter::new(orders_result())));
+
+        let engine = FederationEngine::new(adapters);
+        let result = engine
+            .execute(
+                "SELECT u.name, o.total FROM `my db`.public.users u \
+                 JOIN `my-db`.mydb.orders o ON u.id = o.user_id ORDER BY o.total DESC",
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(result.columns.len(), 2);
+        assert!(!result.rows.is_empty());
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn cross_source_join() {
         let mut adapters: HashMap<String, Arc<dyn ScanAdapter>> = HashMap::new();
         adapters.insert("pg".into(), Arc::new(MockAdapter::new(users_result())));
