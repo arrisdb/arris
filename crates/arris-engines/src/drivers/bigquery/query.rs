@@ -8,7 +8,7 @@ use gcp_bigquery_client::model::query_response::QueryResponse;
 use gcp_bigquery_client::model::table_cell::TableCell;
 use gcp_bigquery_client::model::table_row::TableRow;
 
-use super::constants::{BQ_JOB_POLL_INTERVAL_MS, BQ_STREAM_PAGE_ROWS};
+use super::constants::{BQ_FIRST_PAGE_ROWS, BQ_JOB_POLL_INTERVAL_MS, BQ_STREAM_PAGE_ROWS};
 use super::driver::build_query_request;
 use crate::drivers::common::RowChunkPump;
 use crate::drivers::errors::{DriverError, Result};
@@ -167,7 +167,7 @@ pub(super) async fn stream_query(
     text: String,
 ) -> Result<RowChunkStream> {
     let mut req = build_query_request(&text, location.as_deref());
-    req.max_results = Some(BQ_STREAM_PAGE_ROWS);
+    req.max_results = Some(BQ_FIRST_PAGE_ROWS);
     let resp = client
         .job()
         .query(&project, req)
@@ -301,6 +301,14 @@ mod tests {
             row_to_values(&row, 3),
             vec![QueryValue::Int(7), QueryValue::Null, QueryValue::Bool(true)]
         );
+    }
+
+    #[test]
+    fn follow_up_pages_are_larger_than_the_first() {
+        // The opening page trades throughput for time-to-first-row; every page
+        // after it optimizes for fewer round trips.
+        assert!(BQ_FIRST_PAGE_ROWS > 0);
+        assert!(BQ_STREAM_PAGE_ROWS > BQ_FIRST_PAGE_ROWS);
     }
 
     #[test]

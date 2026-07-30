@@ -1,13 +1,16 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use futures::StreamExt;
 
 use crate::DatabaseDriver;
-use crate::{DatabaseKind, DriverError, QueryLanguage, QueryResult};
 use crate::drivers::errors::Result;
+use crate::drivers::types::{QueryStream, RowChunkStream};
+use crate::{DatabaseKind, DriverError, QueryLanguage, QueryResult};
 
 use super::FederationEngine;
 use super::FederationRef;
+use super::constants::ARROW_SCAN_UNSUPPORTED;
 
 #[async_trait]
 pub trait ScanAdapter: Send + Sync {
@@ -31,17 +34,36 @@ impl DriverScanAdapter {
     pub fn new(driver: Arc<dyn DatabaseDriver>, kind: DatabaseKind) -> Self {
         Self { driver, kind }
     }
+
+    /// A driver's `run_query` may return only the source's first result page
+    /// (BigQuery does), which silently truncates a scan, so scans drain the
+    /// streamed variant instead and keep every chunk.
+    pub(super) async fn collect_stream(stream: QueryStream) -> Result<QueryResult> {
+        let QueryStream::Rows(RowChunkStream { columns, mut chunks }) = stream else {
+            return Err(DriverError::QueryFailed(ARROW_SCAN_UNSUPPORTED.to_owned()));
+        };
+        let mut rows = Vec::new();
+        while let Some(chunk) = chunks.next().await {
+            rows.extend(chunk?);
+        }
+        Ok(QueryResult::new(columns, rows))
+    }
+
+    async fn scan_all_pages(&self, sql: &str) -> Result<QueryResult> {
+        let stream = self.driver.run_query_stream(sql, &[], QueryLanguage::Sql).await?;
+        Self::collect_stream(stream).await
+    }
 }
 
 #[async_trait]
 impl ScanAdapter for DriverScanAdapter {
     async fn scan(&self, source: &FederationRef) -> Result<QueryResult> {
         let sql = FederationEngine::scan_sql(self.kind, source)?;
-        self.driver.run_query(&sql, &[], QueryLanguage::Sql).await
+        self.scan_all_pages(&sql).await
     }
 
     async fn scan_with_sql(&self, sql: &str) -> Result<QueryResult> {
-        self.driver.run_query(sql, &[], QueryLanguage::Sql).await
+        self.scan_all_pages(sql).await
     }
 
     fn database_kind(&self) -> DatabaseKind {
@@ -193,6 +215,61 @@ impl ScanSql {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use crate::{ColumnSpec, QueryValue};
+    use futures::stream;
+
+    fn int_chunk(values: &[i64]) -> Vec<Vec<QueryValue>> {
+        values.iter().map(|v| vec![QueryValue::Int(*v)]).collect()
+    }
+
+    fn row_stream(
+        chunks: Vec<std::result::Result<Vec<Vec<QueryValue>>, DriverError>>,
+    ) -> QueryStream {
+        QueryStream::Rows(RowChunkStream {
+            columns: vec![ColumnSpec::new("pk", "INT64")],
+            chunks: stream::iter(chunks).boxed(),
+        })
+    }
+
+    #[tokio::test]
+    async fn collect_stream_keeps_every_chunk() {
+        let stream = row_stream(vec![
+            Ok(int_chunk(&[1, 2])),
+            Ok(int_chunk(&[3])),
+            Ok(int_chunk(&[4, 5])),
+        ]);
+        let result = DriverScanAdapter::collect_stream(stream).await.unwrap();
+        assert_eq!(result.columns.len(), 1);
+        assert_eq!(result.columns[0].name, "pk");
+        assert_eq!(result.rows, int_chunk(&[1, 2, 3, 4, 5]));
+    }
+
+    #[tokio::test]
+    async fn collect_stream_handles_empty_result() {
+        let result = DriverScanAdapter::collect_stream(row_stream(vec![]))
+            .await
+            .unwrap();
+        assert!(result.rows.is_empty());
+        assert_eq!(result.columns.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn collect_stream_propagates_chunk_error() {
+        let stream = row_stream(vec![
+            Ok(int_chunk(&[1])),
+            Err(DriverError::QueryFailed("page 2 failed".into())),
+        ]);
+        let err = DriverScanAdapter::collect_stream(stream).await.unwrap_err();
+        assert!(err.to_string().contains("page 2 failed"));
+    }
+
+    #[tokio::test]
+    async fn collect_stream_rejects_arrow_streams() {
+        let stream = QueryStream::Arrow(stream::empty().boxed());
+        let err = DriverScanAdapter::collect_stream(stream).await.unwrap_err();
+        assert!(err.to_string().contains(ARROW_SCAN_UNSUPPORTED));
+    }
 
     fn source(schema: Option<&str>, table: &str) -> FederationRef {
         FederationRef {
