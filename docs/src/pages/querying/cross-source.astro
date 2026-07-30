@@ -75,6 +75,15 @@ import Screenshot from "../../components/docs/Screenshot/Screenshot.astro";
     tables and columns.
   </p>
 
+  <p>
+    Wrap any segment whose name is not a plain identifier in backticks: a name holding a space,
+    a hyphen, a dot, or any other character outside letters, digits, and <code>_</code>, or one
+    starting with a digit. So a connection named <strong>Prod DB (EU)</strong> is written
+    <code>`Prod DB (EU)`.public.orders</code>, and each segment is quoted independently, as in
+    <code>`prod-db`.`sales.eu`.`order items`</code>. A literal backtick inside a name is doubled.
+    Autocomplete inserts the quotes for you.
+  </p>
+
   <Screenshot
     src="/screenshots/cross-source-query.png"
     alt="The Arris editor with the DataFusion toggle on and All Connections selected, running a cross-source query that joins a Postgres customers table with a MongoDB orders collection, results shown below"
