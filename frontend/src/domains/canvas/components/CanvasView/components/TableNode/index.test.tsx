@@ -143,7 +143,25 @@ describe("TableNode", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Next page" }));
     await waitFor(() =>
-      expect(fetchCanvasCellPageIPC).toHaveBeenCalledWith(TAB, "sales", 2, 2),
+      expect(fetchCanvasCellPageIPC).toHaveBeenCalledWith(TAB, "q", 2, 2),
+    );
+  });
+
+  it("pages a source query that has no title", async () => {
+    useCanvasStore.setState({ boards: {} });
+    useCanvasStore.getState().ensureBoard(TAB, "");
+    useCanvasStore.getState().addComponent(TAB, makeComponent({ kind: "query", id: "q" }));
+    useCanvasStore.getState().addComponent(
+      TAB,
+      makeComponent({ kind: "table", id: "tbl", sourceQueryId: "q", previewRows: 2 }),
+    );
+    useCanvasStore.getState().setRun(TAB, "q", { result: manyRows(2), totalRows: 5 });
+    vi.mocked(fetchCanvasCellPageIPC).mockResolvedValueOnce(manyRows(2));
+    renderNode("tbl");
+
+    fireEvent.click(screen.getByRole("button", { name: "Next page" }));
+    await waitFor(() =>
+      expect(fetchCanvasCellPageIPC).toHaveBeenCalledWith(TAB, "q", 2, 2),
     );
   });
 
@@ -241,7 +259,7 @@ describe("TableNode", () => {
     // Destination picked before any fetch, then the full result is paged in.
     await waitFor(() => expect(vi.mocked(pickExportPath)).toHaveBeenCalled());
     await waitFor(() =>
-      expect(fetchCanvasCellPageIPC).toHaveBeenCalledWith(TAB, "sales", 0, DOWNLOAD_CHUNK_ROWS),
+      expect(fetchCanvasCellPageIPC).toHaveBeenCalledWith(TAB, "q", 0, DOWNLOAD_CHUNK_ROWS),
     );
     await waitFor(() => expect(vi.mocked(writeExport)).toHaveBeenCalled());
     expect(vi.mocked(writeExport).mock.calls[0][2]).toHaveLength(5);

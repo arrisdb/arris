@@ -17,6 +17,7 @@
 //!   are wrapped in `CAST(... AS SIGNED)` to read them as integers.
 //! - MySQL has no boolean type: comparisons yield `1`/`0` integers.
 
+use std::collections::HashMap;
 use arris_engines::{
     CanvasEngine, CanvasError, ConnectionConfig, DatabaseDriver, DatabaseKind,
     ExplainMode, IsolationLevel, ObjectRef, QueryEngine, QueryLanguage, QueryResult, QueryValue,
@@ -1146,7 +1147,7 @@ async fn streaming_ingests_100k_rows_with_exact_totals_and_page() {
 
     // A chained cell aggregates the FULL cached result, not the 500-row page.
     let agg = engine
-        .run_cell(BOARD, "sums", "SELECT COUNT(*) AS c, SUM(n) AS s FROM big")
+        .run_cell(BOARD, "sums", "SELECT COUNT(*) AS c, SUM(n) AS s FROM big", &HashMap::new())
         .await
         .expect("chained aggregate");
     assert_eq!(agg.result.rows[0][0], QueryValue::Int(100_000));
@@ -1181,7 +1182,7 @@ async fn streaming_cancel_mid_stream_registers_no_cache_entry() {
     driver.cancel_running_query().await.expect("mysql cancel request");
 
     // The aborted cell was never registered, so downstream cannot read it.
-    let chained = engine.run_cell(BOARD, "agg", "SELECT COUNT(*) FROM huge").await;
+    let chained = engine.run_cell(BOARD, "agg", "SELECT COUNT(*) FROM huge", &HashMap::new()).await;
     assert!(chained.is_err(), "cancelled cell must not be queryable");
 }
 
@@ -1208,7 +1209,7 @@ async fn streaming_byte_budget_truncates_and_reports_incomplete() {
 
     // The cached prefix stays queryable and matches the reported total.
     let agg = engine
-        .run_cell(BOARD, "agg", "SELECT COUNT(*) AS c FROM capped")
+        .run_cell(BOARD, "agg", "SELECT COUNT(*) AS c FROM capped", &HashMap::new())
         .await
         .expect("chained count");
     assert_eq!(agg.result.rows[0][0], QueryValue::Int(out.total_rows as i64));

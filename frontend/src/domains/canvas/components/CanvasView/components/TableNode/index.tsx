@@ -15,7 +15,6 @@ import {
 import type { ExportFormat, ResultSortClause, SelectedCell } from "@domains/results";
 
 import { useCanvasStore } from "../../../../hooks";
-import { sanitizeCellTitle } from "../../../../utils";
 import { fetchCanvasCellPageIPC } from "../../../../ipc";
 import type { CanvasNodeData } from "../../types";
 import { CanvasResizer } from "../CanvasResizer";
@@ -43,8 +42,6 @@ function TableNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
   const sourceId = component?.kind === "table" ? component.sourceQueryId : null;
   const source = sourceId ? board?.doc.components.find((c) => c.id === sourceId) : undefined;
   const sourceRun = sourceId ? board?.runs[sourceId] : undefined;
-  const sourceTitle =
-    source?.kind === "query" && source.title ? sanitizeCellTitle(source.title) : undefined;
   // Display name of the bound query, shown as the cell header.
   const sourceName = source?.kind === "query" ? source.title || source.id : undefined;
   const pageSize = (component?.kind === "table" && component.previewRows) || TABLE_PAGE_ROWS;
@@ -116,8 +113,8 @@ function TableNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
 
   const goto = useCallback(
     (next: number) => {
-      if (!sourceTitle) return;
-      fetchCanvasCellPageIPC(tabId, sourceTitle, next, pageSize)
+      if (!sourceId) return;
+      fetchCanvasCellPageIPC(tabId, sourceId, next, pageSize)
         .then((result) => {
           if (!result) return;
           setOffset(next);
@@ -126,7 +123,7 @@ function TableNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
         })
         .catch(() => {});
     },
-    [tabId, sourceTitle, pageSize],
+    [tabId, sourceId, pageSize],
   );
 
   if (!component || component.kind !== "table") return null;
@@ -167,7 +164,7 @@ function TableNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
     // right away rather than after the rows are gathered.
     const path = await pickExportPath(format);
     if (!path) return;
-    if (!sourceTitle) {
+    if (!sourceId) {
       await writeExport(path, page.columns, page.rows, format);
       return;
     }
@@ -182,7 +179,7 @@ function TableNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
       let columns = page.columns;
       for (let offset = 0; offset < target; offset += DOWNLOAD_CHUNK_ROWS) {
         if (exportCancelledRef.current) return;
-        const chunk = await fetchCanvasCellPageIPC(tabId, sourceTitle, offset, DOWNLOAD_CHUNK_ROWS);
+        const chunk = await fetchCanvasCellPageIPC(tabId, sourceId, offset, DOWNLOAD_CHUNK_ROWS);
         if (!chunk || chunk.rows.length === 0) break;
         columns = chunk.columns;
         rows.push(...chunk.rows);

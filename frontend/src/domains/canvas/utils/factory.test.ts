@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { DEFAULT_SIZE } from "../constants";
-import { makeComponent, makeEdge } from "./factory";
+import { makeComponent, makeEdge, nextQueryTitle } from "./factory";
 
 describe("makeComponent", () => {
   it("builds a text object with default size at the origin", () => {
@@ -66,5 +66,29 @@ describe("makeEdge", () => {
     const e = makeEdge("a", "b");
     expect(e.id).toBeTruthy();
     expect(e).toMatchObject({ source: "a", target: "b" });
+  });
+});
+
+describe("nextQueryTitle", () => {
+  it("starts at Query 1 on an empty board", () => {
+    expect(nextQueryTitle([])).toBe("Query 1");
+  });
+
+  it("skips titles already taken by query cells", () => {
+    const cells = [
+      makeComponent({ kind: "query", id: "a", title: "Query 1" }),
+      makeComponent({ kind: "query", id: "b", title: "Query 2" }),
+    ];
+    expect(nextQueryTitle(cells)).toBe("Query 3");
+  });
+
+  it("fills a gap left by a deleted cell", () => {
+    const cells = [makeComponent({ kind: "query", id: "b", title: "Query 2" })];
+    expect(nextQueryTitle(cells)).toBe("Query 1");
+  });
+
+  it("ignores non-query objects with the same title", () => {
+    const cells = [makeComponent({ kind: "table", id: "t", title: "Query 1" })];
+    expect(nextQueryTitle(cells)).toBe("Query 1");
   });
 });

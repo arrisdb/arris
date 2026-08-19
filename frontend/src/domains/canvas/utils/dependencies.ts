@@ -1,13 +1,13 @@
+import { CELL_IDENT_FALLBACK } from "../constants";
 import type { CanvasComponent, CanvasEdge, QueryComponent } from "../types";
 import { makeEdge } from "./factory";
 
-/// Turn a cell title into the SQL-safe identifier a downstream cell references.
-/// MUST match the backend `CanvasEngine::sanitize_title`: lowercased, every run of
-/// non-alphanumerics collapsed to one underscore, trimmed, digit-prefixed.
-function sanitizeCellTitle(title: string): string {
+/// MUST match the backend `CanvasEngine::sanitize_ident`: lowercased, every run
+/// of non-alphanumerics collapsed to one underscore, trimmed, digit-prefixed.
+function sanitizeIdent(value: string): string {
   let out = "";
   let prevUnderscore = false;
-  for (const ch of title) {
+  for (const ch of value) {
     if (/[A-Za-z0-9]/.test(ch)) {
       out += ch.toLowerCase();
       prevUnderscore = false;
@@ -17,9 +17,21 @@ function sanitizeCellTitle(title: string): string {
     }
   }
   const trimmed = out.replace(/^_+|_+$/g, "");
-  if (trimmed === "") return "cell";
+  if (trimmed === "") return CELL_IDENT_FALLBACK;
   if (/^[0-9]/.test(trimmed)) return `_${trimmed}`;
   return trimmed;
+}
+
+/// The identifier a downstream cell writes to read this cell's result
+/// (`FROM <title>`). A blank title yields no usable reference.
+function sanitizeCellTitle(title: string): string {
+  return sanitizeIdent(title);
+}
+
+/// The table name a cell's cached result is registered under, derived from its
+/// id so it is stable across renames and unique even for an untitled cell.
+function cellTableName(id: string): string {
+  return sanitizeIdent(id);
 }
 
 /// The table names referenced after `FROM`/`JOIN`, lowercased to their leading
@@ -87,4 +99,4 @@ function deriveDataEdges(
   return [...keptOthers, ...dependencyEdges];
 }
 
-export { deriveDataEdges, sanitizeCellTitle };
+export { cellTableName, deriveDataEdges, sanitizeCellTitle };

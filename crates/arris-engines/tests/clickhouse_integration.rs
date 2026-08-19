@@ -16,6 +16,7 @@
 //! - There is no `LAG`/`LEAD`; the window equivalents are `lagInFrame` /
 //!   `leadInFrame`, and out-of-frame rows yield the column default (not NULL).
 
+use std::collections::HashMap;
 use arris_engines::{
     ConnectionConfig, DatabaseDriver, DatabaseKind, ExplainMode, QueryLanguage, QueryResult,
     QueryValue, SchemaNode, SchemaNodeKind, TableRef, driver_for_kind,
@@ -604,7 +605,7 @@ async fn streaming_ingests_100k_rows_with_exact_totals_and_page() {
 
     // A chained cell aggregates the FULL cached result, not the 500-row page.
     let agg = engine
-        .run_cell(BOARD, "sums", "SELECT COUNT(*) AS c, SUM(n) AS s FROM big")
+        .run_cell(BOARD, "sums", "SELECT COUNT(*) AS c, SUM(n) AS s FROM big", &HashMap::new())
         .await
         .expect("chained aggregate");
     assert_eq!(agg.result.rows[0][0], QueryValue::Int(100_000));
@@ -633,7 +634,7 @@ async fn streaming_cancel_registers_no_cache_entry() {
     assert!(matches!(err, CanvasError::Cancelled), "got {err:?}");
 
     // The aborted cell was never registered, so downstream cannot read it.
-    let chained = engine.run_cell(BOARD, "agg", "SELECT COUNT(*) FROM huge").await;
+    let chained = engine.run_cell(BOARD, "agg", "SELECT COUNT(*) FROM huge", &HashMap::new()).await;
     assert!(chained.is_err(), "cancelled cell must not be queryable");
 
     // Dropping the aborted stream leaves the HTTP client healthy for new queries.
@@ -667,7 +668,7 @@ async fn streaming_byte_budget_truncates_and_reports_incomplete() {
 
     // The cached prefix stays queryable and matches the reported total.
     let agg = engine
-        .run_cell(BOARD, "agg", "SELECT COUNT(*) AS c FROM capped")
+        .run_cell(BOARD, "agg", "SELECT COUNT(*) AS c FROM capped", &HashMap::new())
         .await
         .expect("chained count");
     assert_eq!(agg.result.rows[0][0], QueryValue::Int(out.total_rows as i64));

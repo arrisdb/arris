@@ -10,7 +10,7 @@ import type {
 } from "../types";
 import { autoLayout } from "./layout";
 import { sanitizeChartSpec } from "./chartSpec";
-import { makeComponent, makeEdge } from "./factory";
+import { makeComponent, makeEdge, nextQueryTitle } from "./factory";
 import type { ComponentInput } from "./factory";
 
 /// One object to patch onto an existing component (the agent reused its id).
@@ -148,6 +148,20 @@ function buildEdges(
   return out;
 }
 
+/// Give every new query cell the agent left untitled a default title: the title
+/// is the name downstream cells reference, so it cannot be blank.
+function withQueryTitles(
+  created: CanvasComponent[],
+  existing: CanvasComponent[],
+): CanvasComponent[] {
+  const known = [...existing];
+  return created.map((c) => {
+    const titled = c.kind === "query" && !c.title ? { ...c, title: nextQueryTitle(known) } : c;
+    known.push(titled);
+    return titled;
+  });
+}
+
 /// Diff a parsed agent spec against the current board: components whose id is
 /// already on the board become patches (the agent is editing them), the rest are
 /// created and auto-laid-out below existing content, removals are filtered to ids
@@ -161,8 +175,11 @@ function planAgentChanges(
   const newSpecs = spec.components.filter((s) => !existingIds.has(s.id));
   const updateSpecs = spec.components.filter((s) => existingIds.has(s.id));
 
-  const created = autoLayout(
-    newSpecs.map((s) => makeComponent(toInput(s, connectionId))),
+  const created = withQueryTitles(
+    autoLayout(
+      newSpecs.map((s) => makeComponent(toInput(s, connectionId))),
+      existing,
+    ),
     existing,
   );
   const updates = updateSpecs.map((s) => {

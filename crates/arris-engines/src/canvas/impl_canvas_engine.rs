@@ -13,7 +13,7 @@ use futures::stream::BoxStream;
 use futures::StreamExt;
 use tokio_util::sync::CancellationToken;
 
-use super::constants::{CELL_RESULT_PAGE_ROWS, QUERY_MEMORY_POOL_SIZE};
+use super::constants::{CELL_IDENT_FALLBACK, CELL_RESULT_PAGE_ROWS, QUERY_MEMORY_POOL_SIZE};
 use super::errors::CanvasError;
 use super::impl_cell_cache_writer::CellCacheWriter;
 use super::impl_cell_result_cache::CellResultCache;
@@ -22,16 +22,12 @@ use crate::drivers::common::ArrowChunkBuilder;
 use crate::federation::FederationEngine;
 use crate::{DriverError, QueryResult, QueryStream, QueryValue, RowChunkStream};
 
-/// Runs canvas query cells that read OTHER cells' results. Each cell's output is
-/// kept (as Arrow) in a [`CellResultCache`]; when a cell's SQL references another
-/// cell by its (sanitized) title, that cached result is registered as a DataFusion
-/// `MemTable` and the query executes in-process. This is the engine half of the
-/// canvas cell-chaining feature: cell B can `SELECT ... FROM a` where `a` is the
-/// sanitized title of cell A.
+/// Runs canvas query cells that read other cells' results: each cell's output is
+/// cached (as Arrow) per board and cell id, then registered as a DataFusion
+/// `MemTable` when another cell's SQL names it.
 ///
-/// Cache entries are board-scoped, so two boards may reuse the same cell titles
-/// without colliding. Planning (`plan`) and reference parsing (`table_refs`) are
-/// pure helpers the command layer uses to drive the auto-run-upstream order.
+/// Title is the reference alias, id is the cache identity, so an untitled or
+/// duplicated title never merges two cells' results.
 pub struct CanvasEngine {
     cache: Arc<CellResultCache>,
 }
@@ -45,14 +41,12 @@ impl CanvasEngine {
         &self.cache
     }
 
-    /// Turn a cell title into a SQL-safe table identifier: lowercased, every
-    /// non-alphanumeric run collapsed to a single underscore, trimmed, and
-    /// prefixed if it would otherwise start with a digit. This is the name a
-    /// downstream cell uses to reference it.
-    pub fn sanitize_title(title: &str) -> String {
+    /// Lowercase, collapse non-alphanumeric runs to `_`, trim, and prefix a
+    /// leading digit. Idempotent, so re-sanitizing an identifier is safe.
+    pub fn sanitize_ident(value: &str) -> String {
         let mut out = String::new();
         let mut prev_underscore = false;
-        for ch in title.chars() {
+        for ch in value.chars() {
             if ch.is_ascii_alphanumeric() {
                 out.push(ch.to_ascii_lowercase());
                 prev_underscore = false;
@@ -63,7 +57,7 @@ impl CanvasEngine {
         }
         let trimmed = out.trim_matches('_');
         if trimmed.is_empty() {
-            return "cell".to_string();
+            return CELL_IDENT_FALLBACK.to_string();
         }
         if trimmed.starts_with(|c: char| c.is_ascii_digit()) {
             return format!("_{trimmed}");
@@ -97,9 +91,10 @@ impl CanvasEngine {
         out
     }
 
-    /// Board-scoped cache key for a cell title.
-    fn key(board: &str, title: &str) -> String {
-        format!("{board}\u{1}{}", Self::sanitize_title(title))
+    /// Board-scoped cache key, on the cell id so an untitled or duplicated title
+    /// never merges two cells' results.
+    fn key(board: &str, cell_id: &str) -> String {
+        format!("{board}\u{1}{}", Self::sanitize_ident(cell_id))
     }
 
     /// Topologically order the target cell and its transitive cell dependencies
@@ -115,7 +110,7 @@ impl CanvasEngine {
         // Sanitized title -> cell id. Last cell wins on a title collision.
         let title_to_id: HashMap<String, String> = cells
             .iter()
-            .map(|c| (Self::sanitize_title(&c.title), c.id.clone()))
+            .map(|c| (Self::sanitize_ident(&c.title), c.id.clone()))
             .collect();
 
         let mut order: Vec<String> = Vec::new();
@@ -174,29 +169,30 @@ impl CanvasEngine {
     pub fn cache_result(
         &self,
         board: &str,
-        title: &str,
+        cell_id: &str,
         result: &QueryResult,
     ) -> Result<(), CanvasError> {
         let (_schema, batch) =
             FederationEngine::query_result_to_batch(result).map_err(CanvasError::Conversion)?;
-        self.cache.put(&Self::key(board, title), vec![batch])
+        self.cache.put(&Self::key(board, cell_id), vec![batch])
     }
 
-    /// Run one cell's SQL over the board's cached cells and cache its output under
-    /// its sanitized title. Returns a `CELL_RESULT_PAGE_ROWS` page; full result cached.
+    /// Run one cell's SQL over the board's cached cells, caching the full output
+    /// under its id and returning a page. `refs` maps sanitized title to cell id.
     pub async fn run_cell(
         &self,
         board: &str,
-        title: &str,
+        cell_id: &str,
         sql: &str,
+        refs: &HashMap<String, String>,
     ) -> Result<IngestedCell, CanvasError> {
         let start = Instant::now();
-        let batches = self.execute_over_cache(board, sql).await?;
+        let batches = self.execute_over_cache(board, sql, refs).await?;
         let total_rows: u64 = batches.iter().map(|b| b.num_rows() as u64).sum();
         let page = Self::slice_batches(&batches, 0, CELL_RESULT_PAGE_ROWS);
         let result =
             FederationEngine::batches_to_query_result(&page, start.elapsed().as_secs_f64());
-        self.cache.put(&Self::key(board, title), batches)?;
+        self.cache.put(&Self::key(board, cell_id), batches)?;
         Ok(IngestedCell {
             result,
             total_rows,
@@ -210,11 +206,15 @@ impl CanvasEngine {
         &self,
         board: &str,
         sql: &str,
+        refs: &HashMap<String, String>,
     ) -> Result<Vec<RecordBatch>, CanvasError> {
         let sql = sql.trim().trim_end_matches(';').trim();
         let ctx = Self::session_context()?;
         for name in Self::table_refs(sql) {
-            if let Some(batches) = self.cache.get(&Self::key(board, &name))? {
+            // A reference naming a cell by title resolves through `refs`; one that
+            // is already a cell's table name (the chart path) keys the cache itself.
+            let cell_id = refs.get(&name).map_or(name.as_str(), String::as_str);
+            if let Some(batches) = self.cache.get(&Self::key(board, cell_id))? {
                 let schema = batches[0].schema();
                 let table = MemTable::try_new(schema, vec![batches])
                     .map_err(|e| CanvasError::Engine(e.to_string()))?;
@@ -238,10 +238,10 @@ impl CanvasEngine {
     }
 
     /// Ephemeral read-only query over the board's cached cells: whole result, not
-    /// cached. Charts aggregate here; their GROUP BY/LIMIT keeps the output small.
+    /// cached. Chart SQL names its source by table name, so no title map.
     pub async fn query_cache(&self, board: &str, sql: &str) -> Result<QueryResult, CanvasError> {
         let start = Instant::now();
-        let batches = self.execute_over_cache(board, sql).await?;
+        let batches = self.execute_over_cache(board, sql, &HashMap::new()).await?;
         Ok(FederationEngine::batches_to_query_result(
             &batches,
             start.elapsed().as_secs_f64(),
@@ -253,11 +253,11 @@ impl CanvasEngine {
     pub fn fetch_page(
         &self,
         board: &str,
-        title: &str,
+        cell_id: &str,
         offset: usize,
         limit: usize,
     ) -> Result<Option<QueryResult>, CanvasError> {
-        let Some(batches) = self.cache.get(&Self::key(board, title))? else {
+        let Some(batches) = self.cache.get(&Self::key(board, cell_id))? else {
             return Ok(None);
         };
         let page = Self::slice_batches(&batches, offset, limit);
@@ -297,7 +297,7 @@ impl CanvasEngine {
     pub async fn ingest_cell_stream(
         &self,
         board: &str,
-        title: &str,
+        cell_id: &str,
         stream: QueryStream,
         cancel: Option<&CancellationToken>,
         budget: usize,
@@ -305,7 +305,7 @@ impl CanvasEngine {
     ) -> Result<IngestedCell, CanvasError> {
         let start = Instant::now();
         let (mut result, cont) = self
-            .start_cell_ingest(board, title, stream, cancel, budget, row_cap)
+            .start_cell_ingest(board, cell_id, stream, cancel, budget, row_cap)
             .await?;
         let done = cont.finish(cancel).await?;
         result.elapsed = start.elapsed().as_secs_f64();
@@ -324,13 +324,13 @@ impl CanvasEngine {
     pub async fn start_cell_ingest(
         &self,
         board: &str,
-        title: &str,
+        cell_id: &str,
         stream: QueryStream,
         cancel: Option<&CancellationToken>,
         budget: usize,
         row_cap: Option<u64>,
     ) -> Result<(QueryResult, CellIngestContinuation), CanvasError> {
-        let key = Self::key(board, title);
+        let key = Self::key(board, cell_id);
         let writer = self.cache.begin(&key, budget);
         match stream {
             QueryStream::Rows(rows) => Self::start_rows(rows, writer, cancel, row_cap).await,
@@ -497,12 +497,6 @@ impl CanvasEngine {
         }
     }
 
-    /// Drop every cached result for a board (e.g. when its tab closes).
-    pub fn clear_board(&self, board: &str, titles: &[String]) {
-        for title in titles {
-            self.cache.remove(&Self::key(board, title));
-        }
-    }
 }
 
 /// The stream a `CellIngestContinuation` drains after the page has been peeled.
@@ -649,6 +643,11 @@ mod tests {
         }
     }
 
+    /// No title aliases: the SQL in these tests names cells by id directly.
+    fn no_refs() -> HashMap<String, String> {
+        HashMap::new()
+    }
+
     fn spec(id: &str, title: &str, sql: &str) -> CanvasCellSpec {
         CanvasCellSpec {
             id: id.to_string(),
@@ -683,6 +682,7 @@ mod tests {
                 BOARD,
                 "b",
                 "SELECT category, SUM(total) AS total FROM a GROUP BY category ORDER BY category",
+                &no_refs(),
             )
             .await
             .unwrap();
@@ -705,7 +705,7 @@ mod tests {
         let engine = engine();
         engine.cache_result(BOARD, "abc", &sales_result()).unwrap();
         // Mirrors the UI: a `SELECT * fROM abc;` reading another cell's result.
-        let out = engine.run_cell(BOARD, "query", "SELECT * fROM abc;").await.unwrap();
+        let out = engine.run_cell(BOARD, "query", "SELECT * fROM abc;", &no_refs()).await.unwrap();
         assert_eq!(out.result.rows.len(), 3);
         assert_eq!(out.result.columns.len(), 2);
     }
@@ -715,13 +715,13 @@ mod tests {
         let engine = engine();
         engine.cache_result(BOARD, "a", &sales_result()).unwrap();
         engine
-            .run_cell(BOARD, "b", "SELECT category, SUM(total) AS total FROM a GROUP BY category")
+            .run_cell(BOARD, "b", "SELECT category, SUM(total) AS total FROM a GROUP BY category", &no_refs())
             .await
             .unwrap();
         assert!(engine.cache().contains(&CanvasEngine::key(BOARD, "b")));
 
         let out = engine
-            .run_cell(BOARD, "c", "SELECT SUM(total) AS grand FROM b")
+            .run_cell(BOARD, "c", "SELECT SUM(total) AS grand FROM b", &no_refs())
             .await
             .unwrap();
         assert_eq!(int_at(&out.result, 0, 0), 18);
@@ -734,17 +734,75 @@ mod tests {
         other.rows.clear();
         engine.cache_result("board-A", "a", &sales_result()).unwrap();
         engine.cache_result("board-B", "a", &other).unwrap();
-        let a = engine.run_cell("board-A", "x", "SELECT * FROM a").await.unwrap();
-        let b = engine.run_cell("board-B", "x", "SELECT * FROM a").await.unwrap();
+        let a = engine.run_cell("board-A", "x", "SELECT * FROM a", &no_refs()).await.unwrap();
+        let b = engine.run_cell("board-B", "x", "SELECT * FROM a", &no_refs()).await.unwrap();
         assert_eq!(a.result.rows.len(), 3);
         assert_eq!(b.result.rows.len(), 0);
+    }
+
+    /// Two untitled cells used to sanitize to the same key and clobber each other.
+    #[tokio::test]
+    async fn untitled_cells_keep_separate_cache_entries() {
+        let engine = engine();
+        let mut empty = sales_result();
+        empty.rows.clear();
+        engine.cache_result(BOARD, "query-aaa", &sales_result()).unwrap();
+        engine.cache_result(BOARD, "query-bbb", &empty).unwrap();
+
+        let first = engine.fetch_page(BOARD, "query-aaa", 0, 10).unwrap().unwrap();
+        let second = engine.fetch_page(BOARD, "query-bbb", 0, 10).unwrap().unwrap();
+        assert_eq!(first.rows.len(), 3);
+        assert_eq!(second.rows.len(), 0);
+    }
+
+    /// A chart names its source by the table name derived from the cell id, with
+    /// no title map, so an untitled cell still charts.
+    #[tokio::test]
+    async fn a_cell_id_table_name_reads_that_cell_without_a_title() {
+        let engine = engine();
+        engine.cache_result(BOARD, "query-3f2a1b9c", &sales_result()).unwrap();
+
+        let out = engine
+            .query_cache(BOARD, "SELECT SUM(total) AS grand FROM query_3f2a1b9c")
+            .await
+            .unwrap();
+        assert_eq!(int_at(&out, 0, 0), 18);
+    }
+
+    /// A `FROM <title>` reference resolves through the title map to the cell id.
+    #[tokio::test]
+    async fn a_title_reference_resolves_to_the_cells_id() {
+        let engine = engine();
+        engine.cache_result(BOARD, "query-aaa", &sales_result()).unwrap();
+        let refs = HashMap::from([("monthly_sales".to_string(), "query-aaa".to_string())]);
+
+        let out = engine
+            .run_cell(BOARD, "query-bbb", "SELECT SUM(total) AS grand FROM monthly_sales", &refs)
+            .await
+            .unwrap();
+        assert_eq!(int_at(&out.result, 0, 0), 18);
+        assert!(engine.cache().contains(&CanvasEngine::key(BOARD, "query-bbb")));
+    }
+
+    /// Renaming a cell must not orphan its cached result: the key is the id.
+    #[tokio::test]
+    async fn a_renamed_cell_keeps_its_cached_result() {
+        let engine = engine();
+        engine.cache_result(BOARD, "query-aaa", &sales_result()).unwrap();
+        let refs = HashMap::from([("renamed".to_string(), "query-aaa".to_string())]);
+
+        let out = engine
+            .run_cell(BOARD, "query-bbb", "SELECT COUNT(*) AS c FROM renamed", &refs)
+            .await
+            .unwrap();
+        assert_eq!(int_at(&out.result, 0, 0), 3);
     }
 
     #[tokio::test]
     async fn referencing_an_unknown_cell_errors() {
         let engine = engine();
         let err = engine
-            .run_cell(BOARD, "b", "SELECT * FROM does_not_exist")
+            .run_cell(BOARD, "b", "SELECT * FROM does_not_exist", &no_refs())
             .await
             .unwrap_err();
         assert!(matches!(err, CanvasError::Engine(_)));
@@ -783,12 +841,12 @@ mod tests {
     }
 
     #[test]
-    fn sanitize_title_makes_a_sql_safe_identifier() {
-        assert_eq!(CanvasEngine::sanitize_title("Monthly Sales"), "monthly_sales");
-        assert_eq!(CanvasEngine::sanitize_title("  spaced  "), "spaced");
-        assert_eq!(CanvasEngine::sanitize_title("2024 totals"), "_2024_totals");
-        assert_eq!(CanvasEngine::sanitize_title("a--b__c"), "a_b_c");
-        assert_eq!(CanvasEngine::sanitize_title("!!!"), "cell");
+    fn sanitize_ident_makes_a_sql_safe_identifier() {
+        assert_eq!(CanvasEngine::sanitize_ident("Monthly Sales"), "monthly_sales");
+        assert_eq!(CanvasEngine::sanitize_ident("  spaced  "), "spaced");
+        assert_eq!(CanvasEngine::sanitize_ident("2024 totals"), "_2024_totals");
+        assert_eq!(CanvasEngine::sanitize_ident("a--b__c"), "a_b_c");
+        assert_eq!(CanvasEngine::sanitize_ident("!!!"), "cell");
     }
 
     #[test]
@@ -836,7 +894,7 @@ mod tests {
 
         // A chained aggregate reads the FULL cached result, not the page.
         let agg = engine
-            .run_cell(BOARD, "b", "SELECT COUNT(*) AS c, SUM(n) AS s FROM a")
+            .run_cell(BOARD, "b", "SELECT COUNT(*) AS c, SUM(n) AS s FROM a", &no_refs())
             .await
             .unwrap();
         assert_eq!(int_at(&agg.result, 0, 0), 900);
@@ -906,7 +964,7 @@ mod tests {
         assert_eq!(out.result.rows[499][0], QueryValue::Int(499));
         // The full capped result is cached and queryable.
         let agg = engine
-            .run_cell(BOARD, "b", "SELECT COUNT(*) AS c FROM capped")
+            .run_cell(BOARD, "b", "SELECT COUNT(*) AS c FROM capped", &no_refs())
             .await
             .unwrap();
         assert_eq!(int_at(&agg.result, 0, 0), 500);
@@ -1020,7 +1078,7 @@ mod tests {
             .unwrap();
         // `SELECT *` over 800 cached rows: page capped, totals exact.
         let out = engine
-            .run_cell(BOARD, "b", "SELECT * FROM a ORDER BY n")
+            .run_cell(BOARD, "b", "SELECT * FROM a ORDER BY n", &no_refs())
             .await
             .unwrap();
         assert_eq!(out.result.rows.len(), CELL_RESULT_PAGE_ROWS);
@@ -1029,7 +1087,7 @@ mod tests {
 
         // And b's own downstream still sees all 800 rows.
         let agg = engine
-            .run_cell(BOARD, "c", "SELECT COUNT(*) AS c FROM b")
+            .run_cell(BOARD, "c", "SELECT COUNT(*) AS c FROM b", &no_refs())
             .await
             .unwrap();
         assert_eq!(int_at(&agg.result, 0, 0), 800);
