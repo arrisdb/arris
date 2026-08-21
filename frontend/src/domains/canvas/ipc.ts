@@ -45,21 +45,21 @@ function cancelCanvasCellIPC(queryId: string): Promise<void> {
 }
 
 /// Aggregate (or sample) a chart's data over a source cell's FULL cached result.
-/// `sql` is built from the chart spec against the source cell's sanitized title;
+/// `sql` is built from the chart spec against the source cell's table name;
 /// the backend runs it over the cache and returns the small result.
 function queryCanvasCacheIPC(boardId: string, sql: string): Promise<QueryResult> {
   return invoke("cmd_query_canvas_cache", { boardId, sql });
 }
 
-/// One page (`offset`..`offset + limit`) of a cell's full cached result, by the
-/// cell's sanitized `title`. `null` when the cell has no cached result.
+/// One page (`offset`..`offset + limit`) of a cell's full cached result, keyed by
+/// the cell's id. `null` when the cell has no cached result.
 function fetchCanvasCellPageIPC(
   boardId: string,
-  title: string,
+  cellId: string,
   offset: number,
   limit: number,
 ): Promise<QueryResult | null> {
-  return invoke("cmd_fetch_canvas_cell_page", { boardId, title, offset, limit });
+  return invoke("cmd_fetch_canvas_cell_page", { boardId, cellId, offset, limit });
 }
 
 export {

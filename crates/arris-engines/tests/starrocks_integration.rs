@@ -32,6 +32,7 @@
 //! * `EXPLAIN` returns a text plan (no JSON plan format).
 //! * StarRocks has no interactive transactions; statements auto-commit.
 
+use std::collections::HashMap;
 use std::time::Duration;
 
 use arris_engines::{
@@ -555,7 +556,7 @@ async fn streaming_ingests_100k_rows_with_exact_totals_and_page() {
 
     // A chained cell aggregates the FULL cached result, not the 500-row page.
     let agg = engine
-        .run_cell(BOARD, "sums", "SELECT COUNT(*) AS c, SUM(n) AS s FROM big")
+        .run_cell(BOARD, "sums", "SELECT COUNT(*) AS c, SUM(n) AS s FROM big", &HashMap::new())
         .await
         .expect("chained aggregate");
     assert_eq!(agg.result.rows[0][0], QueryValue::Int(100_000));
@@ -590,7 +591,7 @@ async fn streaming_cancel_mid_stream_registers_no_cache_entry() {
     assert!(matches!(err, CanvasError::Cancelled), "got {err:?}");
 
     // The aborted cell was never registered, so downstream cannot read it.
-    let chained = engine.run_cell(BOARD, "agg", "SELECT COUNT(*) FROM huge").await;
+    let chained = engine.run_cell(BOARD, "agg", "SELECT COUNT(*) FROM huge", &HashMap::new()).await;
     assert!(chained.is_err(), "cancelled cell must not be queryable");
 }
 
@@ -619,7 +620,7 @@ async fn streaming_byte_budget_truncates_and_reports_incomplete() {
 
     // The cached prefix stays queryable and matches the reported total.
     let agg = engine
-        .run_cell(BOARD, "agg", "SELECT COUNT(*) AS c FROM capped")
+        .run_cell(BOARD, "agg", "SELECT COUNT(*) AS c FROM capped", &HashMap::new())
         .await
         .expect("chained count");
     assert_eq!(agg.result.rows[0][0], QueryValue::Int(out.total_rows as i64));
@@ -661,7 +662,7 @@ async fn streaming_cell_row_cap_stops_ingest_at_500_in_order() {
 
     // The cached cell holds exactly the capped prefix.
     let agg = engine
-        .run_cell(BOARD, "agglim", "SELECT COUNT(*) AS c FROM lim")
+        .run_cell(BOARD, "agglim", "SELECT COUNT(*) AS c FROM lim", &HashMap::new())
         .await
         .expect("chained count");
     assert_eq!(agg.result.rows[0][0], QueryValue::Int(500));

@@ -1,10 +1,11 @@
 import type { ChartSpec } from "@shared";
 
-import { DEFAULT_SIZE } from "../constants";
+import { DEFAULT_SIZE, QUERY_TITLE_PREFIX } from "../constants";
 import type {
   CanvasComponent,
   CanvasEdge,
   ComponentKind,
+  QueryComponent,
   ShapeKind,
   StickyColor,
 } from "../types";
@@ -130,5 +131,19 @@ function makeEdge(source: string, target: string, id?: string): CanvasEdge {
   return { id: id ?? genId("edge"), source, target };
 }
 
-export { genId, makeComponent, makeEdge };
+/// The first unused `Query N` title on a board. A query cell's title is the name
+/// downstream cells reference in `FROM`, so a new cell never starts blank.
+function nextQueryTitle(components: CanvasComponent[]): string {
+  const taken = new Set(
+    components
+      .filter((c): c is QueryComponent => c.kind === "query")
+      .map((c) => c.title),
+  );
+  for (let n = 1; ; n += 1) {
+    const title = `${QUERY_TITLE_PREFIX} ${n}`;
+    if (!taken.has(title)) return title;
+  }
+}
+
+export { genId, makeComponent, makeEdge, nextQueryTitle };
 export type { ComponentInput };

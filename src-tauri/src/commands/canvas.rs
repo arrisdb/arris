@@ -95,7 +95,7 @@ async fn run_streamed_cell(
             .canvas
             .ingest_cell_stream(
                 board_id,
-                &cell.title,
+                cell_id,
                 stream,
                 token.as_ref(),
                 CELL_INGEST_BYTE_BUDGET,
@@ -112,7 +112,7 @@ async fn run_streamed_cell(
         .canvas
         .start_cell_ingest(
             board_id,
-            &cell.title,
+            cell_id,
             stream,
             token.as_ref(),
             CELL_INGEST_BYTE_BUDGET,
@@ -171,7 +171,7 @@ pub async fn cmd_run_canvas_cell(
         cells.iter().map(|c| (c.id.as_str(), c)).collect();
     let title_to_id: HashMap<String, String> = cells
         .iter()
-        .map(|c| (CanvasEngine::sanitize_title(&c.title), c.id.clone()))
+        .map(|c| (CanvasEngine::sanitize_ident(&c.title), c.id.clone()))
         .collect();
     // Only a terminal cell (nothing depends on it) gets the early-page +
     // background-finish treatment; anything depended on must fully ingest first.
@@ -261,7 +261,7 @@ pub async fn cmd_run_canvas_cell(
                         // Materialized non-SELECT: cache + totals now (no ingest
                         // event ever fires for this path).
                         run.map(|result| {
-                            let _ = env.canvas.cache_result(&board_id, &cell.title, &result);
+                            let _ = env.canvas.cache_result(&board_id, id, &result);
                             let total_rows = result.rows.len() as u64;
                             CellOutcome::Ingested(IngestedCell {
                                 result,
@@ -281,7 +281,7 @@ pub async fn cmd_run_canvas_cell(
             // board's cancel token; a cancel abandons the in-flight query.
             let token = env.query.register_cancel_token(query_id.clone());
             let out = tokio::select! {
-                r = env.canvas.run_cell(&board_id, &cell.title, &cell.sql) => {
+                r = env.canvas.run_cell(&board_id, id, &cell.sql, &title_to_id) => {
                     r.map(CellOutcome::Ingested).map_err(|e| e.to_string())
                 }
                 _ = token.cancelled() => {
@@ -341,12 +341,12 @@ pub async fn cmd_query_canvas_cache(
 pub async fn cmd_fetch_canvas_cell_page(
     env: State<'_, Arc<AppEnvironment>>,
     board_id: String,
-    title: String,
+    cell_id: String,
     offset: usize,
     limit: usize,
 ) -> Result<Option<QueryResult>, IpcError> {
     env.canvas
-        .fetch_page(&board_id, &title, offset, limit)
+        .fetch_page(&board_id, &cell_id, offset, limit)
         .map_err(ipc_err)
 }
 

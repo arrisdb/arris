@@ -18,6 +18,7 @@
 //! exercised here; the schema-browser kinds Mongo does surface are collections,
 //! indexes, and views.
 
+use std::collections::HashMap;
 use std::time::Duration;
 
 use arris_engines::{
@@ -1033,7 +1034,7 @@ async fn streaming_ingests_100k_docs_with_exact_totals_and_page() {
 
     // A chained cell aggregates the FULL cached result, not the 500-row page.
     let agg = engine
-        .run_cell(BOARD, "sums", "SELECT COUNT(*) AS c, SUM(n) AS s FROM big")
+        .run_cell(BOARD, "sums", "SELECT COUNT(*) AS c, SUM(n) AS s FROM big", &HashMap::new())
         .await
         .expect("chained aggregate");
     assert_eq!(agg.result.rows[0][0], QueryValue::Int(100_000));
@@ -1070,7 +1071,7 @@ async fn streaming_columns_cover_the_whole_first_chunk_not_just_the_page() {
 
     // The page never shows `late` (it's on row 501), yet the cache holds it.
     let agg = engine
-        .run_cell(BOARD, "late_row", "SELECT late FROM wide WHERE late IS NOT NULL")
+        .run_cell(BOARD, "late_row", "SELECT late FROM wide WHERE late IS NOT NULL", &HashMap::new())
         .await
         .expect("chained select");
     assert_eq!(agg.result.rows.len(), 1);
@@ -1099,7 +1100,7 @@ async fn streaming_cancel_registers_no_cache_entry() {
     assert!(matches!(err, CanvasError::Cancelled), "got {err:?}");
 
     // The aborted cell was never registered, so downstream cannot read it.
-    let chained = engine.run_cell(BOARD, "agg", "SELECT COUNT(*) FROM huge").await;
+    let chained = engine.run_cell(BOARD, "agg", "SELECT COUNT(*) FROM huge", &HashMap::new()).await;
     assert!(chained.is_err(), "cancelled cell must not be queryable");
 
     // The driver is healthy for new queries after the aborted stream drops.
@@ -1132,7 +1133,7 @@ async fn streaming_byte_budget_truncates_and_reports_incomplete() {
     assert_eq!(out.result.rows.len(), CELL_RESULT_PAGE_ROWS);
 
     let agg = engine
-        .run_cell(BOARD, "agg", "SELECT COUNT(*) AS c FROM capped")
+        .run_cell(BOARD, "agg", "SELECT COUNT(*) AS c FROM capped", &HashMap::new())
         .await
         .expect("chained count");
     assert_eq!(agg.result.rows[0][0], QueryValue::Int(out.total_rows as i64));

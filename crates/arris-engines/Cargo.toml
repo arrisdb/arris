@@ -126,10 +126,10 @@ clickhouse = { version = "0.13", default-features = false, features = ["lz4", "r
 russh = "0.62.4"
 
 # drivers: dynamodb — official AWS SDK for Rust, PartiQL over the DynamoDB API.
-# Pin the hyper+rustls(ring) connector instead of the default aws-lc-rs client so
-# we reuse the same ring crypto as every other driver (no aws-lc native build).
-aws-config = { version = "1.8", default-features = false, features = ["rustls", "rt-tokio", "credentials-process", "sso", "behavior-version-latest"], optional = true }
-aws-sdk-dynamodb = { version = "1.116", default-features = false, features = ["rustls", "rt-tokio", "behavior-version-latest"], optional = true }
+# `default-https-client`, not `rustls`: the latter pulls the smithy legacy hyper
+# 0.14 connector, whose h2 0.3 has an unfixable advisory (RUSTSEC-2026-0258).
+aws-config = { version = "1.8", default-features = false, features = ["default-https-client", "rt-tokio", "credentials-process", "sso", "behavior-version-latest"], optional = true }
+aws-sdk-dynamodb = { version = "1.116", default-features = false, features = ["default-https-client", "rt-tokio", "behavior-version-latest"], optional = true }
 
 # python console: send SIGINT to the kernel process for interrupt
 [target.'cfg(unix)'.dependencies]

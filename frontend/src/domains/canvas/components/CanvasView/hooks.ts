@@ -14,7 +14,7 @@ import type {
   ReorderOp,
   ShapeKind,
 } from "../../types";
-import { makeComponent, serializeDoc } from "../../utils";
+import { makeComponent, nextQueryTitle, serializeDoc } from "../../utils";
 import type { CanvasMode, CanvasNodeData } from "./types";
 import {
   hasActiveTextSelection,
@@ -230,8 +230,8 @@ function useCanvas(tab: EditorTab) {
     [addComponent, placementFor, tabId],
   );
 
-  // Manual query objects bind to the canvas's own connection (same one the agent
-  // reads), so Run works without any extra wiring.
+  // Binds to the canvas's own connection so Run needs no extra wiring, and gets a
+  // default title because that is the name downstream cells reference in `FROM`.
   const addQuery = useCallback(() => {
     addComponent(
       tabId,
@@ -240,9 +240,10 @@ function useCanvas(tab: EditorTab) {
         ...placementFor("query"),
         connectionId: tab.connectionId ?? null,
         sql: "",
+        title: nextQueryTitle(components),
       }),
     );
-  }, [addComponent, placementFor, tab.connectionId, tabId]);
+  }, [addComponent, components, placementFor, tab.connectionId, tabId]);
 
   const addChart = useCallback(() => {
     addComponent(tabId, makeComponent({ kind: "chart", ...placementFor("chart") }));

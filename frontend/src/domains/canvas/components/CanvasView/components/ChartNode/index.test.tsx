@@ -87,7 +87,39 @@ describe("ChartNode", () => {
     expect(board).toBe(TAB);
     expect(sql).toContain('GROUP BY "event_type"');
     expect(sql).toContain('COUNT("amount")');
-    expect(sql).toContain("FROM sales");
+    expect(sql).toContain("FROM q");
+  });
+
+  it("charts a source query that has no title", async () => {
+    useCanvasStore.getState().ensureBoard(TAB, "");
+    useCanvasStore.getState().addComponent(TAB, makeComponent({ kind: "query", id: "q" }));
+    useCanvasStore.getState().addComponent(
+      TAB,
+      makeComponent({
+        kind: "chart",
+        id: "c",
+        sourceQueryId: "q",
+        spec: { kind: "bar", xColumn: "event_type", yColumns: ["amount"], aggregation: "count" },
+      }),
+    );
+    useCanvasStore.getState().setRun(TAB, "q", {
+      result: {
+        columns: [
+          { name: "event_type", type_hint: "text" },
+          { name: "amount", type_hint: "int" },
+        ],
+        rows: [],
+        elapsed: 0,
+      },
+      totalRows: 10,
+    });
+    render(
+      <ReactFlowProvider>
+        <ChartNode {...nodeProps("c")} />
+      </ReactFlowProvider>,
+    );
+    await waitFor(() => expect(queryCanvasCacheIPC).toHaveBeenCalled());
+    expect(vi.mocked(queryCanvasCacheIPC).mock.calls[0][1]).toContain("FROM q");
   });
 
   it("drops a stale axis column the source no longer has instead of querying it", async () => {

@@ -6,7 +6,7 @@ import { IconButton } from "@shared/ui/IconButton";
 
 import { useCanvasStore } from "../../../../hooks";
 import { DEFAULT_CHART_MAX_ROWS } from "../../../../constants";
-import { buildChartQuery, sanitizeCellTitle } from "../../../../utils";
+import { buildChartQuery, cellTableName } from "../../../../utils";
 import { queryCanvasCacheIPC } from "../../../../ipc";
 import type { CanvasNodeData } from "../../types";
 import { CanvasResizer } from "../CanvasResizer";
@@ -34,8 +34,8 @@ function ChartNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
     ? board?.doc.components.find((c) => c.id === chart.sourceQueryId)
     : undefined;
   const sourceRun = chart?.sourceQueryId ? board?.runs[chart.sourceQueryId] : undefined;
-  const sourceTitle =
-    source?.kind === "query" && source.title ? sanitizeCellTitle(source.title) : undefined;
+  // Bound by id, so a chart renders even when its source query has no title.
+  const sourceTable = source?.kind === "query" ? cellTableName(source.id) : undefined;
   // Human-readable name of the bound query, used as the default cell title.
   const sourceName = source?.kind === "query" ? source.title || source.id : undefined;
   const spec = chart?.spec;
@@ -52,8 +52,8 @@ function ChartNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
   );
 
   const query = useMemo(
-    () => (effectiveSpec && sourceTitle ? buildChartQuery(effectiveSpec, sourceTitle, maxRows) : null),
-    [effectiveSpec, sourceTitle, maxRows],
+    () => (effectiveSpec && sourceTable ? buildChartQuery(effectiveSpec, sourceTable, maxRows) : null),
+    [effectiveSpec, sourceTable, maxRows],
   );
 
   const [agg, setAgg] = useState<ChartData>({ loading: false });

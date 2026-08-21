@@ -24,6 +24,10 @@ pub(crate) const QUERY_MEMORY_POOL_SIZE: usize = 512 * 1024 * 1024;
 /// startup and clean shutdown so cached query data never persists across runs.
 pub const CANVAS_CELL_CACHE_DIR_NAME: &str = "canvas-cell-cache";
 
+/// Identifier used when a title sanitizes to nothing (punctuation only). Cache
+/// keys use the cell id, so this collides only between two such titles.
+pub(super) const CELL_IDENT_FALLBACK: &str = "cell";
+
 /// XChaCha20-Poly1305 key length (256-bit) for the per-session spill cipher.
 pub(super) const SPILL_KEY_LEN: usize = 32;
 

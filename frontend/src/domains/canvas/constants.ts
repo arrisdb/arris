@@ -50,6 +50,14 @@ const CANVAS_QUERY_ID_PREFIX = "canvas-cell";
 /// chart in the properties panel; bounds render cost and the IPC payload.
 const DEFAULT_CHART_MAX_ROWS = 1000;
 
+/// Identifier a title sanitizes to when it holds no alphanumerics. MUST match
+/// the backend `CELL_IDENT_FALLBACK`.
+const CELL_IDENT_FALLBACK = "cell";
+
+/// Prefix of the title given to a new query cell (`Query 1`, `Query 2`, ...).
+/// Every query cell needs a title: it is the name downstream cells reference.
+const QUERY_TITLE_PREFIX = "Query";
+
 /// Default row limit a query cell fetches when its `limit` is unset and
 /// "Select all rows" is off. Overridable per cell in the properties panel.
 const DEFAULT_QUERY_LIMIT = 500;
@@ -65,10 +73,12 @@ export {
   CANVAS_QUERY_ID_PREFIX,
   CANVAS_SAVE_DEBOUNCE_MS,
   CANVAS_SPEC_FENCE,
+  CELL_IDENT_FALLBACK,
   DEFAULT_CHART_MAX_ROWS,
   DEFAULT_QUERY_LIMIT,
   DEFAULT_SIZE,
   KNOWN_KINDS,
   LAYOUT_GAP,
   LAYOUT_ORIGIN,
+  QUERY_TITLE_PREFIX,
 };

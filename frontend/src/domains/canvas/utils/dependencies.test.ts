@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { makeComponent } from "./factory";
-import { deriveDataEdges, sanitizeCellTitle } from "./dependencies";
+import { cellTableName, deriveDataEdges, sanitizeCellTitle } from "./dependencies";
 
 describe("sanitizeCellTitle", () => {
   it("matches the backend identifier rules", () => {
@@ -51,5 +51,19 @@ describe("deriveDataEdges", () => {
     const existing = { id: "keep", source: "a", target: "b" };
     const edges = deriveDataEdges([a, b], [existing]);
     expect(edges).toEqual([existing]);
+  });
+});
+
+describe("cellTableName", () => {
+  it("derives a SQL-safe table name from a cell id", () => {
+    expect(cellTableName("query-3f2a1b9c")).toBe("query_3f2a1b9c");
+  });
+
+  it("is idempotent, so a name can be re-derived from itself", () => {
+    expect(cellTableName(cellTableName("query-3f2a1b9c"))).toBe("query_3f2a1b9c");
+  });
+
+  it("gives two ids two distinct names", () => {
+    expect(cellTableName("query-aaa")).not.toBe(cellTableName("query-bbb"));
   });
 });
