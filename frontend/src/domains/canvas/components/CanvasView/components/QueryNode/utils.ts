@@ -46,7 +46,11 @@ const theme = EditorView.theme(
     ".cm-cursor, .cm-dropCursor": { borderLeftColor: "var(--m-accent, #7c8cff)" },
     ".cm-scroller": { fontFamily: "var(--m-font-editor, var(--m-font-mono))", lineHeight: "1.5" },
     ".cm-line": { padding: "0" },
-    [`.${CELL_REF_MARK_CLASS}`]: { color: "var(--m-accent)" },
+    // Two classes deep so the reference colour wins over the SQL grammar, which
+    // would otherwise paint the title and any digits in it separately.
+    [`.cm-content .${CELL_REF_MARK_CLASS}, .cm-content .${CELL_REF_MARK_CLASS} span`]: {
+      color: "var(--m-accent)",
+    },
     ".cm-gutters": {
       backgroundColor: "transparent",
       border: "none",
