@@ -74,6 +74,18 @@ describe("useCanvas", () => {
     expect(result.current.rfNodes[0].position.x).toBe(999);
   });
 
+  it("a new query cell reuses the connection last picked on the board", () => {
+    const { result } = renderHook(() => useCanvas(tab));
+    act(() => result.current.addQuery());
+    const first = useCanvasStore.getState().boards["tab-1"].doc.components[0];
+    act(() =>
+      useCanvasStore.getState().updateComponent("tab-1", first.id, { connectionId: "conn-2" }),
+    );
+    act(() => result.current.addQuery());
+    const second = useCanvasStore.getState().boards["tab-1"].doc.components[1];
+    expect(second).toMatchObject({ kind: "query", connectionId: "conn-2" });
+  });
+
   it("addChart appends a chart object", () => {
     const { result } = renderHook(() => useCanvas(tab));
     act(() => result.current.addChart());

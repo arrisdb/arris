@@ -17,6 +17,7 @@ import type {
 import { makeComponent, nextQueryTitle, serializeDoc } from "../../utils";
 import type { CanvasMode, CanvasNodeData } from "./types";
 import {
+  defaultQueryConnectionId,
   flowEdgesKey,
   flowNodesKey,
   hasActiveTextSelection,
@@ -47,6 +48,7 @@ function useCanvas(tab: EditorTab) {
   const removeEdges = useCanvasStore((s) => s.removeEdges);
   const setViewport = useCanvasStore((s) => s.setViewport);
   const runAllQueries = useCanvasStore((s) => s.runAllQueries);
+  const lastQueryConnection = useCanvasStore((s) => s.lastQueryConnection[tabId]);
 
   // The board pane element, so a freshly added object can be centered in the
   // current viewport (its pixel size is needed to invert ReactFlow's transform).
@@ -243,12 +245,12 @@ function useCanvas(tab: EditorTab) {
       makeComponent({
         kind: "query",
         ...placementFor("query"),
-        connectionId: tab.connectionId ?? null,
+        connectionId: defaultQueryConnectionId(components, lastQueryConnection, tab.connectionId),
         sql: "",
         title: nextQueryTitle(components),
       }),
     );
-  }, [addComponent, components, placementFor, tab.connectionId, tabId]);
+  }, [addComponent, components, lastQueryConnection, placementFor, tab.connectionId, tabId]);
 
   const addChart = useCallback(() => {
     addComponent(tabId, makeComponent({ kind: "chart", ...placementFor("chart") }));

@@ -89,6 +89,21 @@ function toFlowNodes(
   }));
 }
 
+/// The connection a new query cell starts on: the one last picked on this board,
+/// else the newest query cell's, else the board tab's own connection.
+function defaultQueryConnectionId(
+  components: CanvasComponent[],
+  lastPicked: string | undefined,
+  tabConnectionId: string | null | undefined,
+): string | null {
+  if (lastPicked) return lastPicked;
+  for (let i = components.length - 1; i >= 0; i--) {
+    const c = components[i];
+    if (c.kind === "query" && c.connectionId) return c.connectionId;
+  }
+  return tabConnectionId ?? null;
+}
+
 /// Identity of the ReactFlow node list: only the fields `toFlowNodes` reads. A
 /// keystroke rewrites a query's SQL, and rebuilding nodes then would re-render
 /// the cell mid-input and drop characters.
@@ -242,6 +257,7 @@ export {
   buildEdgeMenuItems,
   buildNodeMenuItems,
   COMPONENT_KINDS,
+  defaultQueryConnectionId,
   edgeTypes,
   flowEdgesKey,
   flowNodesKey,

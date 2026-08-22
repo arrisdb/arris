@@ -46,6 +46,9 @@ interface CanvasStore {
     patch: Partial<CanvasComponent>,
   ) => void;
   removeComponent: (tabId: string, id: string) => void;
+  /// The connection last picked for a query object, per board. A new query cell
+  /// starts on it so the user picks a connection once, not per cell.
+  lastQueryConnection: Record<string, string>;
   /// A snapshot of an object placed on the in-app clipboard by Copy (⌘C), for a
   /// later Paste (⌘V). Held in memory, not the OS clipboard; never serialized.
   clipboard: CanvasComponent | null;
@@ -187,6 +190,7 @@ function withDoc(
 const useCanvasStore = create<CanvasStore>((set, get) => ({
   boards: {},
   clipboard: null,
+  lastQueryConnection: {},
 
   ensureBoard: (tabId, text) =>
     set((s) =>
@@ -204,14 +208,26 @@ const useCanvasStore = create<CanvasStore>((set, get) => ({
     })),
 
   updateComponent: (tabId, id, patch) =>
-    set((s) => ({
-      boards: withDoc(s.boards, tabId, (doc) => ({
-        ...doc,
-        components: doc.components.map((c) =>
-          c.id === id ? ({ ...c, ...patch } as CanvasComponent) : c,
-        ),
-      })),
-    })),
+    set((s) => {
+      const target = s.boards[tabId]?.doc.components.find((c) => c.id === id);
+      const pickedConnection =
+        "connectionId" in patch && typeof patch.connectionId === "string"
+          ? patch.connectionId
+          : null;
+      const picked =
+        target?.kind === "query" && pickedConnection
+          ? { [tabId]: pickedConnection }
+          : null;
+      return {
+        boards: withDoc(s.boards, tabId, (doc) => ({
+          ...doc,
+          components: doc.components.map((c) =>
+            c.id === id ? ({ ...c, ...patch } as CanvasComponent) : c,
+          ),
+        })),
+        ...(picked ? { lastQueryConnection: { ...s.lastQueryConnection, ...picked } } : {}),
+      };
+    }),
 
   removeComponent: (tabId, id) =>
     set((s) => {

@@ -5,6 +5,7 @@ import {
   buildEdgeMenuItems,
   buildNodeMenuItems,
   COMPONENT_KINDS,
+  defaultQueryConnectionId,
   flowEdgesKey,
   flowNodesKey,
   hasActiveTextSelection,
@@ -46,10 +47,30 @@ describe("toFlowNodes", () => {
   });
 });
 
+describe("defaultQueryConnectionId", () => {
+  const tabConn = "tab-conn";
+
+  it("prefers the connection last picked on the board", () => {
+    const q = makeComponent({ kind: "query", id: "q1", connectionId: "older" });
+    expect(defaultQueryConnectionId([q], "picked", tabConn)).toBe("picked");
+  });
+
+  it("falls back to the newest query cell that has one", () => {
+    const first = makeComponent({ kind: "query", id: "q1", connectionId: "first" });
+    const second = makeComponent({ kind: "query", id: "q2", connectionId: "second" });
+    expect(defaultQueryConnectionId([first, second], undefined, tabConn)).toBe("second");
+  });
+
+  it("falls back to the board tab's connection, then null", () => {
+    expect(defaultQueryConnectionId([], undefined, tabConn)).toBe(tabConn);
+    expect(defaultQueryConnectionId([], undefined, null)).toBeNull();
+  });
+});
+
 describe("flowNodesKey", () => {
   it("ignores content edits so a keystroke never rebuilds the nodes", () => {
     const q = makeComponent({ kind: "query", id: "q1", sql: "SELECT 1" });
-    const typed = { ...q, sql: "SELECT 12" };
+    const typed = makeComponent({ kind: "query", id: "q1", sql: "SELECT 12" });
     expect(flowNodesKey([typed])).toBe(flowNodesKey([q]));
   });
 
@@ -66,7 +87,8 @@ describe("flowNodesKey", () => {
 describe("flowEdgesKey", () => {
   it("ignores content edits", () => {
     const q = makeComponent({ kind: "query", id: "q1", sql: "SELECT 1" });
-    expect(flowEdgesKey([], [{ ...q, sql: "SELECT 2" }])).toBe(flowEdgesKey([], [q]));
+    const typed = makeComponent({ kind: "query", id: "q1", sql: "SELECT 2" });
+    expect(flowEdgesKey([], [typed])).toBe(flowEdgesKey([], [q]));
   });
 
   it("changes when an arrow or a binding changes", () => {
@@ -75,9 +97,8 @@ describe("flowEdgesKey", () => {
     expect(flowEdgesKey([{ id: "e1", source: "q1", target: "t1" }], [q, t])).not.toBe(
       flowEdgesKey([], [q, t]),
     );
-    expect(flowEdgesKey([], [q, { ...t, sourceQueryId: "q1" }])).not.toBe(
-      flowEdgesKey([], [q, t]),
-    );
+    const bound = makeComponent({ kind: "table", id: "t1", sourceQueryId: "q1" });
+    expect(flowEdgesKey([], [q, bound])).not.toBe(flowEdgesKey([], [q, t]));
   });
 });
 

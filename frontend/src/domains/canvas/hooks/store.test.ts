@@ -15,7 +15,7 @@ const get = () => useCanvasStore.getState();
 
 describe("useCanvasStore", () => {
   beforeEach(() => {
-    useCanvasStore.setState({ boards: {}, clipboard: null });
+    useCanvasStore.setState({ boards: {}, clipboard: null, lastQueryConnection: {} });
     vi.clearAllMocks();
   });
 
@@ -34,6 +34,17 @@ describe("useCanvasStore", () => {
     expect(get().boards[TAB].doc.components[0]).toMatchObject({ x: 50 });
     get().removeComponent(TAB, "t");
     expect(get().boards[TAB].doc.components).toHaveLength(0);
+  });
+
+  it("remembers the connection last picked for a query object", () => {
+    get().ensureBoard(TAB, "");
+    get().addComponent(TAB, makeComponent({ kind: "query", id: "q", sql: "" }));
+    get().addComponent(TAB, makeComponent({ kind: "table", id: "t" }));
+    get().updateComponent(TAB, "q", { connectionId: "conn-a" });
+    expect(get().lastQueryConnection[TAB]).toBe("conn-a");
+    // A viewer object bound to a source is not a connection pick.
+    get().updateComponent(TAB, "t", { sourceQueryId: "q" });
+    expect(get().lastQueryConnection[TAB]).toBe("conn-a");
   });
 
   it("removing an object also drops its edges and run state", () => {
