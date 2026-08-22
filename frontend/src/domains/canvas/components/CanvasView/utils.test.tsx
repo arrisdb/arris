@@ -5,6 +5,8 @@ import {
   buildEdgeMenuItems,
   buildNodeMenuItems,
   COMPONENT_KINDS,
+  flowEdgesKey,
+  flowNodesKey,
   hasActiveTextSelection,
   isEditableTarget,
   nodeTypes,
@@ -41,6 +43,41 @@ describe("toFlowNodes", () => {
     const c = makeComponent({ kind: "shape", id: "s", shape: "rect" });
     const [node] = toFlowNodes([{ ...c, locked: true }], "tab-1");
     expect(node.draggable).toBe(false);
+  });
+});
+
+describe("flowNodesKey", () => {
+  it("ignores content edits so a keystroke never rebuilds the nodes", () => {
+    const q = makeComponent({ kind: "query", id: "q1", sql: "SELECT 1" });
+    const typed = { ...q, sql: "SELECT 12" };
+    expect(flowNodesKey([typed])).toBe(flowNodesKey([q]));
+  });
+
+  it("changes when geometry, lock state, or the object set changes", () => {
+    const q = makeComponent({ kind: "query", id: "q1", x: 0, y: 0 });
+    expect(flowNodesKey([{ ...q, x: 5 }])).not.toBe(flowNodesKey([q]));
+    expect(flowNodesKey([{ ...q, locked: true }])).not.toBe(flowNodesKey([q]));
+    expect(flowNodesKey([q, makeComponent({ kind: "text", id: "t1" })])).not.toBe(
+      flowNodesKey([q]),
+    );
+  });
+});
+
+describe("flowEdgesKey", () => {
+  it("ignores content edits", () => {
+    const q = makeComponent({ kind: "query", id: "q1", sql: "SELECT 1" });
+    expect(flowEdgesKey([], [{ ...q, sql: "SELECT 2" }])).toBe(flowEdgesKey([], [q]));
+  });
+
+  it("changes when an arrow or a binding changes", () => {
+    const q = makeComponent({ kind: "query", id: "q1" });
+    const t = makeComponent({ kind: "table", id: "t1" });
+    expect(flowEdgesKey([{ id: "e1", source: "q1", target: "t1" }], [q, t])).not.toBe(
+      flowEdgesKey([], [q, t]),
+    );
+    expect(flowEdgesKey([], [q, { ...t, sourceQueryId: "q1" }])).not.toBe(
+      flowEdgesKey([], [q, t]),
+    );
   });
 });
 

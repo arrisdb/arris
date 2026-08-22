@@ -17,6 +17,8 @@ import type {
 import { makeComponent, nextQueryTitle, serializeDoc } from "../../utils";
 import type { CanvasMode, CanvasNodeData } from "./types";
 import {
+  flowEdgesKey,
+  flowNodesKey,
   hasActiveTextSelection,
   isEditableTarget,
   toFlowEdges,
@@ -60,19 +62,22 @@ function useCanvas(tab: EditorTab) {
   const components = board?.doc.components ?? EMPTY_COMPONENTS;
   const edges = board?.doc.edges ?? EMPTY_EDGES;
 
-  const flowNodes = useMemo(
-    () => toFlowNodes(components, tabId),
-    [components, tabId],
-  );
-  const rfEdges = useMemo(() => toFlowEdges(edges, components), [edges, components]);
+  // Keyed on what ReactFlow actually renders, not on `components` identity: a
+  // keystroke rewrites SQL, and re-rendering the node then eats the input.
+  const nodesKey = flowNodesKey(components);
+  const edgesKey = flowEdgesKey(edges, components);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed by `nodesKey`
+  const flowNodes = useMemo(() => toFlowNodes(components, tabId), [nodesKey, tabId]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed by `edgesKey`
+  const rfEdges = useMemo(() => toFlowEdges(edges, components), [edgesKey]);
 
   const [rfNodes, setRfNodes] = useState<Node<CanvasNodeData>[]>(flowNodes);
 
   // Reseed local nodes only when the SET of objects changes (add/remove);
   // otherwise keep the live drag positions and just refresh node identity.
   const structuralKey = useMemo(
-    () => components.map((c) => `${c.id}:${c.kind}`).sort().join(","),
-    [components],
+    () => flowNodes.map((n) => `${n.id}:${n.type}`).sort().join(","),
+    [flowNodes],
   );
   const prevKeyRef = useRef(structuralKey);
   useEffect(() => {

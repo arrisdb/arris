@@ -55,6 +55,25 @@ describe("useCanvas", () => {
     expect(comp).toMatchObject({ kind: "query", connectionId: "conn-1" });
   });
 
+  it("keeps the ReactFlow nodes identical across an SQL edit (input-loss guard)", () => {
+    const { result } = renderHook(() => useCanvas(tab));
+    act(() => result.current.addQuery());
+    const id = useCanvasStore.getState().boards["tab-1"].doc.components[0].id;
+    const before = result.current.rfNodes;
+    act(() => useCanvasStore.getState().updateComponent("tab-1", id, { sql: "SELECT 1" }));
+    expect(result.current.rfNodes).toBe(before);
+  });
+
+  it("rebuilds the ReactFlow nodes when geometry changes", () => {
+    const { result } = renderHook(() => useCanvas(tab));
+    act(() => result.current.addQuery());
+    const id = useCanvasStore.getState().boards["tab-1"].doc.components[0].id;
+    const before = result.current.rfNodes;
+    act(() => useCanvasStore.getState().updateComponent("tab-1", id, { x: 999 }));
+    expect(result.current.rfNodes).not.toBe(before);
+    expect(result.current.rfNodes[0].position.x).toBe(999);
+  });
+
   it("addChart appends a chart object", () => {
     const { result } = renderHook(() => useCanvas(tab));
     act(() => result.current.addChart());
