@@ -6,7 +6,18 @@ import {
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { syntaxHighlighting } from "@codemirror/language";
 import { type Extension } from "@codemirror/state";
-import { drawSelection, EditorView, keymap, lineNumbers, placeholder } from "@codemirror/view";
+import {
+  Decoration,
+  drawSelection,
+  EditorView,
+  keymap,
+  lineNumbers,
+  placeholder,
+  ViewPlugin,
+  type DecorationSet,
+  type ViewUpdate,
+} from "@codemirror/view";
+import { RangeSetBuilder } from "@codemirror/state";
 
 import { arrisHighlight } from "@shared/ui/utils/codeHighlight";
 import {
@@ -18,7 +29,8 @@ import {
 } from "@domains/editor";
 import type { DatabaseKind, QueryResult, SchemaNode } from "@shared";
 
-import { SQL_FONT_SIZE } from "./constants";
+import { CELL_REF_MARK_CLASS, SQL_FONT_SIZE } from "./constants";
+import { CELL_REF_QUOTE } from "../../../../constants";
 
 // Transparent theme bound to the app tokens: the query node supplies its own
 // background, so the editor stays flush inside the node body.
@@ -34,6 +46,7 @@ const theme = EditorView.theme(
     ".cm-cursor, .cm-dropCursor": { borderLeftColor: "var(--m-accent, #7c8cff)" },
     ".cm-scroller": { fontFamily: "var(--m-font-editor, var(--m-font-mono))", lineHeight: "1.5" },
     ".cm-line": { padding: "0" },
+    [`.${CELL_REF_MARK_CLASS}`]: { color: "var(--m-accent)" },
     ".cm-gutters": {
       backgroundColor: "transparent",
       border: "none",
@@ -97,6 +110,44 @@ function buildCanvasSqlSupport(input: CanvasSqlSupportInput): Extension[] {
   ];
 }
 
+const cellRefMark = Decoration.mark({ class: CELL_REF_MARK_CLASS });
+
+// Backtick-quoted spans in the visible viewport, so `FROM `Query 1`` reads as a
+// reference to another cell rather than as broken SQL.
+function cellRefDecorations(view: EditorView): DecorationSet {
+  const builder = new RangeSetBuilder<Decoration>();
+  for (const { from, to } of view.visibleRanges) {
+    const text = view.state.doc.sliceString(from, to);
+    let cursor = 0;
+    for (;;) {
+      const open = text.indexOf(CELL_REF_QUOTE, cursor);
+      if (open === -1) break;
+      const close = text.indexOf(CELL_REF_QUOTE, open + 1);
+      if (close === -1) break;
+      builder.add(from + open, from + close + 1, cellRefMark);
+      cursor = close + 1;
+    }
+  }
+  return builder.finish();
+}
+
+function cellRefHighlight(): Extension {
+  return ViewPlugin.fromClass(
+    class {
+      decorations: DecorationSet;
+      constructor(view: EditorView) {
+        this.decorations = cellRefDecorations(view);
+      }
+      update(update: ViewUpdate) {
+        if (update.docChanged || update.viewportChanged) {
+          this.decorations = cellRefDecorations(update.view);
+        }
+      }
+    },
+    { decorations: (plugin: { decorations: DecorationSet }) => plugin.decorations },
+  );
+}
+
 interface QueryEditorExtensionsInput {
   onChange: (value: string) => void;
   onRun: () => void;
@@ -115,6 +166,7 @@ function queryEditorExtensions(input: QueryEditorExtensionsInput): Extension[] {
     drawSelection(),
     lineNumbers(),
     indentGuidesExtension(),
+    cellRefHighlight(),
     // `support` always carries the SQL language (plus schema completion once the
     // schema loads), so no standalone `sql()` is added here.
     support,

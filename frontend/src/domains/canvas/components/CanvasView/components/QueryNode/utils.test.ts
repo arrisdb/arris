@@ -1,8 +1,24 @@
 import { describe, expect, it } from "vitest";
+import { EditorState } from "@codemirror/state";
+import { EditorView } from "@codemirror/view";
+import { sql } from "@codemirror/lang-sql";
 
 import type { QueryResult } from "@shared";
 
-import { runResultSummary } from "./utils";
+import { CELL_REF_MARK_CLASS } from "./constants";
+import { queryEditorExtensions, runResultSummary } from "./utils";
+
+function mount(doc: string): EditorView {
+  const parent = document.createElement("div");
+  document.body.appendChild(parent);
+  return new EditorView({
+    parent,
+    state: EditorState.create({
+      doc,
+      extensions: queryEditorExtensions({ support: sql(), onChange: () => {}, onRun: () => {} }),
+    }),
+  });
+}
 
 function result(rows: number, cols: number): QueryResult {
   return {
@@ -39,5 +55,27 @@ describe("runResultSummary", () => {
     expect(runResultSummary(result(100, 1), 0, false)).toBe(
       "100+ rows · 1 column",
     );
+  });
+});
+
+describe("cell reference highlighting", () => {
+  it("marks a backtick-quoted reference", () => {
+    const view = mount("SELECT * FROM `Query 1`");
+    const marks = view.dom.querySelectorAll(`.${CELL_REF_MARK_CLASS}`);
+    expect(marks).toHaveLength(1);
+    expect(marks[0].textContent).toBe("`Query 1`");
+    view.destroy();
+  });
+
+  it("leaves an unbalanced quote unmarked", () => {
+    const view = mount("SELECT * FROM `Query 1");
+    expect(view.dom.querySelectorAll(`.${CELL_REF_MARK_CLASS}`)).toHaveLength(0);
+    view.destroy();
+  });
+
+  it("draws its own caret layer so the cursor tracks programmatic edits", () => {
+    const view = mount("SELECT 1");
+    expect(view.dom.querySelector(".cm-cursorLayer")).not.toBeNull();
+    view.destroy();
   });
 });

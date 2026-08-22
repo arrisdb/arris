@@ -28,6 +28,10 @@ pub const CANVAS_CELL_CACHE_DIR_NAME: &str = "canvas-cell-cache";
 /// keys use the cell id, so this collides only between two such titles.
 pub(super) const CELL_IDENT_FALLBACK: &str = "cell";
 
+/// Quote a cell reference may be wrapped in (`` `Query 1` ``). Rewritten to the
+/// cell's identifier before the SQL reaches DataFusion, which has no backticks.
+pub(super) const CELL_REF_QUOTE: char = '`';
+
 /// XChaCha20-Poly1305 key length (256-bit) for the per-session spill cipher.
 pub(super) const SPILL_KEY_LEN: usize = 32;
 

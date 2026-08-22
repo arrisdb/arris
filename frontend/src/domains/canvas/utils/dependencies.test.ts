@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import { makeComponent } from "./factory";
-import { cellTableName, deriveDataEdges, sanitizeCellTitle } from "./dependencies";
+import {
+  cellTableName,
+  deriveDataEdges,
+  normalizeCellRefs,
+  sanitizeCellTitle,
+} from "./dependencies";
 
 describe("sanitizeCellTitle", () => {
   it("matches the backend identifier rules", () => {
@@ -10,6 +15,20 @@ describe("sanitizeCellTitle", () => {
     expect(sanitizeCellTitle("2024 totals")).toBe("_2024_totals");
     expect(sanitizeCellTitle("a--b__c")).toBe("a_b_c");
     expect(sanitizeCellTitle("!!!")).toBe("cell");
+  });
+});
+
+describe("normalizeCellRefs", () => {
+  it("rewrites a backtick-quoted title to the cell identifier", () => {
+    expect(normalizeCellRefs("SELECT * FROM `Query 1`")).toBe("SELECT * FROM query_1");
+  });
+
+  it("leaves backticks inside string literals alone", () => {
+    expect(normalizeCellRefs("SELECT '`Query 1`' AS s")).toBe("SELECT '`Query 1`' AS s");
+  });
+
+  it("leaves an unbalanced quote as typed", () => {
+    expect(normalizeCellRefs("SELECT * FROM `Query 1")).toBe("SELECT * FROM `Query 1");
   });
 });
 
@@ -51,6 +70,21 @@ describe("deriveDataEdges", () => {
     const existing = { id: "keep", source: "a", target: "b" };
     const edges = deriveDataEdges([a, b], [existing]);
     expect(edges).toEqual([existing]);
+  });
+});
+
+describe("deriveDataEdges with quoted references", () => {
+  it("draws the arrow for a backtick-quoted title", () => {
+    const source = makeComponent({ kind: "query", id: "s", title: "Query 1", sql: "SELECT 1" });
+    const reader = makeComponent({
+      kind: "query",
+      id: "r",
+      title: "Query 2",
+      sql: "SELECT * FROM `Query 1`",
+    });
+    const edges = deriveDataEdges([source, reader], []);
+    expect(edges).toHaveLength(1);
+    expect(edges[0]).toMatchObject({ source: "s", target: "r" });
   });
 });
 
