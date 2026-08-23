@@ -1,4 +1,4 @@
-import { CELL_IDENT_FALLBACK } from "../constants";
+import { CELL_IDENT_FALLBACK, CELL_REF_QUOTE } from "../constants";
 import type { CanvasComponent, CanvasEdge, QueryComponent } from "../types";
 import { makeEdge } from "./factory";
 
@@ -34,11 +34,43 @@ function cellTableName(id: string): string {
   return sanitizeIdent(id);
 }
 
+/// Rewrite backtick-quoted names to the identifier the cell registers under.
+/// Mirrors the backend `CanvasEngine::normalize_cell_refs`.
+function normalizeCellRefs(sql: string): string {
+  let out = "";
+  let inString = false;
+  for (let i = 0; i < sql.length; i += 1) {
+    const ch = sql[i];
+    if (inString) {
+      out += ch;
+      if (ch === "'") inString = false;
+      continue;
+    }
+    if (ch === "'") {
+      inString = true;
+      out += ch;
+      continue;
+    }
+    if (ch !== CELL_REF_QUOTE) {
+      out += ch;
+      continue;
+    }
+    const close = sql.indexOf(CELL_REF_QUOTE, i + 1);
+    if (close === -1) {
+      out += sql.slice(i);
+      break;
+    }
+    out += sanitizeIdent(sql.slice(i + 1, close));
+    i = close;
+  }
+  return out;
+}
+
 /// The table names referenced after `FROM`/`JOIN`, lowercased to their leading
 /// identifier. Mirrors the backend `CanvasEngine::table_refs` so the arrows the
 /// UI draws match the dependencies the engine actually runs.
 function tableRefs(sql: string): string[] {
-  const tokens = sql.split(/[\s,()]+/).filter(Boolean);
+  const tokens = normalizeCellRefs(sql).split(/[\s,()]+/).filter(Boolean);
   const out: string[] = [];
   for (let i = 0; i < tokens.length; i += 1) {
     const upper = tokens[i].toUpperCase();
@@ -99,4 +131,4 @@ function deriveDataEdges(
   return [...keptOthers, ...dependencyEdges];
 }
 
-export { cellTableName, deriveDataEdges, sanitizeCellTitle };
+export { cellTableName, deriveDataEdges, normalizeCellRefs, sanitizeCellTitle };

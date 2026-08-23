@@ -89,6 +89,40 @@ function toFlowNodes(
   }));
 }
 
+/// The connection a new query cell starts on: the one last picked on this board,
+/// else the newest query cell's, else the board tab's own connection.
+function defaultQueryConnectionId(
+  components: CanvasComponent[],
+  lastPicked: string | undefined,
+  tabConnectionId: string | null | undefined,
+): string | null {
+  if (lastPicked) return lastPicked;
+  for (let i = components.length - 1; i >= 0; i--) {
+    const c = components[i];
+    if (c.kind === "query" && c.connectionId) return c.connectionId;
+  }
+  return tabConnectionId ?? null;
+}
+
+/// Identity of the ReactFlow node list: only the fields `toFlowNodes` reads. A
+/// keystroke rewrites a query's SQL, and rebuilding nodes then would re-render
+/// the cell mid-input and drop characters.
+function flowNodesKey(components: CanvasComponent[]): string {
+  return components
+    .map((c) => `${c.id}:${c.kind}:${c.x}:${c.y}:${c.w}:${c.h}:${c.z}:${c.locked ?? false}`)
+    .join(",");
+}
+
+/// Identity of the ReactFlow edge list: the arrows plus the bindings they are
+/// derived from. Same reason as `flowNodesKey`.
+function flowEdgesKey(edges: CanvasEdge[], components: CanvasComponent[]): string {
+  const edgePart = edges.map((e) => `${e.id}:${e.source}:${e.target}`).join(",");
+  const bindPart = components
+    .map((c) => `${c.id}:${c.kind}:${"sourceQueryId" in c ? c.sourceQueryId ?? "" : ""}`)
+    .join(",");
+  return `${edgePart}|${bindPart}`;
+}
+
 /// Every table/chart bound to a query gets a derived query->viewer arrow, so the
 /// relationship always shows even for a viewer bound before any edge was
 /// persisted. A persisted edge for the same pair wins (dedup by source->target).
@@ -223,7 +257,10 @@ export {
   buildEdgeMenuItems,
   buildNodeMenuItems,
   COMPONENT_KINDS,
+  defaultQueryConnectionId,
   edgeTypes,
+  flowEdgesKey,
+  flowNodesKey,
   hasActiveTextSelection,
   isEditableTarget,
   nodeTypes,

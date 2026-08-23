@@ -13,7 +13,9 @@ use futures::stream::BoxStream;
 use futures::StreamExt;
 use tokio_util::sync::CancellationToken;
 
-use super::constants::{CELL_IDENT_FALLBACK, CELL_RESULT_PAGE_ROWS, QUERY_MEMORY_POOL_SIZE};
+use super::constants::{
+    CELL_IDENT_FALLBACK, CELL_REF_QUOTE, CELL_RESULT_PAGE_ROWS, QUERY_MEMORY_POOL_SIZE,
+};
 use super::errors::CanvasError;
 use super::impl_cell_cache_writer::CellCacheWriter;
 use super::impl_cell_result_cache::CellResultCache;
@@ -65,11 +67,55 @@ impl CanvasEngine {
         trimmed.to_string()
     }
 
+    /// Rewrite backtick-quoted names to the identifier the cell registers under
+    /// (DataFusion has no backticks). Quotes inside string literals are kept.
+    pub fn normalize_cell_refs(sql: &str) -> String {
+        let mut out = String::with_capacity(sql.len());
+        let mut chars = sql.chars();
+        let mut in_string = false;
+        while let Some(ch) = chars.next() {
+            if in_string {
+                out.push(ch);
+                if ch == '\'' {
+                    in_string = false;
+                }
+                continue;
+            }
+            match ch {
+                '\'' => {
+                    in_string = true;
+                    out.push(ch);
+                }
+                CELL_REF_QUOTE => {
+                    let mut inner = String::new();
+                    let mut closed = false;
+                    for c in chars.by_ref() {
+                        if c == CELL_REF_QUOTE {
+                            closed = true;
+                            break;
+                        }
+                        inner.push(c);
+                    }
+                    if closed {
+                        out.push_str(&Self::sanitize_ident(&inner));
+                    } else {
+                        out.push(CELL_REF_QUOTE);
+                        out.push_str(&inner);
+                    }
+                }
+                _ => out.push(ch),
+            }
+        }
+        out
+    }
+
     /// The table names referenced after `FROM`/`JOIN`, lowercased and stripped to
     /// their leading identifier. A dotted name (`conn.schema.table`) reduces to
     /// its first segment, which a cell title never matches, so a federation/live
     /// reference simply doesn't resolve to a cell here.
     pub fn table_refs(sql: &str) -> Vec<String> {
+        let normalized = Self::normalize_cell_refs(sql);
+        let sql = normalized.as_str();
         let tokens: Vec<&str> = sql
             .split(|c: char| c.is_whitespace() || c == ',' || c == '(' || c == ')')
             .filter(|t| !t.is_empty())
@@ -208,7 +254,8 @@ impl CanvasEngine {
         sql: &str,
         refs: &HashMap<String, String>,
     ) -> Result<Vec<RecordBatch>, CanvasError> {
-        let sql = sql.trim().trim_end_matches(';').trim();
+        let normalized = Self::normalize_cell_refs(sql);
+        let sql = normalized.trim().trim_end_matches(';').trim();
         let ctx = Self::session_context()?;
         for name in Self::table_refs(sql) {
             // A reference naming a cell by title resolves through `refs`; one that
@@ -782,6 +829,45 @@ mod tests {
             .unwrap();
         assert_eq!(int_at(&out.result, 0, 0), 18);
         assert!(engine.cache().contains(&CanvasEngine::key(BOARD, "query-bbb")));
+    }
+
+    /// A backtick-quoted title reads the cell, so the user can write the title
+    /// exactly as it appears on the board (spaces and all).
+    #[tokio::test]
+    async fn a_backtick_quoted_title_reference_reads_the_cell() {
+        let engine = engine();
+        engine.cache_result(BOARD, "query-aaa", &sales_result()).unwrap();
+        let refs = HashMap::from([("query_1".to_string(), "query-aaa".to_string())]);
+
+        let out = engine
+            .run_cell(BOARD, "query-bbb", "SELECT SUM(total) AS grand FROM `Query 1`", &refs)
+            .await
+            .unwrap();
+        assert_eq!(int_at(&out.result, 0, 0), 18);
+    }
+
+    #[test]
+    fn normalize_cell_refs_rewrites_quoted_names_only_outside_strings() {
+        assert_eq!(
+            CanvasEngine::normalize_cell_refs("SELECT * FROM `Query 1` JOIN `2nd cell`"),
+            "SELECT * FROM query_1 JOIN _2nd_cell"
+        );
+        // A backtick inside a literal is data, not a reference.
+        assert_eq!(
+            CanvasEngine::normalize_cell_refs("SELECT '`Query 1`' AS s"),
+            "SELECT '`Query 1`' AS s"
+        );
+        // An unbalanced quote is left as typed rather than swallowing the rest.
+        assert_eq!(
+            CanvasEngine::normalize_cell_refs("SELECT * FROM `Query 1"),
+            "SELECT * FROM `Query 1"
+        );
+    }
+
+    #[test]
+    fn table_refs_sees_backtick_quoted_names() {
+        let refs = CanvasEngine::table_refs("SELECT * FROM `Query 1` JOIN customers c ON true");
+        assert_eq!(refs, vec!["query_1", "customers"]);
     }
 
     /// Renaming a cell must not orphan its cached result: the key is the id.

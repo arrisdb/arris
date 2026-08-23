@@ -54,6 +54,10 @@ const DEFAULT_CHART_MAX_ROWS = 1000;
 /// the backend `CELL_IDENT_FALLBACK`.
 const CELL_IDENT_FALLBACK = "cell";
 
+/// Quote a cell reference may be wrapped in (``FROM `Query 1` ``). MUST match the
+/// backend `CELL_REF_QUOTE`.
+const CELL_REF_QUOTE = "`";
+
 /// Prefix of the title given to a new query cell (`Query 1`, `Query 2`, ...).
 /// Every query cell needs a title: it is the name downstream cells reference.
 const QUERY_TITLE_PREFIX = "Query";
@@ -74,6 +78,7 @@ export {
   CANVAS_SAVE_DEBOUNCE_MS,
   CANVAS_SPEC_FENCE,
   CELL_IDENT_FALLBACK,
+  CELL_REF_QUOTE,
   DEFAULT_CHART_MAX_ROWS,
   DEFAULT_QUERY_LIMIT,
   DEFAULT_SIZE,
