@@ -14,7 +14,7 @@
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.0",
-    "astro": "^7.1.6",
+    "astro": "^7.2.8",
     "mixpanel-browser": "^2.80.0",
     "tailwindcss": "^4.3.0"
   },
