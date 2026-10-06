@@ -123,7 +123,7 @@ gcp-bigquery-client = { version = "0.28", default-features = false, features = [
 
 # drivers: clickhouse — official ClickHouse/clickhouse-rs crate over HTTP, rustls TLS
 clickhouse = { version = "0.13", default-features = false, features = ["lz4", "rustls-tls"], optional = true }
-russh = "0.62.4"
+russh = "0.63.2"
 
 # drivers: dynamodb — official AWS SDK for Rust, PartiQL over the DynamoDB API.
 # `default-https-client`, not `rustls`: the latter pulls the smithy legacy hyper
