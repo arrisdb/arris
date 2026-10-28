@@ -2,6 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { PROJECT_HEADER, PROJECT_STORAGE_KEY, setCurrentProject } from "@shared/api";
 import { ConnectionRequestPage } from "./index";
+import { enableWebShell } from "@shared/api";
+
+// These cover the browser shell, which talks to the arris server.
+enableWebShell();
 
 const PROJECT = "/work/proj";
 
@@ -110,9 +114,14 @@ describe("ConnectionRequestPage", () => {
   });
 
   it("shows success copy after saving and does not cancel the request", async () => {
+    let saved: object = {};
     const fetchMock = stubApi({
       connection_request_get: pendingRequest("postgres"),
-      connection_save: (body) => ({ status: 200, body: { ...(body.config as object), isConnected: false } }),
+      connection_save: (body) => {
+        saved = { ...(body.config as object), scope: "local", isConnected: false };
+        return { status: 200, body: saved };
+      },
+      connection_list: () => ({ status: 200, body: [saved] }),
     });
     render(<ConnectionRequestPage />);
     fireEvent.click(await screen.findByRole("button", { name: "Save" }));

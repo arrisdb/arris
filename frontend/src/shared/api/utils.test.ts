@@ -137,3 +137,13 @@ describe("shared/api", () => {
     expect(instances).toHaveLength(2);
   });
 });
+
+describe("web shell flag", () => {
+  it("defaults to desktop IPC until the web shell enables it", async () => {
+    vi.resetModules();
+    const api = await import("./utils");
+    expect(api.isWebShell()).toBe(false);
+    api.enableWebShell();
+    expect(api.isWebShell()).toBe(true);
+  });
+});

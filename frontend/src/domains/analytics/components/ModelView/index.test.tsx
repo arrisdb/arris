@@ -3,7 +3,8 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 vi.mock("../../ipc", () => ({ modelIPC: vi.fn(), lineageIPC: vi.fn() }));
 // reactflow needs layout; the stub lists node labels and their traced columns.
-vi.mock("../LineagePanel/components/LineageView", () => ({
+vi.mock("@domains/lineage", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@domains/lineage")>()),
   LineageView: ({ nodes }: { nodes: Array<{ id: string; label: string; columns?: Array<{ name: string }> }> }) => (
     <ul data-testid="graph">
       {nodes.map((n) => (

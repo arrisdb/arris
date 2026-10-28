@@ -43,7 +43,7 @@ const LAYOUT_ORIGIN = { x: 80, y: 80 };
 const CANVAS_SAVE_DEBOUNCE_MS = 400;
 
 /// Prefix of the backend cancellation id for a cell run
-/// (`<prefix>:<tabId>:<cellId>`), passed to run and cancel IPC alike.
+/// (`<prefix>:<boardId>:<cellId>`), passed to run and cancel IPC alike.
 const CANVAS_QUERY_ID_PREFIX = "canvas-cell";
 
 /// Default max rows a chart draws when its `maxRows` is unset. Overridable per
@@ -70,20 +70,44 @@ const DEFAULT_QUERY_LIMIT = 500;
 /// finishes (the UI page arrived with the run response).
 const CANVAS_CELL_INGESTED_EVENT = "canvas://cell-ingested";
 
+/// Server (SSE) event kinds the board listens to in the browser.
+const CANVAS_CELL_INGESTED_SERVER_EVENT = "canvas_cell_ingested";
+const CANVAS_CHANGED_EVENT = "canvas_changed";
+
+/// Shown when a save conflict or another writer's change replaced local edits.
+const CANVAS_RELOADED_MESSAGE = "This canvas changed elsewhere and was reloaded.";
+
+/// Error code for a stale-revision save.
+const CANVAS_CONFLICT_CODE = "conflict";
+
+/// Prompt and default title when creating a canvas from the UI.
+const NEW_CANVAS_PROMPT = "Canvas title";
+const DEFAULT_CANVAS_TITLE = "Untitled canvas";
+
+/// Prefix of the numbered title a desktop "New Canvas" gets (`Canvas 1`, ...).
+const CANVAS_TITLE_PREFIX = "Canvas";
+
 export {
   CANVAS_ASK_FENCE,
   CANVAS_CELL_INGESTED_EVENT,
+  CANVAS_CELL_INGESTED_SERVER_EVENT,
+  CANVAS_CHANGED_EVENT,
+  CANVAS_CONFLICT_CODE,
+  CANVAS_RELOADED_MESSAGE,
   CANVAS_DOC_VERSION,
   CANVAS_QUERY_ID_PREFIX,
   CANVAS_SAVE_DEBOUNCE_MS,
   CANVAS_SPEC_FENCE,
+  CANVAS_TITLE_PREFIX,
   CELL_IDENT_FALLBACK,
   CELL_REF_QUOTE,
+  DEFAULT_CANVAS_TITLE,
   DEFAULT_CHART_MAX_ROWS,
   DEFAULT_QUERY_LIMIT,
   DEFAULT_SIZE,
   KNOWN_KINDS,
   LAYOUT_GAP,
   LAYOUT_ORIGIN,
+  NEW_CANVAS_PROMPT,
   QUERY_TITLE_PREFIX,
 };

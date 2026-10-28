@@ -4,5 +4,9 @@ import { lazy } from "react";
 const LineageContainer = lazy(() =>
   import("./components/LineageContainer").then((m) => ({ default: m.LineageContainer })),
 );
+const LineageView = lazy(() =>
+  import("./components/LineageView").then((m) => ({ default: m.LineageView })),
+);
 
-export { LineageContainer };
+export { LineageContainer, LineageView };
+export type { LineageNode } from "./components/LineageView/types";

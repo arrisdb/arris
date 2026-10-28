@@ -94,6 +94,8 @@ type KindSet = ReadonlySet<SchemaNodeKind>;
 
 interface ConnectionsState {
   connections: ScopedConnection[];
+  /// True once the first list arrives, so pages can tell "none" from "not loaded".
+  connectionsLoaded: boolean;
   selectedId: string | null;
   schemaCache: Record<string, SchemaNode[]>;
   refreshing: Set<string>;

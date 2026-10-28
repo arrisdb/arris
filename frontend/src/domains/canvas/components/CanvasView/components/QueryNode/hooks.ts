@@ -9,7 +9,7 @@ import { useCanvasStore } from "../../../../hooks";
 import { buildCanvasSqlSupport, queryEditorExtensions } from "./utils";
 
 interface QueryEditorInput {
-  tabId: string;
+  boardId: string;
   id: string;
   connectionId: string | null;
 }
@@ -22,7 +22,7 @@ interface QueryEditorInput {
 /// differs from what the editor already holds. Completion reconfigures in place
 /// when the connection's schema finishes loading.
 function useQueryEditor(host: RefObject<HTMLDivElement | null>, input: QueryEditorInput) {
-  const { tabId, id, connectionId } = input;
+  const { boardId, id, connectionId } = input;
 
   // Schema + dialect for completion, read reactively so the editor upgrades from
   // plain highlighting to schema-aware completion once the schema loads.
@@ -56,7 +56,7 @@ function useQueryEditor(host: RefObject<HTMLDivElement | null>, input: QueryEdit
     supportRef.current = support;
     const mounted = useCanvasStore
       .getState()
-      .boards[tabId]?.doc.components.find((c) => c.id === id);
+      .boards[boardId]?.doc.components.find((c) => c.id === id);
     const initialSql = mounted?.kind === "query" ? mounted.sql : "";
     const view = new EditorView({
       parent: host.current,
@@ -64,8 +64,8 @@ function useQueryEditor(host: RefObject<HTMLDivElement | null>, input: QueryEdit
         doc: initialSql,
         extensions: queryEditorExtensions({
           support: support.of(buildCanvasSqlSupport({ connectionKind, schemaNodes })),
-          onChange: (value) => useCanvasStore.getState().updateComponent(tabId, id, { sql: value }),
-          onRun: () => void useCanvasStore.getState().runQueryComponent(tabId, id),
+          onChange: (value) => useCanvasStore.getState().updateComponent(boardId, id, { sql: value }),
+          onRun: () => void useCanvasStore.getState().runQueryComponent(boardId, id),
         }),
       }),
     });
@@ -76,7 +76,7 @@ function useQueryEditor(host: RefObject<HTMLDivElement | null>, input: QueryEdit
     // the SQL on each change and dispatch only when it actually differs from the
     // editor's current doc, which also prevents our own onChange from looping.
     const unsub = useCanvasStore.subscribe((state) => {
-      const comp = state.boards[tabId]?.doc.components.find((c) => c.id === id);
+      const comp = state.boards[boardId]?.doc.components.find((c) => c.id === id);
       if (comp?.kind !== "query") return;
       const current = view.state.doc.toString();
       if (comp.sql !== current) {
@@ -91,7 +91,7 @@ function useQueryEditor(host: RefObject<HTMLDivElement | null>, input: QueryEdit
       supportRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- mount once per node; schema is reconfigured below
-  }, [tabId, id]);
+  }, [boardId, id]);
 
   // Reconfigure completion when the connection's schema/dialect changes, without
   // remounting (which would drop the caret and undo history).

@@ -9,11 +9,11 @@ import { CanvasResizer } from "../CanvasResizer";
 /// + drags the note (the idle textarea is read-only with no pointer events);
 /// double-click starts editing. Selection persists until the board is clicked.
 function StickyNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
-  const { tabId } = data;
+  const { boardId } = data;
   const [editing, setEditing] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const component = useCanvasStore((s) =>
-    s.boards[tabId]?.doc.components.find((c) => c.id === id),
+    s.boards[boardId]?.doc.components.find((c) => c.id === id),
   );
   const updateComponent = useCanvasStore((s) => s.updateComponent);
 
@@ -24,7 +24,7 @@ function StickyNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
   if (!component || component.kind !== "sticky") return null;
   return (
     <>
-      <CanvasResizer tabId={tabId} id={id} visible={selected} />
+      <CanvasResizer boardId={boardId} id={id} visible={selected} />
       <div
         className={`mdbc-canvas-node mdbc-canvas-sticky color-${component.color ?? "yellow"}${selected ? " selected" : ""}`}
         onDoubleClick={() => setEditing(true)}
@@ -36,7 +36,7 @@ function StickyNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
           placeholder="Note…"
           readOnly={!editing}
           onBlur={() => setEditing(false)}
-          onChange={(e) => updateComponent(tabId, id, { text: e.target.value })}
+          onChange={(e) => updateComponent(boardId, id, { text: e.target.value })}
         />
       </div>
     </>

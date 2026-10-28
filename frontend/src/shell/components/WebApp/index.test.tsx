@@ -6,6 +6,10 @@ import { EMPTY_TEST_ID, ROW_TEST_ID } from "@domains/history/components/HistoryV
 import { RERUN_TEST_ID } from "@domains/results/components/RunResultView/constants";
 import { PINNED_LABEL } from "./components/WebSidebar/constants";
 import { NO_PROJECT_MESSAGE, WEB_APP_TEST_ID } from "./constants";
+import { enableWebShell } from "@shared/api";
+
+// These cover the browser shell, which talks to the arris server.
+enableWebShell();
 
 class FakeEventSource {
   static last: FakeEventSource | null = null;
@@ -200,19 +204,13 @@ describe("WebApp", () => {
     window.history.replaceState(null, "", "/pinned?project=%2Fwork%2Fproj");
     const fetchMock = stubFetch({
       pin_list: [
-        {
-          id: "p1",
-          title: "Orders",
-          sql: "select 1",
-          connectionId: "c1",
-          createdAt: "2026-10-25T10:00:00Z",
-        },
+        { id: "p1", name: "Orders", text: "select 1", connectionId: "c1", kind: "postgres" },
       ],
       connection_list: [],
       query_run: { run: { id: "r7" }, result: {} },
     });
     render(<WebApp />);
-    fireEvent.click(await screen.findByTestId("pinned-query-run-p1"));
+    fireEvent.doubleClick(await screen.findByTestId("pinned-query-p1"));
     expect(fetchMock.mock.calls.some(([url]) => String(url).endsWith("/connection_list"))).toBe(true);
     await waitFor(() => expect(window.location.pathname).toBe("/runs/r7"));
     expect(new URLSearchParams(window.location.search).get("project")).toBe("/work/proj");

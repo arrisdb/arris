@@ -11,11 +11,11 @@ import { CanvasResizer } from "../CanvasResizer";
 /// edits the label. The "Add text" hint shows only while the shape is selected.
 /// Rectangles also get a radius handle (riding the top edge) to round corners.
 function ShapeNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
-  const { tabId } = data;
+  const { boardId } = data;
   const [editing, setEditing] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const component = useCanvasStore((s) =>
-    s.boards[tabId]?.doc.components.find((c) => c.id === id),
+    s.boards[boardId]?.doc.components.find((c) => c.id === id),
   );
   const updateComponent = useCanvasStore((s) => s.updateComponent);
   const shape = component && component.kind === "shape" ? component : null;
@@ -72,7 +72,7 @@ function ShapeNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
     const maxR = Math.min(shape.w, shape.h) / 2;
     const onMove = (ev: PointerEvent) => {
       const next = Math.max(0, Math.min(maxR, startR + (ev.clientX - startX)));
-      updateComponent(tabId, id, { radius: next });
+      updateComponent(boardId, id, { radius: next });
     };
     const onUp = () => {
       window.removeEventListener("pointermove", onMove);
@@ -88,7 +88,7 @@ function ShapeNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
 
   return (
     <>
-      <CanvasResizer tabId={tabId} id={id} visible={selected} />
+      <CanvasResizer boardId={boardId} id={id} visible={selected} />
       <div
         className={`mdbc-canvas-node mdbc-canvas-shape${isLine ? " mdbc-canvas-shape-line-node" : ""}${selected ? " selected" : ""}`}
         style={css}
@@ -112,7 +112,7 @@ function ShapeNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
             placeholder={selected ? "Add text" : ""}
             readOnly={!editing}
             onBlur={() => setEditing(false)}
-            onChange={(e) => updateComponent(tabId, id, { text: e.target.value })}
+            onChange={(e) => updateComponent(boardId, id, { text: e.target.value })}
           />
         )}
         {selected && shape.shape === "rect" && (

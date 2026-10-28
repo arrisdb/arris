@@ -1,6 +1,6 @@
 import type { ChartSpec } from "@shared";
 
-import { DEFAULT_SIZE, QUERY_TITLE_PREFIX } from "../constants";
+import { DEFAULT_SIZE, CANVAS_TITLE_PREFIX, QUERY_TITLE_PREFIX } from "../constants";
 import type {
   CanvasComponent,
   CanvasEdge,
@@ -145,5 +145,14 @@ function nextQueryTitle(components: CanvasComponent[]): string {
   }
 }
 
-export { genId, makeComponent, makeEdge, nextQueryTitle };
+/// The first free numbered canvas title (`Canvas 1`, `Canvas 2`, ...).
+function nextCanvasTitle(titles: string[]): string {
+  const taken = new Set(titles);
+  for (let n = 1; ; n += 1) {
+    const title = `${CANVAS_TITLE_PREFIX} ${n}`;
+    if (!taken.has(title)) return title;
+  }
+}
+
+export { genId, makeComponent, makeEdge, nextCanvasTitle, nextQueryTitle };
 export type { ComponentInput };

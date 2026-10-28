@@ -20,7 +20,7 @@ const RESULT: QueryResult = {
 describe("ChartSection", () => {
   beforeEach(() => {
     useCanvasStore.setState({ boards: {} });
-    useCanvasStore.getState().ensureBoard(TAB, "");
+    useCanvasStore.getState().loadBoard(TAB, { version: 1, components: [], edges: [] }, 0);
     useCanvasStore
       .getState()
       .addComponent(TAB, makeComponent({ kind: "query", id: "q1", title: "Orders", connectionId: null }));
@@ -29,7 +29,7 @@ describe("ChartSection", () => {
   it("writes the chart kind through the shared editor's type grid", () => {
     const onChange = vi.fn();
     const { getByTestId } = render(
-      <ChartSection tabId={TAB} component={chart} onChange={onChange} />,
+      <ChartSection boardId={TAB} component={chart} onChange={onChange} />,
     );
     fireEvent.click(getByTestId("chart-editor-kind-line"));
     expect(onChange).toHaveBeenCalledWith(
@@ -40,7 +40,7 @@ describe("ChartSection", () => {
   it("offers the board's query objects as the source", () => {
     const onChange = vi.fn();
     const { getByTestId, getByRole } = render(
-      <ChartSection tabId={TAB} component={chart} onChange={onChange} />,
+      <ChartSection boardId={TAB} component={chart} onChange={onChange} />,
     );
     fireEvent.click(getByTestId("chart-source-select"));
     fireEvent.click(getByRole("option", { name: "Orders" }));
@@ -56,7 +56,7 @@ describe("ChartSection", () => {
     }));
     const onChange = vi.fn();
     const { getByTestId, getAllByText } = render(
-      <ChartSection tabId={TAB} component={chart} onChange={onChange} />,
+      <ChartSection boardId={TAB} component={chart} onChange={onChange} />,
     );
     fireEvent.click(getByTestId("chart-editor-x-axis"));
     // The column appears in the menu (and possibly the trigger), so allow many.
@@ -66,7 +66,7 @@ describe("ChartSection", () => {
   it("edits the object title through the shared Title field, peeled off the spec", () => {
     const onChange = vi.fn();
     const { getByTestId } = render(
-      <ChartSection tabId={TAB} component={chart} onChange={onChange} />,
+      <ChartSection boardId={TAB} component={chart} onChange={onChange} />,
     );
     fireEvent.change(getByTestId("chart-editor-title"), { target: { value: "Sales" } });
     expect(onChange).toHaveBeenCalledWith(
@@ -78,7 +78,7 @@ describe("ChartSection", () => {
 
   it("shows the default max rows as the field value, not a placeholder", () => {
     const { getByTestId } = render(
-      <ChartSection tabId={TAB} component={chart} onChange={vi.fn()} />,
+      <ChartSection boardId={TAB} component={chart} onChange={vi.fn()} />,
     );
     expect((getByTestId("chart-max-rows") as HTMLInputElement).value).toBe("1000");
   });
@@ -86,7 +86,7 @@ describe("ChartSection", () => {
   it("edits the per-chart max rows", () => {
     const onChange = vi.fn();
     const { getByTestId } = render(
-      <ChartSection tabId={TAB} component={chart} onChange={onChange} />,
+      <ChartSection boardId={TAB} component={chart} onChange={onChange} />,
     );
     fireEvent.change(getByTestId("chart-max-rows"), { target: { value: "250" } });
     expect(onChange).toHaveBeenCalledWith({ maxRows: 250 });
@@ -96,7 +96,7 @@ describe("ChartSection", () => {
     const onChange = vi.fn();
     const withMax = makeComponent({ kind: "chart", id: "ch", sourceQueryId: "q1", maxRows: 250 });
     const { getByTestId } = render(
-      <ChartSection tabId={TAB} component={withMax} onChange={onChange} />,
+      <ChartSection boardId={TAB} component={withMax} onChange={onChange} />,
     );
     fireEvent.change(getByTestId("chart-max-rows"), { target: { value: "" } });
     expect(onChange).toHaveBeenCalledWith({ maxRows: undefined });
@@ -105,7 +105,7 @@ describe("ChartSection", () => {
   it("renders nothing for a non-chart object", () => {
     const other = makeComponent({ kind: "shape", id: "s", shape: "rect" });
     const { container } = render(
-      <ChartSection tabId={TAB} component={other} onChange={vi.fn()} />,
+      <ChartSection boardId={TAB} component={other} onChange={vi.fn()} />,
     );
     expect(container.querySelector(".mdbc-pane-form")).toBeNull();
   });

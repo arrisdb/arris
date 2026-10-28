@@ -1,5 +1,5 @@
 import type { ColumnLineageGraph, LineageResponse } from "../../types";
-import type { LineageNode } from "./components/LineageView/types";
+import type { LineageNode } from "@domains/lineage";
 
 /// Graph nodes for `LineageView`; columns are the ones feeding the selected column, all highlighted.
 function toLineageNodes(

@@ -23,7 +23,7 @@ import {
   WEB_APP_TEST_ID,
   WIDE_ROUTES,
 } from "./constants";
-import { useAnalyticsTools, useConnectionList } from "./hooks";
+import { useAnalyticsTools, useConnectionList, useOpenPin, usePins } from "./hooks";
 import "./index.css";
 
 // Run pages and history rows can put a run's query on a canvas.
@@ -75,6 +75,16 @@ function AnalyticsPage({ tool, route }: { tool: AnalyticsTool; route: WebRoute }
   );
 }
 
+function PinnedPage() {
+  const { openPin, pinError } = useOpenPin();
+  return (
+    <>
+      {pinError && <p className="mdbc-web-error">{pinError}</p>}
+      <PinnedQueriesPane onOpenQuery={openPin} />
+    </>
+  );
+}
+
 function RouteView({ route, listError }: { route: WebRoute; listError: string | null }) {
   if ("tool" in route) return <AnalyticsPage tool={route.tool} route={route} />;
   switch (route.kind) {
@@ -103,7 +113,7 @@ function RouteView({ route, listError }: { route: WebRoute; listError: string | 
         </Suspense>
       );
     case "pinned":
-      return <PinnedQueriesPane onOpenRun={(runId) => navigate(runPath(runId))} />;
+      return <PinnedPage />;
     default:
       return (
         <HistoryView onOpenRun={(runId) => navigate(runPath(runId))} runActions={sendToCanvas} />
@@ -118,6 +128,7 @@ function WebApp() {
   const listError = useConnectionList(
     route.kind !== "connectionRequest" && project !== null,
   );
+  usePins(route.kind === "pinned" && project !== null);
 
   if (route.kind === "connectionRequest") return <ConnectionRequestPage />;
   return (

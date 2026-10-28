@@ -62,7 +62,8 @@ interface TabsState {
   /// Open a brand-new untitled in-memory notebook tab (not backed by a file).
   /// The NotebookView seeds it with a single empty Python cell on mount.
   openUntitledNotebookTab: () => EditorTab;
-  openUntitledCanvasTab: (connectionId?: string) => EditorTab;
+  /// Focus the tab of a stored canvas, opening one (tab id = canvas id) if absent.
+  openCanvasTab: (canvas: { id: string; title: string }, connectionId?: string) => EditorTab;
   /// Open (or refocus) the single "Uncommitted Changes" git diff tab. Only one
   /// can ever exist; a second call refocuses the existing one.
   openGitDiffTab: () => EditorTab;
@@ -568,19 +569,15 @@ const useTabsStore = create<TabsState>((set, get) => ({
     useSettingsStore.getState().hideBottomPane();
     return tab;
   },
-  openUntitledCanvasTab: (connectionId) => {
-    // Number from the highest existing "Canvas N" (closed boards linger in
-    // tabs[]), mirroring the notebook scheme so numbers never collide. An empty
-    // text parses to an empty board; the connection seeds query objects + the
-    // agent's schema context.
-    const maxSeq = get().tabs.reduce((max, t) => {
-      if (t.tabType !== "canvas") return max;
-      const m = /^Canvas (\d+)$/.exec(t.title);
-      return m ? Math.max(max, Number(m[1])) : max;
-    }, 0);
+  openCanvasTab: (canvas, connectionId) => {
+    const existing = get().tabs.find((t) => t.id === canvas.id);
+    if (existing) {
+      get().focusTab(existing.id);
+      return existing;
+    }
     const tab: EditorTab = {
-      id: makeId(),
-      title: `Canvas ${maxSeq + 1}`,
+      id: canvas.id,
+      title: canvas.title,
       text: "",
       kind: "canvas",
       connectionId,

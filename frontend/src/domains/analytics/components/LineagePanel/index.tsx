@@ -1,4 +1,4 @@
-import { LineageView } from "./components/LineageView";
+import { LineageView } from "@domains/lineage";
 import { EMPTY_MESSAGE, LINEAGE_TEST_ID, LOADING_MESSAGE } from "./constants";
 import { useLineagePanel } from "./hooks";
 import type { LineagePanelProps } from "./types";

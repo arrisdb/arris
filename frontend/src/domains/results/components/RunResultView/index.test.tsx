@@ -7,7 +7,7 @@ import {
   waitFor,
 } from "@testing-library/react";
 import { useConnectionsStore } from "@domains/connection/hooks";
-import type { ConnectionSummary } from "@domains/connection/components/CombinedConnectionsTree/types";
+import type { ScopedConnection } from "@domains/connection/components/CombinedConnectionsTree/types";
 import type { QueryValue } from "@shared";
 import type { RunRecord } from "@domains/history";
 import { RunResultView } from "./index";
@@ -114,7 +114,7 @@ describe("RunResultView", () => {
     vi.stubGlobal("EventSource", FakeEventSource);
     window.history.replaceState(null, "", "/?project=%2Fwork%2Fproj");
     useConnectionsStore.setState({
-      connections: [{ id: "c1", name: "warehouse" } as ConnectionSummary],
+      connections: [{ id: "c1", name: "warehouse" } as ScopedConnection],
       connectionsLoaded: true,
     });
   });

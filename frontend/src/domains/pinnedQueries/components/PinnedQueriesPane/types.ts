@@ -13,6 +13,10 @@ interface PinnedQuery {
   kind: string;
 }
 
+interface PinnedQueriesPaneProps {
+  onOpenQuery?: (query: PinnedQuery) => void;
+}
+
 interface PinnedQueriesState {
   queries: PinnedQuery[];
   paneOpen: boolean;
@@ -72,6 +76,7 @@ type PinnedQueryRenameKeyEvent = ReactKeyboardEvent<HTMLInputElement>;
 export type {
   DatabaseKind,
   PinnedQueriesContextMenuItems,
+  PinnedQueriesPaneProps,
   PinnedQueriesPaneViewModel,
   PinnedQueriesState,
   PinnedQuery,

@@ -12,6 +12,19 @@ import {
 } from "./constants";
 import type { ApiErrorBody, ServerEvent } from "./types";
 
+// Set once at startup when this bundle runs as the arris server's web UI.
+let webShell = false;
+
+/// Route IPC over the arris server's HTTP API instead of Tauri.
+function enableWebShell(): void {
+  webShell = true;
+}
+
+/// True in the browser web UI; the desktop app (and tests) use Tauri IPC.
+function isWebShell(): boolean {
+  return webShell;
+}
+
 // Project pinned by the page itself (e.g. taken from a connection request).
 let pinnedProject: string | null = null;
 
@@ -106,4 +119,13 @@ function subscribe(handler: (event: ServerEvent) => void): () => void {
   };
 }
 
-export { ApiError, apiBeacon, apiCall, currentProject, setCurrentProject, subscribe };
+export {
+  ApiError,
+  apiBeacon,
+  apiCall,
+  currentProject,
+  enableWebShell,
+  isWebShell,
+  setCurrentProject,
+  subscribe,
+};

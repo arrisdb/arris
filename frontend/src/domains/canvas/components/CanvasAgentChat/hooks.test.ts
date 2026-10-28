@@ -52,7 +52,7 @@ function fire(event: Record<string, unknown>) {
 describe("useCanvasAgentChat", () => {
   beforeEach(() => {
     useCanvasStore.setState({ boards: {} });
-    useCanvasStore.getState().ensureBoard(TAB, "");
+    useCanvasStore.getState().loadBoard(TAB, { version: 1, components: [], edges: [] }, 0);
     useConnectionsStore.setState({ connections: [], selectedId: null });
     vi.clearAllMocks();
     hoisted.handler = null;

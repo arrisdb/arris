@@ -108,6 +108,7 @@ type ErrorCode =
   | "cancelled"
   | "io"
   | "serialization"
+  | "conflict"
   | "other";
 
 interface IpcError {

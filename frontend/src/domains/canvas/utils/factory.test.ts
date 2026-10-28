@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { DEFAULT_SIZE } from "../constants";
-import { makeComponent, makeEdge, nextQueryTitle } from "./factory";
+import { makeComponent, makeEdge, nextCanvasTitle, nextQueryTitle } from "./factory";
 
 describe("makeComponent", () => {
   it("builds a text object with default size at the origin", () => {
@@ -90,5 +90,12 @@ describe("nextQueryTitle", () => {
   it("ignores non-query objects with the same title", () => {
     const cells = [makeComponent({ kind: "table", id: "t", title: "Query 1" })];
     expect(nextQueryTitle(cells)).toBe("Query 1");
+  });
+});
+
+describe("nextCanvasTitle", () => {
+  it("picks the first free numbered title", () => {
+    expect(nextCanvasTitle([])).toBe("Canvas 1");
+    expect(nextCanvasTitle(["Canvas 1", "Canvas 3", "Other"])).toBe("Canvas 2");
   });
 });

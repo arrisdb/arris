@@ -10,13 +10,13 @@ const TAB = "t";
 describe("CanvasPropertiesPane", () => {
   beforeEach(() => {
     useCanvasStore.setState({ boards: {} });
-    useCanvasStore.getState().ensureBoard(TAB, "");
+    useCanvasStore.getState().loadBoard(TAB, { version: 1, components: [], edges: [] }, 0);
   });
 
   it("labels the pane with the object kind and always shows the geometry fields", () => {
     const comp = makeComponent({ kind: "shape", id: "s", shape: "rect" });
     const { getByTestId, getByText, container } = render(
-      <CanvasPropertiesPane tabId={TAB} component={comp} onChange={vi.fn()} />,
+      <CanvasPropertiesPane boardId={TAB} component={comp} onChange={vi.fn()} />,
     );
     expect(getByTestId("canvas-properties-pane")).toBeTruthy();
     expect(getByText("Shape")).toBeTruthy();
@@ -27,7 +27,7 @@ describe("CanvasPropertiesPane", () => {
   it("shows the shape section for a shape", () => {
     const comp = makeComponent({ kind: "shape", id: "s", shape: "rect" });
     const { container } = render(
-      <CanvasPropertiesPane tabId={TAB} component={comp} onChange={vi.fn()} />,
+      <CanvasPropertiesPane boardId={TAB} component={comp} onChange={vi.fn()} />,
     );
     expect(container.querySelector('input[type="color"]')).toBeTruthy();
   });
@@ -35,7 +35,7 @@ describe("CanvasPropertiesPane", () => {
   it("shows the chart section (source picker + shared editor surface) for a chart", () => {
     const comp = makeComponent({ kind: "chart", id: "c", sourceQueryId: "" });
     const { getByTestId } = render(
-      <CanvasPropertiesPane tabId={TAB} component={comp} onChange={vi.fn()} />,
+      <CanvasPropertiesPane boardId={TAB} component={comp} onChange={vi.fn()} />,
     );
     expect(getByTestId("chart-source-select")).toBeTruthy();
     // The shared chart-editor controls are embedded (type grid, x-axis picker).

@@ -8,7 +8,7 @@ import "./index.css";
 /// A common geometry/lock section sits at the top; below it the object's
 /// kind-specific section is picked from the registry, so each kind shows its own
 /// controls (shape fill/stroke, text font, chart kind, and so on).
-function CanvasPropertiesPane({ tabId, component, onChange }: CanvasPropertiesPaneProps) {
+function CanvasPropertiesPane({ boardId, component, onChange }: CanvasPropertiesPaneProps) {
   const KindSection = SECTION_FOR[component.kind];
 
   return (
@@ -17,8 +17,8 @@ function CanvasPropertiesPane({ tabId, component, onChange }: CanvasPropertiesPa
         <span className="mdbc-pane-title">{KIND_LABEL[component.kind]}</span>
       </div>
       <div className="mdbc-pane-body">
-        <CommonSection tabId={tabId} component={component} onChange={onChange} />
-        <KindSection tabId={tabId} component={component} onChange={onChange} />
+        <CommonSection boardId={boardId} component={component} onChange={onChange} />
+        <KindSection boardId={boardId} component={component} onChange={onChange} />
       </div>
     </div>
   );

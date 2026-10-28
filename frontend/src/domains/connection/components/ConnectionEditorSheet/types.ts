@@ -14,6 +14,10 @@ interface ConnectionEditorSheetProps {
   initial: ConnectionConfig | null;
   kind: DatabaseKind;
   onSaved?: (saved: ScopedConnection) => void;
+  /// Pending browser connection request this save resolves.
+  requestId?: string;
+  /// Fields for a new connection, e.g. from a dbt profile; ignored when editing.
+  prefill?: ConnectionConfig | null;
 }
 
 interface ConnectionEditorSheetViewModel {

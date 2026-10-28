@@ -18,6 +18,8 @@ import { findLeaf, findLeafWithTab, planTabDrop } from "@shell/utils/paneTree";
 import { recordSelfWrite } from "@shell/utils/selfWrites";
 import { useEditorHandleStore } from "../../hooks/editorHandleStore";
 import { useTabsStore } from "@shell/hooks/tabsStore";
+import { useSnackbarStore } from "@shell/hooks/snackbarStore";
+import { createAndOpenCanvas } from "@domains/canvas";
 import { useTransactionStore } from "../../hooks/transactionStore";
 import type { EditorTab, PaneNode, PaneSplit, SplitDirection } from "@shell/types";
 import {
@@ -350,7 +352,6 @@ function PaneGroupView({ groupId }: { groupId: string }) {
   const addTab = useTabsStore((s) => s.addTab);
   const openTerminalTab = useTabsStore((s) => s.openTerminalTab);
   const openUntitledNotebookTab = useTabsStore((s) => s.openUntitledNotebookTab);
-  const openUntitledCanvasTab = useTabsStore((s) => s.openUntitledCanvasTab);
   const selectedConnectionId = useConnectionsStore((s) => s.selectedId);
   const selectConnection = useConnectionsStore((s) => s.selectConnection);
   const connections = useConnectionsStore((s) => s.connections);
@@ -659,7 +660,9 @@ function PaneGroupView({ groupId }: { groupId: string }) {
 
   function newCanvasTab() {
     focusGroup(groupId);
-    openUntitledCanvasTab(selectedConnectionId ?? undefined);
+    createAndOpenCanvas(selectedConnectionId ?? undefined).catch((e: unknown) =>
+      useSnackbarStore.getState().enqueue(ipcErrorMessage(e), "error"),
+    );
   }
 
   const tabConnectionId = resolveTabConnectionId({

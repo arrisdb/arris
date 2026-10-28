@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { isWebShell } from "@shared/api";
 import {
   DndContext,
   DragOverlay,
@@ -36,9 +37,9 @@ function CombinedConnectionsTree() {
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
   );
 
-  // Reordering reshuffles the whole connection list, so it only makes sense on
-  // the unfiltered view: disable drag while a filter narrows what's shown.
-  const reorderEnabled = pane.filter.trim() === "";
+  // Reorder only on the unfiltered desktop view: a filter hides rows, and the
+  // arris server has no reorder route.
+  const reorderEnabled = pane.filter.trim() === "" && !isWebShell();
   const ids = pane.visibleConnections.map((connection) => connection.id);
   const draggingConnection = draggingId
     ? pane.visibleConnections.find((connection) => connection.id === draggingId) ?? null
