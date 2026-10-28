@@ -836,7 +836,7 @@ mod tests {
     async fn engine_with_mock_secrets(dir: &std::path::Path) -> ConnectionEngine {
         ConnectionEngine::new_with_secrets(
             dir.to_path_buf(),
-            std::sync::Arc::new(crate::persistence::MockSecretStore::new()),
+            std::sync::Arc::new(crate::persistence::MemorySecretStore::new()),
         )
         .await
     }

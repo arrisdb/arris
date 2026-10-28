@@ -13,6 +13,7 @@ description = "Unified engine crate: types, drivers, persistence, connection, qu
 default = ["postgres", "sqlite", "mongodb", "mysql", "kafka", "mixpanel", "redis", "mssql", "duckdb", "oracle", "elasticsearch", "bigquery", "snowflake", "trino", "clickhouse", "dynamodb", "starrocks"]
 postgres = ["dep:tokio-postgres", "dep:bytes", "dep:tokio-postgres-rustls", "dep:rustls", "dep:rustls-pemfile", "dep:rustls-pki-types"]
 sqlite = []
+test-support = []
 mongodb = ["dep:mongodb", "dep:futures-util"]
 mysql = ["dep:mysql_async", "dep:rustls", "dep:async-stream"]
 kafka = ["dep:rdkafka", "dep:reqwest"]

@@ -55,13 +55,15 @@ pub use editor::LineCommentPrefix;
 pub use drivers::{DatabaseDriver, PaginationStrategy, driver_for_kind};
 
 pub use persistence::{
-    AppPreferences, AppPreferencesStore,
-    ConnectionsStore, ConsoleTabsStore, FederationTabsStore, JsonCollectionStore,
-    JsonSingletonStore, Keychain, KeychainError, PaneLayoutStore, SecretStore,
-    PersistedConsoleTab, PersistedFederationTab, PersistedPaneLayout, PersistedPinnedQuery,
-    PersistedRunHistoryEntry,
-    PinnedQueriesStore, ProjectError, ProjectOpenResult, ProjectState, RunHistoryStore, StoreError,
-    DataPaths,
+    AppPreferences, AppPreferencesStore, CANVAS_DIR_NAME, CANVAS_FILE_EXT, CanvasRecord,
+    CanvasStore, CanvasSummary, ConnectionsStore, ConsoleTabsStore, DataPaths,
+    FederationTabsStore, JsonCollectionStore, JsonSingletonStore, Keychain, KeychainError,
+    PaneLayoutStore, PersistedConsoleTab, PersistedFederationTab, PersistedPaneLayout,
+    PersistedPinnedQuery, PersistedRunHistoryEntry, PinnedQueriesStore, ProjectError,
+    ProjectManifest, ProjectOpenResult, ProjectState, QUERY_RUN_MAX_ENTRIES, QueryRunStore,
+    RUN_PREVIEW_MAX_ROWS, RunHistoryStore, RunPreview, RunRecord, RunSource, RunStatus,
+    SecretStore, StoreError, TOOL_RUN_HISTORY_MAX, ToolKind, ToolRunRecord, ToolRunStore,
+    ToolRunSummary,
 };
 
 #[cfg(test)]
