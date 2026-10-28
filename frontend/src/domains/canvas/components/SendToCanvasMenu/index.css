@@ -1,0 +1,40 @@
+.mdbc-send-canvas {
+  position: relative;
+  display: inline-flex;
+}
+
+.mdbc-send-canvas-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  min-width: 180px;
+  max-height: 280px;
+  overflow-y: auto;
+  padding: 4px;
+  border: 0.5px solid var(--m-sep);
+  border-radius: var(--m-r-sm);
+  background: var(--m-bg-window);
+}
+
+.mdbc-send-canvas-menu button {
+  padding: 6px 8px;
+  border: none;
+  border-radius: var(--m-r-xs);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.mdbc-send-canvas-menu button:hover:not(:disabled) {
+  background: rgb(var(--m-overlay-rgb) / 0.08);
+}
+
+.mdbc-send-canvas-note {
+  padding: 6px 8px;
+  color: var(--m-fg-3);
+  font-size: var(--m-fs-sm);
+}

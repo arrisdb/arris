@@ -1,0 +1,35 @@
+.mdbc-web-app {
+  display: flex;
+  min-height: 100vh;
+  background: var(--m-bg-card);
+}
+
+.mdbc-web-main {
+  flex: 1;
+  min-width: 0;
+  max-width: 720px;
+}
+
+/* A canvas board fills the viewport beside the sidebar. */
+.mdbc-web-main.board {
+  max-width: none;
+  height: 100vh;
+}
+
+.mdbc-web-error {
+  margin: 8px 12px;
+  color: var(--m-red);
+}
+
+.mdbc-web-empty {
+  margin: 16px;
+  color: var(--m-fg-3);
+  font-size: var(--m-fs-sm);
+}
+
+/* The lineage page graph fills the viewport under the section switch. */
+.mdbc-web-main.board .mdbc-analytics-lineage {
+  height: calc(100vh - 44px);
+  border: 0;
+  border-radius: 0;
+}

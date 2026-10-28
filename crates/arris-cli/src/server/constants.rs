@@ -40,6 +40,7 @@ pub const PIN_LIST_ROUTE: &str = "/api/pin_list";
 pub const RUN_GET_ROUTE: &str = "/api/run_get";
 pub const RUN_PAGE_ROUTE: &str = "/api/run_page";
 pub const PIN_RENAME_ROUTE: &str = "/api/pin_rename";
+pub const PIN_SAVE_ROUTE: &str = "/api/pin_save";
 pub const CANVAS_ID_SEPARATOR: &str = ", ";
 pub const CANVAS_LIST_ROUTE: &str = "/api/canvas_list";
 pub const CANVAS_GET_ROUTE: &str = "/api/canvas_get";

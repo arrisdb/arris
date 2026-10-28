@@ -3,7 +3,8 @@ use std::path::PathBuf;
 use arris_engines::dbt::{ColumnLineageGraph, DbtColumnDoc, LineageGraph};
 use arris_engines::sqlmesh::SqlMeshColumnDoc;
 use arris_engines::{
-    CanvasCellSpec, CanvasSummary, ConnectionConfig, ConnectionPrefill, DatabaseKind, QueryResult,
+    CanvasCellSpec, CanvasSummary, ConnectionConfig, ConnectionPrefill, DatabaseKind,
+    PersistedPinnedQuery, QueryResult,
     RunRecord,
     RunSource, ToolKind, ToolRunRecord, ToolRunSummary,
 };
@@ -193,6 +194,12 @@ pub struct RunPageRequest {
 pub struct RunGetResponse {
     pub run: RunRecord,
     pub cached: bool,
+}
+
+/// The full pin list, as the shared pins pane saves it after any edit.
+#[derive(Debug, Clone, Deserialize)]
+pub struct PinSaveRequest {
+    pub queries: Vec<PersistedPinnedQuery>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
