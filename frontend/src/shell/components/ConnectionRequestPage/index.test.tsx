@@ -118,7 +118,8 @@ describe("ConnectionRequestPage", () => {
     const fetchMock = stubApi({
       connection_request_get: pendingRequest("postgres"),
       connection_save: (body) => {
-        saved = { ...(body.config as object), scope: "local", isConnected: false };
+        // The server assigns its own id to a new connection.
+        saved = { ...(body.config as object), id: "server-id", scope: "local", isConnected: false };
         return { status: 200, body: saved };
       },
       connection_list: () => ({ status: 200, body: [saved] }),

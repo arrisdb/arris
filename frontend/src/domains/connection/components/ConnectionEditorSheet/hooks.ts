@@ -138,9 +138,8 @@ function useConnectionEditorSheet({
       // nowhere to persist them (backend rejects with "no project open"), so
       // fall back to a global, app-wide connection.
       const scope = activeProjectPath ? "local" : "global";
-      const connections = await saveConnectionIPC(config, scope, requestId);
+      const { saved, connections } = await saveConnectionIPC(config, scope, requestId);
       setConnections(connections);
-      const saved = connections.find((connection) => connection.id === config.id);
       // Notify before closing so an owner that treats close as cancel (the
       // connection request page) sees the save first. The owner decides on reloads.
       if (saved) onSaved?.(saved);

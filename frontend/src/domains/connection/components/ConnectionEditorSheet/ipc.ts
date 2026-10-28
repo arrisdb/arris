@@ -10,16 +10,19 @@ function deleteConnectionIPC(id: string): Promise<void> {
   return invoke("cmd_delete_connection", { id });
 }
 
-/// Returns the full connection list either way; the arris server always saves to the
-/// project, and `requestId` resolves a pending browser connection request.
+/// The saved connection (the arris server may assign a new id) and the full list.
+/// The server always saves to the project; `requestId` settles a browser request.
 async function saveConnectionIPC(
   config: ConnectionConfig,
   scope: "local" | "global" = "local",
   requestId?: string,
-): Promise<ScopedConnection[]> {
-  if (!isWebShell()) return invoke("cmd_save_connection", { config, scope });
-  await apiCall("connection_save", { config, requestId });
-  return apiCall("connection_list");
+): Promise<{ saved: ScopedConnection | undefined; connections: ScopedConnection[] }> {
+  if (!isWebShell()) {
+    const connections: ScopedConnection[] = await invoke("cmd_save_connection", { config, scope });
+    return { saved: connections.find((c) => c.id === config.id), connections };
+  }
+  const saved: ScopedConnection = await apiCall("connection_save", { config, requestId });
+  return { saved, connections: await apiCall("connection_list") };
 }
 
 function testConnectionIPC(config: ConnectionConfig): Promise<void> {
