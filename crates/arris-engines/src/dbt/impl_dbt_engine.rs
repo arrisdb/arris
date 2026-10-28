@@ -13,7 +13,7 @@ use super::impl_dbt_cli_runner::DbtCliRunner;
 use super::impl_diff_sql_builder::{DiffDialect, DiffSqlBuilder};
 use super::types::*;
 use crate::persistence::{ProjectState, ToolRunSummary};
-use crate::{ConnectionEngine, DatabaseKind, Engine, QueryEngine, QueryResult, QueryValue};
+use crate::{ConnectionEngine, DatabaseKind, Engine, QueryEngine, QueryRequest, QueryResult, QueryValue};
 
 pub struct DbtEngine;
 
@@ -659,12 +659,14 @@ impl DbtEngine {
                 connection_id,
                 connection,
                 project,
-                sql,
-                Vec::new(),
-                None,
-                None,
-                None,
-                None,
+                QueryRequest {
+                    sql: sql,
+                    params: Vec::new(),
+                    language: None,
+                    page_size: None,
+                    page: None,
+                    query_id: None,
+                },
             )
             .await
             .map_err(|e| SlimDiffError::Query(e.to_string()))

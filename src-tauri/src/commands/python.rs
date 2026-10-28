@@ -2,6 +2,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use arris_engines::{
+    QueryRequest,
     AppEnvironment, Completion, CreatedVenv, IpcError, KernelOutput, PythonInterpreter,
     QueryLanguage,
 };
@@ -160,12 +161,14 @@ pub async fn cmd_notebook_run_sql(
             connection_id,
             &env.connection,
             proj.as_ref(),
-            sql,
-            Vec::new(),
-            language,
-            None,
-            None,
-            None,
+            QueryRequest {
+                sql: sql,
+                params: Vec::new(),
+                language: language,
+                page_size: None,
+                page: None,
+                query_id: None,
+            },
         )
         .await
         .map_err(IpcError::from)?;

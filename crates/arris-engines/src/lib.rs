@@ -35,7 +35,7 @@ pub use logging::{DebugLog, DebugLogHandle, DebugLogging, DEBUG_LOGS_DIR_NAME};
 pub use python::{
     Completion, CreatedVenv, InterpreterSource, KernelOutput, PythonEngine, PythonInterpreter,
 };
-pub use query::QueryEngine;
+pub use query::{QueryEngine, QueryRequest};
 pub use search::SearchEngine;
 pub use sqlmesh::{GatewayConnectionMapper, SqlMeshEngine};
 pub use terminal::TerminalEngine;

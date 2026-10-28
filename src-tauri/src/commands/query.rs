@@ -3,6 +3,7 @@ use std::time::Instant;
 
 use arris_engines::query::QueryEngine;
 use arris_engines::{
+    QueryRequest,
     AppEnvironment, DebugLog, ExplainMode, IpcError, IsolationLevel, ObjectRef, PlanResult,
     QueryLanguage, QueryResult, QueryValue, TableMutationBatch, TableRef, TransactionConfig,
     TransactionMode,
@@ -111,12 +112,14 @@ pub async fn cmd_run_query(
             connection_id,
             &env.connection,
             proj.as_ref(),
-            sql,
-            params,
-            language,
-            page_size,
-            page,
-            query_id,
+            QueryRequest {
+                sql: sql,
+                params: params,
+                language: language,
+                page_size: page_size,
+                page: page,
+                query_id: query_id,
+            },
         )
         .await;
     match result {
