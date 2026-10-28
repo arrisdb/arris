@@ -1,5 +1,6 @@
 mod agent;
 mod canvas;
+mod canvas_records;
 mod connection;
 mod constants;
 mod dbt;
@@ -16,6 +17,7 @@ mod terminal;
 
 pub use agent::*;
 pub use canvas::*;
+pub use canvas_records::*;
 pub use connection::*;
 pub use dbt::*;
 pub use federation::*;
