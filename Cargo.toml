@@ -2,6 +2,7 @@
 resolver = "3"
 members = [
     "crates/arris-engines",
+    "crates/arris-cli",
 ]
 exclude = ["src-tauri", ".claude"]
 

@@ -5,6 +5,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use uuid::Uuid;
 
+use super::constants::{CONNECTION_SCOPE_GLOBAL, CONNECTION_SCOPE_LOCAL};
 use super::errors::ConnectionError;
 use super::impl_ssh_tunnel::SshTunnel;
 use super::types::{ActiveConnection, ConnectionConfig, ScopedConnection, TransactionConfig};
@@ -123,14 +124,14 @@ impl ConnectionEngine {
             .iter()
             .map(|c| ScopedConnection {
                 config: c.clone(),
-                scope: "global".into(),
+                scope: CONNECTION_SCOPE_GLOBAL.into(),
                 is_connected: drivers.contains_key(&c.id),
             })
             .collect();
         if let Some(proj) = project {
             result.extend(proj.connections.iter().map(|c| ScopedConnection {
                 config: c.clone(),
-                scope: "local".into(),
+                scope: CONNECTION_SCOPE_LOCAL.into(),
                 is_connected: drivers.contains_key(&c.id),
             }));
         }
@@ -147,7 +148,7 @@ impl ConnectionEngine {
         // before any scrubbed config is written — no plain-text fallback.
         Self::persist_secrets(self.secrets.as_ref(), &config)?;
         match scope {
-            "global" => {
+            CONNECTION_SCOPE_GLOBAL => {
                 let mut conns = self.global_connections.write().await;
                 if let Some(existing) = conns.iter_mut().find(|c| c.id == config.id) {
                     *existing = config;
@@ -156,7 +157,7 @@ impl ConnectionEngine {
                 }
                 self.global_connections_store.save(&conns).await?;
             }
-            "local" => {
+            CONNECTION_SCOPE_LOCAL => {
                 let proj = project.ok_or(ConnectionError::NoProjectOpen)?;
                 if let Some(existing) = proj.connections.iter_mut().find(|c| c.id == config.id) {
                     *existing = config;
