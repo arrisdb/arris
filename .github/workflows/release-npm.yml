@@ -54,7 +54,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
 
       - name: Build
-        run: make build
+        run: make cli
 
       - name: Check release marker
         run: ./target/release/arris --version | grep -q "(release)"
