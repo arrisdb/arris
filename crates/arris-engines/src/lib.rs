@@ -26,8 +26,8 @@ pub use canvas::{
     CanvasCellRun, CanvasCellSpec, CanvasEngine, CanvasError, CellCacheWriter, CellIngestContinuation,
     CellIngestDone, CellResultCache, IngestedCell, CELL_INGEST_BYTE_BUDGET, CELL_RESULT_PAGE_ROWS,
 };
-pub use connection::{ConnectionEngine, ScopedConnection};
-pub use dbt::DbtEngine;
+pub use connection::{ConnectionEngine, PrefillError, ScopedConnection};
+pub use dbt::{DbtEngine, ProfileConnectionMapper};
 pub use federation::FederationEngine;
 pub use file::{FileEngine, FileTreeEntry, DEFAULT_SKIP_DIRS};
 pub use git::GitEngine;
@@ -37,11 +37,11 @@ pub use python::{
 };
 pub use query::QueryEngine;
 pub use search::SearchEngine;
-pub use sqlmesh::SqlMeshEngine;
+pub use sqlmesh::{GatewayConnectionMapper, SqlMeshEngine};
 pub use terminal::TerminalEngine;
 pub use app::{AppEnvironment, AppEnvironmentError};
 
-pub use connection::types::{ConnectionConfig, DatabaseKind, SaslMechanism, SslMode, TransactionConfig};
+pub use connection::types::{ConnectionConfig, ConnectionPrefill, DatabaseKind, PrefillField, SaslMechanism, SslMode, TransactionConfig};
 pub use drivers::errors::{DriverError, ErrorCode, IpcError};
 pub use drivers::constants::STREAM_CHUNK_ROWS;
 pub use drivers::types::{
