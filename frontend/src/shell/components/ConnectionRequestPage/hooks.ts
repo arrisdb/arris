@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { ConnectionConfig } from "@domains/connection/components/CombinedConnectionsTree/types";
 import { ipcErrorMessage, type DatabaseKind } from "@shared";
 import { setCurrentProject } from "@shared/api";
+import { CONNECTIONS_PATH, navigate } from "../../utils";
 import { PENDING_STATUS } from "./constants";
 import {
   cancelConnectionRequestIPC,
@@ -60,9 +61,10 @@ function useConnectionRequest(requestId: string | null): ConnectionRequestPageVi
   useLoadRequest(requestId, setPhase, setKind, setPrefill, setError);
   useCancelOnUnload(requestId, phase);
 
+  // The terminal command has its answer; show the new connection instead of a dead end.
   const onSaved = useCallback(() => {
     savedRef.current = true;
-    setPhase("saved");
+    navigate(CONNECTIONS_PATH);
   }, []);
 
   const onClose = useCallback(() => {

@@ -23,7 +23,7 @@ interface ConnectionRequest {
 }
 
 /// `closed` is a request that was already settled when the page loaded.
-type RequestPhase = "loading" | "pending" | "saved" | "cancelled" | "closed" | "error";
+type RequestPhase = "loading" | "pending" | "cancelled" | "closed" | "error";
 
 interface ConnectionRequestPageViewModel {
   phase: RequestPhase;

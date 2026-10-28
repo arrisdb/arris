@@ -113,7 +113,7 @@ describe("ConnectionRequestPage", () => {
     expect((init.headers as Record<string, string>)[PROJECT_HEADER]).toBe(PROJECT);
   });
 
-  it("shows success copy after saving and does not cancel the request", async () => {
+  it("opens the connections page after saving and does not cancel the request", async () => {
     let saved: object = {};
     const fetchMock = stubApi({
       connection_request_get: pendingRequest("postgres"),
@@ -126,7 +126,7 @@ describe("ConnectionRequestPage", () => {
     });
     render(<ConnectionRequestPage />);
     fireEvent.click(await screen.findByRole("button", { name: "Save" }));
-    expect(await screen.findByText("Saved. You can return to your terminal.")).toBeTruthy();
+    await waitFor(() => expect(window.location.pathname).toBe("/connections"));
     expect(callsTo(fetchMock, "connection_request_cancel")).toHaveLength(0);
   });
 

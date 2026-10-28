@@ -1,7 +1,6 @@
 const REQUEST_QUERY_PARAM = "request";
 const PENDING_STATUS = "pending";
 const LOADING_MESSAGE = "Loading…";
-const SAVED_MESSAGE = "Saved. You can return to your terminal.";
 const CANCELLED_MESSAGE = "Cancelled. You can return to your terminal.";
 const MISSING_REQUEST_MESSAGE = "This page needs a connection request. Run `arris connection new`.";
 
@@ -11,5 +10,4 @@ export {
   MISSING_REQUEST_MESSAGE,
   PENDING_STATUS,
   REQUEST_QUERY_PARAM,
-  SAVED_MESSAGE,
 };

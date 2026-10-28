@@ -4,7 +4,6 @@ import {
   LOADING_MESSAGE,
   MISSING_REQUEST_MESSAGE,
   REQUEST_QUERY_PARAM,
-  SAVED_MESSAGE,
 } from "./constants";
 import type { ConnectionRequestPageViewModel } from "./types";
 
@@ -16,8 +15,6 @@ function requestIdFromLocation(): string | null {
 function pageMessage(page: ConnectionRequestPageViewModel): string {
   if (!page.requestId) return MISSING_REQUEST_MESSAGE;
   switch (page.phase) {
-    case "saved":
-      return SAVED_MESSAGE;
     case "cancelled":
       return CANCELLED_MESSAGE;
     case "closed":
