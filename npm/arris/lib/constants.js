@@ -22,6 +22,7 @@ export const ARRIS_HOME_DIR = ".arris";
 export const BIN_DIR = "bin";
 export const BACKUP_PREFIX = ".arris-backup-";
 export const BINARY_MODE = 0o755;
+export const STAGING_SUFFIX = ".new";
 
 // Bundled at pack time; the repo copy is the fallback when run from a checkout.
 export const BUNDLED_SKILL_DIR = "skill";

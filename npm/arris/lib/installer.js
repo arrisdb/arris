@@ -19,6 +19,7 @@ import {
   REPO_SKILL_DIR,
   SKILLS_DIR,
   SKILL_NAME,
+  STAGING_SUFFIX,
   VERSION_FLAG,
 } from "./constants.js";
 
@@ -57,8 +58,11 @@ export class Installer {
     const binDir = join(home, ARRIS_HOME_DIR, BIN_DIR);
     const binaryPath = join(binDir, BINARY_NAME);
     mkdirSync(binDir, { recursive: true });
-    copyFileSync(binary, binaryPath);
-    chmodSync(binaryPath, BINARY_MODE);
+    // A new inode, not an overwrite: macOS SIGKILLs a binary rewritten in place (cached signature).
+    const staged = `${binaryPath}${STAGING_SUFFIX}`;
+    copyFileSync(binary, staged);
+    chmodSync(staged, BINARY_MODE);
+    renameSync(staged, binaryPath);
     return { skillDir, binaryPath, backup };
   }
 }

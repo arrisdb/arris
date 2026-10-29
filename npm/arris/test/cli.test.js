@@ -70,6 +70,16 @@ test("installs skill and binary", async () => {
   assert.match(c.logs.at(-1), /Restart Claude Code/);
 });
 
+test("reinstall replaces the binary with a new file", async () => {
+  const box = sandbox();
+  assert.equal(await Cli.main([], ctx(box)), 0);
+  const installed = join(box.home, ".arris", "bin", "arris");
+  const before = statSync(installed).ino;
+  assert.equal(await Cli.main([], ctx(box)), 0);
+  assert.notEqual(statSync(installed).ino, before);
+  assert.deepEqual(readdirSync(dirname(installed)), ["arris"]);
+});
+
 test("installer refuses dev binary", async () => {
   const box = sandbox();
   writeFileSync(box.binary, DEV_BINARY);
