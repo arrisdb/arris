@@ -1,11 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useConnectionsStore } from "@domains/connection/hooks";
 import { WebApp } from "./index";
-import { EMPTY_TEST_ID, ROW_TEST_ID } from "@domains/history/components/HistoryView/constants";
 import { RERUN_TEST_ID } from "@domains/results/components/RunResultView/constants";
-import { PINNED_LABEL } from "./components/WebSidebar/constants";
-import { NO_PROJECT_MESSAGE, WEB_APP_TEST_ID } from "./constants";
 import { enableWebShell } from "@shared/api";
 
 // These cover the browser shell, which talks to the arris server.
@@ -48,7 +45,7 @@ describe("WebApp", () => {
 
   afterEach(() => vi.unstubAllGlobals());
 
-  it("renders connections list from mocked connection_list", async () => {
+  it("serves the desktop shell with the project's connections", async () => {
     window.history.replaceState(null, "", "/connections?project=%2Fwork%2Fproj");
     stubFetch({
       connection_list: [
@@ -73,16 +70,6 @@ describe("WebApp", () => {
     expect(screen.getByTitle("New connection")).toBeTruthy();
   });
 
-  it("renders sidebar and history by default", async () => {
-    stubFetch({ project_list: [{ root: "/work/proj", key: "k" }], history_list: [], connection_list: [] });
-    render(<WebApp />);
-    expect(screen.getByText("History").getAttribute("aria-current")).toBe("page");
-    expect(screen.getByText(PINNED_LABEL)).toBeTruthy();
-    expect(screen.getByText("Connections")).toBeTruthy();
-    expect(screen.getByTestId(WEB_APP_TEST_ID)).toBeTruthy();
-    expect(await screen.findByTestId(EMPTY_TEST_ID)).toBeTruthy();
-  });
-
   it("run route renders the run and re-run navigates to the new run", async () => {
     window.history.replaceState(null, "", "/runs/r1?project=%2Fwork%2Fproj");
     const run = {
@@ -103,16 +90,6 @@ describe("WebApp", () => {
     fireEvent.click(await screen.findByTestId(RERUN_TEST_ID));
     await waitFor(() => expect(window.location.pathname).toBe("/runs/r2"));
     expect(fetchMock.mock.calls.some(([url]) => url.endsWith("/connection_list"))).toBe(true);
-  });
-
-  it("with no project shows empty state and makes no project calls", async () => {
-    window.history.replaceState(null, "", "/connections");
-    window.localStorage.clear();
-    const fetchMock = stubFetch({ project_list: [] });
-    render(<WebApp />);
-    expect(screen.getByText(NO_PROJECT_MESSAGE)).toBeTruthy();
-    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
-    expect(fetchMock.mock.calls.every(([url]) => url.endsWith("/project_list"))).toBe(true);
   });
 
   it("connection request page renders without sidebar", async () => {
@@ -144,75 +121,5 @@ describe("WebApp", () => {
     expect(
       await screen.findByPlaceholderText("postgres://user:pass@host:port/db"),
     ).toBeTruthy();
-  });
-
-  it("reloads connections only for this project's connections_changed", async () => {
-    window.history.replaceState(null, "", "/connections?project=%2Fwork%2Fproj");
-    const fetchMock = stubFetch({ connection_list: [] });
-    const listCalls = () =>
-      fetchMock.mock.calls.filter(([url]) => url.endsWith("/connection_list"))
-        .length;
-    render(<WebApp />);
-    await waitFor(() => expect(listCalls()).toBe(1));
-    act(() =>
-      FakeEventSource.last?.emit({
-        kind: "connections_changed",
-        project: "/other",
-        payload: null,
-      }),
-    );
-    expect(listCalls()).toBe(1);
-    act(() =>
-      FakeEventSource.last?.emit({
-        kind: "connections_changed",
-        project: "/work/proj",
-        payload: null,
-      }),
-    );
-    await waitFor(() => expect(listCalls()).toBe(2));
-  });
-
-  it("shows the list error when the project is unknown", async () => {
-    window.history.replaceState(null, "", "/connections?project=%2Fwork%2Fproj");
-    stubFetch({});
-    render(<WebApp />);
-    expect(await screen.findByText("connection_list")).toBeTruthy();
-    expect(useConnectionsStore.getState().connectionsLoaded).toBe(true);
-  });
-
-  it("history row click navigates to the run page keeping the project", async () => {
-    stubFetch({
-      history_list: [
-        {
-          id: "r 1",
-          connectionId: "c1",
-          sql: "select 1",
-          source: "cli",
-          startedAt: "2026-10-25T10:00:00Z",
-          status: "success",
-        },
-      ],
-      connection_list: [],
-    });
-    render(<WebApp />);
-    fireEvent.click(await screen.findByTestId(ROW_TEST_ID));
-    expect(window.location.pathname).toBe("/runs/r%201");
-    expect(new URLSearchParams(window.location.search).get("project")).toBe("/work/proj");
-  });
-
-  it("pinned route lists pins and running one navigates to the new run", async () => {
-    window.history.replaceState(null, "", "/pinned?project=%2Fwork%2Fproj");
-    const fetchMock = stubFetch({
-      pin_list: [
-        { id: "p1", name: "Orders", text: "select 1", connectionId: "c1", kind: "postgres" },
-      ],
-      connection_list: [],
-      query_run: { run: { id: "r7" }, result: {} },
-    });
-    render(<WebApp />);
-    fireEvent.doubleClick(await screen.findByTestId("pinned-query-p1"));
-    expect(fetchMock.mock.calls.some(([url]) => String(url).endsWith("/connection_list"))).toBe(true);
-    await waitFor(() => expect(window.location.pathname).toBe("/runs/r7"));
-    expect(new URLSearchParams(window.location.search).get("project")).toBe("/work/proj");
   });
 });

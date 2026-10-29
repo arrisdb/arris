@@ -2,6 +2,7 @@ import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
+import { apiCall, currentProject, isWebShell, setCurrentProject } from "@shared/api";
 import type {
   AppPreferences,
   FileTreeEntry,
@@ -9,7 +10,32 @@ import type {
   ProjectOpenResult,
   ScopedConnection,
 } from "@shared";
+import { WEB_LAYOUT_STORAGE_PREFIX, WEB_TABS_STORAGE_PREFIX } from "./constants";
 import type { PaneNode } from "./types";
+
+type PersistedPaneLayout = ProjectOpenResult["paneLayout"];
+
+const EMPTY_PANE_LAYOUT: PersistedPaneLayout = { layout: null, focusedPaneGroupId: null };
+
+// The browser has no project folder to write into, so tabs and layout live in localStorage.
+function readWebState<T>(prefix: string, project: string, fallback: T): T {
+  try {
+    const raw = window.localStorage.getItem(`${prefix}${project}`);
+    return raw ? (JSON.parse(raw) as T) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function writeWebState(prefix: string, value: unknown): void {
+  const project = currentProject();
+  if (!project) return;
+  try {
+    window.localStorage.setItem(`${prefix}${project}`, JSON.stringify(value));
+  } catch {
+    // Storage unavailable; the session keeps its in-memory tabs.
+  }
+}
 
 function appPreferencesLoadIPC(): Promise<AppPreferences> {
   return invoke("cmd_app_preferences_load");
@@ -20,11 +46,12 @@ function closeFileIndexIPC(): Promise<void> {
 }
 
 function closeProjectIPC(): Promise<void> {
-  return invoke("cmd_close_project");
+  return isWebShell() ? Promise.resolve() : invoke("cmd_close_project");
 }
 
 function listConnectionsIPC(): Promise<ScopedConnection[]> {
-  return invoke("cmd_list_connections");
+  if (!isWebShell()) return invoke("cmd_list_connections");
+  return currentProject() ? apiCall("connection_list") : Promise.resolve([]);
 }
 
 function listFolderTreeIPC(root: string, skipDirs: string[]): Promise<FileTreeEntry> {
@@ -35,8 +62,16 @@ function openFileIndexIPC(root: string): Promise<void> {
   return invoke("cmd_open_file_index", { root });
 }
 
-function openProjectIPC(root: string): Promise<ProjectOpenResult> {
-  return invoke("cmd_open_project", { root });
+async function openProjectIPC(root: string): Promise<ProjectOpenResult> {
+  if (!isWebShell()) return invoke("cmd_open_project", { root });
+  setCurrentProject(root);
+  return {
+    root,
+    connections: await apiCall("connection_list"),
+    tabs: readWebState(WEB_TABS_STORAGE_PREFIX, root, []),
+    federationTabs: [],
+    paneLayout: readWebState(WEB_LAYOUT_STORAGE_PREFIX, root, EMPTY_PANE_LAYOUT),
+  };
 }
 
 function openProjectInNewWindowIPC(path: string): Promise<void> {
@@ -44,24 +79,27 @@ function openProjectInNewWindowIPC(path: string): Promise<void> {
 }
 
 // This process's launch project path (set by "open in new window"), returned
-// once then cleared so a later reload does not reopen it.
+// once then cleared so a later reload does not reopen it. The browser opens the URL's project.
 function takePendingLaunchIPC(): Promise<string | null> {
-  return invoke("cmd_take_pending_launch");
+  return isWebShell() ? Promise.resolve(currentProject()) : invoke("cmd_take_pending_launch");
 }
 
 function readTextFileIPC(path: string): Promise<string> {
   return invoke("cmd_read_text_file", { path });
 }
 
-function saveTabsIPC(tabs: PersistedTab[]): Promise<void> {
-  return invoke("cmd_save_console_tabs", { tabs });
+async function saveTabsIPC(tabs: PersistedTab[]): Promise<void> {
+  if (!isWebShell()) return invoke("cmd_save_console_tabs", { tabs });
+  writeWebState(WEB_TABS_STORAGE_PREFIX, tabs);
 }
 
-function savePaneLayoutIPC(
+async function savePaneLayoutIPC(
   layout: PaneNode | null,
   focusedPaneGroupId: string | null,
 ): Promise<void> {
-  return invoke("cmd_save_pane_layout", { layout: { layout, focusedPaneGroupId } });
+  const paneLayout: PersistedPaneLayout = { layout, focusedPaneGroupId };
+  if (!isWebShell()) return invoke("cmd_save_pane_layout", { layout: paneLayout });
+  writeWebState(WEB_LAYOUT_STORAGE_PREFIX, paneLayout);
 }
 
 // Move a virtual console/notebook's sidecar file out of `.arris/files/` to the

@@ -10,6 +10,10 @@ const FS_WATCH_REFRESH_DEBOUNCE_MS = 150;
 const MAX_RECENTS = 8;
 const RECENTS_STORAGE_KEY = "arris.recents";
 
+// Browser shell: per-project tabs and pane layout, keyed by prefix + project path.
+const WEB_TABS_STORAGE_PREFIX = "arris.web.tabs:";
+const WEB_LAYOUT_STORAGE_PREFIX = "arris.web.layout:";
+
 // App-level notification service: status-bar spinner while a task runs, then a
 // snackbar with the outcome. Success snackbars auto-dismiss; errors stay until
 // closed. At most SNACKBAR_MAX_VISIBLE stack (oldest evicted first).
@@ -34,4 +38,6 @@ export {
   PROJECT_STORE_SAVE_DEBOUNCE_MS,
   RECENTS_STORAGE_KEY,
   TAB_SAVE_DEBOUNCE_MS,
+  WEB_LAYOUT_STORAGE_PREFIX,
+  WEB_TABS_STORAGE_PREFIX,
 };
