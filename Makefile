@@ -55,7 +55,7 @@ VERSION ?=
 # target triple and returns its bundle output directory.
 PRELUDE := set -euo pipefail; if [ -f "$(REPO_ROOT)/.env" ]; then set -a; . "$(REPO_ROOT)/.env"; set +a; fi; die() { echo "error: $$*" >&2; exit 1; }; require_env() { for v in "$$@"; do [ -n "$${!v:-}" ] || die "required env var '$$v' is not set (see RELEASE.md)"; done; }; require_cmd() { for c in "$$@"; do command -v "$$c" >/dev/null 2>&1 || die "required command '$$c' not found"; done; }; bundle_dir() { local td; td="$$(cd "$(REPO_ROOT)/src-tauri" && cargo metadata --format-version 1 --no-deps | jq -r .target_directory)"; echo "$$td/$$1/release/bundle"; }; arch_label() { case "$$1" in aarch64-*) echo aarch64 ;; x86_64-*) echo x64 ;; *) echo "$$1" ;; esac; }
 
-.PHONY: help deny build build-unsigned publish release bump verify docs-deploy clean cli npm-package
+.PHONY: help deny build build-unsigned publish release bump verify docs-deploy clean cli install-skill npm-package
 
 help:
 	@echo "Arris release targets:"
@@ -67,6 +67,7 @@ help:
 	@echo "  make bump VERSION=x      Bump version in tauri.conf.json, both Cargo.tomls, frontend + docs package.json."
 	@echo "  make verify              Re-run the Gatekeeper check on the built .dmgs."
 	@echo "  make cli                 Build the frontend and the release arris CLI with it embedded."
+	@echo "  make install-skill [SKILL_PROJECT=dir]  Build the CLI, install it and the /arris skill (global, or into dir)."
 	@echo "  make npm-package         Stage the npm launcher and this host's CLI package under npm/dist."
 	@echo "  make docs-deploy         Build docs/ and direct-upload dist/ to Cloudflare Pages."
 	@echo "  make clean               Remove the build bundle directories."
@@ -78,11 +79,18 @@ cli:
 
 # --- npm-package (run after `make cli`; host platform only) -----------------
 NPM_HOST_PLATFORM = $(shell node -p 'process.platform + "-" + process.arch')
-CLI_RELEASE_BINARY := $(REPO_ROOT)/target/release/arris
+# Asks cargo, so a CARGO_TARGET_DIR outside the repo is honored.
+CARGO_TARGET_DIR_RESOLVED = $(shell cargo metadata --no-deps --format-version 1 | node -p 'JSON.parse(require("fs").readFileSync(0)).target_directory')
+CLI_RELEASE_BINARY = $(CARGO_TARGET_DIR_RESOLVED)/release/arris
 
 npm-package:
 	node scripts/package-npm.mjs --main
 	node scripts/package-npm.mjs --binary "$(CLI_RELEASE_BINARY)" --platform "$(NPM_HOST_PLATFORM)"
+
+# --- install-skill (local `npx arris`; SKILL_PROJECT=<dir> installs into that project) ---
+install-skill: cli
+	cd "$(or $(SKILL_PROJECT),$(CURDIR))" && ARRIS_BINARY="$(CLI_RELEASE_BINARY)" \
+		node "$(REPO_ROOT)/npm/arris/bin/arris.js" $(if $(SKILL_PROJECT),--project)
 
 deny:
 	@$(PRELUDE); \
