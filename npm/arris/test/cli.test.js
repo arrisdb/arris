@@ -113,7 +113,8 @@ test("backs up existing skill dir", () => {
     skillSource: box.skill,
     now: new Date("2026-10-26T01:02:03.004Z"),
   });
-  assert.equal(out.backup, join(box.home, ".claude", "skills", ".arris-backup-2026-10-26T01-02-03-004Z"));
+  assert.equal(out.backup, join(box.home, ".arris", "skill-backups", "arris-2026-10-26T01-02-03-004Z"));
+  assert.deepEqual(readdirSync(join(box.home, ".claude", "skills")), ["arris"]);
   assert.equal(readFileSync(join(out.backup, "SKILL.md"), "utf8"), "my edits\n");
   assert.equal(readFileSync(join(skillDir, "SKILL.md"), "utf8"), "# Arris\n");
 });

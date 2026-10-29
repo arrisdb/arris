@@ -15,6 +15,7 @@ Look at the first argument after `/arris`:
 - `query <question>`: answer a data question.
 - `dbt [<question or task>]`: work with the dbt project (see dbt).
 - `sqlmesh [<question or task>]`: work with the SQLMesh project (see sqlmesh).
+- No argument (bare `/arris`): open the Arris UI (see ui).
 - Anything else (including a bare question): treat it as `query`.
 
 ## Always first
@@ -26,6 +27,10 @@ If neither exists, stop and tell the user: "The arris CLI is not installed. Run 
 
 - Never ask the user to paste passwords, tokens or keys into chat. Credentials are entered only in the browser form that `arris connection new` opens.
 - Commands may print URLs containing a one-time local login token. Do not print, repeat or share those URLs outside the user's machine. The `uiUrl` from `query` may be shown to the user, but not pasted into any other tool or service.
+
+## ui
+
+Run `arris ui --open`. It opens the project's Arris UI in the browser. Tell the user it opened; do not print the URL, which carries the login token. If the browser did not open, rerun as `arris ui` and tell the user to open the printed `url` themselves.
 
 ## init-connection
 
