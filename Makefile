@@ -82,6 +82,10 @@ NPM_HOST_PLATFORM = $(shell node -p 'process.platform + "-" + process.arch')
 # Asks cargo, so a CARGO_TARGET_DIR outside the repo is honored.
 CARGO_TARGET_DIR_RESOLVED = $(shell cargo metadata --no-deps --format-version 1 | node -p 'JSON.parse(require("fs").readFileSync(0)).target_directory')
 CLI_RELEASE_BINARY = $(CARGO_TARGET_DIR_RESOLVED)/release/arris
+# macOS keys "Always Allow" to the signature; an ad-hoc build is a new app every rebuild.
+# Override with `make install-skill CLI_SIGNING_IDENTITY="..."`. Empty off macOS: signing is skipped.
+CLI_SIGNING_IDENTITY ?= $(shell security find-identity -v -p codesigning 2>/dev/null | sed -n 's/.*"\(Apple Development[^"]*\)".*/\1/p' | head -n 1)
+CLI_CODESIGN_ID := app.arrisdb.cli
 
 npm-package:
 	node scripts/package-npm.mjs --main
@@ -89,6 +93,7 @@ npm-package:
 
 # --- install-skill (local `npx arris`; SKILL_PROJECT=<dir> installs into that project) ---
 install-skill: cli
+	$(if $(CLI_SIGNING_IDENTITY),codesign --force --sign "$(CLI_SIGNING_IDENTITY)" --identifier $(CLI_CODESIGN_ID) "$(CLI_RELEASE_BINARY)")
 	cd "$(or $(SKILL_PROJECT),$(CURDIR))" && ARRIS_BINARY="$(CLI_RELEASE_BINARY)" \
 		node "$(REPO_ROOT)/npm/arris/bin/arris.js" $(if $(SKILL_PROJECT),--project)
 
