@@ -15,10 +15,9 @@ async function openHandoff({ connectionId, sql, runId }: QueryHandoff): Promise<
   if (!runId) return;
   const result = await fetchRunPageIPC(runId, 0, HANDOFF_PAGE_SIZE);
   const history = useRunHistoryStore.getState();
-  const id = crypto.randomUUID();
   const startedAt = Date.now();
-  history.appendRun(tab.id, { id, sqlSnapshot: sql, status: "pending", startedAt, connectionId });
-  history.patchRun(tab.id, id, { status: "success", result, endedAt: Date.now() });
+  history.appendRun(tab.id, { id: runId, sqlSnapshot: sql, status: "pending", startedAt, connectionId });
+  history.patchRun(tab.id, runId, { status: "success", result, endedAt: Date.now() });
   useTabsStore.getState().updateTab(tab.id, { result, pane: "results" });
   useSettingsStore.getState().showBottomPane();
   history.setRequestedPaneMode("results");

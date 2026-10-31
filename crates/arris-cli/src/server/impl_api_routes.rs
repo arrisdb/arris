@@ -7,7 +7,7 @@ use arris_engines::query::QueryError;
 use arris_engines::{
     CONNECTION_SCOPE_LOCAL, ConnectionConfig, JsonCollectionStore, PersistedPinnedQuery,
     ProjectState, QueryRequest, QueryResult, RUN_PREVIEW_MAX_ROWS, RunPreview, RunRecord,
-    RunStatus, SchemaNode, ScopedConnection, StoreError,
+    RunSource, RunStatus, SchemaNode, ScopedConnection, StoreError,
 };
 use axum::extract::State;
 use axum::extract::rejection::JsonRejection;
@@ -503,7 +503,7 @@ impl ApiRoutes {
                 connection: config.id.to_string(),
                 sql: req.sql.clone(),
                 limit: req.limit,
-                source: None,
+                source: Some(RunSource::Ui),
                 language: None,
                 query_id: None,
             };
