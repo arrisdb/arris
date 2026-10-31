@@ -43,6 +43,7 @@ pub enum ServerEventKind {
     CanvasChanged,
     CanvasCellIngested,
     ToolRunsChanged,
+    QueryOpenRequested,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -163,6 +164,30 @@ pub struct QueryPageRequest {
 pub struct QueryRunResponse {
     pub run: RunRecord,
     pub result: QueryResult,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct QueryOpenRequest {
+    pub connection: String,
+    pub sql: String,
+    pub limit: Option<u32>,
+}
+
+/// `run` is set when the SQL was read-only and already ran; writes wait for the user.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct QueryOpenResponse {
+    pub opened: bool,
+    pub run: Option<QueryRunResponse>,
+}
+
+/// A query waiting to appear in a browser console tab.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct QueryHandoff {
+    pub id: String,
+    pub connection_id: String,
+    pub sql: String,
+    pub run_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]

@@ -29,11 +29,12 @@ use super::{
     HistoryListRequest, OkResponse, PIN_ADD_ROUTE, PIN_LIST_ROUTE, PIN_REMOVE_ROUTE,
     PIN_RENAME_ROUTE, PIN_SAVE_ROUTE, PROJECT_HEADER, PROJECT_LIST_ROUTE, PROJECT_QUERY_PARAM,
     PinAddRequest, PinRemoveRequest, PinRenameRequest, PinSaveRequest, QUERY_DEFAULT_LIMIT,
-    QUERY_DEFAULT_SOURCE, QUERY_FIRST_PAGE, QUERY_PAGE_ROUTE, QUERY_RUN_ROUTE, QueryPageRequest,
-    QueryRunRequest, QueryRunResponse, REQUEST_QUERY_PARAM, RUN_GET_ROUTE, RUN_PAGE_MAX_LIMIT,
-    RUN_PAGE_ROUTE, RUN_RESULTS_BOARD, RunGetResponse, RunIdRequest, RunPageRequest,
-    SCHEMA_LIST_ROUTE, SchemaListRequest, Server, ServerEvent, ServerEventKind, ServerState,
-    ToolRunRoutes,
+    QUERY_DEFAULT_SOURCE, QUERY_FIRST_PAGE, QUERY_HANDOFF_TAKE_ROUTE, QUERY_OPEN_POLL_MS,
+    QUERY_OPEN_ROUTE, QUERY_OPEN_WAIT_MS, QUERY_PAGE_ROUTE, QUERY_RUN_ROUTE, QueryHandoff,
+    QueryOpenRequest, QueryOpenResponse, QueryPageRequest, QueryRunRequest, QueryRunResponse,
+    REQUEST_QUERY_PARAM, RUN_GET_ROUTE, RUN_PAGE_MAX_LIMIT, RUN_PAGE_ROUTE, RUN_RESULTS_BOARD,
+    ReadOnlySql, RunGetResponse, RunIdRequest, RunPageRequest, SCHEMA_LIST_ROUTE,
+    SchemaListRequest, Server, ServerEvent, ServerEventKind, ServerState, ToolRunRoutes,
 };
 
 pub(super) type ApiState = State<Arc<ServerState>>;
@@ -53,6 +54,8 @@ impl ApiRoutes {
             .route(SCHEMA_LIST_ROUTE, post(Self::schema_list))
             .route(QUERY_RUN_ROUTE, post(Self::query_run))
             .route(QUERY_PAGE_ROUTE, post(Self::query_page))
+            .route(QUERY_OPEN_ROUTE, post(Self::query_open))
+            .route(QUERY_HANDOFF_TAKE_ROUTE, post(Self::query_handoff_take))
             .route(HISTORY_LIST_ROUTE, post(Self::history_list))
             .route(RUN_GET_ROUTE, post(Self::run_get))
             .route(RUN_PAGE_ROUTE, post(Self::run_page))
@@ -429,9 +432,17 @@ impl ApiRoutes {
     ) -> ApiResult<QueryRunResponse> {
         let Json(req) = body?;
         let project = Self::project(&state, &headers).await?;
+        Ok(Json(Self::run_and_record(&state, &project, req).await?))
+    }
+
+    async fn run_and_record(
+        state: &ServerState,
+        project: &RwLock<ProjectState>,
+        req: QueryRunRequest,
+    ) -> Result<QueryRunResponse, ApiError> {
         // Project lock only brackets setup and the final update; the query itself runs unlocked.
         let guard = project.read().await;
-        let config = Self::resolve_connection(&state, &guard, &req.connection).await?;
+        let config = Self::resolve_connection(state, &guard, &req.connection).await?;
         let mut run = RunRecord {
             id: Uuid::new_v4().to_string(),
             connection_id: config.id,
@@ -454,7 +465,7 @@ impl ApiRoutes {
             page: Some(QUERY_FIRST_PAGE),
             query_id: Some(req.query_id.unwrap_or_else(|| run.id.clone())),
         };
-        let outcome = Self::execute(&state, &config, request).await;
+        let outcome = Self::execute(state, &config, request).await;
         Self::finish_run(&mut run, &outcome);
         if let Ok(result) = &outcome
             && let Err(e) = state
@@ -466,12 +477,70 @@ impl ApiRoutes {
         }
         let guard = project.read().await;
         let recorded = guard.query_run_store.update(run.clone()).await;
-        Self::emit(&state, ServerEventKind::HistoryChanged, &guard, &run);
+        Self::emit(state, ServerEventKind::HistoryChanged, &guard, &run);
         recorded?;
-        Ok(Json(QueryRunResponse {
+        Ok(QueryRunResponse {
             run,
             result: outcome?,
-        }))
+        })
+    }
+
+    /// Queues SQL for a console tab. Reads run here once, so a warehouse is not billed twice.
+    async fn query_open(
+        State(state): ApiState,
+        headers: HeaderMap,
+        body: Body<QueryOpenRequest>,
+    ) -> ApiResult<QueryOpenResponse> {
+        let Json(req) = body?;
+        let project = Self::project(&state, &headers).await?;
+        let (config, root) = {
+            let guard = project.read().await;
+            let config = Self::resolve_connection(&state, &guard, &req.connection).await?;
+            (config, guard.root.clone())
+        };
+        let run = if ReadOnlySql::check(&req.sql) {
+            let run_req = QueryRunRequest {
+                connection: config.id.to_string(),
+                sql: req.sql.clone(),
+                limit: req.limit,
+                source: None,
+                language: None,
+                query_id: None,
+            };
+            Some(Self::run_and_record(&state, &project, run_req).await?)
+        } else {
+            None
+        };
+        let handoff = QueryHandoff {
+            id: Uuid::new_v4().to_string(),
+            connection_id: config.id.to_string(),
+            sql: req.sql,
+            run_id: run.as_ref().map(|r| r.run.id.clone()),
+        };
+        let id = handoff.id.clone();
+        state.query_handoffs.push(&root, handoff);
+        Self::emit(
+            &state,
+            ServerEventKind::QueryOpenRequested,
+            &*project.read().await,
+            EmptyResponse {},
+        );
+        let mut waited = 0;
+        while state.query_handoffs.is_pending(&root, &id) && waited < QUERY_OPEN_WAIT_MS {
+            tokio::time::sleep(Duration::from_millis(QUERY_OPEN_POLL_MS)).await;
+            waited += QUERY_OPEN_POLL_MS;
+        }
+        let opened = !state.query_handoffs.is_pending(&root, &id);
+        Ok(Json(QueryOpenResponse { opened, run }))
+    }
+
+    async fn query_handoff_take(
+        State(state): ApiState,
+        headers: HeaderMap,
+    ) -> ApiResult<Vec<QueryHandoff>> {
+        let project = Self::project(&state, &headers).await?;
+        let root = project.read().await.root.clone();
+        Ok(Json(state.query_handoffs.take(&root)))
     }
 
     async fn query_page(
@@ -971,6 +1040,32 @@ pub(super) mod tests {
         assert_eq!(page["rows"].as_array().unwrap().len(), 1);
         assert_eq!(page["has_more"], json!(true));
         assert_eq!(h.ok("history_list", json!({})).await, before);
+    }
+
+    #[tokio::test]
+    async fn query_open_runs_reads_once_and_leaves_writes_to_the_user() {
+        let h = Harness::start().await;
+        let cfg = h.save_sqlite("local").await;
+        h.seed_rows(&cfg, 2).await;
+        let id = cfg.id.to_string();
+
+        let read = json!({ "connection": id, "sql": "SELECT x FROM t" });
+        let opened = h.ok("query_open", read).await;
+        assert_eq!(opened["opened"], json!(false));
+        let run_id = opened["run"]["run"]["id"].clone();
+
+        let write = json!({ "connection": id, "sql": "DELETE FROM t" });
+        assert!(h.ok("query_open", write).await["run"].is_null());
+
+        let taken = h.ok("query_handoff_take", json!({})).await;
+        assert_eq!(taken[0]["runId"], run_id);
+        assert_eq!(taken[0]["connectionId"], json!(id));
+        assert!(taken[1]["runId"].is_null());
+        assert_eq!(h.ok("query_handoff_take", json!({})).await, json!([]));
+
+        let count = json!({ "connection": id, "sql": "SELECT count(*) FROM t" });
+        let rows = h.ok("query_run", count).await;
+        assert_eq!(rows["result"]["rows"][0][0]["value"], json!(2));
     }
 
     #[tokio::test]

@@ -34,6 +34,17 @@ pub const CONNECTION_REMOVE_ROUTE: &str = "/api/connection_remove";
 pub const SCHEMA_LIST_ROUTE: &str = "/api/schema_list";
 pub const QUERY_RUN_ROUTE: &str = "/api/query_run";
 pub const QUERY_PAGE_ROUTE: &str = "/api/query_page";
+pub const QUERY_OPEN_ROUTE: &str = "/api/query_open";
+pub const QUERY_HANDOFF_TAKE_ROUTE: &str = "/api/query_handoff_take";
+/// How long `query_open` waits for an open tab to claim the query before reporting none did.
+pub const QUERY_OPEN_WAIT_MS: u64 = 1500;
+pub const QUERY_OPEN_POLL_MS: u64 = 50;
+pub const READ_ONLY_FIRST_KEYWORDS: [&str; 6] =
+    ["SELECT", "WITH", "SHOW", "DESCRIBE", "DESC", "VALUES"];
+pub const WRITE_KEYWORDS: [&str; 19] = [
+    "INSERT", "UPDATE", "DELETE", "MERGE", "UPSERT", "REPLACE", "DROP", "ALTER", "CREATE",
+    "TRUNCATE", "GRANT", "REVOKE", "INTO", "CALL", "EXEC", "EXECUTE", "COPY", "VACUUM", "SET",
+];
 pub const HISTORY_LIST_ROUTE: &str = "/api/history_list";
 pub const PIN_ADD_ROUTE: &str = "/api/pin_add";
 pub const PIN_REMOVE_ROUTE: &str = "/api/pin_remove";

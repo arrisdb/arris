@@ -16,9 +16,9 @@ use tokio_stream::{Stream, StreamExt};
 use super::{
     ApiRoutes, AuthGuard, CANVASES_PAGE_PREFIX, ConnectionRequests, DIR_QUERY_PARAM,
     EVENTS_CHANNEL_CAPACITY, EVENTS_ROUTE, HEALTH_ROUTE, HealthResponse, LOOPBACK_HOST, NEXT_PARAM,
-    OS_ASSIGNED_PORT, PROJECT_QUERY_PARAM, ROOT_ROUTE, RUNS_PAGE_PREFIX, SERVER_INFO_FILE,
-    SERVER_INFO_TMP_EXTENSION, SERVER_LOCK_FILE, SERVER_VERSION, ServerError, ServerInfo,
-    ServerState, StaticAssets, TOKEN_BYTES, TOKEN_PARAM, URL_SCHEME,
+    OS_ASSIGNED_PORT, PROJECT_QUERY_PARAM, QueryHandoffs, ROOT_ROUTE, RUNS_PAGE_PREFIX,
+    SERVER_INFO_FILE, SERVER_INFO_TMP_EXTENSION, SERVER_LOCK_FILE, SERVER_VERSION, ServerError,
+    ServerInfo, ServerState, StaticAssets, TOKEN_BYTES, TOKEN_PARAM, URL_SCHEME,
 };
 
 pub struct Server {
@@ -62,6 +62,7 @@ impl Server {
             port,
             events,
             connection_requests: ConnectionRequests::default(),
+            query_handoffs: QueryHandoffs::default(),
         });
         Ok(Self {
             state,

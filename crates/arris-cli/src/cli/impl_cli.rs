@@ -16,7 +16,7 @@ use super::{
     CURRENT_DIR_LABEL, CanvasAddOutput, CanvasCommand, CanvasNewOutput, CanvasShowDoc,
     CanvasShowOutput, Cli, CliError, Command, ConnectionCommand, ConnectionListEntry,
     ConnectionNewOutput, DBT_TOOL, ENV_DATA_DIR, EXIT_API_ERROR, KIND_LIST_SEPARATOR,
-    LineageOutput, QueryOutput, SERVER_LISTENING_PREFIX, SQLMESH_TOOL, ServerClient, SyncOutput,
+    LineageOutput, QueryOpenOutput, QueryOutput, SERVER_LISTENING_PREFIX, SQLMESH_TOOL, ServerClient, SyncOutput,
     ToolRunOutput, ToolRunner, UrlOutput,
 };
 use crate::server::{
@@ -28,7 +28,8 @@ use crate::server::{
     ConnectionRefRequest, ConnectionRequestCreateRequest, ConnectionRequestCreateResponse,
     ConnectionRequestIdRequest, ConnectionRequestStatus, ConnectionTestRequest, EmptyResponse,
     HISTORY_LIST_ROUTE, HistoryListRequest, PIN_ADD_ROUTE, PIN_LIST_ROUTE, PIN_REMOVE_ROUTE,
-    PinAddRequest, PinRemoveRequest, QUERY_RUN_ROUTE, QueryRunRequest, QueryRunResponse,
+    PinAddRequest, PinRemoveRequest, QUERY_OPEN_ROUTE, QUERY_RUN_ROUTE, QueryOpenRequest,
+    QueryOpenResponse, QueryRunRequest, QueryRunResponse,
     SCHEMA_LIST_ROUTE, SchemaListRequest, Server, TOOL_RUN_RECORD_ROUTE, ToolRunIdPayload,
     ToolRunRecordRequest,
 };
@@ -103,6 +104,7 @@ impl Cli {
                 sql,
                 file,
                 limit,
+                open,
             } => {
                 // clap's `source` group guarantees exactly one of `--sql` / `--file`.
                 let sql = match file {
@@ -110,6 +112,27 @@ impl Cli {
                     None => sql.clone().unwrap_or_default(),
                 };
                 let (client, project) = self.connect(&data_dir).await?;
+                if *open {
+                    let body = QueryOpenRequest {
+                        connection: connection.clone(),
+                        sql,
+                        limit: Some(*limit),
+                    };
+                    let resp: QueryOpenResponse =
+                        client.call(QUERY_OPEN_ROUTE, &project, &body).await?;
+                    if !resp.opened {
+                        webbrowser::open(&client.ui_url(&Server::project_page(&project)))?;
+                    }
+                    let out = QueryOpenOutput {
+                        awaiting_run: resp.run.is_none(),
+                        query: resp.run.map(|run| {
+                            let mut out = Self::query_output(run, *limit, String::new());
+                            out.ui_url = None;
+                            out
+                        }),
+                    };
+                    return Ok(Some(serde_json::to_value(out)?));
+                }
                 let body = QueryRunRequest {
                     connection: connection.clone(),
                     sql,
@@ -210,7 +233,7 @@ impl Cli {
                 .map(|row| row.into_iter().map(Self::plain_value).collect())
                 .collect(),
             truncated,
-            ui_url,
+            ui_url: Some(ui_url),
         }
     }
 }

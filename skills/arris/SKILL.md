@@ -44,9 +44,10 @@ Run `arris ui --open`. It opens the project's Arris UI in the browser. Tell the 
 
 1. Run `arris connection list`. Pick the connection. Ask the user which one only if there is more than one and the question does not make it clear. If there are none, run the `init-connection` flow first.
 2. Run `arris schema <conn>` to see schemas, tables and columns, then `arris schema <conn> --schema <name>` to drill into one schema when the output is large or truncated (skip the flag for engines without schemas, e.g. SQLite). Always inspect the schema before writing SQL; never guess table or column names.
-3. Run `arris query <conn> --sql "<SQL>" --limit 100`. For long SQL, write it to a file and use `--file <path>`.
-4. Answer the question in plain words. Show the SQL you ran. Give the `uiUrl` so the user can open this run's result page in the Arris UI (the rows the query fetched, up to `--limit`). If `truncated` is true, say the result was cut off at the limit.
-5. On a SQL error (`query_failed`), read the message, fix the SQL, and retry. Retry at most 2 times, then show the user the error and what you tried.
+3. Run `arris query <conn> --sql "<SQL>" --limit 100 --open`. It puts the query in an Arris console tab, opening the browser if needed. For long SQL, write it to a file and use `--file <path>`.
+4. Read-only SQL runs and comes back with `rows`; the tab shows the same result. Answer the question in plain words, in a short note. Do not repeat the rows as a table or print a link; the user sees them in Arris. If `truncated` is true, say the result was cut off at the limit.
+5. Anything else returns `awaitingRun: true` and has not run. Tell the user the query is in Arris and to press Run there. Do not run it another way, and do not assume it ran.
+6. On a SQL error (`query_failed`), read the message, fix the SQL, and retry. Retry at most 2 times, then show the user the error and what you tried.
 
 Failures (also for `connection list` and `schema`):
 

@@ -29,7 +29,7 @@ Deletes a saved connection.
 ### `arris schema <conn> [--schema S]`
 Prints a JSON tree of nodes `{name, kind, path, detail, children}`. `kind` is `database`, `schema`, `table` or `column`; for columns `detail` is the data type. Without `--schema` it lists the top levels with their tables and columns where the engine provides them; `--schema S` narrows to one schema (engines without schemas, such as SQLite, return `[]`, so omit the flag there).
 
-### `arris query <conn> (--sql SQL | --file PATH) [--limit N]`
+### `arris query <conn> (--sql SQL | --file PATH) [--limit N] [--open]`
 Exactly one of `--sql` or `--file` is required. `--limit` caps returned rows (default 1000). Output:
 
 ```json
@@ -37,6 +37,8 @@ Exactly one of `--sql` or `--file` is required. `--limit` caps returned rows (de
 ```
 
 Rows are arrays of plain JSON values, in column order. `rowCount` is the number of rows returned, capped at `--limit`. `truncated` is true when more rows exist than were returned; the total is then unknown. `uiUrl` opens this run's result page in the Arris UI (the rows the query fetched, up to `--limit`).
+
+With `--open`, the query also appears in an Arris console tab, opening the browser if no tab is open. Read-only SQL runs once and prints the fields above, without `uiUrl`. Anything else, or anything the check cannot prove read-only, does not run and prints `{"awaitingRun": true}`; the user presses Run in the tab.
 
 ### `arris history [--limit N]`
 JSON array of runs, newest first: `id`, `sql`, `status` (`success` or `error`), `error`, `rowCount`, `connectionId`, `source`, `startedAt`, `finishedAt`.

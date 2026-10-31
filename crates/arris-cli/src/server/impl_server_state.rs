@@ -3,7 +3,7 @@ use std::sync::Arc;
 use arris_engines::AppEnvironment;
 use tokio::sync::broadcast;
 
-use super::{ConnectionRequests, ServerEvent};
+use super::{ConnectionRequests, QueryHandoffs, ServerEvent};
 
 pub struct ServerState {
     pub env: Arc<AppEnvironment>,
@@ -11,6 +11,7 @@ pub struct ServerState {
     pub port: u16,
     pub events: broadcast::Sender<ServerEvent>,
     pub connection_requests: ConnectionRequests,
+    pub query_handoffs: QueryHandoffs,
 }
 
 impl ServerState {
