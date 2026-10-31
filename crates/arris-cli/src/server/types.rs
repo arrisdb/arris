@@ -4,7 +4,7 @@ use arris_engines::dbt::{ColumnLineageGraph, DbtColumnDoc, LineageGraph};
 use arris_engines::sqlmesh::SqlMeshColumnDoc;
 use arris_engines::{
     CanvasCellSpec, CanvasSummary, ConnectionConfig, ConnectionPrefill, DatabaseKind,
-    PersistedPinnedQuery, QueryResult,
+    PersistedPinnedQuery, QueryLanguage, QueryResult,
     RunRecord,
     RunSource, ToolKind, ToolRunRecord, ToolRunSummary,
 };
@@ -138,11 +138,25 @@ pub struct SchemaListRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct QueryRunRequest {
     pub connection: String,
     pub sql: String,
     pub limit: Option<u32>,
     pub source: Option<RunSource>,
+    pub language: Option<QueryLanguage>,
+    pub query_id: Option<String>,
+}
+
+/// A results-grid fetch (page, sort, count): runs like a query but is not a history entry.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct QueryPageRequest {
+    pub connection: String,
+    pub sql: String,
+    pub language: Option<QueryLanguage>,
+    pub page_size: Option<u32>,
+    pub page: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

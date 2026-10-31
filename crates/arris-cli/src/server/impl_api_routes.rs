@@ -3,9 +3,11 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use arris_engines::persistence::ProjectManifest;
+use arris_engines::query::QueryError;
 use arris_engines::{
-    CONNECTION_SCOPE_LOCAL, ConnectionConfig, JsonCollectionStore, PersistedPinnedQuery, ProjectState, ScopedConnection,
-    QueryRequest, QueryResult, RUN_PREVIEW_MAX_ROWS, RunPreview, RunRecord, RunStatus, SchemaNode, StoreError,
+    CONNECTION_SCOPE_LOCAL, ConnectionConfig, JsonCollectionStore, PersistedPinnedQuery,
+    ProjectState, QueryRequest, QueryResult, RUN_PREVIEW_MAX_ROWS, RunPreview, RunRecord,
+    RunStatus, SchemaNode, ScopedConnection, StoreError,
 };
 use axum::extract::State;
 use axum::extract::rejection::JsonRejection;
@@ -25,12 +27,13 @@ use super::{
     ConnectionRequestResolvedPayload, ConnectionRequestStatus, ConnectionSaveRequest,
     ConnectionTestRequest, EmptyResponse, HISTORY_DEFAULT_LIMIT, HISTORY_LIST_ROUTE,
     HistoryListRequest, OkResponse, PIN_ADD_ROUTE, PIN_LIST_ROUTE, PIN_REMOVE_ROUTE,
-    PIN_RENAME_ROUTE, PROJECT_HEADER, PROJECT_LIST_ROUTE, PROJECT_QUERY_PARAM, PinAddRequest,
-    PIN_SAVE_ROUTE, PinRemoveRequest, PinRenameRequest, PinSaveRequest, QUERY_DEFAULT_LIMIT, QUERY_DEFAULT_SOURCE,
-    QUERY_FIRST_PAGE, QUERY_RUN_ROUTE, QueryRunRequest, QueryRunResponse, REQUEST_QUERY_PARAM,
-    RUN_GET_ROUTE, RUN_PAGE_MAX_LIMIT, RUN_PAGE_ROUTE, RUN_RESULTS_BOARD, RunGetResponse,
-    RunIdRequest, RunPageRequest, SCHEMA_LIST_ROUTE, SchemaListRequest, Server, ServerEvent,
-    ServerEventKind, ServerState, ToolRunRoutes,
+    PIN_RENAME_ROUTE, PIN_SAVE_ROUTE, PROJECT_HEADER, PROJECT_LIST_ROUTE, PROJECT_QUERY_PARAM,
+    PinAddRequest, PinRemoveRequest, PinRenameRequest, PinSaveRequest, QUERY_DEFAULT_LIMIT,
+    QUERY_DEFAULT_SOURCE, QUERY_FIRST_PAGE, QUERY_PAGE_ROUTE, QUERY_RUN_ROUTE, QueryPageRequest,
+    QueryRunRequest, QueryRunResponse, REQUEST_QUERY_PARAM, RUN_GET_ROUTE, RUN_PAGE_MAX_LIMIT,
+    RUN_PAGE_ROUTE, RUN_RESULTS_BOARD, RunGetResponse, RunIdRequest, RunPageRequest,
+    SCHEMA_LIST_ROUTE, SchemaListRequest, Server, ServerEvent, ServerEventKind, ServerState,
+    ToolRunRoutes,
 };
 
 pub(super) type ApiState = State<Arc<ServerState>>;
@@ -49,6 +52,7 @@ impl ApiRoutes {
             .route(CONNECTION_REMOVE_ROUTE, post(Self::connection_remove))
             .route(SCHEMA_LIST_ROUTE, post(Self::schema_list))
             .route(QUERY_RUN_ROUTE, post(Self::query_run))
+            .route(QUERY_PAGE_ROUTE, post(Self::query_page))
             .route(HISTORY_LIST_ROUTE, post(Self::history_list))
             .route(RUN_GET_ROUTE, post(Self::run_get))
             .route(RUN_PAGE_ROUTE, post(Self::run_page))
@@ -124,7 +128,13 @@ impl ApiRoutes {
         connection: &str,
     ) -> Result<ConnectionConfig, ApiError> {
         let by_id = match Uuid::parse_str(connection) {
-            Ok(id) => state.env.connection.find_connection(id, Some(project)).await,
+            Ok(id) => {
+                state
+                    .env
+                    .connection
+                    .find_connection(id, Some(project))
+                    .await
+            }
             Err(_) => None,
         };
         match by_id {
@@ -166,10 +176,7 @@ impl ApiRoutes {
         });
     }
 
-    fn finish_run(
-        run: &mut RunRecord,
-        outcome: &Result<QueryResult, arris_engines::query::QueryError>,
-    ) {
+    fn finish_run(run: &mut RunRecord, outcome: &Result<QueryResult, QueryError>) {
         run.finished_at = Some(Utc::now());
         match outcome {
             Ok(result) => {
@@ -351,7 +358,9 @@ impl ApiRoutes {
         let Json(req) = body?;
         let root = Self::project_root(&state, &headers).await?;
         let project = root.to_string_lossy().into_owned();
-        let request = state.connection_requests.create(root, req.kind, req.prefill);
+        let request = state
+            .connection_requests
+            .create(root, req.kind, req.prefill);
         let url = Server::page_path(
             CONNECTION_NEW_PAGE,
             &[
@@ -437,28 +446,15 @@ impl ApiRoutes {
         };
         guard.query_run_store.append(run.clone()).await?;
         drop(guard);
-        let driver = state.env.connection.open_connection(&config).await;
-        let outcome = match driver {
-            Ok(driver) => {
-                state
-                    .env
-                    .query
-                    .run_query_on(
-                        driver,
-                        state.env.connection.transaction_config(config.id).await,
-                        QueryRequest {
-                            sql: req.sql,
-                            params: Vec::new(),
-                            language: None,
-                            page_size: Some(req.limit.unwrap_or(QUERY_DEFAULT_LIMIT)),
-                            page: Some(QUERY_FIRST_PAGE),
-                            query_id: Some(run.id.clone()),
-                        },
-                    )
-                    .await
-            }
-            Err(e) => Err(e.into()),
+        let request = QueryRequest {
+            sql: req.sql,
+            params: Vec::new(),
+            language: req.language,
+            page_size: Some(req.limit.unwrap_or(QUERY_DEFAULT_LIMIT)),
+            page: Some(QUERY_FIRST_PAGE),
+            query_id: Some(req.query_id.unwrap_or_else(|| run.id.clone())),
         };
+        let outcome = Self::execute(&state, &config, request).await;
         Self::finish_run(&mut run, &outcome);
         if let Ok(result) = &outcome
             && let Err(e) = state
@@ -476,6 +472,36 @@ impl ApiRoutes {
             run,
             result: outcome?,
         }))
+    }
+
+    async fn query_page(
+        State(state): ApiState,
+        headers: HeaderMap,
+        body: Body<QueryPageRequest>,
+    ) -> ApiResult<QueryResult> {
+        let Json(req) = body?;
+        let project = Self::project(&state, &headers).await?;
+        let config =
+            Self::resolve_connection(&state, &*project.read().await, &req.connection).await?;
+        let request = QueryRequest {
+            sql: req.sql,
+            params: Vec::new(),
+            language: req.language,
+            page_size: req.page_size,
+            page: req.page,
+            query_id: None,
+        };
+        Ok(Json(Self::execute(&state, &config, request).await?))
+    }
+
+    async fn execute(
+        state: &ServerState,
+        config: &ConnectionConfig,
+        request: QueryRequest,
+    ) -> Result<QueryResult, QueryError> {
+        let driver = state.env.connection.open_connection(config).await?;
+        let tx = state.env.connection.transaction_config(config.id).await;
+        state.env.query.run_query_on(driver, tx, request).await
     }
 
     async fn history_list(
@@ -625,7 +651,10 @@ impl ApiRoutes {
         Ok(Json(EmptyResponse {}))
     }
 
-    async fn pin_list(State(state): ApiState, headers: HeaderMap) -> ApiResult<Vec<PersistedPinnedQuery>> {
+    async fn pin_list(
+        State(state): ApiState,
+        headers: HeaderMap,
+    ) -> ApiResult<Vec<PersistedPinnedQuery>> {
         let project = Self::project(&state, &headers).await?;
         Ok(Json(
             project.read().await.pinned_queries_store.load().await?,
@@ -927,6 +956,24 @@ pub(super) mod tests {
     }
 
     #[tokio::test]
+    async fn query_page_skips_history_and_pages() {
+        let h = Harness::start().await;
+        let cfg = h.save_sqlite("local").await;
+        h.seed_rows(&cfg, 3).await;
+        let before = h.ok("history_list", json!({})).await;
+        let body = json!({
+            "connection": cfg.id.to_string(),
+            "sql": "SELECT x FROM t ORDER BY x",
+            "pageSize": 1,
+            "page": 1,
+        });
+        let page = h.ok("query_page", body).await;
+        assert_eq!(page["rows"].as_array().unwrap().len(), 1);
+        assert_eq!(page["has_more"], json!(true));
+        assert_eq!(h.ok("history_list", json!({})).await, before);
+    }
+
+    #[tokio::test]
     async fn query_run_by_connection_name() {
         let h = Harness::start().await;
         let cfg = h.save_sqlite("Local DB").await;
@@ -1184,9 +1231,18 @@ pub(super) mod tests {
         let list = h.ok("pin_list", json!({})).await;
         assert_eq!(list.as_array().unwrap().len(), 1);
         assert_eq!(list[0]["text"], "SELECT 2");
-        assert_eq!(next_kind(&mut events).await.kind, ServerEventKind::PinsChanged);
+        assert_eq!(
+            next_kind(&mut events).await.kind,
+            ServerEventKind::PinsChanged
+        );
         h.ok("pin_save", json!({ "queries": [] })).await;
-        assert!(h.ok("pin_list", json!({})).await.as_array().unwrap().is_empty());
+        assert!(
+            h.ok("pin_list", json!({}))
+                .await
+                .as_array()
+                .unwrap()
+                .is_empty()
+        );
     }
 
     #[tokio::test]

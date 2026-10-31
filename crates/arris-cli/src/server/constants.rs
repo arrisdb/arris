@@ -33,6 +33,7 @@ pub const CONNECTION_TEST_ROUTE: &str = "/api/connection_test";
 pub const CONNECTION_REMOVE_ROUTE: &str = "/api/connection_remove";
 pub const SCHEMA_LIST_ROUTE: &str = "/api/schema_list";
 pub const QUERY_RUN_ROUTE: &str = "/api/query_run";
+pub const QUERY_PAGE_ROUTE: &str = "/api/query_page";
 pub const HISTORY_LIST_ROUTE: &str = "/api/history_list";
 pub const PIN_ADD_ROUTE: &str = "/api/pin_add";
 pub const PIN_REMOVE_ROUTE: &str = "/api/pin_remove";

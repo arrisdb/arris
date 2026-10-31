@@ -115,6 +115,8 @@ impl Cli {
                     sql,
                     limit: Some(*limit),
                     source: None,
+                    language: None,
+                    query_id: None,
                 };
                 let resp: QueryRunResponse = client.call(QUERY_RUN_ROUTE, &project, &body).await?;
                 let ui_url = client.ui_url(&Server::run_page(&project, &resp.run.id));
