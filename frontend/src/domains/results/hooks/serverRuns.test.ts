@@ -55,6 +55,16 @@ describe("server run log", () => {
     expect(logged()).toEqual(["cli"]);
   });
 
+  it("shows the stored preview when the server's cache is gone", () => {
+    vi.mocked(fetchServerRunPageIPC).mockRejectedValue(new Error("result_not_cached"));
+    const preview = { columns: [], rows: [[]], truncated: true };
+    appendServerRun(record("r1", { preview }));
+    loadSelectedRunResult();
+    const run = useRunHistoryStore.getState().runsByTab[SERVER_RUNS_TAB_ID][0];
+    expect(run.result).toMatchObject({ rows: [[]], has_more: true });
+    expect(fetchServerRunPageIPC).toHaveBeenCalledTimes(1);
+  });
+
   it("loads a selected run's cached rows once", async () => {
     vi.mocked(fetchServerRunPageIPC).mockResolvedValue(RESULT);
     appendServerRun(record("r1"));
