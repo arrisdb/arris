@@ -10,32 +10,13 @@ import type {
   ProjectOpenResult,
   ScopedConnection,
 } from "@shared";
-import { WEB_LAYOUT_STORAGE_PREFIX, WEB_TABS_STORAGE_PREFIX } from "./constants";
+import { DESKTOP_ONLY_TAB_TYPES } from "./constants";
 import type { PaneNode } from "./types";
 
 type PersistedPaneLayout = ProjectOpenResult["paneLayout"];
 
-const EMPTY_PANE_LAYOUT: PersistedPaneLayout = { layout: null, focusedPaneGroupId: null };
-
-// The browser has no project folder to write into, so tabs and layout live in localStorage.
-function readWebState<T>(prefix: string, project: string, fallback: T): T {
-  try {
-    const raw = window.localStorage.getItem(`${prefix}${project}`);
-    return raw ? (JSON.parse(raw) as T) : fallback;
-  } catch {
-    return fallback;
-  }
-}
-
-function writeWebState(prefix: string, value: unknown): void {
-  const project = currentProject();
-  if (!project) return;
-  try {
-    window.localStorage.setItem(`${prefix}${project}`, JSON.stringify(value));
-  } catch {
-    // Storage unavailable; the session keeps its in-memory tabs.
-  }
-}
+// Tabs only the desktop can show stay out of the browser but must survive its saves.
+let desktopOnlyTabs: PersistedTab[] = [];
 
 function appPreferencesLoadIPC(): Promise<AppPreferences> {
   return invoke("cmd_app_preferences_load");
@@ -65,12 +46,18 @@ function openFileIndexIPC(root: string): Promise<void> {
 async function openProjectIPC(root: string): Promise<ProjectOpenResult> {
   if (!isWebShell()) return invoke("cmd_open_project", { root });
   setCurrentProject(root);
+  const [connections, workspace] = await Promise.all([
+    apiCall<ScopedConnection[]>("connection_list"),
+    apiCall<{ tabs: PersistedTab[]; paneLayout: PersistedPaneLayout }>("workspace_load"),
+  ]);
+  const isDesktopOnly = (tab: PersistedTab) => DESKTOP_ONLY_TAB_TYPES.has(tab.tabType ?? "");
+  desktopOnlyTabs = workspace.tabs.filter(isDesktopOnly);
   return {
     root,
-    connections: await apiCall("connection_list"),
-    tabs: readWebState(WEB_TABS_STORAGE_PREFIX, root, []),
+    connections,
+    tabs: workspace.tabs.filter((tab) => !isDesktopOnly(tab)),
     federationTabs: [],
-    paneLayout: readWebState(WEB_LAYOUT_STORAGE_PREFIX, root, EMPTY_PANE_LAYOUT),
+    paneLayout: workspace.paneLayout,
   };
 }
 
@@ -90,7 +77,7 @@ function readTextFileIPC(path: string): Promise<string> {
 
 async function saveTabsIPC(tabs: PersistedTab[]): Promise<void> {
   if (!isWebShell()) return invoke("cmd_save_console_tabs", { tabs });
-  writeWebState(WEB_TABS_STORAGE_PREFIX, tabs);
+  await apiCall("workspace_tabs_save", { tabs: [...desktopOnlyTabs, ...tabs] });
 }
 
 async function savePaneLayoutIPC(
@@ -99,7 +86,7 @@ async function savePaneLayoutIPC(
 ): Promise<void> {
   const paneLayout: PersistedPaneLayout = { layout, focusedPaneGroupId };
   if (!isWebShell()) return invoke("cmd_save_pane_layout", { layout: paneLayout });
-  writeWebState(WEB_LAYOUT_STORAGE_PREFIX, paneLayout);
+  await apiCall("workspace_layout_save", { layout: paneLayout });
 }
 
 // Move a virtual console/notebook's sidecar file out of `.arris/files/` to the

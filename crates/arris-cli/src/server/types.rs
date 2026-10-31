@@ -4,7 +4,7 @@ use arris_engines::dbt::{ColumnLineageGraph, DbtColumnDoc, LineageGraph};
 use arris_engines::sqlmesh::SqlMeshColumnDoc;
 use arris_engines::{
     CanvasCellSpec, CanvasSummary, ConnectionConfig, ConnectionPrefill, DatabaseKind,
-    PersistedPinnedQuery, QueryLanguage, QueryResult,
+    PersistedConsoleTab, PersistedPaneLayout, PersistedPinnedQuery, QueryLanguage, QueryResult,
     RunRecord,
     RunSource, ToolKind, ToolRunRecord, ToolRunSummary,
 };
@@ -188,6 +188,24 @@ pub struct QueryHandoff {
     pub connection_id: String,
     pub sql: String,
     pub run_id: Option<String>,
+}
+
+/// The project's open tabs and pane layout, shared with the desktop app.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkspaceResponse {
+    pub tabs: Vec<PersistedConsoleTab>,
+    pub pane_layout: PersistedPaneLayout,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct WorkspaceTabsSaveRequest {
+    pub tabs: Vec<PersistedConsoleTab>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct WorkspaceLayoutSaveRequest {
+    pub layout: PersistedPaneLayout,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]

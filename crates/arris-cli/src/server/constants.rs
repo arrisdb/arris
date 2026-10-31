@@ -34,6 +34,9 @@ pub const CONNECTION_REMOVE_ROUTE: &str = "/api/connection_remove";
 pub const SCHEMA_LIST_ROUTE: &str = "/api/schema_list";
 pub const QUERY_RUN_ROUTE: &str = "/api/query_run";
 pub const QUERY_PAGE_ROUTE: &str = "/api/query_page";
+pub const WORKSPACE_LOAD_ROUTE: &str = "/api/workspace_load";
+pub const WORKSPACE_TABS_SAVE_ROUTE: &str = "/api/workspace_tabs_save";
+pub const WORKSPACE_LAYOUT_SAVE_ROUTE: &str = "/api/workspace_layout_save";
 pub const QUERY_OPEN_ROUTE: &str = "/api/query_open";
 pub const QUERY_HANDOFF_TAKE_ROUTE: &str = "/api/query_handoff_take";
 /// How long `query_open` waits for an open tab to claim the query before reporting none did.

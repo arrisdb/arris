@@ -5,9 +5,9 @@ use std::time::Duration;
 use arris_engines::persistence::ProjectManifest;
 use arris_engines::query::QueryError;
 use arris_engines::{
-    CONNECTION_SCOPE_LOCAL, ConnectionConfig, JsonCollectionStore, PersistedPinnedQuery,
-    ProjectState, QueryRequest, QueryResult, RUN_PREVIEW_MAX_ROWS, RunPreview, RunRecord,
-    RunSource, RunStatus, SchemaNode, ScopedConnection, StoreError,
+    CONNECTION_SCOPE_LOCAL, ConnectionConfig, JsonCollectionStore, JsonSingletonStore,
+    PersistedPinnedQuery, ProjectState, QueryRequest, QueryResult, RUN_PREVIEW_MAX_ROWS,
+    RunPreview, RunRecord, RunSource, RunStatus, SchemaNode, ScopedConnection, StoreError,
 };
 use axum::extract::State;
 use axum::extract::rejection::JsonRejection;
@@ -35,6 +35,8 @@ use super::{
     REQUEST_QUERY_PARAM, RUN_GET_ROUTE, RUN_PAGE_MAX_LIMIT, RUN_PAGE_ROUTE, RUN_RESULTS_BOARD,
     ReadOnlySql, RunGetResponse, RunIdRequest, RunPageRequest, SCHEMA_LIST_ROUTE,
     SchemaListRequest, Server, ServerEvent, ServerEventKind, ServerState, ToolRunRoutes,
+    WORKSPACE_LAYOUT_SAVE_ROUTE, WORKSPACE_LOAD_ROUTE, WORKSPACE_TABS_SAVE_ROUTE,
+    WorkspaceLayoutSaveRequest, WorkspaceResponse, WorkspaceTabsSaveRequest,
 };
 
 pub(super) type ApiState = State<Arc<ServerState>>;
@@ -63,6 +65,12 @@ impl ApiRoutes {
             .route(PIN_ADD_ROUTE, post(Self::pin_add))
             .route(PIN_REMOVE_ROUTE, post(Self::pin_remove))
             .route(PIN_SAVE_ROUTE, post(Self::pin_save))
+            .route(WORKSPACE_LOAD_ROUTE, post(Self::workspace_load))
+            .route(WORKSPACE_TABS_SAVE_ROUTE, post(Self::workspace_tabs_save))
+            .route(
+                WORKSPACE_LAYOUT_SAVE_ROUTE,
+                post(Self::workspace_layout_save),
+            )
             .route(PIN_LIST_ROUTE, post(Self::pin_list))
             .route(PROJECT_LIST_ROUTE, post(Self::project_list))
             .merge(CanvasRoutes::router())
@@ -707,6 +715,45 @@ impl ApiRoutes {
         Ok(Json(EmptyResponse {}))
     }
 
+    async fn workspace_load(
+        State(state): ApiState,
+        headers: HeaderMap,
+    ) -> ApiResult<WorkspaceResponse> {
+        let project = Self::project(&state, &headers).await?;
+        let guard = project.read().await;
+        Ok(Json(WorkspaceResponse {
+            tabs: guard.tabs_store.load().await?,
+            pane_layout: guard.pane_layout_store.load().await?,
+        }))
+    }
+
+    async fn workspace_tabs_save(
+        State(state): ApiState,
+        headers: HeaderMap,
+        body: Body<WorkspaceTabsSaveRequest>,
+    ) -> ApiResult<EmptyResponse> {
+        let Json(req) = body?;
+        let project = Self::project(&state, &headers).await?;
+        project.read().await.tabs_store.save(&req.tabs).await?;
+        Ok(Json(EmptyResponse {}))
+    }
+
+    async fn workspace_layout_save(
+        State(state): ApiState,
+        headers: HeaderMap,
+        body: Body<WorkspaceLayoutSaveRequest>,
+    ) -> ApiResult<EmptyResponse> {
+        let Json(req) = body?;
+        let project = Self::project(&state, &headers).await?;
+        project
+            .read()
+            .await
+            .pane_layout_store
+            .save(&req.layout)
+            .await?;
+        Ok(Json(EmptyResponse {}))
+    }
+
     async fn pin_save(
         State(state): ApiState,
         headers: HeaderMap,
@@ -1066,6 +1113,22 @@ pub(super) mod tests {
         let count = json!({ "connection": id, "sql": "SELECT count(*) FROM t" });
         let rows = h.ok("query_run", count).await;
         assert_eq!(rows["result"]["rows"][0][0]["value"], json!(2));
+    }
+
+    #[tokio::test]
+    async fn workspace_round_trips_console_text_across_a_restart_of_the_page() {
+        let h = Harness::start().await;
+        let tab = json!({
+            "id": "t1", "title": "Console 1", "text": "SELECT 1", "kind": "sql", "cursor": 0,
+        });
+        h.ok("workspace_tabs_save", json!({ "tabs": [tab] })).await;
+        let layout = json!({ "layout": null, "focusedPaneGroupId": "g1" });
+        h.ok("workspace_layout_save", json!({ "layout": layout }))
+            .await;
+
+        let loaded = h.ok("workspace_load", json!({})).await;
+        assert_eq!(loaded["tabs"][0]["text"], json!("SELECT 1"));
+        assert_eq!(loaded["paneLayout"]["focusedPaneGroupId"], json!("g1"));
     }
 
     #[tokio::test]

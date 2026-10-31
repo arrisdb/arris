@@ -11,8 +11,6 @@ const MAX_RECENTS = 8;
 const RECENTS_STORAGE_KEY = "arris.recents";
 
 // Browser shell: per-project tabs and pane layout, keyed by prefix + project path.
-const WEB_TABS_STORAGE_PREFIX = "arris.web.tabs:";
-const WEB_LAYOUT_STORAGE_PREFIX = "arris.web.layout:";
 
 // App-level notification service: status-bar spinner while a task runs, then a
 // snackbar with the outcome. Success snackbars auto-dismiss; errors stay until
@@ -27,7 +25,21 @@ const TASK_LABEL_RUNNING_SUFFIX = "…";
 // Each analytics tool keeps one tab, so its id is derived from the tool.
 const ANALYTICS_TAB_ID_PREFIX = "analytics:";
 
+// Saved tab types the browser cannot render: they need local files, shells or git.
+const DESKTOP_ONLY_TAB_TYPES: ReadonlySet<string> = new Set([
+  "file",
+  "doc",
+  "terminal",
+  "notebook",
+  "media",
+  "gitdiff",
+  "gitcommitdiff",
+  "githistory",
+  "gitconflict",
+]);
+
 export {
+  DESKTOP_ONLY_TAB_TYPES,
   ANALYTICS_TAB_ID_PREFIX,
   NOTIFIED_TASK_ID_PREFIX,
   SNACKBAR_AUTO_DISMISS_MS,
@@ -42,6 +54,4 @@ export {
   PROJECT_STORE_SAVE_DEBOUNCE_MS,
   RECENTS_STORAGE_KEY,
   TAB_SAVE_DEBOUNCE_MS,
-  WEB_LAYOUT_STORAGE_PREFIX,
-  WEB_TABS_STORAGE_PREFIX,
 };
