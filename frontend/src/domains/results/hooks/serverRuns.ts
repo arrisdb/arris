@@ -1,6 +1,6 @@
 import type { QueryResult } from "@shared";
-import type { RunRecord } from "@domains/history";
-import { fetchServerRunPageIPC, listServerRunsIPC } from "../components/RunHistoryChips/ipc";
+import type { RunRecord } from "../types";
+import { fetchServerRunPageIPC, getServerRunIPC, listServerRunsIPC } from "../components/RunHistoryChips/ipc";
 import { SERVER_RESULT_PAGE_SIZE, SERVER_RUNS_LIMIT, SERVER_RUNS_TAB_ID, SERVER_RUN_RUNNING } from "../constants";
 import { useRunHistoryStore } from "./runHistoryStore";
 
@@ -9,6 +9,8 @@ function previewResult({ preview }: RunRecord): QueryResult | undefined {
   if (!preview) return undefined;
   return { columns: preview.columns, rows: preview.rows, elapsed: 0, has_more: preview.truncated };
 }
+
+let hydration: Promise<void> = Promise.resolve();
 
 function appendRecord(record: RunRecord): void {
   if (record.status === SERVER_RUN_RUNNING) return;
@@ -25,9 +27,25 @@ function appendRecord(record: RunRecord): void {
 }
 
 // Newest-first from the server; the run log reads oldest-first.
-async function hydrateServerRuns(): Promise<void> {
-  const records = await listServerRunsIPC(SERVER_RUNS_LIMIT);
-  [...records].reverse().forEach(appendRecord);
+function hydrateServerRuns(): Promise<void> {
+  hydration = listServerRunsIPC(SERVER_RUNS_LIMIT).then((records) => {
+    [...records].reverse().forEach(appendRecord);
+  });
+  return hydration;
+}
+
+// Selects a run for a deep link, fetching it if it is older than the restored log.
+async function openServerRun(runId: string): Promise<string | undefined> {
+  await hydration;
+  const store = useRunHistoryStore.getState();
+  const known = store.runsByTab[SERVER_RUNS_TAB_ID]?.find((run) => run.id === runId);
+  if (known) {
+    store.selectRun(runId);
+    return known.connectionId;
+  }
+  const { run } = await getServerRunIPC(runId);
+  appendRecord(run);
+  return run.connectionId;
 }
 
 // Runs from this tab are already in its log; this adds the ones from the CLI.
@@ -46,4 +64,4 @@ function loadSelectedRunResult(): void {
     .catch(() => {});
 }
 
-export { appendServerRun, hydrateServerRuns, loadSelectedRunResult };
+export { appendServerRun, hydrateServerRuns, loadSelectedRunResult, openServerRun };

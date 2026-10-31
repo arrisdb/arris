@@ -1,7 +1,7 @@
 import type { QueryResult, SlimDiffResult } from "@shared";
 import type { CommandLogKind } from "@domains/output";
 import type { EditorTab } from "@shell/types";
-import type { QueryValue } from "./components/ResultsTableView/types";
+import type { ColumnSpec, QueryValue } from "./components/ResultsTableView/types";
 
 interface QueryRunResult {
   id: string;
@@ -86,3 +86,28 @@ export type {
   ResultsPaneMode,
   SortClause,
 };
+
+type RunStatus = "running" | "success" | "error" | "cancelled";
+type RunSource = "cli" | "ui" | "canvas" | "dbt" | "sqlmesh";
+
+interface RunPreview {
+  columns: ColumnSpec[];
+  rows: QueryValue[][];
+  truncated: boolean;
+}
+
+/// One entry in the server's query history.
+interface RunRecord {
+  id: string;
+  connectionId: string;
+  sql: string;
+  source: RunSource;
+  startedAt: string;
+  finishedAt: string | null;
+  status: RunStatus;
+  rowCount: number | null;
+  error: string | null;
+  preview: RunPreview | null;
+}
+
+export type { RunRecord };

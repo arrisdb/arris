@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { RunRecord } from "@domains/history";
+import type { RunRecord } from "../types";
 import { fetchServerRunPageIPC, listServerRunsIPC } from "../components/RunHistoryChips/ipc";
 import { SERVER_RUNS_TAB_ID } from "../constants";
 import { useRunHistoryStore } from "./runHistoryStore";

@@ -24,7 +24,11 @@ const SNACKBAR_MESSAGE_SEPARATOR = ": ";
 const NOTIFIED_TASK_ID_PREFIX = "notified-task-";
 const TASK_LABEL_RUNNING_SUFFIX = "…";
 
+// Each analytics tool keeps one tab, so its id is derived from the tool.
+const ANALYTICS_TAB_ID_PREFIX = "analytics:";
+
 export {
+  ANALYTICS_TAB_ID_PREFIX,
   NOTIFIED_TASK_ID_PREFIX,
   SNACKBAR_AUTO_DISMISS_MS,
   SNACKBAR_ID_PREFIX,

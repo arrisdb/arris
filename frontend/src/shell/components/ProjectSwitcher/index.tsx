@@ -1,9 +1,10 @@
 import { useMemo } from "react";
 import { Select } from "@shared/ui";
 import { currentProject, setCurrentProject } from "@shared/api";
-import { SWITCHER_PLACEHOLDER, SWITCHER_TEST_ID, SWITCHER_TITLE } from "./constants";
+import { NO_PROJECT_MESSAGE, SWITCHER_PLACEHOLDER, SWITCHER_TEST_ID, SWITCHER_TITLE } from "./constants";
 import { useProjects } from "./hooks";
 import { projectLabel, projectUrl } from "./utils";
+import "./index.css";
 
 function ProjectSwitcher() {
   const projects = useProjects();
@@ -15,7 +16,7 @@ function ProjectSwitcher() {
 
   const switchTo = (root: string) => {
     setCurrentProject(root);
-    window.location.assign(projectUrl(window.location.pathname, root));
+    window.location.assign(projectUrl(root));
   };
 
   return (
@@ -30,4 +31,13 @@ function ProjectSwitcher() {
   );
 }
 
-export { ProjectSwitcher };
+function NoProjectScreen() {
+  return (
+    <div className="mdbc-no-project">
+      <p>{NO_PROJECT_MESSAGE}</p>
+      <ProjectSwitcher />
+    </div>
+  );
+}
+
+export { NoProjectScreen, ProjectSwitcher };

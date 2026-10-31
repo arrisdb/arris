@@ -17,10 +17,10 @@ async function mount(): Promise<void> {
     root = <App />;
   } else {
     enableWebShell();
-    const { WebApp } = await import("@shell/components/WebApp");
+    const { WebRoot } = await import("@shell/components/WebRoot");
     // Applies the default theme so the [data-theme] color tokens resolve.
     useSettingsStore.getState().hydrate();
-    root = <WebApp />;
+    root = <WebRoot />;
   }
   ReactDOM.createRoot(document.getElementById("root")!).render(
     <React.StrictMode>{root}</React.StrictMode>,

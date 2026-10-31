@@ -30,16 +30,8 @@ describe("ProjectSwitcher", () => {
     render(<ProjectSwitcher />);
     fireEvent.click(await screen.findByText("a"));
     fireEvent.click(await screen.findByText("b"));
-    expect(assign).toHaveBeenCalledWith("/pinned?project=%2Fwork%2Fb");
+    expect(assign).toHaveBeenCalledWith("/?project=%2Fwork%2Fb");
     expect(window.localStorage.getItem(PROJECT_STORAGE_KEY)).toBe("/work/b");
   });
 
-  it("switching from a run page lands on history", async () => {
-    window.history.replaceState(null, "", "/runs/abc?project=%2Fwork%2Fa");
-    vi.stubGlobal("location", { pathname: "/runs/abc", search: "?project=%2Fwork%2Fa", assign });
-    render(<ProjectSwitcher />);
-    fireEvent.click(await screen.findByText("a"));
-    fireEvent.click(await screen.findByText("b"));
-    expect(assign).toHaveBeenCalledWith("/history?project=%2Fwork%2Fb");
-  });
 });

@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { currentProject, subscribe } from "@shared/api";
 import { useConnectionsStore } from "@domains/connection/hooks";
 import { listConnectionsIPC } from "@domains/connection/components/CombinedConnectionsTree/ipc";
-import type { RunRecord } from "@domains/history";
+import type { RunRecord } from "@domains/results/types";
 import { usePinnedQueriesStore } from "@domains/pinnedQueries";
 import { appendServerRun, loadSelectedRunResult, useRunHistoryStore } from "@domains/results/hooks";
 

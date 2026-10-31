@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { apiCall, isWebShell } from "@shared/api";
 import type { QueryResult } from "@shared";
-import type { RunRecord } from "@domains/history";
+import type { RunRecord } from "../../types";
 
 // On-disk shape for one run-history chip. Mirrors the Rust
 // `PersistedRunHistoryEntry`: metadata + SQL only, never the result set. Owned
@@ -42,9 +42,13 @@ function listServerRunsIPC(limit: number): Promise<RunRecord[]> {
   return apiCall("history_list", { limit });
 }
 
+function getServerRunIPC(runId: string): Promise<{ run: RunRecord }> {
+  return apiCall("run_get", { runId });
+}
+
 function fetchServerRunPageIPC(runId: string, limit: number): Promise<QueryResult> {
   return apiCall("run_page", { runId, offset: 0, limit });
 }
 
-export { fetchServerRunPageIPC, listServerRunsIPC, loadRunHistoryIPC, saveRunHistoryIPC };
+export { fetchServerRunPageIPC, getServerRunIPC, listServerRunsIPC, loadRunHistoryIPC, saveRunHistoryIPC };
 export type { PersistedRunHistoryEntry };

@@ -5,7 +5,8 @@ import { ModelsView } from "@domains/analytics";
 import {
   PaneContextMenuSurface,
 } from "@shared/ui/ContextMenu";
-import { analyticsPath, navigate } from "../../utils";
+import { useTabsStore } from "@shell/hooks/tabsStore";
+import { analyticsPath } from "../../utils";
 import { WEB_PROJECT_TITLE } from "./constants";
 import { useLeftSidebarState } from "./hooks";
 import { leftPaneContextMenuItems } from "./utils";
@@ -18,7 +19,9 @@ function WebModels({ view }: { view: string }) {
     <div className="mdbc-pane-body" data-testid="left-sidebar-body">
       <ModelsView
         tool={view}
-        onOpenModel={(name) => navigate(analyticsPath(view, "models", name))}
+        onOpenModel={(name) =>
+          useTabsStore.getState().openAnalyticsTab(view, analyticsPath(view, "models", name))
+        }
       />
     </div>
   );

@@ -1,0 +1,10 @@
+.mdbc-no-project {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 360px;
+  margin: 48px auto;
+  padding: 0 16px;
+  color: var(--m-fg-3);
+  font-size: var(--m-fs-sm);
+}

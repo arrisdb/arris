@@ -1,0 +1,11 @@
+.mdbc-analytics-tab {
+  height: 100%;
+  overflow: auto;
+}
+
+/* The lineage graph fills the tab under the section switch. */
+.mdbc-analytics-tab .mdbc-analytics-lineage {
+  height: calc(100% - 44px);
+  border: 0;
+  border-radius: 0;
+}

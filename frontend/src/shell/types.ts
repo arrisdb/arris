@@ -35,6 +35,8 @@ interface NotifiedTaskResult {
 type ResultPane = "results" | "plan";
 
 interface EditorTab extends PersistedTab {
+  /// Page an `analytics` tab shows, as a `/<tool>/...` route.
+  analyticsPath?: string;
   result?: QueryResult;
   plan?: PlanResult;
   error?: string;
