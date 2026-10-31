@@ -6,6 +6,7 @@ import { AgentProviderSelect } from "./components/AgentProviderSelect";
 function registerAgentPane(): void {
   registerPane({
     id: "agent",
+    nativeOnly: true,
     side: "right",
     kind: "primary",
     priority: 30,

@@ -1,3 +1,4 @@
+import { isWebShell } from "@shared/api";
 import { useResultsTableStore } from "@domains/results/hooks";
 import { usePinnedQueriesStore } from "@domains/pinnedQueries/hooks";
 import { useSettingsStore, type KeymapAction } from "@shared/settings";
@@ -7,7 +8,7 @@ import { useBackgroundTasksStore } from "../../hooks/backgroundTasksStore";
 import { useChartEditorStore } from "@domains/chart/hooks";
 import { useTabsStore } from "../../hooks/tabsStore";
 import type { SidebarMetaTab } from "@shared";
-import { LEFT_RAIL_ITEMS } from "./constants";
+import { LEFT_RAIL_ITEMS, WEB_HIDDEN_RAIL_ITEMS } from "./constants";
 import type { StatusBarViewModel } from "./types";
 
 function useStatusBar(): StatusBarViewModel {
@@ -74,7 +75,9 @@ function useStatusBar(): StatusBarViewModel {
     chartEditorOpen,
     connectionsOpen,
     key,
-    leftRailItems: LEFT_RAIL_ITEMS,
+    leftRailItems: isWebShell()
+      ? LEFT_RAIL_ITEMS.filter((item) => !WEB_HIDDEN_RAIL_ITEMS.has(item.key))
+      : LEFT_RAIL_ITEMS,
     leftVisible,
     onClickAgentPanel,
     onClickChartEditor,

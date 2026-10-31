@@ -5,6 +5,7 @@ import {
   ModelView,
   ModelsView,
   ToolRunsView,
+  useAnalyticsTools,
 } from "@domains/analytics";
 import type { AnalyticsSection, AnalyticsTool } from "@domains/analytics";
 import { CanvasView, SendToCanvasMenu } from "@domains/canvas";
@@ -22,7 +23,7 @@ import {
   WEB_APP_TEST_ID,
   WIDE_ROUTES,
 } from "./constants";
-import { useAnalyticsTools, useConnectionList } from "./hooks";
+import { useConnectionList } from "./hooks";
 import "./index.css";
 
 // Run pages and history rows can put a run's query on a canvas.

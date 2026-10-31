@@ -1,3 +1,4 @@
+import { isWebShell } from "@shared/api";
 import { useConnectionsStore, useSchemaUiStore } from "../../hooks";
 import { useCallback, useMemo, useState } from "react";
 import type { MouseEvent as ReactMouseEvent } from "react";
@@ -151,7 +152,8 @@ function useCombinedConnectionsTree(): CombinedConnectionsTreeViewModel {
     select(connection.id);
     const driver = driverForKind(connection.kind);
     const tableRef = driver.tableRefFromNode(node);
-    const editable = driver.editableKinds.has(node.kind);
+    // The server has no mutation route yet, so browser tables are read-only.
+    const editable = !isWebShell() && driver.editableKinds.has(node.kind);
     tableBrowseQueryIPC(connection.id, tableRef)
       .then((text) => {
         openTableTab({

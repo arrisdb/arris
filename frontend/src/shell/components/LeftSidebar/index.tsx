@@ -1,10 +1,28 @@
 import "@shell";
 import { useRailContent } from "@shared";
+import { isWebShell } from "@shared/api";
+import { ModelsView } from "@domains/analytics";
 import {
   PaneContextMenuSurface,
 } from "@shared/ui/ContextMenu";
+import { analyticsPath, navigate } from "../../utils";
+import { WEB_PROJECT_TITLE } from "./constants";
 import { useLeftSidebarState } from "./hooks";
 import { leftPaneContextMenuItems } from "./utils";
+
+// The browser swaps the file tree for the server's model lists; the project view
+// is just the sections, so it renders no body at all.
+function WebModels({ view }: { view: string }) {
+  if (view !== "dbt" && view !== "sqlmesh") return null;
+  return (
+    <div className="mdbc-pane-body" data-testid="left-sidebar-body">
+      <ModelsView
+        tool={view}
+        onOpenModel={(name) => navigate(analyticsPath(view, "models", name))}
+      />
+    </div>
+  );
+}
 
 // Generic left rail: renders the active left primary the registry resolves
 // (files/dbt/SQLMesh/git) plus any active sections. The only rail-specific
@@ -59,12 +77,16 @@ export function LeftSidebar() {
             )}
           </span>
         ) : (
-          <span className="mdbc-pane-title">{primary?.title}</span>
+          <span className="mdbc-pane-title">{isWebShell() ? WEB_PROJECT_TITLE : primary?.title}</span>
         )}
       </div>
-      <div className="mdbc-pane-body" data-testid="left-sidebar-body">
-        {Primary && <Primary />}
-      </div>
+      {isWebShell() ? (
+        <WebModels view={filesPaneView} />
+      ) : (
+        <div className="mdbc-pane-body" data-testid="left-sidebar-body">
+          {Primary && <Primary />}
+        </div>
+      )}
       {primary?.id === "filesProject" &&
         sections.map((section) => {
           const Section = section.Component;

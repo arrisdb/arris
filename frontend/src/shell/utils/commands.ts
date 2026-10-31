@@ -1,3 +1,4 @@
+import { isWebShell } from "@shared/api";
 import { useConnectionsStore, useSchemaUiStore } from "@domains/connection/hooks";
 import { useResultsTableStore, useRunHistoryStore } from "@domains/results/hooks";
 import { usePinnedQueriesStore } from "@domains/pinnedQueries/hooks";
@@ -34,6 +35,9 @@ import { useCommandRegistryStore } from "../hooks/commandRegistryStore";
 import { useFileSearchStore } from "@domains/files/hooks";
 import { useTabsStore } from "../hooks/tabsStore";
 import { openProjectFromMenu, pickAndOpenFolderInNewWindow } from "./app";
+
+// Features that need local files, git or the desktop settings store.
+const isDesktop = () => !isWebShell();
 
 interface CommandSpec {
   run: () => void;
@@ -219,11 +223,14 @@ function useGlobalCommands(): void {
     aiGenerate: { run: openAgentPanel },
     openTab: { run: () => openNewConsoleTab() },
     closeTab: { run: closeFocusedPaneTab },
-    openSettings: { run: () => useSettingsStore.getState().open() },
-    searchFiles: { run: () => useFileSearchStore.getState().show("file") },
-    searchContent: { run: () => useFileSearchStore.getState().show("content") },
-    openProject: { run: () => { openProjectFromMenu().catch(() => {}); } },
-    openProjectNewWindow: { run: () => { pickAndOpenFolderInNewWindow().catch(() => {}); } },
+    openSettings: { run: () => useSettingsStore.getState().open(), isEnabled: isDesktop },
+    searchFiles: { run: () => useFileSearchStore.getState().show("file"), isEnabled: isDesktop },
+    searchContent: { run: () => useFileSearchStore.getState().show("content"), isEnabled: isDesktop },
+    openProject: { run: () => { openProjectFromMenu().catch(() => {}); }, isEnabled: isDesktop },
+    openProjectNewWindow: {
+      run: () => { pickAndOpenFolderInNewWindow().catch(() => {}); },
+      isEnabled: isDesktop,
+    },
     toggleSidebar: { run: () => useSettingsStore.getState().toggleSidebarLeftVisible() },
     showProjectPane: { run: () => useSettingsStore.getState().setSidebarLeftTab("files") },
     showGitPane: {
@@ -231,8 +238,9 @@ function useGlobalCommands(): void {
         useTabsStore.getState().openGitDiffTab();
         useSettingsStore.getState().setSidebarLeftTab("git");
       },
+      isEnabled: isDesktop,
     },
-    showAgentPanel: { run: toggleAgentPanel },
+    showAgentPanel: { run: toggleAgentPanel, isEnabled: isDesktop },
     showPinnedQueries: { run: togglePinnedQueries },
     showChartEditor: { run: toggleChartEditor },
     showConnections: { run: toggleConnections },

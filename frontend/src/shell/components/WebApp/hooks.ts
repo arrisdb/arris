@@ -1,6 +1,4 @@
 import { useEffect, useState } from "react";
-import { ANALYTICS_TOOLS, modelsIPC } from "@domains/analytics";
-import type { AnalyticsTool } from "@domains/analytics";
 import { ipcErrorMessage } from "@shared";
 import { currentProject, subscribe } from "@shared/api";
 import { useConnectionsStore } from "@domains/connection/hooks";
@@ -38,29 +36,4 @@ function useConnectionList(enabled: boolean): string | null {
   return error;
 }
 
-/// The tools whose project scan succeeds here; the sidebar links only those.
-function useAnalyticsTools(project: string | null): AnalyticsTool[] {
-  const [tools, setTools] = useState<AnalyticsTool[]>([]);
-
-  useEffect(() => {
-    let live = true;
-    setTools([]);
-    if (project === null) return;
-    void Promise.all(
-      ANALYTICS_TOOLS.map((tool) =>
-        modelsIPC(tool).then(
-          () => tool,
-          () => null,
-        ),
-      ),
-    ).then((found) => live && setTools(found.filter((t): t is AnalyticsTool => t !== null)));
-    return () => {
-      live = false;
-    };
-  }, [project]);
-
-  return tools;
-}
-
-/// Loads the project's pins, shared with the desktop app, and reloads them on change.
-export { useAnalyticsTools, useConnectionList };
+export { useConnectionList };
