@@ -27,7 +27,7 @@ describe("QueryHandoffHost", () => {
   });
 
   it("opens a write in a console tab without running it", async () => {
-    const handoff = { id: "h1", connectionId: "c1", sql: "DELETE FROM t", runId: null, newTab: false };
+    const handoff = { kind: "query" as const, id: "h1", connectionId: "c1", sql: "DELETE FROM t", runId: null, newTab: false };
     vi.mocked(takeQueryHandoffsIPC).mockResolvedValue([handoff]);
     render(<QueryHandoffHost />);
     await waitFor(() => expect(lastTab()?.text).toBe("DELETE FROM t"));
@@ -37,7 +37,7 @@ describe("QueryHandoffHost", () => {
 
   it("shows a finished read's result when the server nudges the tab", async () => {
     render(<QueryHandoffHost />);
-    const handoff = { id: "h2", connectionId: "c1", sql: "SELECT 1", runId: "r1", newTab: false };
+    const handoff = { kind: "query" as const, id: "h2", connectionId: "c1", sql: "SELECT 1", runId: "r1", newTab: false };
     vi.mocked(takeQueryHandoffsIPC).mockResolvedValue([handoff]);
     act(() => emit({ kind: "query_open_requested" }));
     await waitFor(() => expect(lastTab()?.result).toEqual(RESULT));
@@ -47,8 +47,8 @@ describe("QueryHandoffHost", () => {
 
   it("appends Claude's queries to one shared console per connection", async () => {
     vi.mocked(takeQueryHandoffsIPC)
-      .mockResolvedValueOnce([{ id: "a", connectionId: "c1", sql: "SELECT 1", runId: null, newTab: false }])
-      .mockResolvedValueOnce([{ id: "b", connectionId: "c1", sql: "SELECT 2", runId: null, newTab: false }]);
+      .mockResolvedValueOnce([{ kind: "query" as const, id: "a", connectionId: "c1", sql: "SELECT 1", runId: null, newTab: false }])
+      .mockResolvedValueOnce([{ kind: "query" as const, id: "b", connectionId: "c1", sql: "SELECT 2", runId: null, newTab: false }]);
     render(<QueryHandoffHost />);
     await waitFor(() => expect(lastTab()?.text).toBe("SELECT 1"));
     act(() => emit({ kind: "query_open_requested" }));
@@ -59,12 +59,21 @@ describe("QueryHandoffHost", () => {
 
   it("opens a separate console when asked for a new tab", async () => {
     vi.mocked(takeQueryHandoffsIPC)
-      .mockResolvedValueOnce([{ id: "a", connectionId: "c1", sql: "SELECT 1", runId: null, newTab: false }])
-      .mockResolvedValueOnce([{ id: "b", connectionId: "c1", sql: "SELECT 2", runId: null, newTab: true }]);
+      .mockResolvedValueOnce([{ kind: "query" as const, id: "a", connectionId: "c1", sql: "SELECT 1", runId: null, newTab: false }])
+      .mockResolvedValueOnce([{ kind: "query" as const, id: "b", connectionId: "c1", sql: "SELECT 2", runId: null, newTab: true }]);
     render(<QueryHandoffHost />);
     await waitFor(() => expect(lastTab()?.text).toBe("SELECT 1"));
     act(() => emit({ kind: "query_open_requested" }));
     await waitFor(() => expect(useTabsStore.getState().tabs).toHaveLength(2));
     expect(lastTab()?.text).toBe("SELECT 2");
+  });
+  it("focuses a canvas the CLI added to", async () => {
+    vi.mocked(takeQueryHandoffsIPC).mockResolvedValueOnce([
+      { kind: "query" as const, id: "a", connectionId: "c1", sql: "SELECT 1", runId: null, newTab: false },
+      { kind: "canvas" as const, id: "b", canvasId: "board1", title: "Sales" },
+    ]);
+    render(<QueryHandoffHost />);
+    await waitFor(() => expect(useTabsStore.getState().activeId).toBe("board1"));
+    expect(lastTab()).toMatchObject({ kind: "canvas", title: "Sales" });
   });
 });

@@ -4,17 +4,16 @@ use std::process::{Child, Command as StdCommand, Stdio};
 use std::thread;
 
 use arris_cli::cli::{
-    ENV_DATA_DIR, ENV_DBT_BIN, ENV_TEST_SECRETS, EXIT_API_ERROR, EXIT_CANCELLED,
-    EXIT_TOOL_NOT_FOUND, SERVER_LISTENING_PREFIX, SERVER_LOG_FILE, TEST_SECRETS_MEMORY,
-    TOOL_RUN_OUTPUT_TAIL_BYTES,
+    ENV_DATA_DIR, ENV_DBT_BIN, ENV_TEST_NO_BROWSER, ENV_TEST_SECRETS, EXIT_API_ERROR,
+    EXIT_CANCELLED, EXIT_TOOL_NOT_FOUND, SERVER_LISTENING_PREFIX, SERVER_LOG_FILE,
+    TEST_SECRETS_MEMORY, TOOL_RUN_OUTPUT_TAIL_BYTES,
 };
 use arris_cli::server::{
     BEARER_PREFIX, CANVASES_PAGE_PREFIX, CONNECTION_NEW_PAGE, CONNECTION_REQUEST_CANCEL_ROUTE,
-    CONNECTION_REQUEST_GET_ROUTE,
-    CONNECTION_SAVE_ROUTE, DBT_LINEAGE_PAGE_PREFIX, DBT_RUNS_PAGE_PREFIX, LOOPBACK_HOST,
-    PROJECT_HEADER, PROJECT_QUERY_PARAM, REQUEST_QUERY_PARAM, ROOT_ROUTE, RUNS_PAGE_PREFIX,
-    SERVER_INFO_FILE, SERVER_VERSION, ServerInfo, TOOL_RUN_GET_ROUTE, TOOL_RUN_LIST_ROUTE,
-    URL_SCHEME,
+    CONNECTION_REQUEST_GET_ROUTE, CONNECTION_SAVE_ROUTE, DBT_LINEAGE_PAGE_PREFIX,
+    DBT_RUNS_PAGE_PREFIX, LOOPBACK_HOST, PROJECT_HEADER, PROJECT_QUERY_PARAM, REQUEST_QUERY_PARAM,
+    ROOT_ROUTE, RUNS_PAGE_PREFIX, SERVER_INFO_FILE, SERVER_VERSION, ServerInfo, TOOL_RUN_GET_ROUTE,
+    TOOL_RUN_LIST_ROUTE, URL_SCHEME,
 };
 use arris_engines::{ConnectionConfig, DatabaseKind};
 use assert_cmd::Command;
@@ -52,6 +51,7 @@ impl TestEnv {
         let mut cmd = Command::new(BIN);
         cmd.env(ENV_DATA_DIR, self.data.path())
             .env(ENV_TEST_SECRETS, TEST_SECRETS_MEMORY)
+            .env(ENV_TEST_NO_BROWSER, "1")
             .env_remove(ENV_DBT_PROFILES_DIR)
             .arg("--project")
             .arg(self.project.path())
@@ -144,6 +144,7 @@ impl TestEnv {
         let mut child = StdCommand::new(BIN)
             .env(ENV_DATA_DIR, self.data.path())
             .env(ENV_TEST_SECRETS, TEST_SECRETS_MEMORY)
+            .env(ENV_TEST_NO_BROWSER, "1")
             .env_remove(ENV_DBT_PROFILES_DIR)
             .arg("--project")
             .arg(self.project.path())
@@ -555,7 +556,9 @@ async fn sync_reuses_existing_connection() {
     env.write_dbt_project();
     env.ok(&["connection", "list"]);
     let cfg = ConnectionConfig::new(SYNC_NAME, DatabaseKind::Duckdb);
-    let saved = env.post(CONNECTION_SAVE_ROUTE, json!({ "config": cfg })).await;
+    let saved = env
+        .post(CONNECTION_SAVE_ROUTE, json!({ "config": cfg }))
+        .await;
     let body = env.ok(&["dbt", "sync"]);
     assert_eq!(
         body,
@@ -587,7 +590,10 @@ fn sync_unsupported_adapter_exits_1() {
     std::fs::write(env.project.path().join("dbt_project.yml"), DBT_PROJECT_YML).unwrap();
     let profiles = DBT_PROFILES_YML.replace("duckdb", "spark");
     std::fs::write(env.project.path().join("profiles.yml"), profiles).unwrap();
-    let out = env.cmd(&["dbt", "sync"]).assert().code(i32::from(EXIT_API_ERROR));
+    let out = env
+        .cmd(&["dbt", "sync"])
+        .assert()
+        .code(i32::from(EXIT_API_ERROR));
     let body: Value = serde_json::from_slice(&out.get_output().stdout).unwrap();
     assert_eq!(body["error"]["code"], "unsupported_adapter");
 }

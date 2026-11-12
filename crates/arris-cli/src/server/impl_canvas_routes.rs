@@ -15,8 +15,8 @@ use super::{
     CANVAS_QUERY_W, CANVAS_RENAME_ROUTE, CANVAS_SAVE_ROUTE, CANVAS_Z_STEP, CanvasAddRequest,
     CanvasAddResponse, CanvasAddSource, CanvasChangedPayload, CanvasCreateRequest,
     CanvasDocGeometry, CanvasEdgeDoc, CanvasIdRequest, CanvasRefRequest, CanvasRenameRequest,
-    CanvasSaveRequest, ChartComponentDoc, ComponentFrame, EmptyResponse, QueryComponentDoc,
-    ServerEventKind, ServerState,
+    CanvasSaveRequest, ChartComponentDoc, ComponentFrame, EmptyResponse, HandoffTarget,
+    QueryComponentDoc, QueryHandoff, ServerEventKind, ServerState,
 };
 
 /// `canvas_*` handlers: per-project board documents with optimistic revisions.
@@ -241,8 +241,8 @@ impl CanvasRoutes {
         };
         let connection_id = config.id;
         // Write lock serializes against browser saves so the slot stays free.
-        let project = project.write().await;
-        let record = Self::resolve(&project, &req.canvas).await?;
+        let guard = project.write().await;
+        let record = Self::resolve(&guard, &req.canvas).await?;
         let (y, z) = Self::next_slot(&record.doc);
         let query_id = Uuid::new_v4().to_string();
         let query = QueryComponentDoc {
@@ -287,16 +287,28 @@ impl CanvasRoutes {
                 .map_err(StoreError::from)?,
             );
         }
-        let saved = project
+        let saved = guard
             .canvas_store
             .append_components(&record.id, components, edges)
             .await
             .map_err(Self::map_err)?;
-        Self::emit_changed(&state, &project, &saved.id, saved.revision);
+        Self::emit_changed(&state, &guard, &saved.id, saved.revision);
+        let root = guard.root.clone();
+        // Released first: the tab saves the board while it opens it.
+        drop(guard);
+        let handoff = QueryHandoff {
+            id: Uuid::new_v4().to_string(),
+            target: HandoffTarget::Canvas {
+                canvas_id: saved.id.clone(),
+                title: saved.title.clone(),
+            },
+        };
+        let (_, launch_browser) = ApiRoutes::hand_off(&state, &project, &root, handoff).await;
         Ok(Json(CanvasAddResponse {
             canvas: saved.into(),
             query_id,
             chart_id,
+            launch_browser,
         }))
     }
 }

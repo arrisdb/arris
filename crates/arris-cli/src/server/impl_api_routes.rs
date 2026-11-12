@@ -27,8 +27,8 @@ use super::{
     ConnectionRequestCreateRequest, ConnectionRequestCreateResponse, ConnectionRequestIdRequest,
     ConnectionRequestResolvedPayload, ConnectionRequestStatus, ConnectionSaveRequest,
     ConnectionTestRequest, EmptyResponse, FileRoutes, HISTORY_DEFAULT_LIMIT, HISTORY_LIST_ROUTE,
-    HistoryListRequest, OBJECT_DEFINITION_ROUTE, ObjectDefinitionRequest, OkResponse,
-    PIN_ADD_ROUTE, PIN_LIST_ROUTE, PIN_REMOVE_ROUTE, PIN_RENAME_ROUTE, PIN_SAVE_ROUTE,
+    HandoffTarget, HistoryListRequest, OBJECT_DEFINITION_ROUTE, ObjectDefinitionRequest,
+    OkResponse, PIN_ADD_ROUTE, PIN_LIST_ROUTE, PIN_REMOVE_ROUTE, PIN_RENAME_ROUTE, PIN_SAVE_ROUTE,
     PROJECT_HEADER, PROJECT_LIST_ROUTE, PROJECT_QUERY_PARAM, PinAddRequest, PinRemoveRequest,
     PinRenameRequest, PinSaveRequest, QUERY_DEFAULT_LIMIT, QUERY_DEFAULT_SOURCE, QUERY_FIRST_PAGE,
     QUERY_HANDOFF_TAKE_ROUTE, QUERY_OPEN_POLL_MS, QUERY_OPEN_ROUTE, QUERY_OPEN_WAIT_MS,
@@ -566,31 +566,43 @@ impl ApiRoutes {
         };
         let handoff = QueryHandoff {
             id: Uuid::new_v4().to_string(),
-            connection_id: config.id.to_string(),
-            sql: req.sql,
-            run_id: run.as_ref().map(|r| r.run.id.clone()),
-            new_tab: req.new_tab,
+            target: HandoffTarget::Query {
+                connection_id: config.id.to_string(),
+                sql: req.sql,
+                run_id: run.as_ref().map(|r| r.run.id.clone()),
+                new_tab: req.new_tab,
+            },
         };
-        let id = handoff.id.clone();
-        state.query_handoffs.push(&root, handoff);
-        Self::emit(
-            &state,
-            ServerEventKind::QueryOpenRequested,
-            &*project.read().await,
-            EmptyResponse {},
-        );
-        let mut waited = 0;
-        while state.query_handoffs.is_pending(&root, &id) && waited < QUERY_OPEN_WAIT_MS {
-            tokio::time::sleep(Duration::from_millis(QUERY_OPEN_POLL_MS)).await;
-            waited += QUERY_OPEN_POLL_MS;
-        }
-        let opened = !state.query_handoffs.is_pending(&root, &id);
-        let launch_browser = !opened && state.query_handoffs.claim_launch(&root);
+        let (opened, launch_browser) = Self::hand_off(&state, &project, &root, handoff).await;
         Ok(Json(QueryOpenResponse {
             opened,
             launch_browser,
             run,
         }))
+    }
+
+    /// Queues a handoff for the open tab and waits briefly for it: (taken, caller should launch).
+    pub(super) async fn hand_off(
+        state: &ServerState,
+        project: &RwLock<ProjectState>,
+        root: &Path,
+        handoff: QueryHandoff,
+    ) -> (bool, bool) {
+        let id = handoff.id.clone();
+        state.query_handoffs.push(root, handoff);
+        Self::emit(
+            state,
+            ServerEventKind::QueryOpenRequested,
+            &*project.read().await,
+            EmptyResponse {},
+        );
+        let mut waited = 0;
+        while state.query_handoffs.is_pending(root, &id) && waited < QUERY_OPEN_WAIT_MS {
+            tokio::time::sleep(Duration::from_millis(QUERY_OPEN_POLL_MS)).await;
+            waited += QUERY_OPEN_POLL_MS;
+        }
+        let opened = !state.query_handoffs.is_pending(root, &id);
+        (opened, !opened && state.query_handoffs.claim_launch(root))
     }
 
     async fn query_handoff_take(

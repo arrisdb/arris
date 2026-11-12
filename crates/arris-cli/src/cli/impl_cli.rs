@@ -128,7 +128,7 @@ impl Cli {
                     let resp: QueryOpenResponse =
                         client.call(QUERY_OPEN_ROUTE, &project, &body).await?;
                     if resp.launch_browser {
-                        webbrowser::open(&client.ui_url(&Server::project_page(&project)))?;
+                        Self::open_browser(&client.ui_url(&Server::project_page(&project)))?;
                     }
                     let out = QueryOpenOutput {
                         awaiting_run: resp.run.is_none(),
@@ -191,7 +191,7 @@ impl Cli {
                 let (client, project) = self.connect(&data_dir).await?;
                 let url = client.ui_url(&Server::project_page(&project));
                 if *open {
-                    webbrowser::open(&url)?;
+                    Self::open_browser(&url)?;
                 }
                 serde_json::to_value(UrlOutput { url })?
             }
@@ -397,8 +397,12 @@ impl Cli {
                 };
                 let added: CanvasAddResponse =
                     client.call(CANVAS_ADD_ROUTE, project, &body).await?;
+                let ui_url = client.ui_url(&Server::canvas_page(project, &added.canvas.id));
+                if added.launch_browser {
+                    Self::open_browser(&ui_url)?;
+                }
                 serde_json::to_value(CanvasAddOutput {
-                    ui_url: client.ui_url(&Server::canvas_page(project, &added.canvas.id)),
+                    ui_url,
                     canvas_id: added.canvas.id,
                     query_id: added.query_id,
                     chart_id: added.chart_id,
@@ -474,7 +478,7 @@ impl Cli {
             "{}",
             serde_json::to_string(&UrlOutput { url: url.clone() })?
         );
-        if !no_open && let Err(e) = webbrowser::open(&url) {
+        if !no_open && let Err(e) = Self::open_browser(&url) {
             eprintln!("{e}");
         }
         let id = ConnectionRequestIdRequest { id: created.id };
@@ -560,10 +564,18 @@ impl Cli {
         } else {
             println!("{url}");
         }
-        if open && let Err(e) = webbrowser::open(&url) {
+        if open && let Err(e) = Self::open_browser(&url) {
             eprintln!("{e}");
         }
         Ok(server.serve().await?)
+    }
+
+    fn open_browser(url: &str) -> std::io::Result<()> {
+        #[cfg(feature = "test-support")]
+        if std::env::var_os(super::ENV_TEST_NO_BROWSER).is_some() {
+            return Ok(());
+        }
+        webbrowser::open(url)
     }
 
     fn secrets() -> Arc<dyn SecretStore> {

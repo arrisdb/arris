@@ -5,7 +5,7 @@ use std::time::{Duration, Instant};
 
 use super::{BROWSER_LAUNCH_GRACE_SECS, QueryHandoff};
 
-/// Queries waiting for a browser tab, by project. A take is atomic, so one tab opens each.
+/// Queries and canvases waiting for a browser tab, by project. A take is atomic, so one tab opens each.
 #[derive(Default)]
 pub struct QueryHandoffs {
     pending: Mutex<HashMap<PathBuf, Vec<QueryHandoff>>>,
@@ -47,15 +47,16 @@ impl QueryHandoffs {
 
 #[cfg(test)]
 mod tests {
+    use super::super::HandoffTarget;
     use super::*;
 
     fn handoff(id: &str) -> QueryHandoff {
         QueryHandoff {
             id: id.into(),
-            connection_id: "c1".into(),
-            sql: "SELECT 1".into(),
-            run_id: None,
-            new_tab: false,
+            target: HandoffTarget::Canvas {
+                canvas_id: "b1".into(),
+                title: "B".into(),
+            },
         }
     }
 

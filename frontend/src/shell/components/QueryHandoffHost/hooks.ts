@@ -6,7 +6,7 @@ import { useTabsStore } from "@shell/hooks/tabsStore";
 import type { EditorTab } from "@shell/types";
 import { HANDOFF_PAGE_SIZE, HANDOFF_SQL_SEPARATOR, HANDOFF_TAB_TITLE } from "./constants";
 import { fetchRunPageIPC, takeQueryHandoffsIPC } from "./ipc";
-import type { QueryHandoff } from "./types";
+import type { QueryHandoff, QueryTarget } from "./types";
 
 /// The connection's shared Claude console, focused, or a new tab when asked for one.
 function handoffTab(connectionId: string, newTab: boolean): EditorTab {
@@ -25,7 +25,7 @@ function handoffTab(connectionId: string, newTab: boolean): EditorTab {
 }
 
 // Reads ran on the server, so the tab shows that result rather than running again.
-async function openHandoff({ connectionId, sql, runId, newTab }: QueryHandoff): Promise<void> {
+async function openQuery({ connectionId, sql, runId, newTab }: QueryTarget): Promise<void> {
   const tab = handoffTab(connectionId, newTab);
   const text = tab.text ? `${tab.text}${HANDOFF_SQL_SEPARATOR}${sql}` : sql;
   useTabsStore.getState().updateTab(tab.id, { text, cursor: text.length - sql.length });
@@ -38,6 +38,14 @@ async function openHandoff({ connectionId, sql, runId, newTab }: QueryHandoff): 
   useTabsStore.getState().updateTab(tab.id, { result, pane: "results" });
   useSettingsStore.getState().showBottomPane();
   history.setRequestedPaneMode("results");
+}
+
+async function openHandoff(handoff: QueryHandoff): Promise<void> {
+  if (handoff.kind === "canvas") {
+    useTabsStore.getState().openCanvasTab({ id: handoff.canvasId, title: handoff.title });
+    return;
+  }
+  await openQuery(handoff);
 }
 
 function useQueryHandoffs(): void {

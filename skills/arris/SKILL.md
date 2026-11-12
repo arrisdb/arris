@@ -66,7 +66,7 @@ When the user asks for a dashboard or board, or to put a result on a canvas:
 1. Answer with `query` first so there is a run to add.
 2. Pick the canvas: `arris canvas list`, or `arris canvas new "<title>"` if none fits. Titles can repeat, so pass the canvas `id` from `canvas list` (a title that matches two canvases fails with `ambiguous`).
 3. Run `arris canvas add <canvas> --run <runId>`, with `--title "..."` to name the object. When a chart was asked for, add `--chart <kind> --x <col> --y <col>` using column names from the query's result: `--x` is the category or time column, `--y` a numeric column (repeat `--y` for several series). Kinds: bar, line, area, pie, donut, scatter, bubble, combo, histogram, radar, treemap, funnel, kpi. Pick bar for categories, line for time.
-4. Give the user the `uiUrl`. The board runs read queries by itself when it opens and draws the chart; a write waits for the user to press Run.
+4. The open Arris tab switches to the board, or a browser opens on it; do not open the `uiUrl` yourself. The board runs read queries by itself when it opens and draws the chart; a write waits for the user to press Run.
 
 Never invent connection ids: `--sql` with `--connection` takes a name or id from `arris connection list`. `arris canvas show <canvas>` lists a canvas's objects.
 

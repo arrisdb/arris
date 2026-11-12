@@ -234,15 +234,31 @@ pub struct QueryOpenResponse {
     pub run: Option<QueryRunResponse>,
 }
 
-/// A query waiting to appear in a browser console tab.
+/// A query or canvas waiting to appear in the open browser tab.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct QueryHandoff {
     pub id: String,
-    pub connection_id: String,
-    pub sql: String,
-    pub run_id: Option<String>,
-    pub new_tab: bool,
+    #[serde(flatten)]
+    pub target: HandoffTarget,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+pub enum HandoffTarget {
+    /// Appended to the connection's shared Claude console, or a new tab.
+    Query {
+        connection_id: String,
+        sql: String,
+        run_id: Option<String>,
+        new_tab: bool,
+    },
+    /// Focused as a canvas tab.
+    Canvas { canvas_id: String, title: String },
 }
 
 /// The project's open tabs and pane layout, shared with the desktop app.
@@ -506,6 +522,8 @@ pub struct CanvasAddResponse {
     pub query_id: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub chart_id: Option<String>,
+    /// No tab showed the canvas and no browser is on its way: the caller opens one.
+    pub launch_browser: bool,
 }
 
 /// Only the geometry `canvas_add` needs from the frontend-owned doc.
