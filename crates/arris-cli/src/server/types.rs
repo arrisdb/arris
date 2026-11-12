@@ -312,13 +312,13 @@ pub struct PinRemoveRequest {
     pub id: String,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RunIdRequest {
     pub run_id: String,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RunPageRequest {
     pub run_id: String,
@@ -365,6 +365,9 @@ pub struct ConnectionRequest {
     pub kind: Option<DatabaseKind>,
     /// Non-secret fields from a dbt profile or sqlmesh gateway, shown in the form.
     pub prefill: Option<ConnectionPrefill>,
+    /// The saved connection being edited, secrets scrubbed; the form saves over it.
+    #[serde(default)]
+    pub editing: Option<ConnectionConfig>,
     pub status: ConnectionRequestStatus,
 }
 
@@ -373,6 +376,9 @@ pub struct ConnectionRequestCreateRequest {
     pub kind: Option<DatabaseKind>,
     #[serde(default)]
     pub prefill: Option<ConnectionPrefill>,
+    /// Saved connection (id or name) to edit instead of creating one.
+    #[serde(default)]
+    pub connection: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -423,7 +429,24 @@ pub struct CanvasRenameRequest {
     pub title: String,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+/// One object of a canvas, for `canvas_remove`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CanvasObjectRequest {
+    /// Canvas id or exact title.
+    pub canvas: String,
+    pub id: String,
+}
+
+/// Redraws a chart object with a new spec.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CanvasChartRequest {
+    /// Canvas id or exact title.
+    pub canvas: String,
+    pub id: String,
+    pub spec: ChartSpecDoc,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CanvasIdRequest {
     pub id: String,
 }

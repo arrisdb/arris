@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { ipcErrorMessage } from "@shared";
+import { currentProject, isWebShell, subscribe } from "@shared/api";
 import { useSnackbarStore } from "@shell/hooks/snackbarStore";
 import { useTabsStore } from "@shell/hooks/tabsStore";
 
+import { CANVAS_CHANGED_EVENT } from "../../constants";
 import { createAndOpenCanvas } from "../../hooks";
 import { deleteCanvasIPC, listCanvasesIPC, renameCanvasIPC } from "../../ipc";
 import type { CanvasSummary } from "../../types";
@@ -18,10 +20,17 @@ function useCanvasSummaries() {
     [allTabs],
   );
 
+  // Each listing also closes tabs of canvases deleted elsewhere (e.g. by the CLI).
   const run = useCallback(async (action: () => Promise<unknown>) => {
     try {
       await action();
-      setCanvases(await listCanvasesIPC());
+      const listed = await listCanvasesIPC();
+      setCanvases(listed);
+      const ids = new Set(listed.map((c) => c.id));
+      const tabs = useTabsStore.getState();
+      for (const tab of tabs.tabs) {
+        if (tab.tabType === "canvas" && !ids.has(tab.id)) tabs.deleteTab(tab.id);
+      }
     } catch (e) {
       useSnackbarStore.getState().enqueue(ipcErrorMessage(e), "error");
     }
@@ -30,6 +39,15 @@ function useCanvasSummaries() {
   useEffect(() => {
     void run(async () => {});
   }, [run, canvasTabKey]);
+
+  // The CLI adds and deletes canvases too; re-list when one changes.
+  useEffect(() => {
+    if (!isWebShell()) return;
+    return subscribe((event) => {
+      if (event.project !== currentProject() || event.kind !== CANVAS_CHANGED_EVENT) return;
+      void run(async () => {});
+    });
+  }, [run]);
 
   const open = useCallback(
     (canvas: CanvasSummary) => useTabsStore.getState().openCanvasTab(canvas),

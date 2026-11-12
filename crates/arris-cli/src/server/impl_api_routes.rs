@@ -411,11 +411,28 @@ impl ApiRoutes {
         body: Body<ConnectionRequestCreateRequest>,
     ) -> ApiResult<ConnectionRequestCreateResponse> {
         let Json(req) = body?;
-        let root = Self::project_root(&state, &headers).await?;
+        let handle = Self::project(&state, &headers).await?;
+        let guard = handle.read().await;
+        let root = guard.root.clone();
         let project = root.to_string_lossy().into_owned();
+        // The form only ever sees the scrubbed copy; an empty secret saves as "unchanged".
+        let editing = match &req.connection {
+            Some(connection) => {
+                let id = Self::resolve_connection(&state, &guard, connection)
+                    .await?
+                    .id;
+                Self::scrubbed_connections(&state, &guard)
+                    .await
+                    .into_iter()
+                    .find(|c| c.config.id == id)
+                    .map(|c| c.config)
+            }
+            None => None,
+        };
+        drop(guard);
         let request = state
             .connection_requests
-            .create(root, req.kind, req.prefill);
+            .create(root, req.kind, req.prefill, editing);
         let url = Server::page_path(
             CONNECTION_NEW_PAGE,
             &[
@@ -1666,6 +1683,29 @@ pub(super) mod tests {
         let got: Value = serde_json::from_str(&text).unwrap();
         assert_eq!(got["kind"], "postgres");
         assert_eq!(got["prefill"]["fields"]["host"], "db.local");
+    }
+
+    #[tokio::test]
+    async fn edit_request_carries_the_scrubbed_saved_connection() {
+        let h = Harness::start().await;
+        let mut cfg = h.sqlite_config("local");
+        cfg.password = "s3cret-edit-never-echoed".into();
+        h.ok("connection_save", json!({ "config": cfg })).await;
+        let created = h
+            .ok(
+                "connection_request_create",
+                json!({ "connection": "local" }),
+            )
+            .await;
+        let got = h
+            .ok("connection_request_get", json!({ "id": created["id"] }))
+            .await;
+        assert_eq!(got["editing"]["name"], "local");
+        assert_eq!(got["kind"], "sqlite");
+        assert!(!got.to_string().contains("s3cret-edit-never-echoed"));
+        let unknown = json!({ "connection": "nope" });
+        let resp = h.call("connection_request_create", unknown).await;
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
     }
 
     #[tokio::test]

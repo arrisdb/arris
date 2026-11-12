@@ -62,6 +62,13 @@ pub const CANVAS_SAVE_ROUTE: &str = "/api/canvas_save";
 pub const CANVAS_RENAME_ROUTE: &str = "/api/canvas_rename";
 pub const CANVAS_DELETE_ROUTE: &str = "/api/canvas_delete";
 pub const CANVAS_ADD_ROUTE: &str = "/api/canvas_add";
+pub const CANVAS_REMOVE_ROUTE: &str = "/api/canvas_remove";
+pub const CANVAS_CHART_ROUTE: &str = "/api/canvas_chart";
+/// Doc keys `canvas_remove` and `canvas_chart` read and write.
+pub const CANVAS_DOC_COMPONENTS: &str = "components";
+pub const CANVAS_DOC_ID: &str = "id";
+pub const CANVAS_DOC_KIND: &str = "kind";
+pub const CANVAS_DOC_SPEC: &str = "spec";
 pub const TOOL_RUN_RECORD_ROUTE: &str = "/api/tool_run_record";
 pub const TOOL_RUN_LIST_ROUTE: &str = "/api/tool_run_list";
 pub const TOOL_RUN_GET_ROUTE: &str = "/api/tool_run_get";

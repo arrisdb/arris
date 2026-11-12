@@ -12,7 +12,7 @@ function ConnectionRequestPage() {
       <ConnectionEditorSheet
         open
         onClose={page.onClose}
-        initial={null}
+        initial={page.initial}
         kind={page.kind}
         onSaved={page.onSaved}
         requestId={page.requestId}

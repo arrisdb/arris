@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 
+import type { ServerEvent } from "@shared/api";
 import { useTabsStore } from "@shell/hooks/tabsStore";
 
 import type { CanvasSummary } from "../../types";
@@ -13,8 +14,22 @@ const ipc = vi.hoisted(() => ({
   deleteCanvasIPC: vi.fn(),
 }));
 vi.mock("../../ipc", () => ipc);
+const events = vi.hoisted(() => ({ handler: null as ((e: ServerEvent) => void) | null }));
+vi.mock("@shared/api", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@shared/api")>()),
+  currentProject: () => PROJECT,
+  isWebShell: () => true,
+  subscribe: (handler: (e: ServerEvent) => void) => {
+    events.handler = handler;
+    return () => {
+      events.handler = null;
+    };
+  },
+}));
 
 import { CanvasSection } from "./index";
+
+const PROJECT = "/p";
 
 function summary(id: string, title: string): CanvasSummary {
   return { id, title, createdAt: "", updatedAt: "", revision: 1, componentCount: 0 };
@@ -96,5 +111,27 @@ describe("CanvasSection", () => {
     });
     expect(ipc.deleteCanvasIPC).toHaveBeenCalledWith("k1");
     expect(useTabsStore.getState().tabs.some((t) => t.id === "k1")).toBe(false);
+  });
+
+  it("a canvas the CLI deleted leaves the list and closes its tab", async () => {
+    await renderSection();
+    fireEvent.click(screen.getByTestId("canvas-section-row-k1"));
+    ipc.canvases = [summary("k3", "From CLI")];
+    await act(async () => {
+      events.handler?.({
+        kind: "canvas_changed",
+        project: PROJECT,
+        payload: { id: "k1", revision: 1 },
+      } as ServerEvent);
+    });
+    expect(screen.queryByText("Canvas 1")).toBeNull();
+    expect(screen.getByText("From CLI")).toBeTruthy();
+    expect(useTabsStore.getState().tabs.some((t) => t.id === "k1")).toBe(false);
+  });
+
+  it("closes a restored tab whose canvas no longer exists", async () => {
+    useTabsStore.getState().openCanvasTab(summary("gone", "Gone"));
+    await renderSection();
+    expect(useTabsStore.getState().tabs.some((t) => t.id === "gone")).toBe(false);
   });
 });

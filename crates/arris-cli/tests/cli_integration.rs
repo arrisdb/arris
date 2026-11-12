@@ -388,6 +388,24 @@ async fn canvas_new_add_show_round_trip() {
     assert!(comps[0].get("x").is_none(), "show drops layout");
     let listed = env.ok(&["canvas", "list"]);
     assert_eq!(listed[0]["componentCount"], 3);
+
+    let chart_id = manual["chartId"].as_str().unwrap();
+    let args = [
+        "canvas", "chart", "Revenue", chart_id, "--chart", "line", "--x", "d", "--y", "n",
+    ];
+    env.ok(&args);
+    let query_id = manual["queryId"].as_str().unwrap();
+    let removed = env.ok(&["canvas", "remove", "Revenue", query_id]);
+    assert_eq!(removed["componentCount"], 2);
+
+    let page = env.ok(&["result", run_id, "--limit", "1"]);
+    assert_eq!(page["rows"], serde_json::json!([[2]]));
+    assert_eq!(page["totalRows"], 1);
+    assert_eq!(page["hasMore"], false);
+
+    let deleted = env.ok(&["canvas", "delete", "Revenue"]);
+    assert_eq!(deleted["id"], id.as_str());
+    assert_eq!(env.ok(&["canvas", "list"]), serde_json::json!([]));
 }
 
 #[tokio::test]

@@ -17,6 +17,7 @@ function useLoadRequest(
   setPhase: (phase: RequestPhase) => void,
   setKind: (kind: DatabaseKind | null) => void,
   setPrefill: (prefill: ConnectionConfig | null) => void,
+  setInitial: (initial: ConnectionConfig | null) => void,
   setError: (error: string) => void,
 ): void {
   useEffect(() => {
@@ -28,6 +29,7 @@ function useLoadRequest(
         setCurrentProject(request.project);
         setKind(request.kind);
         setPrefill(request.prefill?.fields ?? null);
+        setInitial(request.editing ?? null);
         setPhase(request.status.status === PENDING_STATUS ? "pending" : "closed");
       })
       .catch((loadError) => {
@@ -38,7 +40,7 @@ function useLoadRequest(
     return () => {
       live = false;
     };
-  }, [requestId, setPhase, setKind, setPrefill, setError]);
+  }, [requestId, setPhase, setKind, setPrefill, setInitial, setError]);
 }
 
 function useCancelOnUnload(requestId: string | null, phase: RequestPhase): void {
@@ -54,11 +56,12 @@ function useConnectionRequest(requestId: string | null): ConnectionRequestPageVi
   const [phase, setPhase] = useState<RequestPhase>("loading");
   const [kind, setKind] = useState<DatabaseKind | null>(null);
   const [prefill, setPrefill] = useState<ConnectionConfig | null>(null);
+  const [initial, setInitial] = useState<ConnectionConfig | null>(null);
   const [error, setError] = useState<string | null>(null);
   // The editor closes itself after a save; that close must not cancel the request.
   const savedRef = useRef(false);
 
-  useLoadRequest(requestId, setPhase, setKind, setPrefill, setError);
+  useLoadRequest(requestId, setPhase, setKind, setPrefill, setInitial, setError);
   useCancelOnUnload(requestId, phase);
 
   // The terminal command has its answer; show the new connection instead of a dead end.
@@ -73,7 +76,7 @@ function useConnectionRequest(requestId: string | null): ConnectionRequestPageVi
     cancelConnectionRequestIPC(requestId).catch(() => {});
   }, [requestId]);
 
-  return { phase, requestId, kind, prefill, error, onSelectKind: setKind, onSaved, onClose };
+  return { phase, requestId, kind, prefill, initial, error, onSelectKind: setKind, onSaved, onClose };
 }
 
 export { useConnectionRequest };

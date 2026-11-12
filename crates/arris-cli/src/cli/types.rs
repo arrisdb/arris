@@ -67,6 +67,15 @@ pub enum Command {
         #[arg(long, requires = "open")]
         note: Option<String>,
     },
+    /// Rows of an earlier run, read from its saved result; nothing is re-run.
+    Result {
+        run_id: String,
+        /// First row to return.
+        #[arg(long, default_value_t = 0)]
+        offset: usize,
+        #[arg(long, default_value_t = QUERY_DEFAULT_LIMIT)]
+        limit: u32,
+    },
     /// List recent query runs, newest first.
     History {
         #[arg(long)]
@@ -108,6 +117,13 @@ pub enum ConnectionCommand {
         /// Prefill the form from a connection URI; any password in it is dropped.
         #[arg(long)]
         url: Option<String>,
+        /// Print the form URL without opening a browser.
+        #[arg(long)]
+        no_open: bool,
+    },
+    /// Open the saved connection in the browser form; waits until it is saved or cancelled.
+    Edit {
+        connection: String,
         /// Print the form URL without opening a browser.
         #[arg(long)]
         no_open: bool,
@@ -231,6 +247,32 @@ pub enum CanvasCommand {
         #[arg(long, requires = "chart")]
         y: Vec<String>,
     },
+    /// Remove one object (and its arrows) from a canvas.
+    Remove {
+        /// Canvas id or exact title.
+        canvas: String,
+        /// Object id, as `canvas show` lists it.
+        object: String,
+    },
+    /// Redraw a chart object with a new type and axes.
+    Chart {
+        /// Canvas id or exact title.
+        canvas: String,
+        /// Chart object id, as `canvas show` lists it.
+        chart_id: String,
+        #[arg(long, value_enum)]
+        chart: ChartKindDoc,
+        #[arg(long)]
+        x: String,
+        /// Repeat for several series.
+        #[arg(long, required = true)]
+        y: Vec<String>,
+    },
+    /// Delete a whole canvas.
+    Delete {
+        /// Canvas id or exact title.
+        canvas: String,
+    },
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -278,6 +320,26 @@ pub struct CanvasShowComponent {
 pub struct CanvasShowDoc {
     #[serde(default)]
     pub components: Vec<CanvasShowComponent>,
+}
+
+/// One page of an earlier run's saved rows.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ResultOutput {
+    pub run_id: String,
+    pub offset: usize,
+    pub total_rows: u64,
+    pub columns: Vec<ColumnSpec>,
+    pub rows: Vec<Vec<serde_json::Value>>,
+    /// More rows follow; ask again with a larger `--offset`.
+    pub has_more: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasDeleteOutput {
+    pub id: String,
+    pub title: String,
 }
 
 #[derive(Debug, Clone, Serialize)]

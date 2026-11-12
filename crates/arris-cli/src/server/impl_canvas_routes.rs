@@ -10,13 +10,14 @@ use uuid::Uuid;
 use super::impl_api_routes::{ApiResult, ApiState, Body};
 use super::{
     ApiError, ApiRoutes, CANVAS_ADD_GAP, CANVAS_ADD_ROUTE, CANVAS_ADD_X, CANVAS_ADD_Y,
-    CANVAS_CHART_H, CANVAS_CHART_W, CANVAS_CREATE_ROUTE, CANVAS_DELETE_ROUTE, CANVAS_GET_ROUTE,
+    CANVAS_CHART_H, CANVAS_CHART_ROUTE, CANVAS_CHART_W, CANVAS_CREATE_ROUTE, CANVAS_DELETE_ROUTE,
+    CANVAS_DOC_COMPONENTS, CANVAS_DOC_ID, CANVAS_DOC_KIND, CANVAS_DOC_SPEC, CANVAS_GET_ROUTE,
     CANVAS_ID_SEPARATOR, CANVAS_KIND_CHART, CANVAS_KIND_QUERY, CANVAS_LIST_ROUTE, CANVAS_QUERY_H,
-    CANVAS_QUERY_W, CANVAS_RENAME_ROUTE, CANVAS_SAVE_ROUTE, CANVAS_Z_STEP, CanvasAddRequest,
-    CanvasAddResponse, CanvasAddSource, CanvasChangedPayload, CanvasCreateRequest,
-    CanvasDocGeometry, CanvasEdgeDoc, CanvasIdRequest, CanvasRefRequest, CanvasRenameRequest,
-    CanvasSaveRequest, ChartComponentDoc, ComponentFrame, EmptyResponse, HandoffTarget,
-    QueryComponentDoc, QueryHandoff, ServerEventKind, ServerState,
+    CANVAS_QUERY_W, CANVAS_REMOVE_ROUTE, CANVAS_RENAME_ROUTE, CANVAS_SAVE_ROUTE, CANVAS_Z_STEP,
+    CanvasAddRequest, CanvasAddResponse, CanvasAddSource, CanvasChangedPayload, CanvasChartRequest,
+    CanvasCreateRequest, CanvasDocGeometry, CanvasEdgeDoc, CanvasIdRequest, CanvasObjectRequest,
+    CanvasRefRequest, CanvasRenameRequest, CanvasSaveRequest, ChartComponentDoc, ComponentFrame,
+    EmptyResponse, HandoffTarget, QueryComponentDoc, QueryHandoff, ServerEventKind, ServerState,
 };
 
 /// `canvas_*` handlers: per-project board documents with optimistic revisions.
@@ -32,6 +33,8 @@ impl CanvasRoutes {
             .route(CANVAS_RENAME_ROUTE, post(Self::canvas_rename))
             .route(CANVAS_DELETE_ROUTE, post(Self::canvas_delete))
             .route(CANVAS_ADD_ROUTE, post(Self::canvas_add))
+            .route(CANVAS_REMOVE_ROUTE, post(Self::canvas_remove))
+            .route(CANVAS_CHART_ROUTE, post(Self::canvas_chart))
     }
 
     pub(super) fn map_err(e: StoreError) -> ApiError {
@@ -313,6 +316,65 @@ impl CanvasRoutes {
     }
 }
 
+// Agent-facing edits of one object; the browser reloads on the change event.
+impl CanvasRoutes {
+    /// The object's `kind`, or `CanvasObjectNotFound`.
+    fn object_kind(doc: &serde_json::Value, id: &str) -> Result<String, ApiError> {
+        doc.get(CANVAS_DOC_COMPONENTS)
+            .and_then(serde_json::Value::as_array)
+            .and_then(|list| {
+                list.iter()
+                    .find(|c| c.get(CANVAS_DOC_ID).and_then(|v| v.as_str()) == Some(id))
+            })
+            .and_then(|c| c.get(CANVAS_DOC_KIND).and_then(|v| v.as_str()))
+            .map(str::to_owned)
+            .ok_or_else(|| ApiError::CanvasObjectNotFound(id.to_owned()))
+    }
+
+    async fn canvas_remove(
+        State(state): ApiState,
+        headers: HeaderMap,
+        body: Body<CanvasObjectRequest>,
+    ) -> ApiResult<CanvasSummary> {
+        let Json(req) = body?;
+        let project = ApiRoutes::project(&state, &headers).await?;
+        let project = project.write().await;
+        let record = Self::resolve(&project, &req.canvas).await?;
+        Self::object_kind(&record.doc, &req.id)?;
+        let saved = project
+            .canvas_store
+            .remove_component(&record.id, &req.id)
+            .await
+            .map_err(Self::map_err)?;
+        Self::emit_changed(&state, &project, &saved.id, saved.revision);
+        Ok(Json(saved.into()))
+    }
+
+    async fn canvas_chart(
+        State(state): ApiState,
+        headers: HeaderMap,
+        body: Body<CanvasChartRequest>,
+    ) -> ApiResult<CanvasSummary> {
+        let Json(req) = body?;
+        let project = ApiRoutes::project(&state, &headers).await?;
+        let project = project.write().await;
+        let record = Self::resolve(&project, &req.canvas).await?;
+        if Self::object_kind(&record.doc, &req.id)? != CANVAS_KIND_CHART {
+            return Err(ApiError::NotAChart(req.id));
+        }
+        let mut patch = serde_json::Map::new();
+        let spec = serde_json::to_value(req.spec).map_err(StoreError::from)?;
+        patch.insert(CANVAS_DOC_SPEC.to_owned(), spec);
+        let saved = project
+            .canvas_store
+            .patch_component(&record.id, &req.id, patch)
+            .await
+            .map_err(Self::map_err)?;
+        Self::emit_changed(&state, &project, &saved.id, saved.revision);
+        Ok(Json(saved.into()))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use arris_engines::{CANVAS_DIR_NAME, CANVAS_FILE_EXT};
@@ -532,6 +594,42 @@ mod tests {
         let edge = &got["doc"]["edges"][0];
         assert_eq!(edge["source"], added["queryId"]);
         assert_eq!(edge["target"], added["chartId"]);
+    }
+
+    #[tokio::test]
+    async fn canvas_chart_redraws_and_remove_drops_object_with_its_edge() {
+        let h = Harness::start().await;
+        h.save_sqlite("local").await;
+        let board = h.ok("canvas_create", json!({ "title": "B" })).await;
+        let spec = json!({ "kind": "bar", "xColumn": "k", "yColumns": ["n"] });
+        let body = json!({ "canvas": "B", "chart": spec,
+                           "source": { "sql": "SELECT 1", "connection": "local" } });
+        let added = h.ok("canvas_add", body).await;
+        let (query, chart) = (&added["queryId"], &added["chartId"]);
+
+        let line = json!({ "kind": "line", "xColumn": "day", "yColumns": ["a", "b"] });
+        h.ok(
+            "canvas_chart",
+            json!({ "canvas": "B", "id": chart, "spec": line }),
+        )
+        .await;
+        let got = h.ok("canvas_get", json!({ "canvas": board["id"] })).await;
+        assert_eq!(got["doc"]["components"][1]["spec"], line);
+        let not_chart = json!({ "canvas": "B", "id": query, "spec": line });
+        let (status, _) = error_code(h.call("canvas_chart", not_chart).await).await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+
+        h.ok("canvas_remove", json!({ "canvas": "B", "id": query }))
+            .await;
+        let got = h.ok("canvas_get", json!({ "canvas": board["id"] })).await;
+        assert_eq!(got["doc"]["components"].as_array().unwrap().len(), 1);
+        assert_eq!(got["doc"]["edges"], json!([]));
+        let gone = json!({ "canvas": "B", "id": query });
+        let (status, code) = error_code(h.call("canvas_remove", gone).await).await;
+        assert_eq!(
+            (status, code.as_str()),
+            (StatusCode::NOT_FOUND, "canvas_not_found")
+        );
     }
 
     #[tokio::test]

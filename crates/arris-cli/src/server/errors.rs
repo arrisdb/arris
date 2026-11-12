@@ -50,6 +50,10 @@ pub enum ApiError {
     CanvasPlan(String),
     #[error("canvas not found: {0}")]
     CanvasNotFound(String),
+    #[error("no such object on the canvas: {0}")]
+    CanvasObjectNotFound(String),
+    #[error("object {0} is not a chart")]
+    NotAChart(String),
     #[error("canvas title matches several canvases, use an id: {0}")]
     Ambiguous(String),
     #[error("connection request not found (the server may have restarted): {0}")]
@@ -105,7 +109,8 @@ impl ApiError {
             Self::ConnectionNotFound(_) => ApiErrorCode::ConnectionNotFound,
             Self::RunNotFound(_) => ApiErrorCode::RunNotFound,
             Self::PinNotFound(_) => ApiErrorCode::PinNotFound,
-            Self::CanvasNotFound(_) => ApiErrorCode::CanvasNotFound,
+            Self::CanvasNotFound(_) | Self::CanvasObjectNotFound(_) => ApiErrorCode::CanvasNotFound,
+            Self::NotAChart(_) => ApiErrorCode::InvalidRequest,
             Self::Ambiguous(_) => ApiErrorCode::Ambiguous,
             Self::ResultNotCached(_) => ApiErrorCode::ResultNotCached,
             Self::ConnectionRequestNotFound(_) => ApiErrorCode::ConnectionRequestNotFound,
@@ -132,6 +137,7 @@ impl ApiError {
             | Self::RunNotFound(_)
             | Self::PinNotFound(_)
             | Self::CanvasNotFound(_)
+            | Self::CanvasObjectNotFound(_)
             | Self::ResultNotCached(_)
             | Self::ConnectionRequestNotFound(_)
             | Self::DirNotFound(_)

@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::time::Duration;
 
-use arris_engines::{ConnectionPrefill, DatabaseKind};
+use arris_engines::{ConnectionConfig, ConnectionPrefill, DatabaseKind};
 use tokio::sync::watch;
 use uuid::Uuid;
 
@@ -25,13 +25,17 @@ impl ConnectionRequests {
         project: PathBuf,
         kind: Option<DatabaseKind>,
         prefill: Option<ConnectionPrefill>,
+        editing: Option<ConnectionConfig>,
     ) -> ConnectionRequest {
         let prefill = prefill.map(ConnectionPrefill::scrubbed);
         let request = ConnectionRequest {
             id: Uuid::new_v4().to_string(),
             project,
-            kind: kind.or(prefill.as_ref().map(|p| p.kind)),
+            kind: kind
+                .or(prefill.as_ref().map(|p| p.kind))
+                .or(editing.as_ref().map(|c| c.kind)),
             prefill,
+            editing,
             status: ConnectionRequestStatus::Pending,
         };
         let mut entries = self.lock();
@@ -126,7 +130,7 @@ mod tests {
     async fn wait_returns_pending_on_timeout() {
         let requests = ConnectionRequests::default();
         let project = Path::new(PROJECT);
-        let req = requests.create(project.into(), Some(DatabaseKind::Sqlite), None);
+        let req = requests.create(project.into(), Some(DatabaseKind::Sqlite), None, None);
         let status = requests.wait(&req.id, project, SHORT_WAIT).await.unwrap();
         assert_eq!(status, ConnectionRequestStatus::Pending);
         assert_eq!(requests.get(&req.id, project).unwrap().id, req.id);
@@ -136,7 +140,7 @@ mod tests {
     async fn first_resolution_wins_and_wait_drops_it() {
         let requests = ConnectionRequests::default();
         let project = Path::new(PROJECT);
-        let req = requests.create(project.into(), None, None);
+        let req = requests.create(project.into(), None, None, None);
         assert!(requests.resolve(&req.id, project, saved()).unwrap());
         let after = requests.resolve(&req.id, project, ConnectionRequestStatus::Cancelled);
         assert!(!after.unwrap());
@@ -155,17 +159,17 @@ mod tests {
     fn create_caps_map_preferring_resolved_evictions() {
         let requests = ConnectionRequests::default();
         let project = Path::new(PROJECT);
-        let first = requests.create(project.into(), None, None);
+        let first = requests.create(project.into(), None, None, None);
         requests.resolve(&first.id, project, saved()).unwrap();
         let rest: Vec<_> = (1..CONNECTION_REQUESTS_MAX)
-            .map(|_| requests.create(project.into(), None, None))
+            .map(|_| requests.create(project.into(), None, None, None))
             .collect();
-        let last = requests.create(project.into(), None, None);
+        let last = requests.create(project.into(), None, None, None);
         assert_eq!(requests.lock().len(), CONNECTION_REQUESTS_MAX);
         assert!(requests.get(&first.id, project).is_err());
         assert!(rest.iter().all(|r| requests.get(&r.id, project).is_ok()));
         assert!(requests.get(&last.id, project).is_ok());
-        requests.create(project.into(), None, None);
+        requests.create(project.into(), None, None, None);
         assert_eq!(requests.lock().len(), CONNECTION_REQUESTS_MAX);
     }
 }

@@ -40,6 +40,8 @@ Run `arris ui --open`. It opens the project's Arris UI in the browser. Tell the 
 4. Exit code 3 means the form was cancelled or timed out: report that it was cancelled and offer to try again. Exit code 2 means the server could not start (see the reference).
 5. If the browser did not open, rerun with `--no-open`; the form URL is printed on stderr for the user to open themselves.
 
+To change a saved connection (host, database, user, options, password), run `arris connection edit <conn>`. The same form opens filled in with the saved values; tell the user to change them and save. It waits and prints `{"connectionId","name"}` like `connection new`. Never remove and re-create a connection to change it.
+
 ## query
 
 1. Run `arris connection list`. Pick the connection. Ask the user which one only if there is more than one and the question does not make it clear. If there are none, run the `init-connection` flow first.
@@ -55,6 +57,8 @@ Failures (also for `connection list` and `schema`):
 - A macOS Keychain prompt for `arris` can also appear on the first command after the server starts (it reads stored passwords then). Tell the user to approve it (Always Allow); the command waits until they do.
 - Exit 1 with `connection_not_found` or `connection_failed`: do not rewrite the SQL. Suggest `arris connection list` and `arris connection test <conn>`, or re-creating the connection with `init-connection`.
 
+To read more rows of a query that already ran (the next page, or rows cut off by `--limit`), run `arris result <runId> --offset <n> --limit <n>` instead of running the query again. It reads the saved result and prints `{columns, rows, totalRows, hasMore}`.
+
 Results: `rowCount` is the number of rows returned, capped at `--limit`. When `truncated` is true the total row count is unknown, so never report `rowCount` as the total. If `truncated` is true, say so and suggest narrowing with WHERE or aggregation, or raising `--limit`. Prefer aggregate SQL (`count(*)`, `sum`, `group by`) over fetching rows to count or total them.
 
 `<conn>` is a connection id or its name (case-insensitive).
@@ -68,7 +72,13 @@ When the user asks for a dashboard or board, or to put a result on a canvas:
 3. Run `arris canvas add <canvas> --run <runId>`, with `--title "..."` to name the object. When a chart was asked for, add `--chart <kind> --x <col> --y <col>` using column names from the query's result: `--x` is the category or time column, `--y` a numeric column (repeat `--y` for several series). Kinds: bar, line, area, pie, donut, scatter, bubble, combo, histogram, radar, treemap, funnel, kpi. Pick bar for categories, line for time.
 4. The open Arris tab switches to the board, or a browser opens on it; do not open the `uiUrl` yourself. The board runs read queries by itself when it opens and draws the chart; a write waits for the user to press Run.
 
-Never invent connection ids: `--sql` with `--connection` takes a name or id from `arris connection list`. `arris canvas show <canvas>` lists a canvas's objects.
+To fix a canvas, take object ids from `arris canvas show <canvas>`:
+
+- `arris canvas chart <canvas> <chartId> --chart <kind> --x <col> --y <col>` redraws a chart with a new type or axes.
+- `arris canvas remove <canvas> <objectId>` removes one object and its arrows. Removing a query leaves its chart without data, so remove the chart too unless the user wants to rebind it.
+- `arris canvas delete <canvas>` deletes the whole canvas. Run it only when the user asks to delete the canvas.
+
+Never invent connection ids: `--sql` with `--connection` takes a name or id from `arris connection list`.
 
 ## dbt
 
