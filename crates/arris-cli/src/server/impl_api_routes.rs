@@ -551,7 +551,7 @@ impl ApiRoutes {
             let config = Self::resolve_connection(&state, &guard, &req.connection).await?;
             (config, guard.root.clone())
         };
-        let run = if ReadOnlySql::check(&req.sql) {
+        let run = if ReadOnlySql::check(&req.sql, config.kind) {
             let run_req = QueryRunRequest {
                 connection: config.id.to_string(),
                 sql: req.sql.clone(),

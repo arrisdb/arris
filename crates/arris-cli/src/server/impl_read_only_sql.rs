@@ -1,6 +1,8 @@
+use arris_engines::DatabaseKind;
+
 use super::{
-    MONGO_READ_METHODS, MONGO_SHELL_STMT_PREFIX, MONGO_VALUE_HELPERS, MONGO_WRITE_STAGES,
-    READ_ONLY_FIRST_KEYWORDS, WRITE_KEYWORDS,
+    MONGO_READ_METHODS, MONGO_VALUE_HELPERS, MONGO_WRITE_STAGES, READ_ONLY_FIRST_KEYWORDS,
+    WRITE_KEYWORDS,
 };
 
 /// Decides whether SQL may run without a click. Errs towards "no": a false negative
@@ -8,8 +10,8 @@ use super::{
 pub struct ReadOnlySql;
 
 impl ReadOnlySql {
-    pub fn check(sql: &str) -> bool {
-        if sql.trim_start().starts_with(MONGO_SHELL_STMT_PREFIX) {
+    pub fn check(sql: &str, kind: DatabaseKind) -> bool {
+        if kind == DatabaseKind::Mongodb && Self::is_mongo_shell(sql) {
             return Self::check_mongo(sql);
         }
         let code = Self::strip_literals_and_comments(sql);
@@ -27,7 +29,16 @@ impl ReadOnlySql {
         starts_read_only && !words.any(|w| WRITE_KEYWORDS.contains(&w.as_str()))
     }
 
-    /// One `db.` statement whose every call is a read method or a value helper.
+    /// `db.coll...` or `appdb.coll...`: a leading name followed straight by a dot.
+    fn is_mongo_shell(stmt: &str) -> bool {
+        let stmt = stmt.trim_start();
+        let name_len = stmt
+            .find(|c: char| !c.is_alphanumeric() && c != '_' && c != '-')
+            .unwrap_or(stmt.len());
+        name_len > 0 && stmt[name_len..].starts_with('.')
+    }
+
+    /// One shell statement whose every call is a read method or a value helper.
     fn check_mongo(stmt: &str) -> bool {
         if MONGO_WRITE_STAGES.iter().any(|stage| stmt.contains(stage)) {
             return false;
@@ -103,12 +114,8 @@ mod tests {
             "/* update */ SELECT 1",
             "WITH a AS (SELECT 1) SELECT * FROM a",
             "SHOW TABLES",
-            "db.orders.countDocuments({})",
-            "db.orders.find({ status: 'paid', at: { $gt: ISODate('2025-01-01') } }).sort({ at: -1 }).limit(5)",
-            "db.orders.aggregate([{ $group: { _id: '$status', n: { $sum: 1 } } }])",
-            "db.getCollectionNames()",
         ] {
-            assert!(ReadOnlySql::check(sql), "{sql}");
+            assert!(ReadOnlySql::check(sql, DatabaseKind::Postgres), "{sql}");
         }
     }
 
@@ -124,15 +131,38 @@ mod tests {
             "EXPLAIN ANALYZE DELETE FROM t",
             "SELECT * FROM t FOR UPDATE",
             "-- only a comment",
+            "",
+        ] {
+            assert!(!ReadOnlySql::check(sql, DatabaseKind::Postgres), "{sql}");
+        }
+    }
+
+    #[test]
+    fn mongo_shell_reads_run_without_a_click() {
+        for stmt in [
+            "db.orders.countDocuments({})",
+            "appdb.events_10m.aggregate([{ $group: { _id: '$event_type', n: { $sum: 1 } } }])",
+            "db.orders.find({ status: 'paid', at: { $gt: ISODate('2025-01-01') } }).sort({ at: -1 }).limit(5)",
+            "db.getSiblingDB('appdb').orders.find({})",
+            "db.getCollectionNames()",
+            "SELECT * FROM orders",
+        ] {
+            assert!(ReadOnlySql::check(stmt, DatabaseKind::Mongodb), "{stmt}");
+        }
+    }
+
+    #[test]
+    fn mongo_shell_writes_wait_for_a_click() {
+        for stmt in [
             "db.orders.insertOne({ a: 1 })",
+            "appdb.orders.deleteMany({})",
             "db.orders.find({}).forEach(printjson)",
             "db.orders.aggregate([{ $out: 'copy' }])",
             "db.orders.aggregate([{ '$merge': { into: 'copy' } }])",
             "db.orders.find({}); db.orders.drop()",
             "db.dropDatabase()",
-            "",
         ] {
-            assert!(!ReadOnlySql::check(sql), "{sql}");
+            assert!(!ReadOnlySql::check(stmt, DatabaseKind::Mongodb), "{stmt}");
         }
     }
 }

@@ -178,8 +178,9 @@ pub const OPEN_DEFAULT_COMMAND: &str = "xdg-open";
 #[cfg(windows)]
 pub const OPEN_DEFAULT_COMMAND: &str = "explorer";
 /// Mongo shell methods that only read; any other chained call waits for a click.
-pub const MONGO_READ_METHODS: [&str; 22] = [
+pub const MONGO_READ_METHODS: [&str; 23] = [
     "find",
+    "getSiblingDB",
     "findOne",
     "countDocuments",
     "estimatedDocumentCount",
