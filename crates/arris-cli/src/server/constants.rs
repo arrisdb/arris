@@ -177,3 +177,41 @@ pub const OPEN_DEFAULT_COMMAND: &str = "open";
 pub const OPEN_DEFAULT_COMMAND: &str = "xdg-open";
 #[cfg(windows)]
 pub const OPEN_DEFAULT_COMMAND: &str = "explorer";
+/// Mongo shell methods that only read; any other chained call waits for a click.
+pub const MONGO_READ_METHODS: [&str; 22] = [
+    "find",
+    "findOne",
+    "countDocuments",
+    "estimatedDocumentCount",
+    "count",
+    "distinct",
+    "aggregate",
+    "getCollection",
+    "getCollectionNames",
+    "getCollectionInfos",
+    "getIndexes",
+    "stats",
+    "limit",
+    "skip",
+    "sort",
+    "project",
+    "projection",
+    "toArray",
+    "explain",
+    "hint",
+    "batchSize",
+    "pretty",
+];
+/// Value constructors a Mongo shell filter may call.
+pub const MONGO_VALUE_HELPERS: [&str; 8] = [
+    "ObjectId",
+    "ISODate",
+    "Date",
+    "NumberLong",
+    "NumberInt",
+    "NumberDecimal",
+    "UUID",
+    "RegExp",
+];
+/// Pipeline stages that write their output to a collection.
+pub const MONGO_WRITE_STAGES: [&str; 2] = ["$out", "$merge"];
