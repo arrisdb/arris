@@ -6,7 +6,7 @@ use arris_engines::persistence::ProjectManifest;
 use arris_engines::query::QueryError;
 use arris_engines::{
     CONNECTION_SCOPE_LOCAL, ConnectionConfig, JsonCollectionStore, JsonSingletonStore,
-    PersistedPinnedQuery, ProjectState, QueryEngine, QueryRequest, QueryResult,
+    PersistedPinnedQuery, ProjectState, QueryEngine, QueryLanguage, QueryRequest, QueryResult,
     RUN_PREVIEW_MAX_ROWS, RunPreview, RunRecord, RunSource, RunStatus, SchemaNode,
     ScopedConnection, StoreError,
 };
@@ -34,12 +34,11 @@ use super::{
     QUERY_HANDOFF_TAKE_ROUTE, QUERY_OPEN_POLL_MS, QUERY_OPEN_ROUTE, QUERY_OPEN_WAIT_MS,
     QUERY_PAGE_ROUTE, QUERY_RUN_ROUTE, QueryHandoff, QueryOpenRequest, QueryOpenResponse,
     QueryPageRequest, QueryRunRequest, QueryRunResponse, REQUEST_QUERY_PARAM, RUN_GET_ROUTE,
-    RUN_PAGE_MAX_LIMIT, RUN_PAGE_ROUTE, RUN_RESULTS_BOARD, ReadOnlySql, RunGetResponse,
-    RunIdRequest, RunPageRequest, SCHEMA_LIST_ROUTE, SchemaListRequest, Server, ServerEvent,
-    ServerEventKind, ServerState, TABLE_BROWSE_DEFAULT_LIMIT, TABLE_BROWSE_QUERY_ROUTE,
-    TableBrowseQueryRequest, ToolRunRoutes, WORKSPACE_LAYOUT_SAVE_ROUTE, WORKSPACE_LOAD_ROUTE,
-    WORKSPACE_TABS_SAVE_ROUTE, WorkspaceLayoutSaveRequest, WorkspaceResponse,
-    WorkspaceTabsSaveRequest,
+    RUN_PAGE_MAX_LIMIT, RUN_PAGE_ROUTE, RUN_RESULTS_BOARD, RunGetResponse, RunIdRequest,
+    RunPageRequest, SCHEMA_LIST_ROUTE, SchemaListRequest, Server, ServerEvent, ServerEventKind,
+    ServerState, TABLE_BROWSE_DEFAULT_LIMIT, TABLE_BROWSE_QUERY_ROUTE, TableBrowseQueryRequest,
+    ToolRunRoutes, WORKSPACE_LAYOUT_SAVE_ROUTE, WORKSPACE_LOAD_ROUTE, WORKSPACE_TABS_SAVE_ROUTE,
+    WorkspaceLayoutSaveRequest, WorkspaceResponse, WorkspaceTabsSaveRequest,
 };
 
 pub(super) type ApiState = State<Arc<ServerState>>;
@@ -551,7 +550,8 @@ impl ApiRoutes {
             let config = Self::resolve_connection(&state, &guard, &req.connection).await?;
             (config, guard.root.clone())
         };
-        let run = if ReadOnlySql::check(&req.sql, config.kind) {
+        let driver = state.env.connection.open_connection(&config).await?;
+        let run = if driver.is_read_only(&req.sql, QueryLanguage::default()) {
             let run_req = QueryRunRequest {
                 connection: config.id.to_string(),
                 sql: req.sql.clone(),

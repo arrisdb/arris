@@ -46,12 +46,6 @@ pub const QUERY_HANDOFF_TAKE_ROUTE: &str = "/api/query_handoff_take";
 /// How long `query_open` waits for an open tab to claim the query before reporting none did.
 pub const QUERY_OPEN_WAIT_MS: u64 = 1500;
 pub const QUERY_OPEN_POLL_MS: u64 = 50;
-pub const READ_ONLY_FIRST_KEYWORDS: [&str; 6] =
-    ["SELECT", "WITH", "SHOW", "DESCRIBE", "DESC", "VALUES"];
-pub const WRITE_KEYWORDS: [&str; 19] = [
-    "INSERT", "UPDATE", "DELETE", "MERGE", "UPSERT", "REPLACE", "DROP", "ALTER", "CREATE",
-    "TRUNCATE", "GRANT", "REVOKE", "INTO", "CALL", "EXEC", "EXECUTE", "COPY", "VACUUM", "SET",
-];
 pub const HISTORY_LIST_ROUTE: &str = "/api/history_list";
 pub const PIN_ADD_ROUTE: &str = "/api/pin_add";
 pub const PIN_REMOVE_ROUTE: &str = "/api/pin_remove";
@@ -177,42 +171,3 @@ pub const OPEN_DEFAULT_COMMAND: &str = "open";
 pub const OPEN_DEFAULT_COMMAND: &str = "xdg-open";
 #[cfg(windows)]
 pub const OPEN_DEFAULT_COMMAND: &str = "explorer";
-/// Mongo shell methods that only read; any other chained call waits for a click.
-pub const MONGO_READ_METHODS: [&str; 23] = [
-    "find",
-    "getSiblingDB",
-    "findOne",
-    "countDocuments",
-    "estimatedDocumentCount",
-    "count",
-    "distinct",
-    "aggregate",
-    "getCollection",
-    "getCollectionNames",
-    "getCollectionInfos",
-    "getIndexes",
-    "stats",
-    "limit",
-    "skip",
-    "sort",
-    "project",
-    "projection",
-    "toArray",
-    "explain",
-    "hint",
-    "batchSize",
-    "pretty",
-];
-/// Value constructors a Mongo shell filter may call.
-pub const MONGO_VALUE_HELPERS: [&str; 8] = [
-    "ObjectId",
-    "ISODate",
-    "Date",
-    "NumberLong",
-    "NumberInt",
-    "NumberDecimal",
-    "UUID",
-    "RegExp",
-];
-/// Pipeline stages that write their output to a collection.
-pub const MONGO_WRITE_STAGES: [&str; 2] = ["$out", "$merge"];

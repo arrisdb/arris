@@ -16,6 +16,7 @@
 //!   and walks the response into a `PlanNode` tree.
 //! - CRUD helpers route through the `_id` primary key (Mongo has no schema PK).
 
+mod constants;
 mod explain;
 mod mutation;
 mod parser;
@@ -195,6 +196,20 @@ impl DatabaseDriver for MongoDriver {
             .database(db_name)
             .collection::<Document>(&request.collection);
         Ok(QueryStream::Rows(stream_find(coll, &request).await?))
+    }
+
+    /// Parsed with the same parser that runs the query: a read verb, and no pipeline stage that writes.
+    fn is_read_only(&self, text: &str, language: QueryLanguage) -> bool {
+        parse_request(text, language).is_ok_and(|request| {
+            request.verb.is_read()
+                && !request.args.iter().any(|arg| {
+                    arg.as_array().is_some_and(|stages| {
+                        stages.iter().any(|stage| {
+                            constants::WRITE_STAGES.iter().any(|w| stage.get(w).is_some())
+                        })
+                    })
+                })
+        })
     }
 
     async fn explain_query(
@@ -400,6 +415,30 @@ mod tests {
     use schema::{
         collection_detail, collection_node_kind, fields_from_docs, schema_index_nodes,
     };
+
+    #[test]
+    fn reads_are_read_only_and_writes_are_not() {
+        let driver = MongoDriver::new();
+        let native = QueryLanguage::Native;
+        for read in [
+            r#"db.orders.countDocuments({})"#,
+            r#"appdb.events.aggregate([{"$group":{"_id":"$type","n":{"$sum":1}}}])"#,
+            r#"db.orders.find({"status":"paid"}).limit(5)"#,
+        ] {
+            assert!(driver.is_read_only(read, native), "{read}");
+        }
+        for write in [
+            r#"db.orders.insertOne({"a":1})"#,
+            r#"db.orders.deleteMany({})"#,
+            r#"db.orders.aggregate([{"$match":{}},{"$out":"copy"}])"#,
+            r#"db.orders.aggregate([{"$merge":{"into":"copy"}}])"#,
+            "not a mongo statement",
+        ] {
+            assert!(!driver.is_read_only(write, native), "{write}");
+        }
+        assert!(driver.is_read_only("SELECT * FROM orders", QueryLanguage::Sql));
+        assert!(!driver.is_read_only("DELETE FROM orders", QueryLanguage::Sql));
+    }
 
     #[test]
     fn driver_starts_disconnected() {
