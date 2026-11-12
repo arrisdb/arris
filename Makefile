@@ -55,7 +55,7 @@ VERSION ?=
 # target triple and returns its bundle output directory.
 PRELUDE := set -euo pipefail; if [ -f "$(REPO_ROOT)/.env" ]; then set -a; . "$(REPO_ROOT)/.env"; set +a; fi; die() { echo "error: $$*" >&2; exit 1; }; require_env() { for v in "$$@"; do [ -n "$${!v:-}" ] || die "required env var '$$v' is not set (see RELEASE.md)"; done; }; require_cmd() { for c in "$$@"; do command -v "$$c" >/dev/null 2>&1 || die "required command '$$c' not found"; done; }; bundle_dir() { local td; td="$$(cd "$(REPO_ROOT)/src-tauri" && cargo metadata --format-version 1 --no-deps | jq -r .target_directory)"; echo "$$td/$$1/release/bundle"; }; arch_label() { case "$$1" in aarch64-*) echo aarch64 ;; x86_64-*) echo x64 ;; *) echo "$$1" ;; esac; }
 
-.PHONY: help deny build build-unsigned publish release bump verify docs-deploy clean cli install-skill npm-package
+.PHONY: help deny build build-unsigned publish release bump verify docs-deploy clean cli install-skill install-skill-dev npm-package
 
 help:
 	@echo "Arris release targets:"
@@ -68,6 +68,7 @@ help:
 	@echo "  make verify              Re-run the Gatekeeper check on the built .dmgs."
 	@echo "  make cli                 Build the frontend and the release arris CLI with it embedded."
 	@echo "  make install-skill [SKILL_PROJECT=dir]  Build the CLI, install it and the /arris skill (global, or into dir)."
+	@echo "  make install-skill-dev   Same, but a fast incremental local build (no npm ci, no LTO)."
 	@echo "  make npm-package         Stage the npm launcher and this host's CLI package under npm/dist."
 	@echo "  make docs-deploy         Build docs/ and direct-upload dist/ to Cloudflare Pages."
 	@echo "  make clean               Remove the build bundle directories."
@@ -82,6 +83,7 @@ NPM_HOST_PLATFORM = $(shell node -p 'process.platform + "-" + process.arch')
 # Asks cargo, so a CARGO_TARGET_DIR outside the repo is honored.
 CARGO_TARGET_DIR_RESOLVED = $(shell cargo metadata --no-deps --format-version 1 | node -p 'JSON.parse(require("fs").readFileSync(0)).target_directory')
 CLI_RELEASE_BINARY = $(CARGO_TARGET_DIR_RESOLVED)/release/arris
+CLI_DEV_BINARY = $(CARGO_TARGET_DIR_RESOLVED)/dev-install/arris
 # macOS keys "Always Allow" to the signature; an ad-hoc build is a new app every rebuild.
 # Override with `make install-skill CLI_SIGNING_IDENTITY="..."`. Empty off macOS: signing is skipped.
 CLI_SIGNING_IDENTITY ?= $(shell security find-identity -v -p codesigning 2>/dev/null | sed -n 's/.*"\(Apple Development[^"]*\)".*/\1/p' | head -n 1)
@@ -92,10 +94,19 @@ npm-package:
 	node scripts/package-npm.mjs --binary "$(CLI_RELEASE_BINARY)" --platform "$(NPM_HOST_PLATFORM)"
 
 # --- install-skill (local `npx arris`; SKILL_PROJECT=<dir> installs into that project) ---
-install-skill: cli
-	$(if $(CLI_SIGNING_IDENTITY),codesign --force --sign "$(CLI_SIGNING_IDENTITY)" --identifier $(CLI_CODESIGN_ID) "$(CLI_RELEASE_BINARY)")
-	cd "$(or $(SKILL_PROJECT),$(CURDIR))" && ARRIS_BINARY="$(CLI_RELEASE_BINARY)" \
+# Signs $(1) and installs it with the /arris skill.
+define INSTALL_CLI
+	$(if $(CLI_SIGNING_IDENTITY),codesign --force --sign "$(CLI_SIGNING_IDENTITY)" --identifier $(CLI_CODESIGN_ID) "$(1)")
+	cd "$(or $(SKILL_PROJECT),$(CURDIR))" && ARRIS_BINARY="$(1)" \
 		node "$(REPO_ROOT)/npm/arris/bin/arris.js" $(if $(SKILL_PROJECT),--project)
+endef
+
+install-skill: cli
+	$(call INSTALL_CLI,$(CLI_RELEASE_BINARY))
+
+install-skill-dev:
+	npm --prefix frontend run build && cargo build -p arris-cli --profile dev-install
+	$(call INSTALL_CLI,$(CLI_DEV_BINARY))
 
 deny:
 	@$(PRELUDE); \
