@@ -18,6 +18,17 @@ use super::parser::{Chain, MongoRequest, Verb};
 use super::tabular::{accumulate_columns_raw, column_index, finalize_columns, project_row_raw};
 
 pub(super) fn parse_request(text: &str, language: QueryLanguage) -> Result<MongoRequest> {
+    // Whole-line comments (e.g. the note above a handed-off query) are skipped.
+    let code: Vec<&str> = text
+        .lines()
+        .filter(|line| {
+            let line = line.trim_start();
+            !super::constants::LINE_COMMENTS
+                .iter()
+                .any(|marker| line.starts_with(marker))
+        })
+        .collect();
+    let text = &code.join("\n");
     match language {
         QueryLanguage::Native => super::parser::parse(text)
             .map_err(|e| DriverError::InvalidArgument(e.to_string())),

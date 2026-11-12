@@ -417,6 +417,19 @@ mod tests {
     };
 
     #[test]
+    fn skips_whole_line_comments_in_both_languages() {
+        for marker in ["//", "--"] {
+            let note = format!("{marker} Claude 1a2b3c4d: count orders\n");
+            let shell = (format!("{note}db.orders.countDocuments({{}});"), QueryLanguage::Native);
+            let sql = (format!("{note}SELECT * FROM orders LIMIT 1;"), QueryLanguage::Sql);
+            for (text, language) in [shell, sql] {
+                let request = query::parse_request(&text, language).unwrap();
+                assert_eq!(request.collection, "orders");
+            }
+        }
+    }
+
+    #[test]
     fn reads_are_read_only_and_writes_are_not() {
         let driver = MongoDriver::new();
         let native = QueryLanguage::Native;

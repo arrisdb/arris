@@ -30,7 +30,7 @@ describe("QueryHandoffHost", () => {
     const handoff = { kind: "query" as const, id: "h1", connectionId: "c1", sql: "DELETE FROM t", runId: null, newTab: false, note: null, session: null };
     vi.mocked(takeQueryHandoffsIPC).mockResolvedValue([handoff]);
     render(<QueryHandoffHost />);
-    await waitFor(() => expect(lastTab()?.text).toBe("DELETE FROM t"));
+    await waitFor(() => expect(lastTab()?.text).toBe("DELETE FROM t;"));
     expect(lastTab()?.connectionId).toBe("c1");
     expect(fetchRunPageIPC).not.toHaveBeenCalled();
   });
@@ -50,11 +50,13 @@ describe("QueryHandoffHost", () => {
       .mockResolvedValueOnce([{ kind: "query" as const, id: "a", connectionId: "c1", sql: "SELECT 1", runId: null, newTab: false, note: null, session: null }])
       .mockResolvedValueOnce([{ kind: "query" as const, id: "b", connectionId: "c1", sql: "SELECT 2", runId: null, newTab: false, note: null, session: null }]);
     render(<QueryHandoffHost />);
-    await waitFor(() => expect(lastTab()?.text).toBe("SELECT 1"));
+    await waitFor(() => expect(lastTab()?.text).toBe("SELECT 1;"));
     act(() => emit({ kind: "query_open_requested" }));
-    await waitFor(() => expect(lastTab()?.text).toBe("SELECT 1\n\nSELECT 2"));
+    await waitFor(() => expect(lastTab()?.text).toBe("SELECT 1;\n\nSELECT 2;"));
     expect(useTabsStore.getState().tabs).toHaveLength(1);
-    expect(lastTab()?.cursor).toBe("SELECT 1\n\n".length);
+    expect(lastTab()?.cursor).toBe("SELECT 1;\n\n".length);
+    // A bumped token makes the mounted editor reload the appended text.
+    expect(lastTab()?.refreshToken).toBe(2);
   });
 
   it("opens a separate console when asked for a new tab", async () => {
@@ -62,10 +64,10 @@ describe("QueryHandoffHost", () => {
       .mockResolvedValueOnce([{ kind: "query" as const, id: "a", connectionId: "c1", sql: "SELECT 1", runId: null, newTab: false, note: null, session: null }])
       .mockResolvedValueOnce([{ kind: "query" as const, id: "b", connectionId: "c1", sql: "SELECT 2", runId: null, newTab: true, note: null, session: null }]);
     render(<QueryHandoffHost />);
-    await waitFor(() => expect(lastTab()?.text).toBe("SELECT 1"));
+    await waitFor(() => expect(lastTab()?.text).toBe("SELECT 1;"));
     act(() => emit({ kind: "query_open_requested" }));
     await waitFor(() => expect(useTabsStore.getState().tabs).toHaveLength(2));
-    expect(lastTab()?.text).toBe("SELECT 2");
+    expect(lastTab()?.text).toBe("SELECT 2;");
   });
   it("focuses a canvas the CLI added to", async () => {
     vi.mocked(takeQueryHandoffsIPC).mockResolvedValueOnce([
@@ -83,9 +85,9 @@ describe("QueryHandoffHost", () => {
       .mockResolvedValueOnce([{ ...query, id: "b", sql: "SELECT 2", note: null, session: "s2" }]);
     render(<QueryHandoffHost />);
     await waitFor(() => expect(lastTab()?.title).toBe("Claude s1"));
-    expect(lastTab()?.text).toBe("-- Claude s1: count orders\nSELECT 1");
+    expect(lastTab()?.text).toBe("-- Claude s1: count orders\nSELECT 1;");
     act(() => emit({ kind: "query_open_requested" }));
     await waitFor(() => expect(useTabsStore.getState().tabs).toHaveLength(2));
-    expect(lastTab()).toMatchObject({ title: "Claude s2", text: "SELECT 2" });
+    expect(lastTab()).toMatchObject({ title: "Claude s2", text: "SELECT 2;" });
   });
 });

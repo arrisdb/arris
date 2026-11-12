@@ -6,5 +6,7 @@ const HANDOFF_TAB_TITLE = "Claude";
 const HANDOFF_SQL_SEPARATOR = "\n\n";
 // Used when the tab's language has no line-comment marker of its own.
 const HANDOFF_DEFAULT_COMMENT = "--";
+// Ends each query so the console runs only the statement under the cursor.
+const HANDOFF_STATEMENT_END = ";";
 
-export { HANDOFF_DEFAULT_COMMENT, HANDOFF_PAGE_SIZE, HANDOFF_SQL_SEPARATOR, HANDOFF_TAB_TITLE };
+export { HANDOFF_DEFAULT_COMMENT, HANDOFF_STATEMENT_END, HANDOFF_PAGE_SIZE, HANDOFF_SQL_SEPARATOR, HANDOFF_TAB_TITLE };

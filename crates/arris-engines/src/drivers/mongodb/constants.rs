@@ -1,5 +1,5 @@
 /// Aggregation stages that write their output to a collection.
 pub(super) const WRITE_STAGES: [&str; 2] = ["$out", "$merge"];
 
-/// Shell line-comment marker.
-pub const LINE_COMMENT: &str = "//";
+/// Line-comment markers; the mongosh editor highlights both.
+pub const LINE_COMMENTS: [&str; 2] = ["//", "--"];

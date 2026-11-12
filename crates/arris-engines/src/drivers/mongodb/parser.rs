@@ -103,18 +103,8 @@ pub enum ParseError {
 }
 
 pub fn parse(input: &str) -> Result<MongoRequest, ParseError> {
-    // Whole-line `//` comments (e.g. the note above a handed-off query) are skipped.
-    let code: Vec<&str> = input
-        .lines()
-        .filter(|line| {
-            !line
-                .trim_start()
-                .starts_with(super::constants::LINE_COMMENT)
-        })
-        .collect();
-    let code = code.join("\n");
     // mongosh statements may terminate with a single `;` — tolerate one.
-    let trimmed = code.trim();
+    let trimmed = input.trim();
     let trimmed = trimmed.strip_suffix(';').unwrap_or(trimmed).trim_end();
     let mut p = Parser::new(trimmed);
 
@@ -455,12 +445,6 @@ impl<'a> Parser<'a> {
 mod tests {
     use super::*;
     use serde_json::json;
-
-    #[test]
-    fn skips_whole_line_comments() {
-        let req = parse("// Claude 1a2b3c4d: count orders\ndb.orders.countDocuments({})").unwrap();
-        assert_eq!(req.collection, "orders");
-    }
 
     #[test]
     fn parses_find_no_args() {

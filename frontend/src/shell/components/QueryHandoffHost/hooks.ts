@@ -9,6 +9,7 @@ import {
   HANDOFF_DEFAULT_COMMENT,
   HANDOFF_PAGE_SIZE,
   HANDOFF_SQL_SEPARATOR,
+  HANDOFF_STATEMENT_END,
   HANDOFF_TAB_TITLE,
 } from "./constants";
 import { fetchRunPageIPC, takeQueryHandoffsIPC } from "./ipc";
@@ -38,9 +39,17 @@ async function openQuery(handoff: QueryTarget): Promise<void> {
   const label = sessionLabel(session);
   const tab = handoffTab(connectionId, newTab, label);
   const marker = lineCommentPrefix(tab.kind) ?? HANDOFF_DEFAULT_COMMENT;
-  const block = note ? `${marker} ${label}: ${note}\n${sql}` : sql;
+  const statement = sql.trimEnd().endsWith(HANDOFF_STATEMENT_END)
+    ? sql.trimEnd()
+    : `${sql.trimEnd()}${HANDOFF_STATEMENT_END}`;
+  const block = note ? `${marker} ${label}: ${note}\n${statement}` : statement;
   const text = tab.text ? `${tab.text}${HANDOFF_SQL_SEPARATOR}${block}` : block;
-  useTabsStore.getState().updateTab(tab.id, { text, cursor: text.length - sql.length });
+  // refreshToken makes a mounted editor reload the text instead of keeping its own copy.
+  useTabsStore.getState().updateTab(tab.id, {
+    text,
+    cursor: text.length - statement.length,
+    refreshToken: (tab.refreshToken ?? 0) + 1,
+  });
   if (!runId) return;
   const result = await fetchRunPageIPC(runId, 0, HANDOFF_PAGE_SIZE);
   const history = useRunHistoryStore.getState();
