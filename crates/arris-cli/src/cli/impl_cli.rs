@@ -16,8 +16,8 @@ use super::{
     CURRENT_DIR_LABEL, CanvasAddOutput, CanvasCommand, CanvasNewOutput, CanvasShowDoc,
     CanvasShowOutput, Cli, CliError, Command, ConnectionCommand, ConnectionListEntry,
     ConnectionNewOutput, DBT_TOOL, ENV_DATA_DIR, EXIT_API_ERROR, KIND_LIST_SEPARATOR,
-    LineageOutput, QueryOpenOutput, QueryOutput, SERVER_LISTENING_PREFIX, SQLMESH_TOOL, ServerClient, SyncOutput,
-    ToolRunOutput, ToolRunner, UrlOutput,
+    LineageOutput, QueryOpenOutput, QueryOutput, SERVER_LISTENING_PREFIX, SQLMESH_TOOL,
+    ServerClient, SyncOutput, ToolRunOutput, ToolRunner, UrlOutput,
 };
 use crate::server::{
     AnalyticsDirRequest, AnalyticsLineageRequest, AnalyticsLineageResponse, AnalyticsModelRequest,
@@ -29,9 +29,8 @@ use crate::server::{
     ConnectionRequestIdRequest, ConnectionRequestStatus, ConnectionTestRequest, EmptyResponse,
     HISTORY_LIST_ROUTE, HistoryListRequest, PIN_ADD_ROUTE, PIN_LIST_ROUTE, PIN_REMOVE_ROUTE,
     PinAddRequest, PinRemoveRequest, QUERY_OPEN_ROUTE, QUERY_RUN_ROUTE, QueryOpenRequest,
-    QueryOpenResponse, QueryRunRequest, QueryRunResponse,
-    SCHEMA_LIST_ROUTE, SchemaListRequest, Server, TOOL_RUN_RECORD_ROUTE, ToolRunIdPayload,
-    ToolRunRecordRequest,
+    QueryOpenResponse, QueryRunRequest, QueryRunResponse, SCHEMA_LIST_ROUTE, SchemaListRequest,
+    Server, TOOL_RUN_RECORD_ROUTE, ToolRunIdPayload, ToolRunRecordRequest,
 };
 
 impl Cli {
@@ -63,11 +62,16 @@ impl Cli {
                 Self::serve(data_dir, &self.project_root()?, *port, *open, *background).await?;
                 return Ok(None);
             }
-            Command::Connection(ConnectionCommand::New { kind, no_open }) => {
+            Command::Connection(ConnectionCommand::New { kind, url, no_open }) => {
                 let kind = kind.as_deref().map(Self::parse_kind).transpose()?;
+                let prefill = url
+                    .as_deref()
+                    .map(ConnectionPrefill::from_url)
+                    .transpose()?;
                 let (client, project) = self.connect(&data_dir).await?;
                 let out =
-                    Self::connection_new(&data_dir, client, &project, kind, None, *no_open).await?;
+                    Self::connection_new(&data_dir, client, &project, kind, prefill, *no_open)
+                        .await?;
                 serde_json::to_value(out)?
             }
             Command::Connection(ConnectionCommand::List) => {

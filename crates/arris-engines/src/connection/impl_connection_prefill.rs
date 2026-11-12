@@ -1,7 +1,12 @@
+use percent_encoding::percent_decode_str;
 use serde_yml::{Mapping, Value};
+use url::Url;
 
-use super::constants::{JINJA_OPEN, OPTION_ASSIGN, OPTION_SEPARATOR};
-use super::{ConnectionConfig, ConnectionPrefill, DatabaseKind, PrefillField};
+use super::constants::{
+    CONNECTION_URL_LABEL, JINJA_OPEN, MONGODB_SRV_SCHEME, OPTION_ASSIGN, OPTION_SEPARATOR,
+    URL_PATH_SEPARATOR, URL_SCHEMES,
+};
+use super::{ConnectionConfig, ConnectionPrefill, DatabaseKind, PrefillError, PrefillField};
 
 impl ConnectionPrefill {
     /// Copies only the listed keys, first alias wins; Jinja values are dropped.
@@ -43,6 +48,33 @@ impl ConnectionPrefill {
         Self { name, kind, fields }.scrubbed()
     }
 
+    /// Reads host, port, user, database and query options from a URI; a password is dropped.
+    pub fn from_url(raw: &str) -> Result<Self, PrefillError> {
+        let url = Url::parse(raw.trim())
+            .map_err(|_| PrefillError::Invalid(CONNECTION_URL_LABEL.into()))?;
+        let scheme = url.scheme();
+        let kind = URL_SCHEMES
+            .iter()
+            .find(|(s, _)| *s == scheme)
+            .map(|(_, k)| *k)
+            .ok_or_else(|| PrefillError::UnsupportedAdapter(scheme.into()))?;
+        let host = url.host_str().unwrap_or_default().to_owned();
+        let decode = |s: &str| percent_decode_str(s).decode_utf8_lossy().into_owned();
+        let mut fields = ConnectionConfig::new(host.clone(), kind);
+        fields.host = host.clone();
+        fields.port = url.port().unwrap_or(kind.default_port());
+        fields.user = decode(url.username());
+        fields.database = decode(url.path().trim_start_matches(URL_PATH_SEPARATOR));
+        fields.options = url.query().unwrap_or_default().to_owned();
+        fields.is_srv = scheme == MONGODB_SRV_SCHEME;
+        Ok(Self {
+            name: host,
+            kind,
+            fields,
+        }
+        .scrubbed())
+    }
+
     /// Clears every secret field and keeps `fields` in step with `name` and `kind`.
     pub fn scrubbed(mut self) -> Self {
         self.fields.password.clear();
@@ -78,6 +110,41 @@ mod tests {
 
     fn mapping(yaml: &str) -> Mapping {
         serde_yml::from_str(yaml).unwrap()
+    }
+
+    #[test]
+    fn url_fills_host_port_and_default_port() {
+        let prefill = ConnectionPrefill::from_url("mongodb://localhost").unwrap();
+        assert_eq!(prefill.kind, DatabaseKind::Mongodb);
+        assert_eq!(prefill.name, "localhost");
+        assert_eq!(prefill.fields.host, "localhost");
+        assert_eq!(prefill.fields.port, DatabaseKind::Mongodb.default_port());
+        let pg = ConnectionPrefill::from_url("postgresql://db.local:6543/shop").unwrap();
+        assert_eq!((pg.kind, pg.fields.port), (DatabaseKind::Postgres, 6543));
+        assert_eq!(pg.fields.database, "shop");
+    }
+
+    #[test]
+    fn url_keeps_user_and_options_but_drops_the_password() {
+        let raw = "mongodb+srv://ada%40x:s3cret@cluster.example.net/app%20db?authSource=admin";
+        let prefill = ConnectionPrefill::from_url(raw).unwrap();
+        assert!(prefill.fields.is_srv);
+        assert_eq!(prefill.fields.user, "ada@x");
+        assert_eq!(prefill.fields.database, "app db");
+        assert_eq!(prefill.fields.options, "authSource=admin");
+        assert!(prefill.fields.password.is_empty());
+    }
+
+    #[test]
+    fn url_rejects_unknown_schemes_and_garbage() {
+        assert!(matches!(
+            ConnectionPrefill::from_url("ftp://h"),
+            Err(PrefillError::UnsupportedAdapter(s)) if s == "ftp"
+        ));
+        assert!(matches!(
+            ConnectionPrefill::from_url("not a url"),
+            Err(PrefillError::Invalid(_))
+        ));
     }
 
     #[test]

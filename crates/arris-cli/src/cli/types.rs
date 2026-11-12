@@ -97,8 +97,11 @@ pub enum ConnectionCommand {
     List,
     /// Open a browser form and wait until it is saved or cancelled.
     New {
-        #[arg(long)]
+        #[arg(long, conflicts_with = "url")]
         kind: Option<String>,
+        /// Prefill the form from a connection URI; any password in it is dropped.
+        #[arg(long)]
+        url: Option<String>,
         /// Print the form URL without opening a browser.
         #[arg(long)]
         no_open: bool,
