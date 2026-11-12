@@ -220,6 +220,9 @@ pub struct QueryOpenRequest {
     pub connection: String,
     pub sql: String,
     pub limit: Option<u32>,
+    /// Skips the connection's shared console tab.
+    #[serde(default)]
+    pub new_tab: bool,
 }
 
 /// `run` is set when the SQL was read-only and already ran; writes wait for the user.
@@ -237,6 +240,7 @@ pub struct QueryHandoff {
     pub connection_id: String,
     pub sql: String,
     pub run_id: Option<String>,
+    pub new_tab: bool,
 }
 
 /// The project's open tabs and pane layout, shared with the desktop app.

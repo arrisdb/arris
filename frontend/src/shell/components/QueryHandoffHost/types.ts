@@ -3,6 +3,7 @@ interface QueryHandoff {
   connectionId: string;
   sql: string;
   runId: string | null;
+  newTab: boolean;
 }
 
 export type { QueryHandoff };

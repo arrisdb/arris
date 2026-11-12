@@ -60,6 +60,9 @@ pub enum Command {
         /// Show the query in an Arris console tab. Writes wait there for the user to press Run.
         #[arg(long)]
         open: bool,
+        /// With --open, use a new console tab instead of the shared one.
+        #[arg(long, requires = "open")]
+        new_tab: bool,
     },
     /// List recent query runs, newest first.
     History {

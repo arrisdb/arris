@@ -21,12 +21,13 @@ const lastTab = () => useTabsStore.getState().tabs.at(-1);
 
 describe("QueryHandoffHost", () => {
   beforeEach(() => {
+    useTabsStore.getState().setTabs([]);
     vi.mocked(takeQueryHandoffsIPC).mockReset().mockResolvedValue([]);
     vi.mocked(fetchRunPageIPC).mockReset().mockResolvedValue(RESULT);
   });
 
   it("opens a write in a console tab without running it", async () => {
-    const handoff = { id: "h1", connectionId: "c1", sql: "DELETE FROM t", runId: null };
+    const handoff = { id: "h1", connectionId: "c1", sql: "DELETE FROM t", runId: null, newTab: false };
     vi.mocked(takeQueryHandoffsIPC).mockResolvedValue([handoff]);
     render(<QueryHandoffHost />);
     await waitFor(() => expect(lastTab()?.text).toBe("DELETE FROM t"));
@@ -36,11 +37,34 @@ describe("QueryHandoffHost", () => {
 
   it("shows a finished read's result when the server nudges the tab", async () => {
     render(<QueryHandoffHost />);
-    const handoff = { id: "h2", connectionId: "c1", sql: "SELECT 1", runId: "r1" };
+    const handoff = { id: "h2", connectionId: "c1", sql: "SELECT 1", runId: "r1", newTab: false };
     vi.mocked(takeQueryHandoffsIPC).mockResolvedValue([handoff]);
     act(() => emit({ kind: "query_open_requested" }));
     await waitFor(() => expect(lastTab()?.result).toEqual(RESULT));
     const runs = useRunHistoryStore.getState().runsByTab[lastTab()!.id];
     expect(runs.at(-1)).toMatchObject({ status: "success", sqlSnapshot: "SELECT 1" });
+  });
+
+  it("appends Claude's queries to one shared console per connection", async () => {
+    vi.mocked(takeQueryHandoffsIPC)
+      .mockResolvedValueOnce([{ id: "a", connectionId: "c1", sql: "SELECT 1", runId: null, newTab: false }])
+      .mockResolvedValueOnce([{ id: "b", connectionId: "c1", sql: "SELECT 2", runId: null, newTab: false }]);
+    render(<QueryHandoffHost />);
+    await waitFor(() => expect(lastTab()?.text).toBe("SELECT 1"));
+    act(() => emit({ kind: "query_open_requested" }));
+    await waitFor(() => expect(lastTab()?.text).toBe("SELECT 1\n\nSELECT 2"));
+    expect(useTabsStore.getState().tabs).toHaveLength(1);
+    expect(lastTab()?.cursor).toBe("SELECT 1\n\n".length);
+  });
+
+  it("opens a separate console when asked for a new tab", async () => {
+    vi.mocked(takeQueryHandoffsIPC)
+      .mockResolvedValueOnce([{ id: "a", connectionId: "c1", sql: "SELECT 1", runId: null, newTab: false }])
+      .mockResolvedValueOnce([{ id: "b", connectionId: "c1", sql: "SELECT 2", runId: null, newTab: true }]);
+    render(<QueryHandoffHost />);
+    await waitFor(() => expect(lastTab()?.text).toBe("SELECT 1"));
+    act(() => emit({ kind: "query_open_requested" }));
+    await waitFor(() => expect(useTabsStore.getState().tabs).toHaveLength(2));
+    expect(lastTab()?.text).toBe("SELECT 2");
   });
 });

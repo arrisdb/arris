@@ -109,6 +109,7 @@ impl Cli {
                 file,
                 limit,
                 open,
+                new_tab,
             } => {
                 // clap's `source` group guarantees exactly one of `--sql` / `--file`.
                 let sql = match file {
@@ -121,6 +122,7 @@ impl Cli {
                         connection: connection.clone(),
                         sql,
                         limit: Some(*limit),
+                        new_tab: *new_tab,
                     };
                     let resp: QueryOpenResponse =
                         client.call(QUERY_OPEN_ROUTE, &project, &body).await?;

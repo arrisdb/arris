@@ -569,6 +569,7 @@ impl ApiRoutes {
             connection_id: config.id.to_string(),
             sql: req.sql,
             run_id: run.as_ref().map(|r| r.run.id.clone()),
+            new_tab: req.new_tab,
         };
         let id = handoff.id.clone();
         state.query_handoffs.push(&root, handoff);

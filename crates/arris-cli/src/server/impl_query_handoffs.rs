@@ -42,6 +42,7 @@ mod tests {
             connection_id: "c1".into(),
             sql: "SELECT 1".into(),
             run_id: None,
+            new_tab: false,
         }
     }
 
