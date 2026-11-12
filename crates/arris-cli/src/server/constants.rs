@@ -150,3 +150,30 @@ pub const INDEX_EMBED_EXPECT: &str = "index.html is embedded";
 pub const ASSETS_PREFIX: &str = "assets/";
 pub const CACHE_NO_CACHE: &str = "no-cache";
 pub const CACHE_IMMUTABLE: &str = "public, max-age=31536000, immutable";
+
+pub const FILE_TREE_ROUTE: &str = "/api/file_tree";
+pub const FILE_READ_ROUTE: &str = "/api/file_read";
+pub const FILE_READ_BASE64_ROUTE: &str = "/api/file_read_base64";
+pub const FILE_WRITE_ROUTE: &str = "/api/file_write";
+pub const FILE_CREATE_ROUTE: &str = "/api/file_create";
+pub const FOLDER_CREATE_ROUTE: &str = "/api/folder_create";
+pub const ENTRY_RENAME_ROUTE: &str = "/api/entry_rename";
+pub const ENTRY_DELETE_ROUTE: &str = "/api/entry_delete";
+pub const ENTRY_COPY_ROUTE: &str = "/api/entry_copy";
+pub const ENTRY_MOVE_ROUTE: &str = "/api/entry_move";
+pub const ENTRY_DUPLICATE_ROUTE: &str = "/api/entry_duplicate";
+pub const FILE_OPEN_DEFAULT_ROUTE: &str = "/api/file_open_default";
+pub const CLIPBOARD_FILE_PATHS_ROUTE: &str = "/api/clipboard_file_paths";
+pub const FILE_INDEX_OPEN_ROUTE: &str = "/api/file_index_open";
+pub const FILE_INDEX_CLOSE_ROUTE: &str = "/api/file_index_close";
+pub const FILE_SEARCH_ROUTE: &str = "/api/file_search";
+pub const CONTENT_SEARCH_ROUTE: &str = "/api/content_search";
+pub const TAB_MOVE_TO_PROJECT_ROUTE: &str = "/api/tab_move_to_project";
+pub const TAB_MOVE_TO_SCRATCH_ROUTE: &str = "/api/tab_move_to_scratch";
+/// Command that opens a path with the OS default app.
+#[cfg(target_os = "macos")]
+pub const OPEN_DEFAULT_COMMAND: &str = "open";
+#[cfg(all(unix, not(target_os = "macos")))]
+pub const OPEN_DEFAULT_COMMAND: &str = "xdg-open";
+#[cfg(windows)]
+pub const OPEN_DEFAULT_COMMAND: &str = "explorer";

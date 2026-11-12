@@ -89,6 +89,7 @@ pub enum ApiErrorCode {
     SqlmeshProjectNotFound,
     ModelNotFound,
     ToolRunNotFound,
+    FileFailed,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -100,6 +101,42 @@ pub struct ApiErrorDetail {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ApiErrorBody {
     pub error: ApiErrorDetail,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FilePathRequest {
+    pub path: PathBuf,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileTreeRequest {
+    pub root: PathBuf,
+    pub skip_dirs: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FileWriteRequest {
+    pub path: PathBuf,
+    pub content: String,
+}
+
+/// Rename, copy or move of one entry.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FileMoveRequest {
+    pub from: PathBuf,
+    pub to: PathBuf,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FileSearchRequest {
+    pub query: String,
+    pub limit: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TabIdRequest {
+    pub id: String,
 }
 
 /// `{}` response for commands with nothing to return.

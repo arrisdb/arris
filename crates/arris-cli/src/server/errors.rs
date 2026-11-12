@@ -2,7 +2,9 @@ use arris_engines::AppEnvironmentError;
 use arris_engines::CanvasError;
 use arris_engines::StoreError;
 use arris_engines::connection::ConnectionError;
+use arris_engines::file::FileError;
 use arris_engines::query::QueryError;
+use arris_engines::search::SearchError;
 use axum::Json;
 use axum::extract::rejection::JsonRejection;
 use axum::http::StatusCode;
@@ -70,6 +72,14 @@ pub enum ApiError {
     ToolRunNotFound(String),
     #[error("project scan failed: {0}")]
     ProjectScan(String),
+    #[error("path must stay inside the project root: {0}")]
+    PathOutsideProject(String),
+    #[error("file: {0}")]
+    File(#[from] FileError),
+    #[error("search: {0}")]
+    Search(#[from] SearchError),
+    #[error("background task failed: {0}")]
+    Task(String),
     #[error("{0}")]
     Connection(#[from] ConnectionError),
     #[error("{0}")]
@@ -99,7 +109,10 @@ impl ApiError {
             Self::Ambiguous(_) => ApiErrorCode::Ambiguous,
             Self::ResultNotCached(_) => ApiErrorCode::ResultNotCached,
             Self::ConnectionRequestNotFound(_) => ApiErrorCode::ConnectionRequestNotFound,
-            Self::Forbidden | Self::DirOutsideProject(_) => ApiErrorCode::Forbidden,
+            Self::Forbidden | Self::DirOutsideProject(_) | Self::PathOutsideProject(_) => {
+                ApiErrorCode::Forbidden
+            }
+            Self::File(_) | Self::Search(_) | Self::Task(_) => ApiErrorCode::FileFailed,
             Self::DirNotFound(_) => ApiErrorCode::DirNotFound,
             Self::DbtProjectNotFound(_) => ApiErrorCode::DbtProjectNotFound,
             Self::SqlMeshProjectNotFound(_) => ApiErrorCode::SqlmeshProjectNotFound,
@@ -126,9 +139,11 @@ impl ApiError {
             | Self::SqlMeshProjectNotFound(_)
             | Self::ModelNotFound(_)
             | Self::ToolRunNotFound(_) => StatusCode::NOT_FOUND,
-            Self::Forbidden | Self::DirOutsideProject(_) => StatusCode::FORBIDDEN,
+            Self::Forbidden | Self::DirOutsideProject(_) | Self::PathOutsideProject(_) => {
+                StatusCode::FORBIDDEN
+            }
             Self::Conflict(_) | Self::Ambiguous(_) => StatusCode::CONFLICT,
-            Self::Store(_) | Self::Cache(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            Self::Store(_) | Self::Cache(_) | Self::Task(_) => StatusCode::INTERNAL_SERVER_ERROR,
             _ => StatusCode::BAD_REQUEST,
         }
     }
