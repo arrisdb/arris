@@ -22,6 +22,11 @@ describe("driver registry", () => {
     }
   });
 
+  it("sqlite tables open by bare name, since the database level is only the file name", () => {
+    const orders = node("table", "orders", "shop.orders");
+    expect(driverForKind("sqlite").tableRefFromNode(orders)).toEqual({ name: "orders" });
+  });
+
   it("allDrivers returns 19 drivers", () => {
     expect(allDrivers()).toHaveLength(19);
   });
