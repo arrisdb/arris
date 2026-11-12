@@ -111,6 +111,7 @@ impl Cli {
                 limit,
                 open,
                 new_tab,
+                note,
             } => {
                 // clap's `source` group guarantees exactly one of `--sql` / `--file`.
                 let sql = match file {
@@ -124,6 +125,8 @@ impl Cli {
                         sql,
                         limit: Some(*limit),
                         new_tab: *new_tab,
+                        note: note.clone(),
+                        session: Self::agent_session(),
                     };
                     let resp: QueryOpenResponse =
                         client.call(QUERY_OPEN_ROUTE, &project, &body).await?;
@@ -568,6 +571,12 @@ impl Cli {
             eprintln!("{e}");
         }
         Ok(server.serve().await?)
+    }
+
+    /// The calling Claude Code session's id, shortened; None outside Claude Code.
+    fn agent_session() -> Option<String> {
+        let id = std::env::var(super::ENV_AGENT_SESSION_ID).ok()?;
+        Some(id.chars().take(super::AGENT_SESSION_SHORT_LEN).collect())
     }
 
     fn open_browser(url: &str) -> std::io::Result<()> {

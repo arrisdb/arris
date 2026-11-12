@@ -4,6 +4,10 @@ interface QueryTarget {
   sql: string;
   runId: string | null;
   newTab: boolean;
+  /// What the query answers, from `--note`.
+  note: string | null;
+  /// Short agent session id; each session gets its own console.
+  session: string | null;
 }
 
 interface CanvasTarget {

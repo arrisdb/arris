@@ -571,6 +571,8 @@ impl ApiRoutes {
                 sql: req.sql,
                 run_id: run.as_ref().map(|r| r.run.id.clone()),
                 new_tab: req.new_tab,
+                note: req.note,
+                session: req.session,
             },
         };
         let (opened, launch_browser) = Self::hand_off(&state, &project, &root, handoff).await;

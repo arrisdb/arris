@@ -4,30 +4,42 @@ import { useSettingsStore } from "@shared/settings";
 import { useRunHistoryStore } from "@domains/results/hooks/runHistoryStore";
 import { useTabsStore } from "@shell/hooks/tabsStore";
 import type { EditorTab } from "@shell/types";
-import { HANDOFF_PAGE_SIZE, HANDOFF_SQL_SEPARATOR, HANDOFF_TAB_TITLE } from "./constants";
+import { lineCommentPrefix } from "@domains/editor/utils/ui/lineCommentToggler";
+import {
+  HANDOFF_DEFAULT_COMMENT,
+  HANDOFF_PAGE_SIZE,
+  HANDOFF_SQL_SEPARATOR,
+  HANDOFF_TAB_TITLE,
+} from "./constants";
 import { fetchRunPageIPC, takeQueryHandoffsIPC } from "./ipc";
 import type { QueryHandoff, QueryTarget } from "./types";
 
-/// The connection's shared Claude console, focused, or a new tab when asked for one.
-function handoffTab(connectionId: string, newTab: boolean): EditorTab {
+/// "Claude 1a2b3c4d" names the console and tags each query from that session.
+function sessionLabel(session: string | null): string {
+  return session ? `${HANDOFF_TAB_TITLE} ${session}` : HANDOFF_TAB_TITLE;
+}
+
+/// The session's shared console for the connection, focused, or a new tab when asked for one.
+function handoffTab(connectionId: string, newTab: boolean, title: string): EditorTab {
   const tabs = useTabsStore.getState();
   const shared = newTab
     ? undefined
     : tabs.tabs.find(
-        (t) =>
-          t.tabType === "console" &&
-          t.title === HANDOFF_TAB_TITLE &&
-          t.connectionId === connectionId,
+        (t) => t.tabType === "console" && t.title === title && t.connectionId === connectionId,
       );
-  if (!shared) return tabs.addTab({ connectionId, title: newTab ? undefined : HANDOFF_TAB_TITLE });
+  if (!shared) return tabs.addTab({ connectionId, title: newTab ? undefined : title });
   tabs.focusTab(shared.id);
   return shared;
 }
 
 // Reads ran on the server, so the tab shows that result rather than running again.
-async function openQuery({ connectionId, sql, runId, newTab }: QueryTarget): Promise<void> {
-  const tab = handoffTab(connectionId, newTab);
-  const text = tab.text ? `${tab.text}${HANDOFF_SQL_SEPARATOR}${sql}` : sql;
+async function openQuery(handoff: QueryTarget): Promise<void> {
+  const { connectionId, sql, runId, newTab, note, session } = handoff;
+  const label = sessionLabel(session);
+  const tab = handoffTab(connectionId, newTab, label);
+  const marker = lineCommentPrefix(tab.kind) ?? HANDOFF_DEFAULT_COMMENT;
+  const block = note ? `${marker} ${label}: ${note}\n${sql}` : sql;
+  const text = tab.text ? `${tab.text}${HANDOFF_SQL_SEPARATOR}${block}` : block;
   useTabsStore.getState().updateTab(tab.id, { text, cursor: text.length - sql.length });
   if (!runId) return;
   const result = await fetchRunPageIPC(runId, 0, HANDOFF_PAGE_SIZE);

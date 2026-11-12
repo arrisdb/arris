@@ -4,5 +4,7 @@ const HANDOFF_PAGE_SIZE = 100;
 // Claude's shared console per connection; each query is appended below the last.
 const HANDOFF_TAB_TITLE = "Claude";
 const HANDOFF_SQL_SEPARATOR = "\n\n";
+// Used when the tab's language has no line-comment marker of its own.
+const HANDOFF_DEFAULT_COMMENT = "--";
 
-export { HANDOFF_PAGE_SIZE, HANDOFF_SQL_SEPARATOR, HANDOFF_TAB_TITLE };
+export { HANDOFF_DEFAULT_COMMENT, HANDOFF_PAGE_SIZE, HANDOFF_SQL_SEPARATOR, HANDOFF_TAB_TITLE };

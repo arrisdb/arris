@@ -223,6 +223,12 @@ pub struct QueryOpenRequest {
     /// Skips the connection's shared console tab.
     #[serde(default)]
     pub new_tab: bool,
+    /// What the query answers; shown as a comment above it.
+    #[serde(default)]
+    pub note: Option<String>,
+    /// Short id of the agent session, so each session gets its own console.
+    #[serde(default)]
+    pub session: Option<String>,
 }
 
 /// `run` is set when the SQL was read-only and already ran; writes wait for the user.
@@ -256,6 +262,8 @@ pub enum HandoffTarget {
         sql: String,
         run_id: Option<String>,
         new_tab: bool,
+        note: Option<String>,
+        session: Option<String>,
     },
     /// Focused as a canvas tab.
     Canvas { canvas_id: String, title: String },

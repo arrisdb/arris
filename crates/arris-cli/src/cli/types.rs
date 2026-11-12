@@ -63,6 +63,9 @@ pub enum Command {
         /// With --open, use a new console tab instead of the shared one.
         #[arg(long, requires = "open")]
         new_tab: bool,
+        /// With --open, a short comment above the query saying what it answers.
+        #[arg(long, requires = "open")]
+        note: Option<String>,
     },
     /// List recent query runs, newest first.
     History {
