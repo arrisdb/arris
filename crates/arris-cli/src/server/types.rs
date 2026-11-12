@@ -466,8 +466,37 @@ pub struct CanvasAddRequest {
     pub source: CanvasAddSource,
     /// Defaults to the first SQL line.
     pub title: Option<String>,
+    /// Adds a chart bound to the query, drawn with this spec.
     #[serde(default)]
-    pub chart: bool,
+    pub chart: Option<ChartSpecDoc>,
+}
+
+/// Frontend `ChartKind`.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, clap::ValueEnum)]
+#[serde(rename_all = "lowercase")]
+pub enum ChartKindDoc {
+    Bar,
+    Line,
+    Area,
+    Pie,
+    Scatter,
+    Bubble,
+    Combo,
+    Histogram,
+    Donut,
+    Radar,
+    Treemap,
+    Funnel,
+    Kpi,
+}
+
+/// Frontend `ChartSpec` axes; the board fills style defaults.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChartSpecDoc {
+    pub kind: ChartKindDoc,
+    pub x_column: String,
+    pub y_columns: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -517,15 +546,18 @@ pub struct QueryComponentDoc {
     pub connection_id: Uuid,
     pub sql: String,
     pub title: String,
+    /// The board runs it once on open; set only for reads.
+    pub auto_run: bool,
 }
 
-/// Frontend `ChartComponent` without a spec; the board fills a default on first result.
+/// Frontend `ChartComponent`.
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ChartComponentDoc {
     #[serde(flatten)]
     pub frame: ComponentFrame,
     pub source_query_id: String,
+    pub spec: ChartSpecDoc,
 }
 
 /// Frontend `CanvasEdge`.

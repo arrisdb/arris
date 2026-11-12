@@ -367,6 +367,11 @@ async fn canvas_new_add_show_round_trip() {
         "--title",
         "One",
         "--chart",
+        "bar",
+        "--x",
+        "k",
+        "--y",
+        "n",
     ]);
 
     let shown = env.ok(&["canvas", "show", "Revenue"]);

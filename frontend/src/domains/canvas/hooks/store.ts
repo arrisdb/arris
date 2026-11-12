@@ -104,6 +104,8 @@ interface CanvasStore {
   /// cell reads) are dispatched; the backend auto-runs each sink's upstream
   /// dependencies, so a shared upstream runs once rather than once per dependent.
   runAllQueries: (boardId: string) => Promise<void>;
+  /// Run the query objects the CLI marked `autoRun`, once.
+  runAutoRunQueries: (boardId: string) => Promise<void>;
 }
 
 /// Normalize any thrown value into a readable message. Tauri rejects IPC with a
@@ -532,6 +534,15 @@ const useCanvasStore = create<CanvasStore>((set, get) => ({
     );
     const sinks = queries.filter((c) => !upstream.has(c.id));
     await Promise.all(sinks.map((c) => get().runQueryComponent(boardId, c.id)));
+  },
+
+  runAutoRunQueries: async (boardId) => {
+    const pending = (get().boards[boardId]?.doc.components ?? []).filter(
+      (c): c is QueryComponent => c.kind === "query" && c.autoRun === true,
+    );
+    // Clear first so the saved doc never re-runs them on the next open.
+    for (const c of pending) get().updateComponent(boardId, c.id, { autoRun: undefined });
+    await Promise.all(pending.map((c) => get().runQueryComponent(boardId, c.id)));
   },
 }));
 

@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use arris_engines::{CanvasRecord, CanvasSummary, ProjectState, StoreError};
+use arris_engines::{CanvasRecord, CanvasSummary, ProjectState, QueryLanguage, StoreError};
 use axum::extract::State;
 use axum::http::HeaderMap;
 use axum::routing::post;
@@ -218,23 +218,31 @@ impl CanvasRoutes {
     ) -> ApiResult<CanvasAddResponse> {
         let Json(req) = body?;
         let project = ApiRoutes::project(&state, &headers).await?;
+        let (sql, config) = {
+            let guard = project.read().await;
+            let (sql, connection) = match req.source {
+                CanvasAddSource::FromRun { run_id } => {
+                    let run = guard
+                        .query_run_store
+                        .get(&run_id)
+                        .await?
+                        .ok_or(ApiError::RunNotFound(run_id))?;
+                    (run.sql, run.connection_id.to_string())
+                }
+                CanvasAddSource::Manual { sql, connection } => (sql, connection),
+            };
+            let config = ApiRoutes::resolve_connection(&state, &guard, &connection).await?;
+            (sql, config)
+        };
+        // Outside the lock: opening a remote connection can take seconds.
+        let auto_run = match state.env.connection.open_connection(&config).await {
+            Ok(driver) => driver.is_read_only(&sql, QueryLanguage::default()),
+            Err(_) => false,
+        };
+        let connection_id = config.id;
         // Write lock serializes against browser saves so the slot stays free.
         let project = project.write().await;
         let record = Self::resolve(&project, &req.canvas).await?;
-        let (sql, connection_id) = match req.source {
-            CanvasAddSource::FromRun { run_id } => {
-                let run = project
-                    .query_run_store
-                    .get(&run_id)
-                    .await?
-                    .ok_or(ApiError::RunNotFound(run_id))?;
-                (run.sql, run.connection_id)
-            }
-            CanvasAddSource::Manual { sql, connection } => {
-                let config = ApiRoutes::resolve_connection(&state, &project, &connection).await?;
-                (sql, config.id)
-            }
-        };
         let (y, z) = Self::next_slot(&record.doc);
         let query_id = Uuid::new_v4().to_string();
         let query = QueryComponentDoc {
@@ -250,11 +258,12 @@ impl CanvasRoutes {
             connection_id,
             title: req.title.unwrap_or_else(|| Self::default_title(&sql)),
             sql,
+            auto_run,
         };
         let mut components = vec![serde_json::to_value(query).map_err(StoreError::from)?];
         let mut edges = Vec::new();
-        let chart_id = req.chart.then(|| Uuid::new_v4().to_string());
-        if let Some(chart_id) = &chart_id {
+        let chart_id = req.chart.as_ref().map(|_| Uuid::new_v4().to_string());
+        if let (Some(chart_id), Some(spec)) = (&chart_id, req.chart) {
             let chart = ChartComponentDoc {
                 frame: ComponentFrame {
                     id: chart_id.clone(),
@@ -266,6 +275,7 @@ impl CanvasRoutes {
                     z: z + CANVAS_Z_STEP,
                 },
                 source_query_id: query_id.clone(),
+                spec,
             };
             components.push(serde_json::to_value(chart).map_err(StoreError::from)?);
             edges.push(
@@ -474,6 +484,19 @@ mod tests {
         assert_eq!(query["x"], CANVAS_ADD_X);
         assert_eq!(query["y"], CANVAS_ADD_Y);
         assert_eq!(query["w"], CANVAS_QUERY_W);
+        assert_eq!(query["autoRun"], true);
+    }
+
+    #[tokio::test]
+    async fn canvas_add_never_auto_runs_a_write() {
+        let h = Harness::start().await;
+        h.save_sqlite("local").await;
+        let board = h.ok("canvas_create", json!({ "title": "B" })).await;
+        let body = json!({ "canvas": board["id"],
+                           "source": { "sql": "DELETE FROM t", "connection": "local" } });
+        h.ok("canvas_add", body).await;
+        let got = h.ok("canvas_get", json!({ "canvas": board["id"] })).await;
+        assert_eq!(got["doc"]["components"][0]["autoRun"], false);
     }
 
     #[tokio::test]
@@ -481,7 +504,8 @@ mod tests {
         let h = Harness::start().await;
         let cfg = h.save_sqlite("local").await;
         let board = h.ok("canvas_create", json!({ "title": "B" })).await;
-        let body = json!({ "canvas": board["id"], "title": "Totals", "chart": true,
+        let spec = json!({ "kind": "bar", "xColumn": "k", "yColumns": ["n"] });
+        let body = json!({ "canvas": board["id"], "title": "Totals", "chart": spec,
                            "source": { "sql": "SELECT 1", "connection": "local" } });
         let added = h.ok("canvas_add", body).await;
         let got = h.ok("canvas_get", json!({ "canvas": board["id"] })).await;
@@ -492,6 +516,7 @@ mod tests {
         assert_eq!(comps[1]["id"], added["chartId"]);
         assert_eq!(comps[1]["kind"], CANVAS_KIND_CHART);
         assert_eq!(comps[1]["sourceQueryId"], added["queryId"]);
+        assert_eq!(comps[1]["spec"], spec);
         let edge = &got["doc"]["edges"][0];
         assert_eq!(edge["source"], added["queryId"]);
         assert_eq!(edge["target"], added["chartId"]);

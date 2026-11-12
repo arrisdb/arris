@@ -8,7 +8,7 @@ use uuid::Uuid;
 use arris_engines::{ToolKind, ToolRunSummary};
 
 use super::VERSION_STRING;
-use crate::server::{AnalyticsLineageResponse, QUERY_DEFAULT_LIMIT};
+use crate::server::{AnalyticsLineageResponse, ChartKindDoc, QUERY_DEFAULT_LIMIT};
 
 #[derive(Debug, Parser)]
 #[command(name = "arris", version = VERSION_STRING, about = "Arris local data workbench")]
@@ -218,8 +218,15 @@ pub enum CanvasCommand {
         connection: Option<String>,
         #[arg(long)]
         title: Option<String>,
-        #[arg(long)]
-        chart: bool,
+        /// Also add a chart of this type bound to the query; needs --x and --y.
+        #[arg(long, value_enum, requires_all = ["x", "y"])]
+        chart: Option<ChartKindDoc>,
+        /// Chart x-axis column.
+        #[arg(long, requires = "chart")]
+        x: Option<String>,
+        /// Chart y-axis column; repeat for several series.
+        #[arg(long, requires = "chart")]
+        y: Vec<String>,
     },
 }
 

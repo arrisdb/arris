@@ -25,12 +25,13 @@ use crate::server::{
     CONNECTION_LIST_ROUTE, CONNECTION_REMOVE_ROUTE, CONNECTION_REQUEST_CANCEL_ROUTE,
     CONNECTION_REQUEST_CREATE_ROUTE, CONNECTION_REQUEST_WAIT_ROUTE, CONNECTION_TEST_ROUTE,
     CanvasAddRequest, CanvasAddResponse, CanvasAddSource, CanvasCreateRequest, CanvasRefRequest,
-    ConnectionRefRequest, ConnectionRequestCreateRequest, ConnectionRequestCreateResponse,
-    ConnectionRequestIdRequest, ConnectionRequestStatus, ConnectionTestRequest, EmptyResponse,
-    HISTORY_LIST_ROUTE, HistoryListRequest, PIN_ADD_ROUTE, PIN_LIST_ROUTE, PIN_REMOVE_ROUTE,
-    PinAddRequest, PinRemoveRequest, QUERY_OPEN_ROUTE, QUERY_RUN_ROUTE, QueryOpenRequest,
-    QueryOpenResponse, QueryRunRequest, QueryRunResponse, SCHEMA_LIST_ROUTE, SchemaListRequest,
-    Server, TOOL_RUN_RECORD_ROUTE, ToolRunIdPayload, ToolRunRecordRequest,
+    ChartSpecDoc, ConnectionRefRequest, ConnectionRequestCreateRequest,
+    ConnectionRequestCreateResponse, ConnectionRequestIdRequest, ConnectionRequestStatus,
+    ConnectionTestRequest, EmptyResponse, HISTORY_LIST_ROUTE, HistoryListRequest, PIN_ADD_ROUTE,
+    PIN_LIST_ROUTE, PIN_REMOVE_ROUTE, PinAddRequest, PinRemoveRequest, QUERY_OPEN_ROUTE,
+    QUERY_RUN_ROUTE, QueryOpenRequest, QueryOpenResponse, QueryRunRequest, QueryRunResponse,
+    SCHEMA_LIST_ROUTE, SchemaListRequest, Server, TOOL_RUN_RECORD_ROUTE, ToolRunIdPayload,
+    ToolRunRecordRequest,
 };
 
 impl Cli {
@@ -370,6 +371,8 @@ impl Cli {
                 connection,
                 title,
                 chart,
+                x,
+                y,
             } => {
                 // clap's `from` group guarantees `--run` or `--sql` with `--connection`.
                 let source = match (run, sql, connection) {
@@ -385,7 +388,12 @@ impl Cli {
                     canvas: canvas.clone(),
                     source,
                     title: title.clone(),
-                    chart: *chart,
+                    // clap requires --x and --y with --chart.
+                    chart: chart.map(|kind| ChartSpecDoc {
+                        kind,
+                        x_column: x.clone().unwrap_or_default(),
+                        y_columns: y.clone(),
+                    }),
                 };
                 let added: CanvasAddResponse =
                     client.call(CANVAS_ADD_ROUTE, project, &body).await?;
