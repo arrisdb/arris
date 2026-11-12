@@ -481,6 +481,10 @@ mod tests {
         assert!(!format!("{info:?}").contains("supersecrettoken"));
     }
 
+    /// A child another test forks can briefly hold an inherited copy of the lock fd.
+    const REBIND_ATTEMPTS: usize = 50;
+    const REBIND_WAIT: std::time::Duration = std::time::Duration::from_millis(20);
+
     #[tokio::test]
     async fn second_bind_fails_already_running() {
         let tmp = TempDir::new().unwrap();
@@ -491,7 +495,14 @@ mod tests {
             Err(ServerError::AlreadyRunning)
         ));
         drop(first);
-        assert!(Server::bind(env, Some(0)).is_ok());
+        let rebound = (0..REBIND_ATTEMPTS).any(|_| {
+            let ok = Server::bind(env.clone(), Some(0)).is_ok();
+            if !ok {
+                std::thread::sleep(REBIND_WAIT);
+            }
+            ok
+        });
+        assert!(rebound, "the lock frees once the first server drops");
     }
 
     #[tokio::test]
