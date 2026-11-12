@@ -25,6 +25,9 @@ const TASK_LABEL_RUNNING_SUFFIX = "…";
 // Each analytics tool keeps one tab, so its id is derived from the tool.
 const ANALYTICS_TAB_ID_PREFIX = "analytics:";
 
+// Tab types never saved: each reopens on demand and holds nothing worth restoring.
+const TRANSIENT_TAB_TYPES: ReadonlySet<string> = new Set(["gitdiff", "analytics", "definition"]);
+
 // Saved tab types the browser cannot render: they need local files, shells or git.
 const DESKTOP_ONLY_TAB_TYPES: ReadonlySet<string> = new Set([
   "file",
@@ -40,6 +43,7 @@ const DESKTOP_ONLY_TAB_TYPES: ReadonlySet<string> = new Set([
 
 export {
   DESKTOP_ONLY_TAB_TYPES,
+  TRANSIENT_TAB_TYPES,
   ANALYTICS_TAB_ID_PREFIX,
   NOTIFIED_TASK_ID_PREFIX,
   SNACKBAR_AUTO_DISMISS_MS,
