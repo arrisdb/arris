@@ -6,9 +6,9 @@ use arris_engines::persistence::ProjectManifest;
 use arris_engines::query::QueryError;
 use arris_engines::{
     CONNECTION_SCOPE_LOCAL, ConnectionConfig, JsonCollectionStore, JsonSingletonStore,
-    PersistedPinnedQuery, ProjectState, QueryEngine, QueryLanguage, QueryRequest, QueryResult,
-    RUN_PREVIEW_MAX_ROWS, RunPreview, RunRecord, RunSource, RunStatus, SchemaNode,
-    ScopedConnection, StoreError,
+    PersistedConsoleTab, PersistedPinnedQuery, ProjectState, QueryEngine, QueryLanguage,
+    QueryRequest, QueryResult, RUN_PREVIEW_MAX_ROWS, RunPreview, RunRecord, RunSource, RunStatus,
+    SchemaNode, ScopedConnection, StoreError,
 };
 use axum::extract::State;
 use axum::extract::rejection::JsonRejection;
@@ -26,19 +26,21 @@ use super::{
     CONNECTION_TEST_ROUTE, CanvasRoutes, CanvasRunRoutes, ConnectionRefRequest, ConnectionRequest,
     ConnectionRequestCreateRequest, ConnectionRequestCreateResponse, ConnectionRequestIdRequest,
     ConnectionRequestResolvedPayload, ConnectionRequestStatus, ConnectionSaveRequest,
-    ConnectionTestRequest, EmptyResponse, FileRoutes, HISTORY_DEFAULT_LIMIT, HISTORY_LIST_ROUTE,
-    HandoffTarget, HistoryListRequest, OBJECT_DEFINITION_ROUTE, ObjectDefinitionRequest,
-    OkResponse, PIN_ADD_ROUTE, PIN_LIST_ROUTE, PIN_REMOVE_ROUTE, PIN_RENAME_ROUTE, PIN_SAVE_ROUTE,
-    PROJECT_HEADER, PROJECT_LIST_ROUTE, PROJECT_QUERY_PARAM, PinAddRequest, PinRemoveRequest,
-    PinRenameRequest, PinSaveRequest, QUERY_DEFAULT_LIMIT, QUERY_DEFAULT_SOURCE, QUERY_FIRST_PAGE,
-    QUERY_HANDOFF_TAKE_ROUTE, QUERY_OPEN_POLL_MS, QUERY_OPEN_ROUTE, QUERY_OPEN_WAIT_MS,
-    QUERY_PAGE_ROUTE, QUERY_RUN_ROUTE, QueryHandoff, QueryOpenRequest, QueryOpenResponse,
-    QueryPageRequest, QueryRunRequest, QueryRunResponse, REQUEST_QUERY_PARAM, RUN_GET_ROUTE,
-    RUN_PAGE_MAX_LIMIT, RUN_PAGE_ROUTE, RUN_RESULTS_BOARD, RunGetResponse, RunIdRequest,
-    RunPageRequest, SCHEMA_LIST_ROUTE, SchemaListRequest, Server, ServerEvent, ServerEventKind,
-    ServerState, TABLE_BROWSE_DEFAULT_LIMIT, TABLE_BROWSE_QUERY_ROUTE, TableBrowseQueryRequest,
-    ToolRunRoutes, WORKSPACE_LAYOUT_SAVE_ROUTE, WORKSPACE_LOAD_ROUTE, WORKSPACE_TABS_SAVE_ROUTE,
-    WorkspaceLayoutSaveRequest, WorkspaceResponse, WorkspaceTabsSaveRequest,
+    ConnectionTestRequest, DEFAULT_TAB_TYPE, EmptyResponse, FileRoutes, HISTORY_DEFAULT_LIMIT,
+    HISTORY_LIST_ROUTE, HandoffTarget, HistoryListRequest, OBJECT_DEFINITION_ROUTE,
+    ObjectDefinitionRequest, OkResponse, PIN_ADD_ROUTE, PIN_LIST_ROUTE, PIN_REMOVE_ROUTE,
+    PIN_RENAME_ROUTE, PIN_SAVE_ROUTE, PROJECT_HEADER, PROJECT_LIST_ROUTE, PROJECT_QUERY_PARAM,
+    PinAddRequest, PinRemoveRequest, PinRenameRequest, PinSaveRequest, QUERY_DEFAULT_LIMIT,
+    QUERY_DEFAULT_SOURCE, QUERY_FIRST_PAGE, QUERY_HANDOFF_TAKE_ROUTE, QUERY_OPEN_POLL_MS,
+    QUERY_OPEN_ROUTE, QUERY_OPEN_WAIT_MS, QUERY_PAGE_ROUTE, QUERY_RUN_ROUTE, QueryHandoff,
+    QueryOpenRequest, QueryOpenResponse, QueryPageRequest, QueryRunRequest, QueryRunResponse,
+    REQUEST_QUERY_PARAM, RUN_GET_ROUTE, RUN_PAGE_MAX_LIMIT, RUN_PAGE_ROUTE, RUN_RESULTS_BOARD,
+    RunGetResponse, RunIdRequest, RunPageRequest, SCHEMA_LIST_ROUTE, SchemaListRequest, Server,
+    ServerEvent, ServerEventKind, ServerState, TAB_CLOSE_ROUTE, TAB_LIST_ROUTE,
+    TABLE_BROWSE_DEFAULT_LIMIT, TABLE_BROWSE_QUERY_ROUTE, TabCloseRequest, TabCloseResponse,
+    TabSummary, TableBrowseQueryRequest, ToolRunRoutes, WORKSPACE_LAYOUT_SAVE_ROUTE,
+    WORKSPACE_LOAD_ROUTE, WORKSPACE_TABS_SAVE_ROUTE, WorkspaceLayoutSaveRequest, WorkspaceResponse,
+    WorkspaceTabsSaveRequest,
 };
 
 pub(super) type ApiState = State<Arc<ServerState>>;
@@ -62,6 +64,8 @@ impl ApiRoutes {
             .route(QUERY_PAGE_ROUTE, post(Self::query_page))
             .route(QUERY_OPEN_ROUTE, post(Self::query_open))
             .route(QUERY_HANDOFF_TAKE_ROUTE, post(Self::query_handoff_take))
+            .route(TAB_LIST_ROUTE, post(Self::tab_list))
+            .route(TAB_CLOSE_ROUTE, post(Self::tab_close))
             .route(HISTORY_LIST_ROUTE, post(Self::history_list))
             .route(RUN_GET_ROUTE, post(Self::run_get))
             .route(RUN_PAGE_ROUTE, post(Self::run_page))
@@ -600,13 +604,13 @@ impl ApiRoutes {
         }))
     }
 
-    /// Queues a handoff for the open tab and waits briefly for it: (taken, caller should launch).
-    pub(super) async fn hand_off(
+    /// Queues a handoff and waits briefly for an open tab to take it.
+    async fn deliver(
         state: &ServerState,
         project: &RwLock<ProjectState>,
         root: &Path,
         handoff: QueryHandoff,
-    ) -> (bool, bool) {
+    ) -> bool {
         let id = handoff.id.clone();
         state.query_handoffs.push(root, handoff);
         Self::emit(
@@ -620,8 +624,69 @@ impl ApiRoutes {
             tokio::time::sleep(Duration::from_millis(QUERY_OPEN_POLL_MS)).await;
             waited += QUERY_OPEN_POLL_MS;
         }
-        let opened = !state.query_handoffs.is_pending(root, &id);
+        !state.query_handoffs.is_pending(root, &id)
+    }
+
+    /// Delivers a handoff: (taken, caller should launch a browser).
+    pub(super) async fn hand_off(
+        state: &ServerState,
+        project: &RwLock<ProjectState>,
+        root: &Path,
+        handoff: QueryHandoff,
+    ) -> (bool, bool) {
+        let opened = Self::deliver(state, project, root, handoff).await;
         (opened, !opened && state.query_handoffs.claim_launch(root))
+    }
+
+    fn open_tabs(tabs: Vec<PersistedConsoleTab>) -> Vec<TabSummary> {
+        tabs.into_iter()
+            .filter(|t| t.closed != Some(true))
+            .map(|t| TabSummary {
+                id: t.id,
+                title: t.title,
+                tab_type: t.tab_type.unwrap_or_else(|| DEFAULT_TAB_TYPE.into()),
+                connection_id: t.connection_id,
+                created_at: t.created_at,
+            })
+            .collect()
+    }
+
+    async fn tab_list(State(state): ApiState, headers: HeaderMap) -> ApiResult<Vec<TabSummary>> {
+        let project = Self::project(&state, &headers).await?;
+        let tabs = project.read().await.tabs_store.load().await?;
+        Ok(Json(Self::open_tabs(tabs)))
+    }
+
+    async fn tab_close(
+        State(state): ApiState,
+        headers: HeaderMap,
+        body: Body<TabCloseRequest>,
+    ) -> ApiResult<TabCloseResponse> {
+        let Json(req) = body?;
+        let project = Self::project(&state, &headers).await?;
+        let (open, root) = {
+            let guard = project.read().await;
+            (
+                Self::open_tabs(guard.tabs_store.load().await?),
+                guard.root.clone(),
+            )
+        };
+        if let Some(id) = req.ids.iter().find(|id| !open.iter().any(|t| &t.id == *id)) {
+            return Err(ApiError::TabNotFound(id.clone()));
+        }
+        let applied = req.ids.is_empty() || {
+            let handoff = QueryHandoff {
+                id: Uuid::new_v4().to_string(),
+                target: HandoffTarget::CloseTabs {
+                    tab_ids: req.ids.clone(),
+                },
+            };
+            Self::deliver(&state, &project, &root, handoff).await
+        };
+        Ok(Json(TabCloseResponse {
+            closed: req.ids,
+            applied,
+        }))
     }
 
     async fn query_handoff_take(
@@ -1212,6 +1277,27 @@ pub(super) mod tests {
         let loaded = h.ok("workspace_load", json!({})).await;
         assert_eq!(loaded["tabs"][0]["text"], json!("SELECT 1"));
         assert_eq!(loaded["paneLayout"]["focusedPaneGroupId"], json!("g1"));
+    }
+
+    #[tokio::test]
+    async fn tab_close_queues_open_tabs_and_rejects_unknown_ones() {
+        let h = Harness::start().await;
+        let tab = |id: &str, closed: bool| json!({ "id": id, "title": id, "text": "", "kind": "sql", "closed": closed });
+        let tabs = json!([tab("a", false), tab("b", true), tab("c", false)]);
+        h.ok("workspace_tabs_save", json!({ "tabs": tabs })).await;
+
+        let listed = h.ok("tab_list", json!({})).await;
+        assert_eq!(listed[0]["tabType"], json!(super::DEFAULT_TAB_TYPE));
+        assert_eq!(listed.as_array().unwrap().len(), 2);
+
+        let closed_already = h.call("tab_close", json!({ "ids": ["b"] })).await;
+        assert_eq!(closed_already.status(), StatusCode::NOT_FOUND);
+
+        let out = h.ok("tab_close", json!({ "ids": ["a"] })).await;
+        assert_eq!(out, json!({ "closed": ["a"], "applied": false }));
+        let taken = h.ok("query_handoff_take", json!({})).await;
+        assert_eq!(taken[0]["kind"], json!("closeTabs"));
+        assert_eq!(taken[0]["tabIds"], json!(["a"]));
     }
 
     #[tokio::test]

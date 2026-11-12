@@ -16,7 +16,12 @@ interface CanvasTarget {
   title: string;
 }
 
-/// A query or canvas the CLI handed to this tab.
-type QueryHandoff = { id: string } & (QueryTarget | CanvasTarget);
+interface CloseTabsTarget {
+  kind: "closeTabs";
+  tabIds: string[];
+}
+
+/// A query, canvas or tab close the CLI handed to this tab.
+type QueryHandoff = { id: string } & (QueryTarget | CanvasTarget | CloseTabsTarget);
 
 export type { QueryHandoff, QueryTarget };

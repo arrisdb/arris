@@ -94,6 +94,9 @@ pub enum Command {
     /// Manage canvases (boards of queries and charts).
     #[command(subcommand)]
     Canvas(CanvasCommand),
+    /// List or close the Arris UI's open tabs.
+    #[command(subcommand)]
+    Tab(TabCommand),
     /// dbt models and lineage in this project.
     #[command(subcommand)]
     Dbt(AnalyticsCommand),
@@ -210,6 +213,20 @@ pub struct LineageOutput {
     #[serde(flatten)]
     pub lineage: AnalyticsLineageResponse,
     pub ui_url: String,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum TabCommand {
+    /// Open tabs (consoles, canvases, tables) with their ids.
+    List,
+    /// Close tabs by id, or every tab but one.
+    #[command(group(ArgGroup::new("which").required(true).args(["ids", "all_except"])))]
+    Close {
+        ids: Vec<String>,
+        /// Close every open tab except this one.
+        #[arg(long)]
+        all_except: Option<String>,
+    },
 }
 
 #[derive(Debug, Subcommand)]

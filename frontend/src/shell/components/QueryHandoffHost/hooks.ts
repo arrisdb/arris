@@ -66,6 +66,11 @@ async function openHandoff(handoff: QueryHandoff): Promise<void> {
     useTabsStore.getState().openCanvasTab({ id: handoff.canvasId, title: handoff.title });
     return;
   }
+  if (handoff.kind === "closeTabs") {
+    const tabs = useTabsStore.getState();
+    for (const id of handoff.tabIds) tabs.closeTab(id);
+    return;
+  }
   await openQuery(handoff);
 }
 

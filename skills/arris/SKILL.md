@@ -103,4 +103,4 @@ Do not run INSERT, UPDATE, DELETE or DDL (CREATE, ALTER, DROP, TRUNCATE) unless 
 
 ## Other commands
 
-`arris history` lists recent runs. `arris pin <run-id> --title "..."` saves a run, `arris pins` lists pins, `arris unpin <id>` removes one. `arris connection test|remove <conn>` check or delete a connection (confirm before removing). Use these when the user asks for them.
+`arris tab list` lists the UI's open tabs; `arris tab close <id>...` closes some, `arris tab close --all-except <id>` all but one (this session's console is the one titled "Claude" plus your session id). `arris history` lists recent runs. `arris pin <run-id> --title "..."` saves a run, `arris pins` lists pins, `arris unpin <id>` removes one. `arris connection test|remove <conn>` check or delete a connection (confirm before removing). Use these when the user asks for them.

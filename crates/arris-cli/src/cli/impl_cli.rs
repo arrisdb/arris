@@ -17,8 +17,8 @@ use super::{
     CanvasShowDoc, CanvasShowOutput, Cli, CliError, Command, ConnectionCommand,
     ConnectionListEntry, ConnectionNewOutput, DBT_TOOL, ENV_DATA_DIR, EXIT_API_ERROR,
     KIND_LIST_SEPARATOR, LineageOutput, QueryOpenOutput, QueryOutput, ResultOutput,
-    SERVER_LISTENING_PREFIX, SQLMESH_TOOL, ServerClient, SyncOutput, ToolRunOutput, ToolRunner,
-    UrlOutput,
+    SERVER_LISTENING_PREFIX, SQLMESH_TOOL, ServerClient, SyncOutput, TabCommand, ToolRunOutput,
+    ToolRunner, UrlOutput,
 };
 use crate::server::{
     AnalyticsDirRequest, AnalyticsLineageRequest, AnalyticsLineageResponse, AnalyticsModelRequest,
@@ -33,8 +33,9 @@ use crate::server::{
     HistoryListRequest, PIN_ADD_ROUTE, PIN_LIST_ROUTE, PIN_REMOVE_ROUTE, PinAddRequest,
     PinRemoveRequest, QUERY_OPEN_ROUTE, QUERY_RUN_ROUTE, QueryOpenRequest, QueryOpenResponse,
     QueryRunRequest, QueryRunResponse, RUN_GET_ROUTE, RUN_PAGE_ROUTE, RunGetResponse, RunIdRequest,
-    RunPageRequest, SCHEMA_LIST_ROUTE, SchemaListRequest, Server, TOOL_RUN_RECORD_ROUTE,
-    ToolRunIdPayload, ToolRunRecordRequest,
+    RunPageRequest, SCHEMA_LIST_ROUTE, SchemaListRequest, Server, TAB_CLOSE_ROUTE, TAB_LIST_ROUTE,
+    TOOL_RUN_RECORD_ROUTE, TabCloseRequest, TabCloseResponse, TabSummary, ToolRunIdPayload,
+    ToolRunRecordRequest,
 };
 
 impl Cli {
@@ -226,6 +227,10 @@ impl Cli {
                 let (client, project) = self.connect(&data_dir).await?;
                 Self::canvas(&client, &project, cmd).await?
             }
+            Command::Tab(cmd) => {
+                let (client, project) = self.connect(&data_dir).await?;
+                Self::tab(&client, &project, cmd).await?
+            }
             Command::Dbt(cmd) => {
                 let (client, project) = self.connect(&data_dir).await?;
                 Self::analytics(&data_dir, client, &project, &DBT_TOOL, cmd).await?
@@ -388,6 +393,34 @@ impl Cli {
                     });
                 }
                 output
+            }
+        })
+    }
+
+    async fn tab(
+        client: &ServerClient,
+        project: &Path,
+        cmd: &TabCommand,
+    ) -> Result<Value, CliError> {
+        let tabs: Vec<TabSummary> = client
+            .call(TAB_LIST_ROUTE, project, &EmptyResponse {})
+            .await?;
+        Ok(match cmd {
+            TabCommand::List => serde_json::to_value(tabs)?,
+            TabCommand::Close { ids, all_except } => {
+                let ids = match all_except {
+                    // An unknown kept id goes alone so the server reports it as not found.
+                    Some(keep) if !tabs.iter().any(|t| &t.id == keep) => vec![keep.clone()],
+                    Some(keep) => tabs
+                        .into_iter()
+                        .map(|t| t.id)
+                        .filter(|id| id != keep)
+                        .collect(),
+                    None => ids.clone(),
+                };
+                let body = TabCloseRequest { ids };
+                let closed: TabCloseResponse = client.call(TAB_CLOSE_ROUTE, project, &body).await?;
+                serde_json::to_value(closed)?
             }
         })
     }

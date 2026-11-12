@@ -74,6 +74,7 @@ pub enum ApiErrorCode {
     ConnectionNotFound,
     RunNotFound,
     PinNotFound,
+    TabNotFound,
     ResultNotCached,
     ConnectionFailed,
     QueryFailed,
@@ -267,6 +268,34 @@ pub enum HandoffTarget {
     },
     /// Focused as a canvas tab.
     Canvas { canvas_id: String, title: String },
+    /// Closed like the tab's own close button.
+    CloseTabs { tab_ids: Vec<String> },
+}
+
+/// One open tab, as `arris tab list` prints it.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TabSummary {
+    pub id: String,
+    pub title: String,
+    pub tab_type: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub connection_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub created_at: Option<f64>,
+}
+
+/// Tab ids from `tab_list`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TabCloseRequest {
+    pub ids: Vec<String>,
+}
+
+/// `applied` is false when no browser tab is open; the close then waits for the next one.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TabCloseResponse {
+    pub closed: Vec<String>,
+    pub applied: bool,
 }
 
 /// The project's open tabs and pane layout, shared with the desktop app.

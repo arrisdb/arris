@@ -44,6 +44,8 @@ pub enum ApiError {
     ResultNotCached(String),
     #[error("pin not found: {0}")]
     PinNotFound(String),
+    #[error("no open tab with id {0}; see arris tab list")]
+    TabNotFound(String),
     #[error("invalid canvas doc: {0}")]
     InvalidCanvasDoc(String),
     #[error("{0}")]
@@ -109,6 +111,7 @@ impl ApiError {
             Self::ConnectionNotFound(_) => ApiErrorCode::ConnectionNotFound,
             Self::RunNotFound(_) => ApiErrorCode::RunNotFound,
             Self::PinNotFound(_) => ApiErrorCode::PinNotFound,
+            Self::TabNotFound(_) => ApiErrorCode::TabNotFound,
             Self::CanvasNotFound(_) | Self::CanvasObjectNotFound(_) => ApiErrorCode::CanvasNotFound,
             Self::NotAChart(_) => ApiErrorCode::InvalidRequest,
             Self::Ambiguous(_) => ApiErrorCode::Ambiguous,
@@ -136,6 +139,7 @@ impl ApiError {
             | Self::ConnectionNotFound(_)
             | Self::RunNotFound(_)
             | Self::PinNotFound(_)
+            | Self::TabNotFound(_)
             | Self::CanvasNotFound(_)
             | Self::CanvasObjectNotFound(_)
             | Self::ResultNotCached(_)

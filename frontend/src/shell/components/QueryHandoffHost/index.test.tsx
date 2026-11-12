@@ -78,6 +78,16 @@ describe("QueryHandoffHost", () => {
     await waitFor(() => expect(useTabsStore.getState().activeId).toBe("board1"));
     expect(lastTab()).toMatchObject({ kind: "canvas", title: "Sales" });
   });
+  it("closes the tabs the CLI names and keeps the rest", async () => {
+    vi.mocked(takeQueryHandoffsIPC).mockResolvedValueOnce([
+      { kind: "canvas" as const, id: "a", canvasId: "b1", title: "One" },
+      { kind: "canvas" as const, id: "b", canvasId: "b2", title: "Two" },
+      { kind: "closeTabs" as const, id: "c", tabIds: ["b1"] },
+    ]);
+    render(<QueryHandoffHost />);
+    await waitFor(() => expect(useTabsStore.getState().tabs.find((t) => t.id === "b1")?.closed).toBe(true));
+    expect(useTabsStore.getState().activeId).toBe("b2");
+  });
   it("gives each session its own console and tags queries with the note", async () => {
     const query = { kind: "query" as const, connectionId: "c1", runId: null, newTab: false };
     vi.mocked(takeQueryHandoffsIPC)
