@@ -22,3 +22,6 @@ pub const DEFAULT_SKIP_DIRS: &[&str] = &[
     ".dbt",
     "logs",
 ];
+/// The pasteboard type Finder writes for copied files.
+#[cfg(target_os = "macos")]
+pub(super) const PASTEBOARD_FILE_URL_TYPE: &str = "public.file-url";

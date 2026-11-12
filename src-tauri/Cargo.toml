@@ -30,12 +30,6 @@ tauri-plugin-process = "2"
 tauri-plugin-opener = "2"
 notify-debouncer-full = "0.7"
 
-# macOS clipboard file-list access (NSPasteboard file URLs). Versions match the
-# objc2 crates Tauri already pulls in on macOS.
-[target.'cfg(target_os = "macos")'.dependencies]
-objc2-app-kit = { version = "0.3", features = ["NSPasteboard", "NSPasteboardItem"] }
-objc2-foundation = { version = "0.3", features = ["NSString", "NSURL", "NSArray"] }
-
 # src-tauri is excluded from the root workspace (see ../Cargo.toml `exclude`),
 # so the app binary does NOT inherit the workspace [profile.release]. Mirror it
 # here so release builds are stripped + LTO'd (otherwise the binary ships

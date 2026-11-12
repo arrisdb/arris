@@ -136,6 +136,11 @@ aws-sdk-dynamodb = { version = "1.116", default-features = false, features = ["d
 [target.'cfg(unix)'.dependencies]
 nix = { version = "0.31", features = ["signal"] }
 
+# Clipboard file-list access (NSPasteboard file URLs), matching Tauri's objc2 versions.
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2-app-kit = { version = "0.3", features = ["NSPasteboard", "NSPasteboardItem"] }
+objc2-foundation = { version = "0.3", features = ["NSString", "NSURL", "NSArray"] }
+
 [dev-dependencies]
 tempfile = "3.27"
 rcgen = "0.13"

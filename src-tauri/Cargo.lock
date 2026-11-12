@@ -218,6 +218,8 @@ dependencies = [
  "notify",
  "notify-debouncer-full",
  "nucleo",
+ "objc2-app-kit",
+ "objc2-foundation",
  "oracle-rs",
  "percent-encoding",
  "rdkafka",
@@ -254,8 +256,6 @@ version = "0.15.0"
 dependencies = [
  "arris-engines",
  "notify-debouncer-full",
- "objc2-app-kit",
- "objc2-foundation",
  "serde",
  "serde_json",
  "sha2 0.10.9",
