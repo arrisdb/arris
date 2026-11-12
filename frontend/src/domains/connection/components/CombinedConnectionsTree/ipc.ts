@@ -28,6 +28,7 @@ function objectDefinitionIPC(
   connectionId: string,
   object: ObjectRef,
 ): Promise<string> {
+  if (isWebShell()) return apiCall("object_definition", { connection: connectionId, object });
   return invoke("cmd_object_definition", { connectionId, object });
 }
 

@@ -32,6 +32,7 @@ pub const CONNECTION_SAVE_ROUTE: &str = "/api/connection_save";
 pub const CONNECTION_TEST_ROUTE: &str = "/api/connection_test";
 pub const CONNECTION_REMOVE_ROUTE: &str = "/api/connection_remove";
 pub const SCHEMA_LIST_ROUTE: &str = "/api/schema_list";
+pub const OBJECT_DEFINITION_ROUTE: &str = "/api/object_definition";
 pub const QUERY_RUN_ROUTE: &str = "/api/query_run";
 pub const QUERY_PAGE_ROUTE: &str = "/api/query_page";
 pub const WORKSPACE_LOAD_ROUTE: &str = "/api/workspace_load";

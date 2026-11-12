@@ -26,17 +26,18 @@ use super::{
     ConnectionRequestCreateRequest, ConnectionRequestCreateResponse, ConnectionRequestIdRequest,
     ConnectionRequestResolvedPayload, ConnectionRequestStatus, ConnectionSaveRequest,
     ConnectionTestRequest, EmptyResponse, HISTORY_DEFAULT_LIMIT, HISTORY_LIST_ROUTE,
-    HistoryListRequest, OkResponse, PIN_ADD_ROUTE, PIN_LIST_ROUTE, PIN_REMOVE_ROUTE,
-    PIN_RENAME_ROUTE, PIN_SAVE_ROUTE, PROJECT_HEADER, PROJECT_LIST_ROUTE, PROJECT_QUERY_PARAM,
-    PinAddRequest, PinRemoveRequest, PinRenameRequest, PinSaveRequest, QUERY_DEFAULT_LIMIT,
-    QUERY_DEFAULT_SOURCE, QUERY_FIRST_PAGE, QUERY_HANDOFF_TAKE_ROUTE, QUERY_OPEN_POLL_MS,
-    QUERY_OPEN_ROUTE, QUERY_OPEN_WAIT_MS, QUERY_PAGE_ROUTE, QUERY_RUN_ROUTE, QueryHandoff,
-    QueryOpenRequest, QueryOpenResponse, QueryPageRequest, QueryRunRequest, QueryRunResponse,
-    REQUEST_QUERY_PARAM, RUN_GET_ROUTE, RUN_PAGE_MAX_LIMIT, RUN_PAGE_ROUTE, RUN_RESULTS_BOARD,
-    ReadOnlySql, RunGetResponse, RunIdRequest, RunPageRequest, SCHEMA_LIST_ROUTE,
-    SchemaListRequest, Server, ServerEvent, ServerEventKind, ServerState, ToolRunRoutes,
-    WORKSPACE_LAYOUT_SAVE_ROUTE, WORKSPACE_LOAD_ROUTE, WORKSPACE_TABS_SAVE_ROUTE,
-    WorkspaceLayoutSaveRequest, WorkspaceResponse, WorkspaceTabsSaveRequest,
+    HistoryListRequest, OBJECT_DEFINITION_ROUTE, ObjectDefinitionRequest, OkResponse,
+    PIN_ADD_ROUTE, PIN_LIST_ROUTE, PIN_REMOVE_ROUTE, PIN_RENAME_ROUTE, PIN_SAVE_ROUTE,
+    PROJECT_HEADER, PROJECT_LIST_ROUTE, PROJECT_QUERY_PARAM, PinAddRequest, PinRemoveRequest,
+    PinRenameRequest, PinSaveRequest, QUERY_DEFAULT_LIMIT, QUERY_DEFAULT_SOURCE, QUERY_FIRST_PAGE,
+    QUERY_HANDOFF_TAKE_ROUTE, QUERY_OPEN_POLL_MS, QUERY_OPEN_ROUTE, QUERY_OPEN_WAIT_MS,
+    QUERY_PAGE_ROUTE, QUERY_RUN_ROUTE, QueryHandoff, QueryOpenRequest, QueryOpenResponse,
+    QueryPageRequest, QueryRunRequest, QueryRunResponse, REQUEST_QUERY_PARAM, RUN_GET_ROUTE,
+    RUN_PAGE_MAX_LIMIT, RUN_PAGE_ROUTE, RUN_RESULTS_BOARD, ReadOnlySql, RunGetResponse,
+    RunIdRequest, RunPageRequest, SCHEMA_LIST_ROUTE, SchemaListRequest, Server, ServerEvent,
+    ServerEventKind, ServerState, ToolRunRoutes, WORKSPACE_LAYOUT_SAVE_ROUTE, WORKSPACE_LOAD_ROUTE,
+    WORKSPACE_TABS_SAVE_ROUTE, WorkspaceLayoutSaveRequest, WorkspaceResponse,
+    WorkspaceTabsSaveRequest,
 };
 
 pub(super) type ApiState = State<Arc<ServerState>>;
@@ -54,6 +55,7 @@ impl ApiRoutes {
             .route(CONNECTION_TEST_ROUTE, post(Self::connection_test))
             .route(CONNECTION_REMOVE_ROUTE, post(Self::connection_remove))
             .route(SCHEMA_LIST_ROUTE, post(Self::schema_list))
+            .route(OBJECT_DEFINITION_ROUTE, post(Self::object_definition))
             .route(QUERY_RUN_ROUTE, post(Self::query_run))
             .route(QUERY_PAGE_ROUTE, post(Self::query_page))
             .route(QUERY_OPEN_ROUTE, post(Self::query_open))
@@ -356,6 +358,24 @@ impl ApiRoutes {
             None => query.list_schemas_on(driver).await?,
         };
         Ok(Json(nodes))
+    }
+
+    async fn object_definition(
+        State(state): ApiState,
+        headers: HeaderMap,
+        body: Body<ObjectDefinitionRequest>,
+    ) -> ApiResult<String> {
+        let Json(req) = body?;
+        let project = Self::project(&state, &headers).await?;
+        let config =
+            Self::resolve_connection(&state, &*project.read().await, &req.connection).await?;
+        let driver = state.env.connection.open_connection(&config).await?;
+        Ok(Json(
+            driver
+                .object_definition(&req.object)
+                .await
+                .map_err(QueryError::from)?,
+        ))
     }
 }
 
@@ -1453,6 +1473,21 @@ pub(super) mod tests {
             next_kind(&mut events).await.kind,
             ServerEventKind::PinsChanged
         );
+    }
+
+    #[tokio::test]
+    async fn object_definition_returns_the_table_ddl() {
+        let h = Harness::start().await;
+        let cfg = h.save_sqlite("local").await;
+        h.seed_rows(&cfg, 1).await;
+        let object = json!({ "kind": "table", "name": "t" });
+        let ddl = h
+            .ok(
+                "object_definition",
+                json!({ "connection": "local", "object": object }),
+            )
+            .await;
+        assert!(ddl.as_str().unwrap().contains("CREATE TABLE"));
     }
 
     #[tokio::test]

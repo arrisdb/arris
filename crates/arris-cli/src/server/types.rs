@@ -5,8 +5,7 @@ use arris_engines::sqlmesh::SqlMeshColumnDoc;
 use arris_engines::{
     CanvasCellSpec, CanvasSummary, ConnectionConfig, ConnectionPrefill, DatabaseKind,
     PersistedConsoleTab, PersistedPaneLayout, PersistedPinnedQuery, QueryLanguage, QueryResult,
-    RunRecord,
-    RunSource, ToolKind, ToolRunRecord, ToolRunSummary,
+    RunRecord, RunSource, ToolKind, ToolRunRecord, ToolRunSummary,
 };
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -136,6 +135,12 @@ pub struct ConnectionRefRequest {
 pub struct SchemaListRequest {
     pub connection: String,
     pub schema: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct ObjectDefinitionRequest {
+    pub connection: String,
+    pub object: arris_engines::ObjectRef,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
