@@ -219,21 +219,7 @@ const useTabsStore = create<TabsState>((set, get) => ({
     }),
   setLayout: (layout, focusedId) =>
     set((s) => {
-      // Hydration call (`s.tabs` may be empty when pane layout loads from
-      // localStorage *before* `setTabs` runs). Skip reconciliation so the
-      // persisted layout survives until `setTabs` reconciles against the
-      // real tab list.
-      if (s.tabs.length === 0) {
-        const validFocused =
-          focusedId && findLeaf(layout, focusedId)
-            ? focusedId
-            : firstLeaf(layout)?.id ?? null;
-        return {
-          layout,
-          focusedPaneGroupId: validFocused,
-          activeId: null,
-        };
-      }
+      // Tabs load first, so ids of tabs that were never saved drop out here.
       const r = reconcileLayout(s.tabs, layout, focusedId);
       return {
         layout: r.layout,
