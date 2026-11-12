@@ -143,6 +143,13 @@ pub struct ObjectDefinitionRequest {
     pub object: arris_engines::ObjectRef,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+pub struct TableBrowseQueryRequest {
+    pub connection: String,
+    pub table: arris_engines::TableRef,
+    pub limit: Option<u32>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct QueryRunRequest {

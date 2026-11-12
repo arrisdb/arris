@@ -6,8 +6,9 @@ use arris_engines::persistence::ProjectManifest;
 use arris_engines::query::QueryError;
 use arris_engines::{
     CONNECTION_SCOPE_LOCAL, ConnectionConfig, JsonCollectionStore, JsonSingletonStore,
-    PersistedPinnedQuery, ProjectState, QueryRequest, QueryResult, RUN_PREVIEW_MAX_ROWS,
-    RunPreview, RunRecord, RunSource, RunStatus, SchemaNode, ScopedConnection, StoreError,
+    PersistedPinnedQuery, ProjectState, QueryEngine, QueryRequest, QueryResult,
+    RUN_PREVIEW_MAX_ROWS, RunPreview, RunRecord, RunSource, RunStatus, SchemaNode,
+    ScopedConnection, StoreError,
 };
 use axum::extract::State;
 use axum::extract::rejection::JsonRejection;
@@ -35,7 +36,8 @@ use super::{
     QueryPageRequest, QueryRunRequest, QueryRunResponse, REQUEST_QUERY_PARAM, RUN_GET_ROUTE,
     RUN_PAGE_MAX_LIMIT, RUN_PAGE_ROUTE, RUN_RESULTS_BOARD, ReadOnlySql, RunGetResponse,
     RunIdRequest, RunPageRequest, SCHEMA_LIST_ROUTE, SchemaListRequest, Server, ServerEvent,
-    ServerEventKind, ServerState, ToolRunRoutes, WORKSPACE_LAYOUT_SAVE_ROUTE, WORKSPACE_LOAD_ROUTE,
+    ServerEventKind, ServerState, TABLE_BROWSE_DEFAULT_LIMIT, TABLE_BROWSE_QUERY_ROUTE,
+    TableBrowseQueryRequest, ToolRunRoutes, WORKSPACE_LAYOUT_SAVE_ROUTE, WORKSPACE_LOAD_ROUTE,
     WORKSPACE_TABS_SAVE_ROUTE, WorkspaceLayoutSaveRequest, WorkspaceResponse,
     WorkspaceTabsSaveRequest,
 };
@@ -56,6 +58,7 @@ impl ApiRoutes {
             .route(CONNECTION_REMOVE_ROUTE, post(Self::connection_remove))
             .route(SCHEMA_LIST_ROUTE, post(Self::schema_list))
             .route(OBJECT_DEFINITION_ROUTE, post(Self::object_definition))
+            .route(TABLE_BROWSE_QUERY_ROUTE, post(Self::table_browse_query))
             .route(QUERY_RUN_ROUTE, post(Self::query_run))
             .route(QUERY_PAGE_ROUTE, post(Self::query_page))
             .route(QUERY_OPEN_ROUTE, post(Self::query_open))
@@ -358,6 +361,27 @@ impl ApiRoutes {
             None => query.list_schemas_on(driver).await?,
         };
         Ok(Json(nodes))
+    }
+
+    async fn table_browse_query(
+        State(state): ApiState,
+        headers: HeaderMap,
+        body: Body<TableBrowseQueryRequest>,
+    ) -> ApiResult<String> {
+        let Json(req) = body?;
+        let project = Self::project(&state, &headers).await?;
+        let guard = project.read().await;
+        let config = Self::resolve_connection(&state, &guard, &req.connection).await?;
+        let limit = req.limit.unwrap_or(TABLE_BROWSE_DEFAULT_LIMIT);
+        let sql = QueryEngine::table_browse_query(
+            config.id,
+            &state.env.connection,
+            Some(&guard),
+            &req.table,
+            limit,
+        )
+        .await?;
+        Ok(Json(sql))
     }
 
     async fn object_definition(
@@ -818,6 +842,7 @@ pub(super) mod tests {
     use crate::server::{
         CONNECTION_NEW_PAGE, PROJECT_HEADER, PROJECT_QUERY_PARAM, REQUEST_QUERY_PARAM,
         RUN_PAGE_MAX_LIMIT, RUN_RESULTS_BOARD, Server, ServerEvent, ServerEventKind, ServerState,
+        TABLE_BROWSE_DEFAULT_LIMIT,
     };
 
     const EVENT_TIMEOUT: Duration = Duration::from_secs(5);
@@ -1473,6 +1498,21 @@ pub(super) mod tests {
             next_kind(&mut events).await.kind,
             ServerEventKind::PinsChanged
         );
+    }
+
+    #[tokio::test]
+    async fn table_browse_query_selects_the_table() {
+        let h = Harness::start().await;
+        let cfg = h.save_sqlite("local").await;
+        h.seed_rows(&cfg, 1).await;
+        let sql = h
+            .ok(
+                "table_browse_query",
+                json!({ "connection": "local", "table": { "name": "t" } }),
+            )
+            .await;
+        let sql = sql.as_str().unwrap();
+        assert!(sql.contains("t") && sql.contains(&TABLE_BROWSE_DEFAULT_LIMIT.to_string()));
     }
 
     #[tokio::test]

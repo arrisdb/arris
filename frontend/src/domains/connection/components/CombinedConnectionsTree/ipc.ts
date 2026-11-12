@@ -82,6 +82,7 @@ function tableBrowseQueryIPC(
   table: TableRef,
   limit?: number,
 ): Promise<string> {
+  if (isWebShell()) return apiCall("table_browse_query", { connection: connectionId, table, limit });
   return invoke("cmd_table_browse_query", { connectionId, table, limit });
 }
 

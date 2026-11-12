@@ -33,6 +33,9 @@ pub const CONNECTION_TEST_ROUTE: &str = "/api/connection_test";
 pub const CONNECTION_REMOVE_ROUTE: &str = "/api/connection_remove";
 pub const SCHEMA_LIST_ROUTE: &str = "/api/schema_list";
 pub const OBJECT_DEFINITION_ROUTE: &str = "/api/object_definition";
+pub const TABLE_BROWSE_QUERY_ROUTE: &str = "/api/table_browse_query";
+/// Rows a table tab loads first, matching the desktop app.
+pub const TABLE_BROWSE_DEFAULT_LIMIT: u32 = 500;
 pub const QUERY_RUN_ROUTE: &str = "/api/query_run";
 pub const QUERY_PAGE_ROUTE: &str = "/api/query_page";
 pub const WORKSPACE_LOAD_ROUTE: &str = "/api/workspace_load";
