@@ -30,11 +30,9 @@ const TRANSIENT_TAB_TYPES: ReadonlySet<string> = new Set(["gitdiff", "analytics"
 
 // Saved tab types the browser cannot render: they need local files, shells or git.
 const DESKTOP_ONLY_TAB_TYPES: ReadonlySet<string> = new Set([
-  "file",
   "doc",
   "terminal",
   "notebook",
-  "media",
   "gitdiff",
   "gitcommitdiff",
   "githistory",

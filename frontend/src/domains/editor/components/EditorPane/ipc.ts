@@ -107,6 +107,7 @@ function listSchemasIPC(connectionId: string): Promise<SchemaNode[]> {
 }
 
 function readTextFileIPC(path: string): Promise<string> {
+  if (isWebShell()) return apiCall("file_read", { path });
   return invoke("cmd_read_text_file", { path });
 }
 
@@ -215,6 +216,7 @@ function sqlmeshAuditIPC(
 }
 
 function writeTextFileIPC(path: string, content: string): Promise<void> {
+  if (isWebShell()) return apiCall("file_write", { path, content });
   return invoke("cmd_write_text_file", { path, content });
 }
 

@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { apiCall, isWebShell } from "@shared/api";
 import type { DbtRunResults } from "@shared";
 import type {
   DbtCommandResult,
@@ -38,6 +39,7 @@ function dbtProjectPaneDebugIPC(root: string, _select: string, args: string[], d
 }
 
 function dbtProjectPaneReadTextFileIPC(path: string): Promise<string> {
+  if (isWebShell()) return apiCall("file_read", { path });
   return invoke("cmd_read_text_file", { path });
 }
 

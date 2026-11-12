@@ -23,6 +23,7 @@ function appPreferencesLoadIPC(): Promise<AppPreferences> {
 }
 
 function closeFileIndexIPC(): Promise<void> {
+  if (isWebShell()) return apiCall("file_index_close");
   return invoke("cmd_close_file_index");
 }
 
@@ -36,10 +37,12 @@ function listConnectionsIPC(): Promise<ScopedConnection[]> {
 }
 
 function listFolderTreeIPC(root: string, skipDirs: string[]): Promise<FileTreeEntry> {
+  if (isWebShell()) return apiCall("file_tree", { root, skipDirs });
   return invoke("cmd_list_folder_tree", { root, skipDirs });
 }
 
 function openFileIndexIPC(root: string): Promise<void> {
+  if (isWebShell()) return apiCall("file_index_open", { path: root });
   return invoke("cmd_open_file_index", { root });
 }
 
@@ -72,6 +75,7 @@ function takePendingLaunchIPC(): Promise<string | null> {
 }
 
 function readTextFileIPC(path: string): Promise<string> {
+  if (isWebShell()) return apiCall("file_read", { path });
   return invoke("cmd_read_text_file", { path });
 }
 
@@ -93,6 +97,7 @@ async function savePaneLayoutIPC(
 // project root, returning the new absolute path. The tab then becomes a normal
 // file-backed tab.
 function moveTabToProjectIPC(id: string): Promise<string> {
+  if (isWebShell()) return apiCall("tab_move_to_project", { id });
   return invoke("cmd_move_tab_to_project", { id });
 }
 
