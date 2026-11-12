@@ -171,3 +171,5 @@ pub const OPEN_DEFAULT_COMMAND: &str = "open";
 pub const OPEN_DEFAULT_COMMAND: &str = "xdg-open";
 #[cfg(windows)]
 pub const OPEN_DEFAULT_COMMAND: &str = "explorer";
+/// After one CLI call opens the browser, later calls wait this long for that tab instead.
+pub const BROWSER_LAUNCH_GRACE_SECS: u64 = 30;

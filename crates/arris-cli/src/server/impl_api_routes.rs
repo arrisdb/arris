@@ -585,7 +585,12 @@ impl ApiRoutes {
             waited += QUERY_OPEN_POLL_MS;
         }
         let opened = !state.query_handoffs.is_pending(&root, &id);
-        Ok(Json(QueryOpenResponse { opened, run }))
+        let launch_browser = !opened && state.query_handoffs.claim_launch(&root);
+        Ok(Json(QueryOpenResponse {
+            opened,
+            launch_browser,
+            run,
+        }))
     }
 
     async fn query_handoff_take(

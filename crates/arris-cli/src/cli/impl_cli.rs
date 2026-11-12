@@ -126,7 +126,7 @@ impl Cli {
                     };
                     let resp: QueryOpenResponse =
                         client.call(QUERY_OPEN_ROUTE, &project, &body).await?;
-                    if !resp.opened {
+                    if resp.launch_browser {
                         webbrowser::open(&client.ui_url(&Server::project_page(&project)))?;
                     }
                     let out = QueryOpenOutput {

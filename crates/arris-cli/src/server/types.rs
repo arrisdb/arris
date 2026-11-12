@@ -229,6 +229,8 @@ pub struct QueryOpenRequest {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct QueryOpenResponse {
     pub opened: bool,
+    /// No tab took the query and no browser is already on its way: the caller opens one.
+    pub launch_browser: bool,
     pub run: Option<QueryRunResponse>,
 }
 
