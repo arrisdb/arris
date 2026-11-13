@@ -230,9 +230,12 @@ pub struct QueryOpenRequest {
     /// Short id of the agent session, so each session gets its own console.
     #[serde(default)]
     pub session: Option<String>,
+    /// Runs a write the user explicitly asked for instead of leaving it for Run.
+    #[serde(default)]
+    pub allow_write: bool,
 }
 
-/// `run` is set when the SQL was read-only and already ran; writes wait for the user.
+/// `run` is set when the SQL already ran (reads, or writes with `allow_write`).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct QueryOpenResponse {
     pub opened: bool,

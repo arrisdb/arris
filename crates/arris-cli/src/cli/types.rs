@@ -57,7 +57,7 @@ pub enum Command {
         file: Option<PathBuf>,
         #[arg(long, default_value_t = QUERY_DEFAULT_LIMIT)]
         limit: u32,
-        /// Show the query in an Arris console tab. Writes wait there for the user to press Run.
+        /// Show the query in an Arris console tab. Writes wait there for Run unless --allow-write.
         #[arg(long)]
         open: bool,
         /// With --open, use a new console tab instead of the shared one.
@@ -66,6 +66,9 @@ pub enum Command {
         /// With --open, a short comment above the query saying what it answers.
         #[arg(long, requires = "open")]
         note: Option<String>,
+        /// With --open, run a write the user explicitly asked for instead of waiting for Run.
+        #[arg(long, requires = "open")]
+        allow_write: bool,
     },
     /// Rows of an earlier run, read from its saved result; nothing is re-run.
     Result {
