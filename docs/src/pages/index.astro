@@ -32,15 +32,16 @@ import styles from "./index.module.css";
   </p>
 
   <p>
-    There is also the <a href="/canvas">Canvas</a>, a board where you describe an analysis in
-    plain English and an AI agent builds it for you, the query, the chart, and the explanation, all
-    laid out together.
+    There is also the <a href="/canvas">Canvas</a>, a board that keeps an analysis together: the
+    queries, the charts bound to their results, and the notes that explain them. And with
+    <a href="/ai/claude-code">Claude Code</a>, you can ask data questions in your terminal and watch
+    the queries and charts land in Arris.
   </p>
 
   <p>
     This documentation covers everything from installing the app and running your first query to
-    advanced topics like cross-source federation, analytics engineering workflows, and configuring
-    AI providers. Use the sidebar to navigate, or pick a section below to get started.
+    advanced topics like cross-source federation, analytics engineering workflows, and working with
+    Claude Code. Use the sidebar to navigate, or pick a section below to get started.
   </p>
 
   <h2 id="sections">Sections</h2>
@@ -78,7 +79,7 @@ import styles from "./index.module.css";
         <span class={styles.cardIcon} class:list={["bg-[rgba(195,155,255,0.15)] text-accent-2"]}>4</span>
         Canvas
       </div>
-      <div class={styles.cardDesc}>A board where an AI agent turns a plain-English request into a running query, a chart, and the text that explains it.</div>
+      <div class={styles.cardDesc}>A board of connected queries, charts, tables, and notes that keeps a whole analysis in view.</div>
       <div class={styles.cardCount}>1 article</div>
     </a>
 
@@ -118,12 +119,12 @@ import styles from "./index.module.css";
       <div class={styles.cardCount}>3 articles</div>
     </a>
 
-    <a href="/ai/codex-agent" class={styles.card}>
+    <a href="/ai/claude-code" class={styles.card}>
       <div class={styles.cardTitle}>
         <span class={styles.cardIcon} class:list={["bg-[rgba(255,161,74,0.15)] text-orange"]}>9</span>
         AI
       </div>
-      <div class={styles.cardDesc}>Chat with a local Codex agent to write, explain, and fix schema-aware SQL (requires a Codex subscription or OPENAI_API_KEY).</div>
+      <div class={styles.cardDesc}>Ask Claude Code data questions through the arris CLI; its queries, results, and canvases show up in Arris.</div>
       <div class={styles.cardCount}>1 article</div>
     </a>
 
