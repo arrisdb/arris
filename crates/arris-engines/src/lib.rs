@@ -1,7 +1,6 @@
 pub mod drivers;
 pub mod persistence;
 
-pub mod agent;
 pub mod canvas;
 pub mod connection;
 pub mod editor;
@@ -21,7 +20,6 @@ pub trait Engine: Send + Sync {
     fn name(&self) -> &str;
 }
 
-pub use agent::AgentEngine;
 pub use canvas::{
     CanvasCellRun, CanvasCellSpec, CanvasEngine, CanvasError, CellCacheWriter, CellIngestContinuation,
     CellIngestDone, CellResultCache, IngestedCell, CELL_INGEST_BYTE_BUDGET, CELL_RESULT_PAGE_ROWS,

@@ -10,7 +10,6 @@ interface StatusBarRailItem<Key extends string> {
 }
 
 interface StatusBarViewModel {
-  agentPanelOpen: boolean;
   bgLabel: string | null;
   canChart: boolean;
   chartEditorOpen: boolean;
@@ -18,7 +17,6 @@ interface StatusBarViewModel {
   key: (action: KeymapAction) => string | undefined;
   leftRailItems: StatusBarRailItem<SidebarMetaTab>[];
   leftVisible: boolean;
-  onClickAgentPanel: () => void;
   onClickChartEditor: () => void;
   onClickConnections: () => void;
   onClickLeftRail: (tab: SidebarMetaTab) => void;

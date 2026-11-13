@@ -1,4 +1,3 @@
-import { isWebShell } from "@shared/api";
 import { Icon } from "@shared/ui/Icon";
 import { Tooltip } from "@shared/ui";
 import { PaneContextMenuSurface } from "@shared/ui/ContextMenu";
@@ -12,7 +11,6 @@ import "./index.css";
 
 export function StatusBar() {
   const {
-    agentPanelOpen,
     bgLabel,
     canChart,
     chartEditorOpen,
@@ -20,7 +18,6 @@ export function StatusBar() {
     key,
     leftRailItems,
     leftVisible,
-    onClickAgentPanel,
     onClickChartEditor,
     onClickConnections,
     onClickLeftRail,
@@ -77,21 +74,6 @@ export function StatusBar() {
             <Icon name={STATUS_BAR_ICONS.chartEditor} size={14} />
           </button>
         </Tooltip>
-        {!isWebShell() && (
-          <Tooltip label="Agent" shortcut={key(RIGHT_RAIL_ACTIONS.agentPanel)}>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={agentPanelOpen}
-              aria-label="Agent"
-              onClick={onClickAgentPanel}
-              className={`mdbc-status-btn${agentPanelOpen ? " on" : ""}`}
-              data-testid="status-rail-agent"
-            >
-              <Icon name={STATUS_BAR_ICONS.agentPanel} size={14} />
-            </button>
-          </Tooltip>
-        )}
         <Tooltip label="Pinned Queries" shortcut={key(RIGHT_RAIL_ACTIONS.pinnedQueries)}>
           <button
             type="button"

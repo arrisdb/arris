@@ -1,4 +1,3 @@
-mod agent;
 mod arris_server;
 mod canvas;
 mod canvas_records;
@@ -16,7 +15,6 @@ mod search;
 mod sqlmesh;
 mod terminal;
 
-pub use agent::*;
 pub use arris_server::*;
 pub use canvas::*;
 pub use canvas_records::*;

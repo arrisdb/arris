@@ -9,7 +9,6 @@ export const ACTIONS = {
   findInEditor: { label: "Find in Editor", category: "editor", defaultShortcut: { key: "Mod-f" } },
   replaceInEditor: { label: "Find & Replace in Editor", category: "editor", defaultShortcut: { key: "Mod-r" } },
   saveFile: { label: "Save File", category: "editor", defaultShortcut: { key: "Mod-s" } },
-  aiGenerate: { label: "Ask Agent", category: "editor", defaultShortcut: { key: "Mod-k" } },
   expandStar: { label: "Expand All Columns", category: "editor", defaultShortcut: null },
   pinQuery: { label: "Pin Query", category: "editor", defaultShortcut: null },
   openEditorContextMenu: { label: "Open Editor Menu", category: "editor", defaultShortcut: { key: "Alt-Enter" } },
@@ -49,7 +48,6 @@ export const ACTIONS = {
 
   toggleSidebar: { label: "Toggle Sidebar", category: "sidebar", defaultShortcut: { key: "Mod-Shift-s" } },
   showDefinition: { label: "Show Definition", category: "sidebar", defaultShortcut: { key: "Mod-b" } },
-  showAgentPanel: { label: "Show Agent", category: "sidebar", defaultShortcut: { key: "Mod-8" } },
   showProjectPane: { label: "Show Project", category: "sidebar", defaultShortcut: { key: "Mod-1" } },
   showGitPane: { label: "Show Git", category: "sidebar", defaultShortcut: { key: "Mod-2" } },
   showChartEditor: { label: "Show Chart Editor", category: "sidebar", defaultShortcut: { key: "Mod-7" } },
@@ -265,7 +263,6 @@ export const PRESET_OVERRIDES: Record<
     searchFiles: { key: "Mod-Shift-o" },
     // Shift+Cmd+O is Go to File in JetBrains, so free it from the niche open-in-new-window action.
     openProjectNewWindow: null,
-    aiGenerate: { key: "Mod-Alt-k" },
     gitCommit: { key: "Mod-k" },
     gitPush: { key: "Mod-Shift-k" },
     gitPull: { key: "Mod-t" },

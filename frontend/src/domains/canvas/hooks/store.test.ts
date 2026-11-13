@@ -5,7 +5,6 @@ vi.mock("../ipc", () => ({
   cancelCanvasCellIPC: vi.fn(),
 }));
 
-import type { AgentCanvasSpec } from "../types";
 import { makeComponent } from "../utils";
 import { cancelCanvasCellIPC, runCanvasCellIPC } from "../ipc";
 import { useCanvasStore } from "./store";
@@ -66,61 +65,6 @@ describe("useCanvasStore", () => {
     get().loadBoard(TAB, { version: 1, components: [], edges: [] }, 0);
     get().setViewport(TAB, { x: 1, y: 2, zoom: 1.5 });
     expect(get().boards[TAB].doc.viewport).toEqual({ x: 1, y: 2, zoom: 1.5 });
-  });
-
-  it("applyAgentSpec appends objects and returns the query ids to run", () => {
-    get().loadBoard(TAB, { version: 1, components: [], edges: [] }, 0);
-    const spec: AgentCanvasSpec = {
-      components: [
-        { kind: "query", id: "q1", sql: "s" },
-        {
-          kind: "chart",
-          id: "c1",
-          sourceQueryId: "q1",
-          spec: { kind: "bar", xColumn: "a", yColumns: ["b"] },
-        },
-      ],
-      edges: [],
-    };
-    const ids = get().applyAgentSpec(TAB, spec, "conn");
-    expect(ids).toEqual(["q1"]);
-    expect(get().boards[TAB].doc.components).toHaveLength(2);
-    expect(get().boards[TAB].doc.edges).toHaveLength(1);
-  });
-
-  it("applyAgentSpec patches an existing object by id and re-runs a changed query", () => {
-    get().loadBoard(TAB, { version: 1, components: [], edges: [] }, 0);
-    get().addComponent(
-      TAB,
-      makeComponent({ kind: "query", id: "q1", sql: "select 1", connectionId: "conn" }),
-    );
-    const ids = get().applyAgentSpec(
-      TAB,
-      { components: [{ kind: "query", id: "q1", sql: "select 2" }], edges: [] },
-      "conn",
-    );
-    // No duplicate object; the existing one is patched; the changed query re-runs.
-    expect(get().boards[TAB].doc.components).toHaveLength(1);
-    expect(get().boards[TAB].doc.components[0]).toMatchObject({ id: "q1", sql: "select 2" });
-    expect(ids).toEqual(["q1"]);
-  });
-
-  it("applyAgentSpec re-runs a query whose connection changed even without an sql edit", () => {
-    get().loadBoard(TAB, { version: 1, components: [], edges: [] }, 0);
-    get().addComponent(
-      TAB,
-      makeComponent({ kind: "query", id: "q1", sql: "select 1", connectionId: "conn-a" }),
-    );
-    const ids = get().applyAgentSpec(
-      TAB,
-      { components: [{ kind: "query", id: "q1", connectionId: "conn-b" }], edges: [] },
-      "conn-a",
-    );
-    expect(get().boards[TAB].doc.components[0]).toMatchObject({
-      id: "q1",
-      connectionId: "conn-b",
-    });
-    expect(ids).toEqual(["q1"]);
   });
 
   it("runAllQueries dispatches only sink cells, letting the backend run upstreams", async () => {
@@ -273,32 +217,6 @@ describe("useCanvasStore", () => {
     expect(run.result).toBeTruthy();
   });
 
-  it("applyAgentSpec removes the ids in the remove list, with their edges and runs", () => {
-    get().loadBoard(TAB, { version: 1, components: [], edges: [] }, 0);
-    get().applyAgentSpec(
-      TAB,
-      {
-        components: [
-          { kind: "query", id: "q1", sql: "s" },
-          {
-            kind: "chart",
-            id: "c1",
-            sourceQueryId: "q1",
-            spec: { kind: "bar", xColumn: "a", yColumns: ["b"] },
-          },
-        ],
-        edges: [],
-      },
-      "conn",
-    );
-    get().setRun(TAB, "q1", { result: { columns: [], rows: [], elapsed: 0 } });
-    get().applyAgentSpec(TAB, { components: [], edges: [], remove: ["q1"] }, "conn");
-    const board = get().boards[TAB];
-    expect(board.doc.components.map((c) => c.id)).toEqual(["c1"]);
-    expect(board.doc.edges).toHaveLength(0);
-    expect(board.runs.q1).toBeUndefined();
-  });
-
   it("copy then paste clones with a new id, an offset, and raised z", () => {
     get().loadBoard(TAB, { version: 1, components: [], edges: [] }, 0);
     get().addComponent(
@@ -320,12 +238,6 @@ describe("useCanvasStore", () => {
     get().addComponent(TAB, makeComponent({ kind: "shape", id: "s", shape: "rect" }));
     get().pasteComponent(TAB);
     expect(get().boards[TAB].doc.components).toHaveLength(1);
-  });
-
-  it("setConnectionIds persists the board's connection set", () => {
-    get().loadBoard(TAB, { version: 1, components: [], edges: [] }, 0);
-    get().setConnectionIds(TAB, ["conn-a", "conn-b"]);
-    expect(get().boards[TAB].doc.connectionIds).toEqual(["conn-a", "conn-b"]);
   });
 
   it("addEdge connects two objects, ignoring self-links and duplicates", () => {
@@ -522,34 +434,4 @@ describe("useCanvasStore", () => {
     expect(tables).toHaveLength(1);
   });
 
-  it("setChat persists the chat log into the doc", () => {
-    get().loadBoard(TAB, { version: 1, components: [], edges: [] }, 0);
-    get().setChat(TAB, [
-      { id: "u1", role: "user", text: "hi" },
-      { id: "a1", role: "agent", text: "done", action: "Added query" },
-    ]);
-    expect(get().boards[TAB].doc.chat).toEqual([
-      { id: "u1", role: "user", text: "hi" },
-      { id: "a1", role: "agent", text: "done", action: "Added query" },
-    ]);
-  });
-
-  it("clearChat empties the persisted chat log", () => {
-    get().loadBoard(TAB, { version: 1, components: [], edges: [] }, 0);
-    get().setChat(TAB, [{ id: "u1", role: "user", text: "hi" }]);
-    get().clearChat(TAB);
-    expect(get().boards[TAB].doc.chat).toEqual([]);
-  });
-
-  it("writing chat keeps the components/edges array references stable", () => {
-    // Board nodes subscribe to `doc.components`/`doc.edges`; writing chat must not
-    // swap those arrays, or every node would needlessly re-render per token.
-    get().loadBoard(TAB, { version: 1, components: [], edges: [] }, 0);
-    get().addComponent(TAB, makeComponent({ kind: "text", id: "t", text: "x" }));
-    const beforeComps = get().boards[TAB].doc.components;
-    const beforeEdges = get().boards[TAB].doc.edges;
-    get().setChat(TAB, [{ id: "u1", role: "user", text: "hi" }]);
-    expect(get().boards[TAB].doc.components).toBe(beforeComps);
-    expect(get().boards[TAB].doc.edges).toBe(beforeEdges);
-  });
 });

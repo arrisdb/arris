@@ -324,7 +324,7 @@ describe("App bootstrapping — no welcome screen flash", () => {
       expect(screen.getByTestId("welcome-screen")).toBeTruthy();
     });
     act(() => {
-      // Mod-7 is now Show Chart Editor (swapped with Show Agent's Mod-8).
+      // Mod-7 is Show Chart Editor.
       window.dispatchEvent(new KeyboardEvent("keydown", { key: "7", ctrlKey: true }));
     });
 

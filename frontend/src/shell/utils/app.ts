@@ -1,5 +1,4 @@
 import type { EditorTab } from "../types";
-import { useAgentStore } from "@domains/agent/hooks";
 import { useTabsStore } from "../hooks/tabsStore";
 import { useFilesStore } from "@domains/files/hooks";
 import { useGitStore } from "@domains/git/hooks";
@@ -109,10 +108,6 @@ async function refreshFileTabFromDisk(tab: EditorTab): Promise<void> {
   }
 }
 
-function hydrateFrontendStores(): void {
-  useAgentStore.getState().checkAgent().catch(() => {});
-}
-
 async function reopenLastProjectIfNeeded(): Promise<void> {
   const prefs = useSettingsStore.getState();
   if (!prefs.reopenLastProject) return;
@@ -220,7 +215,6 @@ export {
   FONT_SIZE_STEP,
   clampFontSize,
   handleDroppedPath,
-  hydrateFrontendStores,
   isRunnableQueryKind,
   kindForConnection,
   nextFontSize,

@@ -15,43 +15,6 @@ describe("serialize", () => {
     expect(parseDoc(doc)).toEqual(doc);
   });
 
-  it("keeps the board's connection set and drops non-string ids", () => {
-    const doc = {
-      version: CANVAS_DOC_VERSION,
-      components: [],
-      edges: [],
-      connectionIds: ["conn-a", "conn-b"],
-    };
-    expect(parseDoc(doc).connectionIds).toEqual(["conn-a", "conn-b"]);
-    const dirty = {
-      version: CANVAS_DOC_VERSION,
-      components: [],
-      edges: [],
-      connectionIds: ["conn-a", 7, null, "conn-b"],
-    };
-    expect(parseDoc(dirty).connectionIds).toEqual(["conn-a", "conn-b"]);
-  });
-
-  it("keeps the chat log and forces pending off on load", () => {
-    const text = ({
-      version: CANVAS_DOC_VERSION,
-      components: [],
-      edges: [],
-      chat: [
-        { id: "u1", role: "user", text: "monthly sales" },
-        // A persisted entry should never be mid-stream, but force pending off so a
-        // stray one can't read as stuck after a reload.
-        { id: "a1", role: "agent", text: "done", action: "Added query", pending: true },
-        { bad: true },
-      ],
-    });
-    const doc = parseDoc(text);
-    expect(doc.chat).toEqual([
-      { id: "u1", role: "user", text: "monthly sales", pending: false },
-      { id: "a1", role: "agent", text: "done", action: "Added query", pending: false },
-    ]);
-  });
-
   it("returns an empty doc for a non-object", () => {
     expect(parseDoc(null)).toEqual(emptyDoc());
     expect(parseDoc("text")).toEqual(emptyDoc());

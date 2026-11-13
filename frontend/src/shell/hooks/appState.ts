@@ -27,7 +27,6 @@ import { ACTION_ORDER, useSettingsStore } from "@shared/settings";
 import type { AppViewModel } from "../types";
 import {
   handleDroppedPath,
-  hydrateFrontendStores,
   isBareKeySpec,
   isTypingTarget,
   matchesShortcut,
@@ -103,7 +102,6 @@ function useAppBootstrap(
     if (bootstrapped.current) return;
     bootstrapped.current = true;
     useSettingsStore.getState().hydrate();
-    hydrateFrontendStores();
 
     Promise.all([
       listConnectionsIPC(),

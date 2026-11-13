@@ -16,8 +16,7 @@ interface CanvasNodeData {
 
 interface CanvasViewProps {
   canvasId: string;
-  /// The desktop tab hosting the board; present only in the desktop app, where it
-  /// enables the agent chat panel.
+  /// The tab hosting the board; its connection is the default for new query objects.
   tab?: EditorTab;
 }
 

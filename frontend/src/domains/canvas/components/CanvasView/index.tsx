@@ -1,4 +1,3 @@
-import { isWebShell } from "@shared/api";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 import ReactFlow, { Background, Controls } from "reactflow";
 import type { Edge, Node } from "reactflow";
@@ -9,7 +8,6 @@ import "./index.css";
 import { ContextMenu, useContextMenu } from "@shared/ui/ContextMenu";
 import { useRegisterCommands } from "@shell/utils";
 
-import { CanvasAgentChat } from "../CanvasAgentChat";
 import { CanvasPropertiesPane } from "./components/CanvasPropertiesPane";
 import { CanvasToolbar } from "./components/CanvasToolbar";
 import {
@@ -23,7 +21,7 @@ import type { CanvasViewProps } from "./types";
 import { buildEdgeMenuItems, buildNodeMenuItems, edgeTypes, nodeTypes } from "./utils";
 
 /// One stored canvas: an infinite ReactFlow board of objects (text/query/chart/
-/// shape) plus a floating add-toolbar, with the agent chat beside it on desktop only.
+/// shape) plus a floating add-toolbar.
 function CanvasView({ canvasId, tab }: CanvasViewProps) {
   const canvas = useCanvas(canvasId, tab?.connectionId);
 
@@ -93,16 +91,6 @@ function CanvasView({ canvasId, tab }: CanvasViewProps) {
         </div>
       )}
       <PanelGroup className="mdbc-canvas-panels" id="canvas-horizontal" direction="horizontal">
-        {tab && !isWebShell() && (
-          <>
-            <Panel id="canvas-agent" order={1} defaultSize={18} minSize={12} maxSize={40}>
-              {/* Key by tab id so each canvas gets its own chat instance instead
-                  of carrying over the previous board's conversation. */}
-              <CanvasAgentChat key={tab.id} tab={tab} />
-            </Panel>
-            <PanelResizeHandle className="mdbc-canvas-pane-resizer" />
-          </>
-        )}
         <Panel id="canvas-board" order={2} minSize={30}>
           <div
             ref={canvas.boardRef}

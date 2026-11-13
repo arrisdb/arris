@@ -285,9 +285,8 @@ function useCanvas(boardId: string, defaultConnectionId?: string) {
       if (isEditableTarget(e.target)) return;
       const key = e.key.toLowerCase();
       if (key === "c" && selectedComponent) {
-        // A live text selection means the user is copying text (e.g. an agent
-        // reply in the side chat), not the selected object: let the browser's
-        // native copy run instead of cloning the node.
+        // A live text selection means the user is copying text, not the selected
+        // object: let the browser's native copy run instead of cloning the node.
         if (hasActiveTextSelection()) return;
         e.preventDefault();
         copyComponent(boardId, selectedComponent.id);
@@ -341,13 +340,13 @@ function useCanvas(boardId: string, defaultConnectionId?: string) {
         connectionId: defaultQueryConnectionId(
           components,
           lastQueryConnection,
-          board?.doc.connectionIds?.[0] ?? defaultConnectionId,
+          defaultConnectionId,
         ),
         sql: "",
         title: nextQueryTitle(components),
       }),
     );
-  }, [addComponent, components, lastQueryConnection, placementFor, board?.doc.connectionIds, defaultConnectionId, boardId]);
+  }, [addComponent, components, lastQueryConnection, placementFor, defaultConnectionId, boardId]);
 
   const addChart = useCallback(() => {
     addComponent(boardId, makeComponent({ kind: "chart", ...placementFor("chart") }));

@@ -5,7 +5,6 @@ import {
 } from "@domains/pinnedQueries/components/PinnedQueriesPane/ipc";
 import type { PinnedQueriesState } from "@domains/pinnedQueries/components/PinnedQueriesPane/types";
 import { useChartEditorStore } from "@domains/chart/hooks";
-import { useAgentStore } from "@domains/agent/hooks";
 
 const usePinnedQueriesStore = create<PinnedQueriesState>((set, get) => ({
   queries: [],
@@ -39,12 +38,11 @@ const usePinnedQueriesStore = create<PinnedQueriesState>((set, get) => ({
     else get().openPane();
   },
   // The right sidebar shows one pane at a time, so revealing pinned queries
-  // closes the chart editor and agent panel. Routing every open through here
+  // closes the chart editor. Routing every open through here
   // keeps the rail toggles mutually exclusive no matter who opens the pane
   // (toggle command, "pin query" actions, etc.).
   openPane: () => {
     useChartEditorStore.getState().close();
-    useAgentStore.getState().closePane();
     set({ paneOpen: true });
   },
   closePane: () => set({ paneOpen: false }),

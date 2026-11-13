@@ -11,8 +11,7 @@ import type { Tool } from "./types";
 
 /// The floating bottom toolbar (Figma/Canva style): a pointer-mode tool plus one
 /// button per object kind. Tools with sub-options (pointer mode, query language,
-/// shape kind) show a caret that opens a pop-up menu above the bar. The agent
-/// chat adds objects too; this is the manual path.
+/// shape kind) show a caret that opens a pop-up menu above the bar.
 function CanvasToolbar({
   mode,
   onModeChange,

@@ -66,13 +66,6 @@ vi.mock("@domains/notebook/components/NotebookView/ipc", () => ({
   writeNotebookFileIPC: vi.fn(),
 }));
 
-// CanvasView owns the canvas tool commands. Its agent chat panel reaches the
-// agent CLI over IPC and renders a provider picker; stub it to nothing so the
-// coverage harness only exercises the board's command registration.
-vi.mock("@domains/canvas/components/CanvasAgentChat", () => ({
-  CanvasAgentChat: () => null,
-}));
-
 vi.mock("@tanstack/react-virtual", () => ({
   useVirtualizer: (opts: { count: number }) => ({
     getVirtualItems: () =>

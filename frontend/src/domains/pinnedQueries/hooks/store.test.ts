@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { usePinnedQueriesStore } from "./store";
 import { useChartEditorStore } from "@domains/chart/hooks";
-import { useAgentStore } from "@domains/agent/hooks";
 
 const mockInvoke = vi.hoisted(() => vi.fn());
 
@@ -17,7 +16,6 @@ beforeEach(() => {
     paneOpen: false,
   });
   useChartEditorStore.setState({ targetTabId: null });
-  useAgentStore.setState({ paneOpen: false });
 });
 
 describe("pinnedQueries store", () => {
@@ -123,16 +121,13 @@ describe("pinnedQueries store", () => {
     expect(usePinnedQueriesStore.getState().paneOpen).toBe(false);
   });
 
-  it("openPane closes the chart editor and agent panel (right rail is exclusive)", () => {
+  it("openPane closes the chart editor (right rail is exclusive)", () => {
     useChartEditorStore.getState().open("tab-1");
-    useAgentStore.getState().openPane();
     expect(useChartEditorStore.getState().targetTabId).toBe("tab-1");
-    expect(useAgentStore.getState().paneOpen).toBe(true);
 
     usePinnedQueriesStore.getState().openPane();
 
     expect(usePinnedQueriesStore.getState().paneOpen).toBe(true);
     expect(useChartEditorStore.getState().targetTabId).toBeNull();
-    expect(useAgentStore.getState().paneOpen).toBe(false);
   });
 });
