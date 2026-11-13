@@ -1,9 +1,11 @@
-use std::sync::Arc;
+use std::collections::HashMap;
+use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
 
 use arris_engines::AppEnvironment;
 use tokio::sync::broadcast;
 
-use super::{ConnectionRequests, QueryHandoffs, ServerEvent};
+use super::{ConnectionRequests, QueryHandoffs, ServerEvent, UiContext};
 
 pub struct ServerState {
     pub env: Arc<AppEnvironment>,
@@ -12,6 +14,8 @@ pub struct ServerState {
     pub events: broadcast::Sender<ServerEvent>,
     pub connection_requests: ConnectionRequests,
     pub query_handoffs: QueryHandoffs,
+    /// Latest UI context per project root, kept in memory only.
+    pub ui_contexts: Mutex<HashMap<PathBuf, UiContext>>,
 }
 
 impl ServerState {

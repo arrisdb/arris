@@ -35,7 +35,7 @@ use crate::server::{
     QueryRunRequest, QueryRunResponse, RUN_GET_ROUTE, RUN_PAGE_ROUTE, RunGetResponse, RunIdRequest,
     RunPageRequest, SCHEMA_LIST_ROUTE, SchemaListRequest, Server, TAB_CLOSE_ROUTE, TAB_LIST_ROUTE,
     TOOL_RUN_RECORD_ROUTE, TabCloseRequest, TabCloseResponse, TabSummary, ToolRunIdPayload,
-    ToolRunRecordRequest,
+    ToolRunRecordRequest, UI_CONTEXT_ROUTE,
 };
 
 impl Cli {
@@ -226,6 +226,12 @@ impl Cli {
             Command::Canvas(cmd) => {
                 let (client, project) = self.connect(&data_dir).await?;
                 Self::canvas(&client, &project, cmd).await?
+            }
+            Command::Context => {
+                let (client, project) = self.connect(&data_dir).await?;
+                client
+                    .call(UI_CONTEXT_ROUTE, &project, &EmptyResponse {})
+                    .await?
             }
             Command::Tab(cmd) => {
                 let (client, project) = self.connect(&data_dir).await?;

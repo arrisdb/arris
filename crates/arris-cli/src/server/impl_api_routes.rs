@@ -38,8 +38,9 @@ use super::{
     RunGetResponse, RunIdRequest, RunPageRequest, SCHEMA_LIST_ROUTE, SchemaListRequest, Server,
     ServerEvent, ServerEventKind, ServerState, TAB_CLOSE_ROUTE, TAB_LIST_ROUTE,
     TABLE_BROWSE_DEFAULT_LIMIT, TABLE_BROWSE_QUERY_ROUTE, TabCloseRequest, TabCloseResponse,
-    TabSummary, TableBrowseQueryRequest, ToolRunRoutes, WORKSPACE_LAYOUT_SAVE_ROUTE,
-    WORKSPACE_LOAD_ROUTE, WORKSPACE_TABS_SAVE_ROUTE, WorkspaceLayoutSaveRequest, WorkspaceResponse,
+    TabSummary, TableBrowseQueryRequest, ToolRunRoutes, UI_CONTEXT_ROUTE, UI_CONTEXT_SAVE_ROUTE,
+    UiContext, UiContextResponse, WORKSPACE_LAYOUT_SAVE_ROUTE, WORKSPACE_LOAD_ROUTE,
+    WORKSPACE_TABS_SAVE_ROUTE, WorkspaceLayoutSaveRequest, WorkspaceResponse,
     WorkspaceTabsSaveRequest,
 };
 
@@ -66,6 +67,8 @@ impl ApiRoutes {
             .route(QUERY_HANDOFF_TAKE_ROUTE, post(Self::query_handoff_take))
             .route(TAB_LIST_ROUTE, post(Self::tab_list))
             .route(TAB_CLOSE_ROUTE, post(Self::tab_close))
+            .route(UI_CONTEXT_SAVE_ROUTE, post(Self::ui_context_save))
+            .route(UI_CONTEXT_ROUTE, post(Self::ui_context))
             .route(HISTORY_LIST_ROUTE, post(Self::history_list))
             .route(RUN_GET_ROUTE, post(Self::run_get))
             .route(RUN_PAGE_ROUTE, post(Self::run_page))
@@ -655,6 +658,29 @@ impl ApiRoutes {
         let project = Self::project(&state, &headers).await?;
         let tabs = project.read().await.tabs_store.load().await?;
         Ok(Json(Self::open_tabs(tabs)))
+    }
+
+    async fn ui_context_save(
+        State(state): ApiState,
+        headers: HeaderMap,
+        body: Body<UiContext>,
+    ) -> ApiResult<EmptyResponse> {
+        let Json(mut context) = body?;
+        let project = Self::project(&state, &headers).await?;
+        let root = project.read().await.root.clone();
+        context.updated_at = Some(Utc::now().to_rfc3339());
+        state.ui_contexts.lock().unwrap().insert(root, context);
+        Ok(Json(EmptyResponse {}))
+    }
+
+    async fn ui_context(
+        State(state): ApiState,
+        headers: HeaderMap,
+    ) -> ApiResult<UiContextResponse> {
+        let project = Self::project(&state, &headers).await?;
+        let root = project.read().await.root.clone();
+        let context = state.ui_contexts.lock().unwrap().get(&root).cloned();
+        Ok(Json(UiContextResponse { context }))
     }
 
     async fn tab_close(
@@ -1277,6 +1303,23 @@ pub(super) mod tests {
         let loaded = h.ok("workspace_load", json!({})).await;
         assert_eq!(loaded["tabs"][0]["text"], json!("SELECT 1"));
         assert_eq!(loaded["paneLayout"]["focusedPaneGroupId"], json!("g1"));
+    }
+
+    #[tokio::test]
+    async fn ui_context_round_trips_the_pushed_tab_and_selection() {
+        let h = Harness::start().await;
+        assert_eq!(
+            h.ok("ui_context", json!({})).await,
+            json!({ "context": null })
+        );
+        let tab = json!({
+            "id": "t1", "title": "Console", "tabType": "console", "text": "SELECT 1",
+            "selection": { "from": 0, "to": 6, "text": "SELECT" },
+        });
+        h.ok("ui_context_save", json!({ "tab": tab })).await;
+        let got = h.ok("ui_context", json!({})).await["context"].clone();
+        assert_eq!(got["tab"]["selection"]["text"], json!("SELECT"));
+        assert!(got["updatedAt"].is_string());
     }
 
     #[tokio::test]

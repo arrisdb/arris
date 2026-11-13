@@ -44,6 +44,8 @@ pub const WORKSPACE_LAYOUT_SAVE_ROUTE: &str = "/api/workspace_layout_save";
 pub const QUERY_OPEN_ROUTE: &str = "/api/query_open";
 pub const QUERY_HANDOFF_TAKE_ROUTE: &str = "/api/query_handoff_take";
 pub const TAB_LIST_ROUTE: &str = "/api/tab_list";
+pub const UI_CONTEXT_SAVE_ROUTE: &str = "/api/ui_context_save";
+pub const UI_CONTEXT_ROUTE: &str = "/api/ui_context";
 pub const TAB_CLOSE_ROUTE: &str = "/api/tab_close";
 /// Saved tabs without a `tabType` are SQL consoles.
 pub const DEFAULT_TAB_TYPE: &str = "console";

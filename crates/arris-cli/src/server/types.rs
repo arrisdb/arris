@@ -285,6 +285,44 @@ pub struct TabSummary {
     pub created_at: Option<f64>,
 }
 
+/// What the open UI shows, pushed by the UI so an agent can read it with `arris context`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UiContext {
+    pub tab: Option<UiTabContext>,
+    /// Set by the server when the UI pushes.
+    #[serde(default)]
+    pub updated_at: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UiTabContext {
+    pub id: String,
+    pub title: String,
+    pub tab_type: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub connection_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub text: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub selection: Option<UiSelection>,
+}
+
+/// Character offsets into the tab's text, with the selected text itself.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UiSelection {
+    pub from: usize,
+    pub to: usize,
+    pub text: String,
+}
+
+/// `context` is null until a UI for the project has pushed one.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UiContextResponse {
+    pub context: Option<UiContext>,
+}
+
 /// Tab ids from `tab_list`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TabCloseRequest {
