@@ -1,6 +1,6 @@
 # arris
 
-Arris for Claude Code. Query your databases, explore dbt and SQLMesh projects, and build canvases by typing `/arris` in Claude Code.
+Arris for Claude Code, Codex and Cursor. Query your databases, explore dbt and SQLMesh projects, and build canvases with the `arris` skill.
 
 ## Install
 
@@ -8,10 +8,10 @@ Arris for Claude Code. Query your databases, explore dbt and SQLMesh projects, a
 npx arris
 ```
 
-This installs the arris skill to `~/.claude/skills/arris` and the `arris` binary to `~/.arris/bin/arris`. Restart Claude Code, then type `/arris`.
+This installs the arris skill to `~/.claude/skills/arris` (Claude Code) and `~/.agents/skills/arris` (Codex), and the `arris` binary to `~/.arris/bin/arris`. Cursor reads both skill folders. Restart your agent, then type `/arris` in Claude Code or Cursor, or `$arris` in Codex.
 
-- `npx arris --project` installs the skill into `./.claude/skills/arris` for the current project only.
-- Run `npx arris` again to upgrade. An existing skill folder is moved to `~/.arris/skill-backups/arris-<time>` first.
+- `npx arris --project` installs the skill into `./.claude/skills/arris` and `./.agents/skills/arris` for the current project only.
+- Run `npx arris` again to upgrade. An existing skill folder is moved to `~/.arris/skill-backups/arris-<agent>-<time>` first.
 - `npx arris <command>` runs the arris CLI, for example `npx arris connection list`.
 
 Supported platforms: macOS (Apple silicon and Intel) and Linux (x64 and arm64). Set `ARRIS_BINARY` to use an arris binary you built yourself.

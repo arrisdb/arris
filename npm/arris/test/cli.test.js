@@ -64,10 +64,11 @@ test("installs skill and binary", async () => {
   const c = ctx(box);
   assert.equal(await Cli.main([], c), 0);
   assert.ok(existsSync(join(box.home, ".claude", "skills", "arris", "SKILL.md")));
+  assert.ok(existsSync(join(box.home, ".agents", "skills", "arris", "SKILL.md")));
   const installed = join(box.home, ".arris", "bin", "arris");
   assert.equal(readFileSync(installed, "utf8"), FAKE_BINARY);
   assert.equal(statSync(installed).mode & 0o777, 0o755);
-  assert.match(c.logs.at(-1), /Restart Claude Code/);
+  assert.match(c.logs.at(-1), /\$arris \(Codex\)/);
 });
 
 test("reinstall replaces the binary with a new file", async () => {
@@ -96,7 +97,9 @@ test("project flag installs into cwd", async () => {
   const box = sandbox();
   assert.equal(await Cli.main(["install", "--project"], ctx(box)), 0);
   assert.ok(existsSync(join(box.cwd, ".claude", "skills", "arris", "SKILL.md")));
+  assert.ok(existsSync(join(box.cwd, ".agents", "skills", "arris", "SKILL.md")));
   assert.ok(!existsSync(join(box.home, ".claude")));
+  assert.ok(!existsSync(join(box.home, ".agents")));
   assert.ok(existsSync(join(box.home, ".arris", "bin", "arris")));
 });
 
@@ -113,9 +116,9 @@ test("backs up existing skill dir", () => {
     skillSource: box.skill,
     now: new Date("2026-10-26T01:02:03.004Z"),
   });
-  assert.equal(out.backup, join(box.home, ".arris", "skill-backups", "arris-2026-10-26T01-02-03-004Z"));
+  assert.deepEqual(out.backups, [join(box.home, ".arris", "skill-backups", "arris-claude-2026-10-26T01-02-03-004Z")]);
   assert.deepEqual(readdirSync(join(box.home, ".claude", "skills")), ["arris"]);
-  assert.equal(readFileSync(join(out.backup, "SKILL.md"), "utf8"), "my edits\n");
+  assert.equal(readFileSync(join(out.backups[0], "SKILL.md"), "utf8"), "my edits\n");
   assert.equal(readFileSync(join(skillDir, "SKILL.md"), "utf8"), "# Arris\n");
 });
 

@@ -33,8 +33,8 @@ export class Cli {
     try {
       Installer.checkRelease(binary, ctx.env);
       const out = Installer.run({ ...ctx, project: argv.includes(PROJECT_FLAG), binary });
-      if (out.backup) ctx.log(`${MSG_BACKUP} ${out.backup}`);
-      ctx.log(`${MSG_INSTALLED_SKILL} ${out.skillDir}`);
+      for (const backup of out.backups) ctx.log(`${MSG_BACKUP} ${backup}`);
+      for (const dir of out.skillDirs) ctx.log(`${MSG_INSTALLED_SKILL} ${dir}`);
       ctx.log(`${MSG_INSTALLED_BINARY} ${out.binaryPath}`);
       ctx.log(MSG_NEXT_STEP);
       return EXIT_OK;
