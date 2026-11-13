@@ -17,9 +17,9 @@ import {
 import { fetchRunPageIPC, takeQueryHandoffsIPC } from "./ipc";
 import type { QueryHandoff, QueryTarget } from "./types";
 
-/// "Claude 1a2b3c4d" names the console and tags each query from that session.
+/// "Codex 1a2b3c4d" names the console and tags each query from that session.
 function sessionLabel(session: string | null): string {
-  return session ? `${HANDOFF_TAB_TITLE} ${session}` : HANDOFF_TAB_TITLE;
+  return session ?? HANDOFF_TAB_TITLE;
 }
 
 /// The session's shared console for the connection, focused, or a new tab when asked for one.

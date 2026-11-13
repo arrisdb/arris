@@ -172,7 +172,7 @@ impl Cli {
                         limit: Some(*limit),
                         new_tab: *new_tab,
                         note: note.clone(),
-                        session: Self::agent_session(),
+                        session: Self::agent_session(|key| std::env::var(key).ok()),
                         allow_write: *allow_write,
                     };
                     let resp: QueryOpenResponse =
@@ -722,10 +722,21 @@ impl Cli {
         Ok(server.serve().await?)
     }
 
-    /// The calling Claude Code session's id, shortened; None outside Claude Code.
-    fn agent_session() -> Option<String> {
-        let id = std::env::var(super::ENV_AGENT_SESSION_ID).ok()?;
-        Some(id.chars().take(super::AGENT_SESSION_SHORT_LEN).collect())
+    /// The calling agent's console name, e.g. "Codex 1a2b3c4d"; None when no agent runs the CLI.
+    fn agent_session(env: impl Fn(&str) -> Option<String>) -> Option<String> {
+        for (key, name) in super::AGENT_SESSION_ENVS {
+            if let Some(id) = env(key) {
+                let skip = id
+                    .chars()
+                    .count()
+                    .saturating_sub(super::AGENT_SESSION_SHORT_LEN);
+                return Some(format!(
+                    "{name} {}",
+                    id.chars().skip(skip).collect::<String>()
+                ));
+            }
+        }
+        env(super::ENV_CURSOR_AGENT).map(|_| super::CURSOR_AGENT_NAME.to_string())
     }
 
     fn open_browser(url: &str) -> std::io::Result<()> {
@@ -757,6 +768,26 @@ mod tests {
         use clap::CommandFactory;
         let version = Cli::command().get_version().unwrap().to_owned();
         assert_eq!(version, format!("{} (dev)", env!("CARGO_PKG_VERSION")));
+    }
+
+    #[test]
+    fn agent_session_names_the_innermost_agent_and_keeps_the_id_tail() {
+        let session = |vars: &[(&str, &str)]| {
+            let vars: Vec<(String, String)> = vars
+                .iter()
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect();
+            Cli::agent_session(|key| vars.iter().find(|(k, _)| k == key).map(|(_, v)| v.clone()))
+        };
+        let claude = (
+            "CLAUDE_CODE_SESSION_ID",
+            "aaaaaaaa-1111-2222-3333-44445555cafe",
+        );
+        let codex = ("CODEX_THREAD_ID", "019a0000-0000-7000-8000-00000000beef");
+        assert_eq!(session(&[claude]).as_deref(), Some("Claude 5555cafe"));
+        assert_eq!(session(&[claude, codex]).as_deref(), Some("Codex 0000beef"));
+        assert_eq!(session(&[("CURSOR_AGENT", "1")]).as_deref(), Some("Cursor"));
+        assert_eq!(session(&[]), None);
     }
 
     fn response(rows: usize, has_more: Option<bool>) -> QueryRunResponse {

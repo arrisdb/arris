@@ -9,19 +9,19 @@ Arris runs SQL against the user's databases through the local `arris` CLI. Every
 
 ## Intent
 
-Look at the first argument after `/arris`:
+Look at the first argument after `/arris` (`$arris` in Codex):
 
 - `init-connection`: set up a new connection.
 - `query <question>`: answer a data question.
 - `dbt [<question or task>]`: work with the dbt project (see dbt).
 - `sqlmesh [<question or task>]`: work with the SQLMesh project (see sqlmesh).
-- No argument (bare `/arris`): open the Arris UI (see ui).
+- No argument (bare `/arris` or `$arris`): open the Arris UI (see ui).
 - Anything else (including a bare question): treat it as `query`.
 
 ## Always first
 
 Find the arris binary: run `command -v arris`, else check that `~/.arris/bin/arris` exists. Use whichever path you found as `arris` in every command below.
-If neither exists, stop and tell the user: "The arris CLI is not installed. Run `npx arris` in a terminal, then restart Claude Code."
+If neither exists, stop and tell the user: "The arris CLI is not installed. Run `npx arris` in a terminal, then restart your agent."
 
 ## Security
 
@@ -46,7 +46,7 @@ To change a saved connection (host, database, user, options, password), run `arr
 
 1. Run `arris connection list`. Pick the connection. Ask the user which one only if there is more than one and the question does not make it clear. If there are none, run the `init-connection` flow first.
 2. Run `arris schema <conn>` to see schemas, tables and columns, then `arris schema <conn> --schema <name>` to drill into one schema when the output is large or truncated (skip the flag for engines without schemas, e.g. SQLite). Always inspect the schema before writing SQL; never guess table or column names.
-3. Run `arris query <conn> --sql "<SQL>" --limit 100 --open --note "<what this query answers, under 10 words>"`. It appends the query, under a comment with the note, to this session's console tab for the connection (titled "Claude" plus a short session id), opening the browser if needed; every query of this session lands in that tab. Add `--new-tab` only when the user asks for a separate tab. For long SQL, write it to a file and use `--file <path>`. For MongoDB, write one mongo shell statement per query in strict JSON (quoted keys), not SQL. Always name the database from `arris schema`, e.g. `db.appdb.orders.countDocuments({})` or `db.appdb.orders.aggregate([{"$group": ...}])`; a bare `db.orders` reads the connection's default database, which may be empty. `getSiblingDB` and shell helpers like `ISODate()` are not supported.
+3. Run `arris query <conn> --sql "<SQL>" --limit 100 --open --note "<what this query answers, under 10 words>"`. It appends the query, under a comment with the note, to this session's console tab for the connection (titled with your agent and a short session id, e.g. "Claude 1a2b3c4d" or "Codex 1a2b3c4d"; Cursor chats share one "Cursor" console), opening the browser if needed; every query of this session lands in that tab. Add `--new-tab` only when the user asks for a separate tab. For long SQL, write it to a file and use `--file <path>`. For MongoDB, write one mongo shell statement per query in strict JSON (quoted keys), not SQL. Always name the database from `arris schema`, e.g. `db.appdb.orders.countDocuments({})` or `db.appdb.orders.aggregate([{"$group": ...}])`; a bare `db.orders` reads the connection's default database, which may be empty. `getSiblingDB` and shell helpers like `ISODate()` are not supported.
 4. Read-only queries (SELECT-style SQL, and MongoDB `find`, `countDocuments`, `distinct` or `aggregate` without `$out`/`$merge`) run and come back with `rows`; the tab shows the same result. Answer the question in plain words, in a short note. Do not repeat the rows as a table or print a link; the user sees them in Arris. If `truncated` is true, say the result was cut off at the limit.
 5. Anything else is a write. When the user explicitly asked for that change, add `--allow-write`: it runs, the tab shows the result, and you report what changed. Without the flag it returns `awaitingRun: true` and has not run; tell the user to press Run in Arris. Do not run it another way, and do not assume it ran.
 6. On a SQL error (`query_failed`), read the message, fix the SQL, and retry. Retry at most 2 times, then show the user the error and what you tried.
@@ -103,4 +103,4 @@ Do not run INSERT, UPDATE, DELETE or DDL (CREATE, ALTER, DROP, TRUNCATE), or Mon
 
 ## Other commands
 
-`arris context` shows the UI's active tab, its text and the user's selection; run it when the user says "this query", "the selected part" or similar. `arris tab list` lists the UI's open tabs; `arris tab close <id>...` closes some, `arris tab close --all-except <id>` all but one (this session's console is the one titled "Claude" plus your session id). `arris history` lists recent runs. `arris pin <run-id> --title "..."` saves a run, `arris pins` lists pins, `arris unpin <id>` removes one. `arris connection test|remove <conn>` check or delete a connection (confirm before removing). Use these when the user asks for them.
+`arris context` shows the UI's active tab, its text and the user's selection; run it when the user says "this query", "the selected part" or similar. `arris tab list` lists the UI's open tabs; `arris tab close <id>...` closes some, `arris tab close --all-except <id>` all but one (this session's console is the one titled with your agent and session id). `arris history` lists recent runs. `arris pin <run-id> --title "..."` saves a run, `arris pins` lists pins, `arris unpin <id>` removes one. `arris connection test|remove <conn>` check or delete a connection (confirm before removing). Use these when the user asks for them.

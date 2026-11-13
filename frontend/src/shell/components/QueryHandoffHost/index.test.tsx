@@ -108,13 +108,13 @@ describe("QueryHandoffHost", () => {
   it("gives each session its own console and tags queries with the note", async () => {
     const query = { kind: "query" as const, connectionId: "c1", runId: null, newTab: false };
     vi.mocked(takeQueryHandoffsIPC)
-      .mockResolvedValueOnce([{ ...query, id: "a", sql: "SELECT 1", note: "count orders", session: "s1" }])
-      .mockResolvedValueOnce([{ ...query, id: "b", sql: "SELECT 2", note: null, session: "s2" }]);
+      .mockResolvedValueOnce([{ ...query, id: "a", sql: "SELECT 1", note: "count orders", session: "Claude s1" }])
+      .mockResolvedValueOnce([{ ...query, id: "b", sql: "SELECT 2", note: null, session: "Codex s2" }]);
     render(<QueryHandoffHost />);
     await waitFor(() => expect(lastTab()?.title).toBe("Claude s1"));
     expect(lastTab()?.text).toBe("-- Claude s1: count orders\nSELECT 1;");
     act(() => emit({ kind: "query_open_requested" }));
     await waitFor(() => expect(useTabsStore.getState().tabs).toHaveLength(2));
-    expect(lastTab()).toMatchObject({ title: "Claude s2", text: "SELECT 2;" });
+    expect(lastTab()).toMatchObject({ title: "Codex s2", text: "SELECT 2;" });
   });
 });
