@@ -276,7 +276,7 @@ describe("docs output content", () => {
     );
     expect(html).toContain("npx arris");
     expect(html).toContain("--allow-write");
-    for (const agent of ["Claude Code", "Codex", "Cursor", "~/.agents/skills"]) expect(html).toContain(agent);
+    for (const agent of ["Claude Code", "Codex", "Cursor", "GitHub Copilot", "~/.agents/skills"]) expect(html).toContain(agent);
   });
 
   it("no page links to the removed agent page", () => {

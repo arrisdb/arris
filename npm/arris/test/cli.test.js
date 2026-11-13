@@ -68,7 +68,7 @@ test("installs skill and binary", async () => {
   const installed = join(box.home, ".arris", "bin", "arris");
   assert.equal(readFileSync(installed, "utf8"), FAKE_BINARY);
   assert.equal(statSync(installed).mode & 0o777, 0o755);
-  assert.match(c.logs.at(-1), /\$arris \(Codex\)/);
+  assert.match(c.logs.at(-1), /GitHub Copilot\) or \$arris \(Codex\)/);
 });
 
 test("reinstall replaces the binary with a new file", async () => {

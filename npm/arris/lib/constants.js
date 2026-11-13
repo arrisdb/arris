@@ -15,8 +15,8 @@ export const RELEASE_MARKER = "(release)";
 export const INSTALL_COMMAND = "install";
 export const PROJECT_FLAG = "--project";
 
-// Agent config dirs the skill is copied into: Claude Code reads `.claude`, Codex `.agents`.
-// Cursor reads both, so it needs no copy of its own.
+// Agent config dirs the skill is copied into: Claude Code reads `.claude`; Codex, Cursor and
+// GitHub Copilot read `.agents`, so they need no copy of their own.
 export const AGENT_DIRS = [".claude", ".agents"];
 export const SKILLS_DIR = "skills";
 export const SKILL_NAME = "arris";
@@ -39,7 +39,7 @@ export const EXIT_FAILURE = 1;
 export const MSG_INSTALLED_SKILL = "Installed the arris skill to";
 export const MSG_INSTALLED_BINARY = "Installed the arris binary to";
 export const MSG_BACKUP = "Moved the previous skill to";
-export const MSG_NEXT_STEP = "Restart your agent, then type /arris (Claude Code, Cursor) or $arris (Codex).";
+export const MSG_NEXT_STEP = "Restart your agent, then type /arris (Claude Code, Cursor, GitHub Copilot) or $arris (Codex).";
 export const MSG_UNSUPPORTED = "arris has no prebuilt binary for";
 export const MSG_SUPPORTED_LIST = "Supported platforms:";
 export const MSG_MISSING_PACKAGE = "The arris binary package is not installed:";
