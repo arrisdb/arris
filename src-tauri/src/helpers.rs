@@ -31,7 +31,10 @@ mod tests {
     fn binary_hash_is_16_lowercase_hex_chars() {
         let hash = binary_hash().expect("hash current test binary");
         assert_eq!(hash.len(), BINARY_HASH_DISPLAY_LEN);
-        assert!(hash.chars().all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase()));
+        assert!(
+            hash.chars()
+                .all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase())
+        );
     }
 
     #[test]

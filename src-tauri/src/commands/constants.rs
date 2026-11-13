@@ -20,3 +20,36 @@ pub const MONGO_SHELL_STMT_PREFIX: &str = "db.";
 
 /// Error for project-scoped commands called before a project is open.
 pub const NO_PROJECT_OPEN_MESSAGE: &str = "no project open";
+
+/// Overrides the data dir, as for the `arris` CLI, so both can share a scratch dir.
+pub const ENV_DATA_DIR: &str = "ARRIS_DATA_DIR";
+
+/// Discovery file the arris server writes in the shared data dir (mirrors the CLI's).
+pub const ARRIS_SERVER_INFO_FILE: &str = "server.json";
+
+/// The arris server only listens on loopback.
+pub const ARRIS_SERVER_HOST: &str = "127.0.0.1";
+
+pub const ARRIS_SERVER_API_PREFIX: &str = "/api/";
+
+pub const ARRIS_SERVER_EVENTS_PATH: &str = "/api/events";
+
+/// Header naming the project a server call is about.
+pub const ARRIS_SERVER_PROJECT_HEADER: &str = "x-arris-project";
+
+/// How often the bridge looks for a (re)started server.
+pub const ARRIS_SERVER_RETRY_MS: u64 = 500;
+
+/// Tauri event re-emitting each server event to the windows.
+pub const ARRIS_SERVER_EVENT: &str = "arris://server-event";
+
+/// Synthetic event kind sent when the bridge (re)connects.
+pub const ARRIS_SERVER_CONNECTED_KIND: &str = "server_connected";
+
+pub const SSE_DATA_PREFIX: &str = "data:";
+
+pub const SSE_FRAME_END: &str = "\n\n";
+
+pub const ARRIS_SERVER_DOWN_MESSAGE: &str = "the arris server is not running";
+
+pub const ARRIS_SERVER_BAD_ROUTE_MESSAGE: &str = "invalid arris server route";

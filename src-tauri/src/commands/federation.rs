@@ -21,10 +21,9 @@ pub async fn cmd_run_federation_query(
     };
 
     let handle_plan = app_handle.clone();
-    let on_plan: Box<dyn FnOnce(&[DagNode]) + Send> =
-        Box::new(move |dag| {
-            let _ = handle_plan.emit("federation-plan", dag);
-        });
+    let on_plan: Box<dyn FnOnce(&[DagNode]) + Send> = Box::new(move |dag| {
+        let _ = handle_plan.emit("federation-plan", dag);
+    });
 
     let handle_progress = app_handle.clone();
     let progress: ProgressCallback = Arc::new(move |event| {

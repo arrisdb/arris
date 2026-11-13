@@ -2,10 +2,9 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use arris_engines::{
-    QueryRequest,
-    AppEnvironment, CanvasCellRun, CanvasCellSpec, CanvasEngine, CanvasError,
-    CELL_INGEST_BYTE_BUDGET, ErrorCode, IngestedCell, IpcError, ProjectState, QueryEngine,
-    QueryLanguage, QueryResult, QueryValue,
+    AppEnvironment, CELL_INGEST_BYTE_BUDGET, CanvasCellRun, CanvasCellSpec, CanvasEngine,
+    CanvasError, ErrorCode, IngestedCell, IpcError, ProjectState, QueryEngine, QueryLanguage,
+    QueryRequest, QueryResult, QueryValue,
 };
 use tauri::{Emitter, State};
 use uuid::Uuid;
@@ -168,8 +167,7 @@ pub async fn cmd_run_canvas_cell(
 ) -> Result<Vec<CanvasCellRun>, IpcError> {
     let order = CanvasEngine::plan(&cells, &target_id).map_err(ipc_err)?;
 
-    let by_id: HashMap<&str, &CanvasCellSpec> =
-        cells.iter().map(|c| (c.id.as_str(), c)).collect();
+    let by_id: HashMap<&str, &CanvasCellSpec> = cells.iter().map(|c| (c.id.as_str(), c)).collect();
     let title_to_id: HashMap<String, String> = cells
         .iter()
         .map(|c| (CanvasEngine::sanitize_ident(&c.title), c.id.clone()))
@@ -276,9 +274,11 @@ pub async fn cmd_run_canvas_cell(
                 },
             }
         } else if has_live_ref {
-            Err("a cell that joins a live table with another cell's result is not \
+            Err(
+                "a cell that joins a live table with another cell's result is not \
                  supported yet; put the live data in its own cell first"
-                .to_string())
+                    .to_string(),
+            )
         } else {
             // DataFusion has no driver to kill, so race the run against the
             // board's cancel token; a cancel abandons the in-flight query.
@@ -359,16 +359,31 @@ mod tests {
 
     #[test]
     fn sql_cells_use_the_sql_frontend() {
-        assert_eq!(cell_query_language("SELECT * FROM appdb.events_10m"), QueryLanguage::Sql);
+        assert_eq!(
+            cell_query_language("SELECT * FROM appdb.events_10m"),
+            QueryLanguage::Sql
+        );
         assert_eq!(cell_query_language("  select 1"), QueryLanguage::Sql);
         // `database.table` in a FROM clause is SQL, not a shell statement.
-        assert_eq!(cell_query_language("SELECT * FROM db.events"), QueryLanguage::Sql);
-        assert_eq!(cell_query_language("INSERT INTO t VALUES (1)"), QueryLanguage::Sql);
+        assert_eq!(
+            cell_query_language("SELECT * FROM db.events"),
+            QueryLanguage::Sql
+        );
+        assert_eq!(
+            cell_query_language("INSERT INTO t VALUES (1)"),
+            QueryLanguage::Sql
+        );
     }
 
     #[test]
     fn native_mongo_shell_statements_use_the_native_language() {
-        assert_eq!(cell_query_language("db.events_10m.find({})"), QueryLanguage::Native);
-        assert_eq!(cell_query_language("  db.orders.aggregate([])"), QueryLanguage::Native);
+        assert_eq!(
+            cell_query_language("db.events_10m.find({})"),
+            QueryLanguage::Native
+        );
+        assert_eq!(
+            cell_query_language("  db.orders.aggregate([])"),
+            QueryLanguage::Native
+        );
     }
 }

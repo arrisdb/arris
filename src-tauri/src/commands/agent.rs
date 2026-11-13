@@ -6,7 +6,7 @@ use arris_engines::agent::{AgentEngine, AgentEvent, AgentProfile, AgentProvider}
 use arris_engines::{AppEnvironment, IpcError};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, State};
-use tokio::sync::{oneshot, Mutex};
+use tokio::sync::{Mutex, oneshot};
 use uuid::Uuid;
 
 /// Cap on how long we wait to open the connection and read its schema before
@@ -110,7 +110,9 @@ pub async fn cmd_agent_schema_context(
             .await
     };
     match conn {
-        Some(conn) => Ok(resolve_schema_ddl(env.inner(), &conn).await.unwrap_or_default()),
+        Some(conn) => Ok(resolve_schema_ddl(env.inner(), &conn)
+            .await
+            .unwrap_or_default()),
         None => Ok(String::new()),
     }
 }
@@ -158,7 +160,9 @@ async fn run_turn(
                 let project = env.project.read().await;
                 match project.as_ref() {
                     Some(project_state) => {
-                        env.connection.find_connection(id, Some(project_state)).await
+                        env.connection
+                            .find_connection(id, Some(project_state))
+                            .await
                     }
                     None => None,
                 }

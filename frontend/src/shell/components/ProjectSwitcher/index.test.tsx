@@ -1,7 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
-import { PROJECT_STORAGE_KEY } from "@shared/api";
+import { PROJECT_STORAGE_KEY, enableWebShell } from "@shared/api";
 import { ProjectSwitcher } from "./index";
+
+enableWebShell();
 
 describe("ProjectSwitcher", () => {
   const assign = vi.fn();

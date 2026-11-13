@@ -3,8 +3,8 @@ use std::sync::Arc;
 
 use arris_engines::dbt::{
     ColumnLineageGraph, DbtCommandResult, DbtCompileResult, DbtDocs, DbtProfileInfo, DbtRunResults,
-    ScannedNode as DbtScannedNode, ScannedProject as DbtScannedProject, SlimDiffError, SlimDiffMode,
-    SlimDiffResult,
+    ScannedNode as DbtScannedNode, ScannedProject as DbtScannedProject, SlimDiffError,
+    SlimDiffMode, SlimDiffResult,
 };
 use arris_engines::{AppEnvironment, DatabaseKind, IpcError};
 use tauri::State;

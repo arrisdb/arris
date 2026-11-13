@@ -1,6 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { API_BASE, PROJECT_HEADER, PROJECT_STORAGE_KEY } from "./constants";
-import { ApiError, apiBeacon, apiCall, currentProject, setCurrentProject, subscribe } from "./utils";
+import {
+  ApiError,
+  apiBeacon,
+  apiCall,
+  currentProject,
+  enableWebShell,
+  setCurrentProject,
+  subscribe,
+} from "./utils";
+
+enableWebShell();
 
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
@@ -122,6 +132,8 @@ describe("shared/api", () => {
     const unsubscribeFirst = subscribe(first);
     const unsubscribeSecond = subscribe(second);
     expect(instances).toHaveLength(1);
+    (instances[0] as unknown as { onopen: () => void }).onopen();
+    expect(first).toHaveBeenCalledWith(expect.objectContaining({ kind: "server_connected" }));
     const source = instances[0];
     const event = { kind: "connections_changed", project: "/p", payload: {} };
     source.onmessage?.(new MessageEvent("message", { data: JSON.stringify(event) }));

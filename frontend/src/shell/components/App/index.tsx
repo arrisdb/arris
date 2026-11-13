@@ -42,8 +42,8 @@ function App() {
       <ContentView />
       <FileSearchPopover />
       <SnackbarHost />
-      {isWebShell() && <QueryHandoffHost />}
-      {isWebShell() && <ServerEventsHost />}
+      <QueryHandoffHost />
+      <ServerEventsHost />
       {isWebShell() && <DeepLinkHost />}
     </>
   );
