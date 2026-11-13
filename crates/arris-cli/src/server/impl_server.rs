@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use arris_engines::AppEnvironment;
-use axum::extract::State;
+use axum::extract::{Query, State};
 use axum::response::sse::{Event, KeepAlive, Sse};
 use axum::routing::get;
 use axum::{Json, Router, middleware};
@@ -15,10 +15,11 @@ use tokio_stream::{Stream, StreamExt};
 
 use super::{
     ApiRoutes, AuthGuard, CANVASES_PAGE_PREFIX, ConnectionRequests, DIR_QUERY_PARAM,
-    EVENTS_CHANNEL_CAPACITY, EVENTS_ROUTE, HEALTH_ROUTE, HealthResponse, LOOPBACK_HOST, NEXT_PARAM,
-    OS_ASSIGNED_PORT, PROJECT_QUERY_PARAM, QueryHandoffs, ROOT_ROUTE, RUNS_PAGE_PREFIX,
-    SERVER_INFO_FILE, SERVER_INFO_TMP_EXTENSION, SERVER_LOCK_FILE, SERVER_VERSION, ServerError,
-    ServerInfo, ServerState, StaticAssets, TOKEN_BYTES, TOKEN_PARAM, URL_SCHEME,
+    EVENTS_CHANNEL_CAPACITY, EVENTS_ROUTE, EventsQuery, HEALTH_ROUTE, HealthResponse,
+    LOOPBACK_HOST, NEXT_PARAM, OS_ASSIGNED_PORT, PROJECT_QUERY_PARAM, QueryHandoffs, ROOT_ROUTE,
+    RUNS_PAGE_PREFIX, SERVER_INFO_FILE, SERVER_INFO_TMP_EXTENSION, SERVER_LOCK_FILE,
+    SERVER_VERSION, ServerError, ServerInfo, ServerState, StaticAssets, TOKEN_BYTES, TOKEN_PARAM,
+    URL_SCHEME, UiPage,
 };
 
 pub struct Server {
@@ -64,6 +65,7 @@ impl Server {
             connection_requests: ConnectionRequests::default(),
             query_handoffs: QueryHandoffs::default(),
             ui_contexts: Default::default(),
+            ui_pages: Default::default(),
         });
         Ok(Self {
             state,
@@ -200,11 +202,26 @@ impl Server {
 
     async fn events(
         State(state): State<Arc<ServerState>>,
+        Query(query): Query<EventsQuery>,
     ) -> Sse<impl Stream<Item = Result<Event, axum::Error>>> {
+        // The page counts as open until its stream drops; an unknown project counts for none.
+        let page = match query.project {
+            None => Some(UiPage::open(state.clone(), None)),
+            Some(root) => match state.env.project(Path::new(&root)).await {
+                Ok(project) => {
+                    let root = project.read().await.root.clone();
+                    Some(UiPage::open(state.clone(), Some(root)))
+                }
+                Err(_) => None,
+            },
+        };
         // Lagged receivers skip dropped events; clients refetch state on the next one.
         let stream = BroadcastStream::new(state.events.subscribe())
             .filter_map(Result::ok)
-            .map(|event| Event::default().json_data(event));
+            .map(move |event| {
+                let _open = &page;
+                Event::default().json_data(event)
+            });
         Sse::new(stream).keep_alive(KeepAlive::default())
     }
 }

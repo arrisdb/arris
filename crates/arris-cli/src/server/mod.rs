@@ -12,6 +12,7 @@ mod impl_server;
 mod impl_server_state;
 mod impl_static_assets;
 mod impl_tool_run_routes;
+mod impl_ui_pages;
 mod types;
 
 pub use constants::*;
@@ -28,4 +29,5 @@ pub use impl_server::Server;
 pub use impl_server_state::ServerState;
 pub use impl_static_assets::StaticAssets;
 pub use impl_tool_run_routes::ToolRunRoutes;
+pub use impl_ui_pages::{UiPage, UiPages};
 pub use types::*;

@@ -326,6 +326,12 @@ pub struct UiContextResponse {
     pub context: Option<UiContext>,
 }
 
+/// `/api/events` query: the page's project root. The desktop bridge omits it to follow every project.
+#[derive(Debug, Default, Deserialize)]
+pub struct EventsQuery {
+    pub project: Option<String>,
+}
+
 /// Tab ids from `tab_list`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TabCloseRequest {
