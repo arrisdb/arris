@@ -10,7 +10,7 @@ import Callout from "../../components/docs/Callout/Callout.astro";
   title="Coding agents - Arris Docs"
   breadcrumbs={[{ label: "Docs", href: "/" }, { label: "AI" }, { label: "Coding agents" }]}
   heading="Coding agents"
-  lede="Ask Claude Code, Codex, Cursor, or GitHub Copilot data questions. They work through the arris CLI: the agent reads your schema, writes the query, and puts it in an Arris console tab where you see the same result."
+  lede="Ask Claude Code or Codex data questions. They work through the arris CLI: the agent reads your schema, writes the query, and puts it in an Arris console tab where you see the same result."
   tocItems={[
     { label: "Install", href: "#install" },
     { label: "How it works", href: "#how" },
@@ -37,7 +37,7 @@ import Callout from "../../components/docs/Callout/Callout.astro";
 
   <p>
     It installs the <code>arris</code> binary to <code>~/.arris/bin/arris</code> and the
-    <code>arris</code> skill to two folders that cover all four agents:
+    <code>arris</code> skill to one folder per agent:
   </p>
 
   <DocTable>
@@ -59,16 +59,6 @@ import Callout from "../../components/docs/Callout/Callout.astro";
         <td><code>~/.agents/skills/arris</code></td>
         <td><code>$arris</code></td>
       </tr>
-      <tr>
-        <td class="font-medium text-fg">Cursor</td>
-        <td>both of the above</td>
-        <td><code>/arris</code></td>
-      </tr>
-      <tr>
-        <td class="font-medium text-fg">GitHub Copilot</td>
-        <td><code>~/.agents/skills/arris</code> (VS Code also reads <code>~/.claude/skills</code>)</td>
-        <td><code>/arris</code> in VS Code chat</td>
-      </tr>
     </tbody>
   </DocTable>
 
@@ -79,10 +69,6 @@ import Callout from "../../components/docs/Callout/Callout.astro";
     instead. It runs on macOS and Linux.
   </p>
 
-  <Callout type="note" title="The skill may be listed twice">
-    Cursor and Copilot in VS Code load skills from both folders, so they can show two
-    <code>arris</code> entries. They are the same skill.
-  </Callout>
 
   <h2 id="how">How it works</h2>
 
@@ -153,8 +139,7 @@ import Callout from "../../components/docs/Callout/Callout.astro";
 
   <ul>
     <li><strong>Claude Code</strong> and <strong>Codex</strong>: the agent plus a short session id, such as <code>Claude 1a2b3c4d</code> or <code>Codex 1a2b3c4d</code>, so two sessions never share a tab.</li>
-    <li><strong>Cursor</strong>: <code>Cursor</code>. Cursor does not expose a chat id, so all its chats share one tab per connection.</li>
-    <li><strong>GitHub Copilot</strong>, and anything else running the CLI: <code>Agent</code>. Copilot does not tell the commands it runs which chat they come from, so its chats share one tab per connection.</li>
+    <li>Anything else running the CLI: <code>Agent</code>.</li>
   </ul>
 
   <ul>

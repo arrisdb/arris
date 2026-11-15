@@ -22,7 +22,7 @@
 
 Arris is a desktop data workbench for working with all the most popular database engines. Unlike many database clients that lean heavily on the JVM and consume large amounts of memory, Arris is built on a Rust backend with Rust-based drivers, keeping the app lightweight and fast.
 
-And it is more than a database client: beyond writing SQL with dialect-aware autocomplete, you can join data across different databases with the DataFusion engine, work with dbt and SQLMesh through first-class support, run Python and Jupyter, visualize query results, and let Claude Code, Codex, Cursor, or GitHub Copilot query your databases through the `arris` CLI, with more to discover as we keep improving.
+And it is more than a database client: beyond writing SQL with dialect-aware autocomplete, you can join data across different databases with the DataFusion engine, work with dbt and SQLMesh through first-class support, run Python and Jupyter, visualize query results, and let Claude Code or Codex query your databases through the `arris` CLI, with more to discover as we keep improving.
 
 This repository is the **public home for Arris releases**. It is where you download the app, read release notes, and report problems.
 
@@ -39,7 +39,7 @@ You can also download from [arrisdb.app/download](https://arrisdb.app/download).
 
 Requires macOS 12 (Monterey) or later. Arris updates itself in place once installed.
 
-## Use with Claude Code, Codex, Cursor, or GitHub Copilot
+## Use with Claude Code or Codex
 
 Ask your coding agent data questions and watch the answers land in Arris:
 
@@ -47,7 +47,7 @@ Ask your coding agent data questions and watch the answers land in Arris:
 npx arris
 ```
 
-This installs the `arris` CLI to `~/.arris/bin/arris` and the `arris` skill to `~/.claude/skills/arris` (Claude Code) and `~/.agents/skills/arris` (Codex, Cursor and GitHub Copilot). Restart your agent, then type `/arris` in Claude Code, Cursor or Copilot, or `$arris` in Codex.
+This installs the `arris` CLI to `~/.arris/bin/arris` and the `arris` skill to `~/.claude/skills/arris` (Claude Code) and `~/.agents/skills/arris` (Codex). Restart your agent, then type `/arris` in Claude Code or `$arris` in Codex.
 
 - **Connect** with `/arris init-connection`. A browser form opens; passwords go there and into the system keychain, never into the chat.
 - **Ask** a question in plain words. The agent reads the schema, writes the query, and puts it in an Arris console tab named after it (e.g. `Codex 1a2b3c4d`), where you see the same result. Reads run right away.

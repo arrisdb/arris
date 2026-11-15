@@ -736,7 +736,7 @@ impl Cli {
                 ));
             }
         }
-        env(super::ENV_CURSOR_AGENT).map(|_| super::CURSOR_AGENT_NAME.to_string())
+        None
     }
 
     fn open_browser(url: &str) -> std::io::Result<()> {
@@ -786,7 +786,6 @@ mod tests {
         let codex = ("CODEX_THREAD_ID", "019a0000-0000-7000-8000-00000000beef");
         assert_eq!(session(&[claude]).as_deref(), Some("Claude 5555cafe"));
         assert_eq!(session(&[claude, codex]).as_deref(), Some("Codex 0000beef"));
-        assert_eq!(session(&[("CURSOR_AGENT", "1")]).as_deref(), Some("Cursor"));
         assert_eq!(session(&[]), None);
     }
 

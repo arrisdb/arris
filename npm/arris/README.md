@@ -1,6 +1,6 @@
 # arris
 
-Arris for Claude Code, Codex, Cursor and GitHub Copilot. Query your databases, explore dbt and SQLMesh projects, and build canvases with the `arris` skill.
+Arris for Claude Code and Codex. Query your databases, explore dbt and SQLMesh projects, and build canvases with the `arris` skill.
 
 ## Install
 
@@ -8,7 +8,7 @@ Arris for Claude Code, Codex, Cursor and GitHub Copilot. Query your databases, e
 npx arris
 ```
 
-This installs the arris skill to `~/.claude/skills/arris` (Claude Code) and `~/.agents/skills/arris` (Codex, Cursor and GitHub Copilot), and the `arris` binary to `~/.arris/bin/arris`. Restart your agent, then type `/arris` in Claude Code, Cursor or Copilot, or `$arris` in Codex.
+This installs the arris skill to `~/.claude/skills/arris` (Claude Code) and `~/.agents/skills/arris` (Codex), and the `arris` binary to `~/.arris/bin/arris`. Restart your agent, then type `/arris` in Claude Code or `$arris` in Codex.
 
 - `npx arris --project` installs the skill into `./.claude/skills/arris` and `./.agents/skills/arris` for the current project only.
 - Run `npx arris` again to upgrade. An existing skill folder is moved to `~/.arris/skill-backups/arris-<agent>-<time>` first.

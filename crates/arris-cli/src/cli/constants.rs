@@ -24,9 +24,6 @@ pub const AGENT_SESSION_ENVS: [(&str, &str); 2] = [
     ("CODEX_THREAD_ID", "Codex"),
     ("CLAUDE_CODE_SESSION_ID", "Claude"),
 ];
-/// Set by Cursor in agent shells, with no session id, so its chats share one console.
-pub const ENV_CURSOR_AGENT: &str = "CURSOR_AGENT";
-pub const CURSOR_AGENT_NAME: &str = "Cursor";
 /// Trailing chars kept; a Codex UUIDv7 thread id starts with its creation time.
 pub const AGENT_SESSION_SHORT_LEN: usize = 8;
 /// Set by tests so CLI runs never open the developer's browser.
