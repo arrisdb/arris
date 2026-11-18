@@ -290,6 +290,37 @@ impl ConnectionEngine {
         None
     }
 
+    /// Case-insensitive name lookup; global connections win over project ones.
+    pub async fn find_connection_by_name(
+        &self,
+        name: &str,
+        project: Option<&ProjectState>,
+    ) -> Option<ConnectionConfig> {
+        let matches = |c: &&ConnectionConfig| c.name.eq_ignore_ascii_case(name);
+        if let Some(c) = self.global_connections.read().await.iter().find(matches) {
+            return Some(c.clone());
+        }
+        project.and_then(|p| p.connections.iter().find(matches).cloned())
+    }
+
+    /// Empty secrets on a config whose id is already saved inherit the stored ones,
+    /// since browser clients only ever see scrubbed configs.
+    pub async fn fill_stored_secrets(
+        &self,
+        config: &mut ConnectionConfig,
+        project: Option<&ProjectState>,
+    ) {
+        let Some(stored) = self.find_connection(config.id, project).await else {
+            return;
+        };
+        if config.password.is_empty() {
+            config.password = stored.password;
+        }
+        if config.ssh_password.as_deref().is_none_or(str::is_empty) {
+            config.ssh_password = stored.ssh_password;
+        }
+    }
+
     /// Open an SSH tunnel when the config calls for one and return the config
     /// the driver should actually connect with — `host`/`port` rewritten to the
     /// tunnel's local forward when tunneling, otherwise the config unchanged.
@@ -380,7 +411,7 @@ mod tests {
     async fn engine_with_dir(dir: &std::path::Path) -> ConnectionEngine {
         ConnectionEngine::new_with_secrets(
             dir.to_path_buf(),
-            Arc::new(crate::persistence::MockSecretStore::new()),
+            Arc::new(crate::persistence::MemorySecretStore::new()),
         )
         .await
     }
@@ -416,6 +447,61 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn find_by_name_is_case_insensitive_across_scopes() {
+        let global_tmp = tempfile::tempdir().unwrap();
+        let proj_tmp = tempfile::tempdir().unwrap();
+        let engine = engine_with_dir(global_tmp.path()).await;
+        let mut project = ProjectState::open(global_tmp.path(), proj_tmp.path().into())
+            .await
+            .unwrap();
+        let global = ConnectionConfig::new("Warehouse", DatabaseKind::Postgres);
+        let local = ConnectionConfig::new("scratch", DatabaseKind::Sqlite);
+        engine.save_connection(global.clone(), "global", None).await.unwrap();
+        engine
+            .save_connection(local.clone(), "local", Some(&mut project))
+            .await
+            .unwrap();
+        let found = engine.find_connection_by_name("warehouse", Some(&project)).await;
+        assert_eq!(found.map(|c| c.id), Some(global.id));
+        let found = engine.find_connection_by_name("SCRATCH", Some(&project)).await;
+        assert_eq!(found.map(|c| c.id), Some(local.id));
+        assert!(engine.find_connection_by_name("scratch", None).await.is_none());
+    }
+
+    #[tokio::test]
+    async fn fill_stored_secrets_only_fills_empty_fields() {
+        let tmp = tempfile::tempdir().unwrap();
+        let engine = engine_with_dir(tmp.path()).await;
+        let mut saved = ConnectionConfig::new("pg", DatabaseKind::Postgres);
+        saved.password = "stored".into();
+        saved.ssh_password = Some("ssh-stored".into());
+        engine.save_connection(saved.clone(), "global", None).await.unwrap();
+
+        let mut edit = saved.clone();
+        edit.password.clear();
+        edit.ssh_password = None;
+        engine.fill_stored_secrets(&mut edit, None).await;
+        assert_eq!(edit.password, "stored");
+        assert_eq!(edit.ssh_password.as_deref(), Some("ssh-stored"));
+
+        let mut changed = saved.clone();
+        changed.password = "new".into();
+        engine.fill_stored_secrets(&mut changed, None).await;
+        assert_eq!(changed.password, "new");
+    }
+
+    #[test]
+    fn scrubbed_scoped_connection_has_no_secrets() {
+        let mut config = ConnectionConfig::new("pg", DatabaseKind::Postgres);
+        config.password = "pw".into();
+        config.ssh_password = Some("ssh".into());
+        let scoped = ScopedConnection { config, scope: "global".into(), is_connected: false };
+        let clean = scoped.scrubbed();
+        assert!(clean.config.password.is_empty());
+        assert!(clean.config.ssh_password.is_none());
+    }
+
+    #[tokio::test]
     async fn save_connection_global_persists() {
         let tmp = tempfile::tempdir().unwrap();
         let engine = engine_with_dir(tmp.path()).await;
@@ -433,7 +519,7 @@ mod tests {
         let global_tmp = tempfile::tempdir().unwrap();
         let proj_tmp = tempfile::tempdir().unwrap();
         let engine = engine_with_dir(global_tmp.path()).await;
-        let mut project = ProjectState::open(proj_tmp.path().into()).await.unwrap();
+        let mut project = ProjectState::open(global_tmp.path(), proj_tmp.path().into()).await.unwrap();
 
         let cfg = ConnectionConfig::new("local_pg", DatabaseKind::Postgres);
         engine
@@ -441,7 +527,7 @@ mod tests {
             .await
             .unwrap();
 
-        let store = ConnectionsStore::new(proj_tmp.path().join(".arris"));
+        let store = ConnectionsStore::new(project.arris_dir.clone());
         let loaded = store.load().await.unwrap();
         assert_eq!(loaded.len(), 1);
         assert_eq!(loaded[0].name, "local_pg");
@@ -525,7 +611,7 @@ mod tests {
         let global_tmp = tempfile::tempdir().unwrap();
         let proj_tmp = tempfile::tempdir().unwrap();
         let engine = engine_with_dir(global_tmp.path()).await;
-        let mut project = ProjectState::open(proj_tmp.path().into()).await.unwrap();
+        let mut project = ProjectState::open(global_tmp.path(), proj_tmp.path().into()).await.unwrap();
 
         let cfg = ConnectionConfig::new("del_local", DatabaseKind::Sqlite);
         let id = cfg.id;
@@ -545,7 +631,7 @@ mod tests {
         let global_tmp = tempfile::tempdir().unwrap();
         let proj_tmp = tempfile::tempdir().unwrap();
         let engine = engine_with_dir(global_tmp.path()).await;
-        let mut project = ProjectState::open(proj_tmp.path().into()).await.unwrap();
+        let mut project = ProjectState::open(global_tmp.path(), proj_tmp.path().into()).await.unwrap();
 
         let cfg = ConnectionConfig::new("promo", DatabaseKind::Sqlite);
         let id = cfg.id;
@@ -567,7 +653,7 @@ mod tests {
         let global_tmp = tempfile::tempdir().unwrap();
         let proj_tmp = tempfile::tempdir().unwrap();
         let engine = engine_with_dir(global_tmp.path()).await;
-        let mut project = ProjectState::open(proj_tmp.path().into()).await.unwrap();
+        let mut project = ProjectState::open(global_tmp.path(), proj_tmp.path().into()).await.unwrap();
 
         let cfg = ConnectionConfig::new("shared", DatabaseKind::Postgres);
         let id = cfg.id;
@@ -586,7 +672,7 @@ mod tests {
         let global_tmp = tempfile::tempdir().unwrap();
         let proj_tmp = tempfile::tempdir().unwrap();
         let engine = engine_with_dir(global_tmp.path()).await;
-        let mut project = ProjectState::open(proj_tmp.path().into()).await.unwrap();
+        let mut project = ProjectState::open(global_tmp.path(), proj_tmp.path().into()).await.unwrap();
 
         let gc = ConnectionConfig::new("gc", DatabaseKind::Postgres);
         engine
@@ -712,7 +798,7 @@ mod tests {
         let global_tmp = tempfile::tempdir().unwrap();
         let proj_tmp = tempfile::tempdir().unwrap();
         let engine = engine_with_dir(global_tmp.path()).await;
-        let mut project = ProjectState::open(proj_tmp.path().into()).await.unwrap();
+        let mut project = ProjectState::open(global_tmp.path(), proj_tmp.path().into()).await.unwrap();
 
         let gc = ConnectionConfig::new("global_pg", DatabaseKind::Postgres);
         engine.save_connection(gc, "global", None).await.unwrap();
@@ -784,11 +870,11 @@ mod tests {
 
     // ── Keychain credential storage ────────────────────────────────
 
-    use crate::persistence::MockSecretStore;
+    use crate::persistence::MemorySecretStore;
 
     async fn engine_with_secrets(
         dir: &std::path::Path,
-        secrets: Arc<MockSecretStore>,
+        secrets: Arc<MemorySecretStore>,
     ) -> ConnectionEngine {
         ConnectionEngine::new_with_secrets(dir.to_path_buf(), secrets).await
     }
@@ -805,7 +891,7 @@ mod tests {
     #[tokio::test]
     async fn saved_json_contains_no_secret_fields_or_values() {
         let tmp = tempfile::tempdir().unwrap();
-        let secrets = Arc::new(MockSecretStore::new());
+        let secrets = Arc::new(MemorySecretStore::new());
         let engine = engine_with_secrets(tmp.path(), secrets.clone()).await;
 
         let cfg = config_with_secrets();
@@ -832,7 +918,7 @@ mod tests {
     #[tokio::test]
     async fn load_rehydrates_secrets_from_keychain() {
         let tmp = tempfile::tempdir().unwrap();
-        let secrets = Arc::new(MockSecretStore::new());
+        let secrets = Arc::new(MemorySecretStore::new());
         let cfg = config_with_secrets();
         let id = cfg.id;
         {
@@ -850,7 +936,7 @@ mod tests {
     #[tokio::test]
     async fn delete_connection_clears_keychain_entries() {
         let tmp = tempfile::tempdir().unwrap();
-        let secrets = Arc::new(MockSecretStore::new());
+        let secrets = Arc::new(MemorySecretStore::new());
         let engine = engine_with_secrets(tmp.path(), secrets.clone()).await;
 
         let cfg = config_with_secrets();
@@ -866,7 +952,7 @@ mod tests {
     #[tokio::test]
     async fn keychain_write_failure_aborts_save_without_disk_write() {
         let tmp = tempfile::tempdir().unwrap();
-        let secrets = Arc::new(MockSecretStore::failing());
+        let secrets = Arc::new(MemorySecretStore::failing());
         let engine = engine_with_secrets(tmp.path(), secrets).await;
 
         let cfg = config_with_secrets();

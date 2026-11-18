@@ -1,0 +1,18 @@
+pub(super) const PROJECTS_DIR_NAME: &str = "projects";
+pub(super) const PROJECT_MANIFEST_FILE: &str = "project.json";
+pub(super) const PROJECT_KEY_HEX_LEN: usize = 16;
+pub const QUERY_RUN_MAX_ENTRIES: usize = 1000;
+pub const RUN_PREVIEW_MAX_ROWS: usize = 50;
+pub const INTERRUPTED_RUN_ERROR: &str =
+    "Interrupted: the Arris server stopped before this run finished.";
+pub const CANVAS_DIR_NAME: &str = "canvases";
+pub const CANVAS_FILE_EXT: &str = "json";
+pub(super) const CANVAS_DOC_VERSION: u64 = 1;
+pub(super) const CANVAS_INITIAL_REVISION: u64 = 0;
+pub(super) const CANVAS_REVISION_STEP: u64 = 1;
+pub(super) const CANVAS_VERSION_KEY: &str = "version";
+pub(super) const CANVAS_COMPONENTS_KEY: &str = "components";
+pub(super) const CANVAS_EDGES_KEY: &str = "edges";
+pub const TOOL_RUN_HISTORY_MAX: usize = 200;
+pub(super) const TOOL_RUNS_FILE: &str = "tool_runs.json";
+pub(super) const QUERY_RUNS_FILE: &str = "query_runs.json";

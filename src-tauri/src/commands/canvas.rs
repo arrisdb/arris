@@ -2,6 +2,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use arris_engines::{
+    QueryRequest,
     AppEnvironment, CanvasCellRun, CanvasCellSpec, CanvasEngine, CanvasError,
     CELL_INGEST_BYTE_BUDGET, ErrorCode, IngestedCell, IpcError, ProjectState, QueryEngine,
     QueryLanguage, QueryResult, QueryValue,
@@ -245,12 +246,14 @@ pub async fn cmd_run_canvas_cell(
                                 uuid,
                                 &env.connection,
                                 proj.as_ref(),
-                                cell.sql.clone(),
-                                Vec::<QueryValue>::new(),
-                                Some(cell_query_language(&cell.sql)),
-                                None,
-                                None,
-                                Some(query_id.clone()),
+                                QueryRequest {
+                                    sql: cell.sql.clone(),
+                                    params: Vec::<QueryValue>::new(),
+                                    language: Some(cell_query_language(&cell.sql)),
+                                    page_size: None,
+                                    page: None,
+                                    query_id: Some(query_id.clone()),
+                                },
                             )
                             .await
                             .map_err(|e| {

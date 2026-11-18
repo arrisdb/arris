@@ -1,12 +1,5 @@
-//! Cross-platform keychain wrapper.
-//!
-//! All secrets live in a **single** keychain item — service `arris`, account
-//! `secrets` — holding a JSON vault of every connection password, SSH key
-//! passphrase, and the MCP bearer token. One item means macOS prompts for
-//! access at most once per session instead of once per connection.
-//!
-//! Access goes through the [`SecretStore`] trait so persistence logic can be
-//! tested without a live macOS keychain (which would prompt in CI).
+//! All secrets live in one keychain item (service `arris`, account `secrets`) holding a
+//! JSON vault, so macOS prompts at most once per session. Tests use [`SecretStore`] mocks.
 
 use std::collections::HashMap;
 use std::sync::Mutex;
@@ -28,9 +21,6 @@ pub trait SecretStore: Send + Sync {
     fn set_ssh_passphrase(&self, connection_id: &str, passphrase: &str) -> Result<(), KeychainError>;
     fn get_ssh_passphrase(&self, connection_id: &str) -> Result<Option<String>, KeychainError>;
     fn delete_ssh_passphrase(&self, connection_id: &str) -> Result<(), KeychainError>;
-
-    fn set_mcp_bearer(&self, token: &str) -> Result<(), KeychainError>;
-    fn get_mcp_bearer(&self) -> Result<Option<String>, KeychainError>;
 }
 
 /// The single JSON blob stored under the one keychain item.
@@ -40,8 +30,6 @@ struct Vault {
     passwords: HashMap<String, String>,
     #[serde(default)]
     ssh: HashMap<String, String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    mcp_bearer: Option<String>,
 }
 
 /// Production secret store backed by one keychain item. The decoded vault is
@@ -130,24 +118,15 @@ impl SecretStore for Keychain {
         }
         Ok(())
     }
-
-    fn set_mcp_bearer(&self, token: &str) -> Result<(), KeychainError> {
-        let mut vault = self.vault()?;
-        vault.mcp_bearer = Some(token.to_string());
-        self.store(vault)
-    }
-
-    fn get_mcp_bearer(&self) -> Result<Option<String>, KeychainError> {
-        Ok(self.vault()?.mcp_bearer)
-    }
 }
 
-#[cfg(test)]
-pub(crate) use mock::MockSecretStore;
+#[cfg(any(test, feature = "test-support"))]
+pub use mock::MemorySecretStore;
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 mod mock {
     use std::collections::HashMap;
+    use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::Mutex;
 
     use super::{KeychainError, SecretStore};
@@ -155,31 +134,38 @@ mod mock {
     /// In-memory [`SecretStore`] for tests. Keys are namespaced by secret kind
     /// so connection-password and SSH-passphrase entries never collide.
     #[derive(Default)]
-    pub(crate) struct MockSecretStore {
+    pub struct MemorySecretStore {
         entries: Mutex<HashMap<String, String>>,
         fail_writes: bool,
+        calls: AtomicUsize,
     }
 
-    impl MockSecretStore {
-        pub(crate) fn new() -> Self {
+    impl MemorySecretStore {
+        pub fn new() -> Self {
             Self::default()
         }
 
-        /// A store whose writes always fail — used to assert fail-loud behavior.
-        pub(crate) fn failing() -> Self {
+        /// A store whose writes always fail, used to assert fail-loud behavior.
+        pub fn failing() -> Self {
             Self {
-                entries: Mutex::new(HashMap::new()),
                 fail_writes: true,
+                ..Self::default()
             }
         }
 
         /// Read a namespaced key directly (e.g. `pw:<id>`, `ssh:<id>`) for
         /// assertions.
-        pub(crate) fn raw_get(&self, key: &str) -> Option<String> {
+        pub fn raw_get(&self, key: &str) -> Option<String> {
             self.entries.lock().unwrap().get(key).cloned()
         }
 
+        /// Total trait calls so far, to assert a path never touches the store.
+        pub fn calls(&self) -> usize {
+            self.calls.load(Ordering::SeqCst)
+        }
+
         fn set(&self, key: String, value: &str) -> Result<(), KeychainError> {
+            self.calls.fetch_add(1, Ordering::SeqCst);
             if self.fail_writes {
                 return Err(KeychainError::Keyring("mock write failure".into()));
             }
@@ -188,16 +174,18 @@ mod mock {
         }
 
         fn get(&self, key: &str) -> Result<Option<String>, KeychainError> {
+            self.calls.fetch_add(1, Ordering::SeqCst);
             Ok(self.entries.lock().unwrap().get(key).cloned())
         }
 
         fn delete(&self, key: &str) -> Result<(), KeychainError> {
+            self.calls.fetch_add(1, Ordering::SeqCst);
             self.entries.lock().unwrap().remove(key);
             Ok(())
         }
     }
 
-    impl SecretStore for MockSecretStore {
+    impl SecretStore for MemorySecretStore {
         fn set_connection_password(&self, id: &str, password: &str) -> Result<(), KeychainError> {
             self.set(format!("pw:{id}"), password)
         }
@@ -215,12 +203,6 @@ mod mock {
         }
         fn delete_ssh_passphrase(&self, id: &str) -> Result<(), KeychainError> {
             self.delete(&format!("ssh:{id}"))
-        }
-        fn set_mcp_bearer(&self, token: &str) -> Result<(), KeychainError> {
-            self.set("mcp:bearer".into(), token)
-        }
-        fn get_mcp_bearer(&self) -> Result<Option<String>, KeychainError> {
-            self.get("mcp:bearer")
         }
     }
 }
@@ -240,12 +222,10 @@ mod tests {
         let mut vault = Vault::default();
         vault.passwords.insert("c1".into(), "pw".into());
         vault.ssh.insert("c1".into(), "ssh".into());
-        vault.mcp_bearer = Some("tok".into());
         let json = serde_json::to_string(&vault).unwrap();
         let back: Vault = serde_json::from_str(&json).unwrap();
         assert_eq!(back.passwords.get("c1").map(String::as_str), Some("pw"));
         assert_eq!(back.ssh.get("c1").map(String::as_str), Some("ssh"));
-        assert_eq!(back.mcp_bearer.as_deref(), Some("tok"));
     }
 
     #[test]
@@ -253,23 +233,20 @@ mod tests {
         let back: Vault = serde_json::from_str("{}").unwrap();
         assert!(back.passwords.is_empty());
         assert!(back.ssh.is_empty());
-        assert!(back.mcp_bearer.is_none());
     }
 
     #[test]
     fn mock_round_trips_each_secret_kind() {
-        let store = MockSecretStore::new();
+        let store = MemorySecretStore::new();
         store.set_connection_password("c1", "pw").unwrap();
         store.set_ssh_passphrase("c1", "ssh").unwrap();
-        store.set_mcp_bearer("tok").unwrap();
         assert_eq!(store.get_connection_password("c1").unwrap().as_deref(), Some("pw"));
         assert_eq!(store.get_ssh_passphrase("c1").unwrap().as_deref(), Some("ssh"));
-        assert_eq!(store.get_mcp_bearer().unwrap().as_deref(), Some("tok"));
     }
 
     #[test]
     fn mock_delete_clears_only_target_kind() {
-        let store = MockSecretStore::new();
+        let store = MemorySecretStore::new();
         store.set_connection_password("c1", "pw").unwrap();
         store.set_ssh_passphrase("c1", "ssh").unwrap();
         store.delete_connection_password("c1").unwrap();
@@ -279,9 +256,9 @@ mod tests {
 
     #[test]
     fn failing_mock_errors_on_write() {
-        let store = MockSecretStore::failing();
+        let store = MemorySecretStore::failing();
         assert!(store.set_connection_password("c1", "pw").is_err());
     }
 
-    // Live keychain tests are skipped in CI — they would prompt on macOS.
+    // Live keychain tests are skipped in CI: they would prompt on macOS.
 }
