@@ -7,7 +7,6 @@ export { ResultsFooterBar } from "./components/ResultsTableView/components/Resul
 export { ResultsDataTable } from "./components/ResultsTableView/components/ResultsDataTable";
 export { ResultsSearchBar } from "./components/ResultsTableView/components/ResultsSearchBar";
 export { RowDetailPane } from "./components/RowDetailPane";
-export { RunResultView } from "./components/RunResultView";
 export { RunHistoryChips } from "./components/RunHistoryChips";
 export { exportResults, findVisibleMatches, pickExportPath, visibleRowsForResult, writeExport } from "./components/ResultsTableView/utils";
 export type { ExportFormat } from "./components/ResultsTableView/utils";

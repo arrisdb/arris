@@ -269,7 +269,8 @@ type TabType =
   | "gitcommitdiff"
   | "githistory"
   | "gitconflict"
-  | "canvas";
+  | "canvas"
+  | "analytics";
 
 /** Identity of the object a `definition` tab shows DDL for; drives one-tab-per-object dedup. */
 interface ObjectIdentity {

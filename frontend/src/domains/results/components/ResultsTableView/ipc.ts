@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { apiCall, isWebShell } from "@shared/api";
 import type {
   MutationResult,
   QueryLanguage,
@@ -18,6 +19,9 @@ function runQueryIPC(
   page?: number,
   queryId?: string,
 ): Promise<QueryResult> {
+  if (isWebShell()) {
+    return apiCall("query_page", { connection: connectionId, sql, language, pageSize, page });
+  }
   return invoke("cmd_run_query", {
     connectionId,
     sql,
@@ -42,6 +46,7 @@ function applyMutationsIPC(
 }
 
 function listSchemasIPC(connectionId: string): Promise<SchemaNode[]> {
+  if (isWebShell()) return apiCall("schema_list", { connection: connectionId });
   return invoke("cmd_list_schemas", { connectionId });
 }
 

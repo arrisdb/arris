@@ -3,9 +3,12 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use arris_engines::persistence::ProjectManifest;
+use arris_engines::query::QueryError;
 use arris_engines::{
-    CONNECTION_SCOPE_LOCAL, ConnectionConfig, JsonCollectionStore, PersistedPinnedQuery, ProjectState, ScopedConnection,
-    QueryRequest, QueryResult, RUN_PREVIEW_MAX_ROWS, RunPreview, RunRecord, RunStatus, SchemaNode, StoreError,
+    CONNECTION_SCOPE_LOCAL, ConnectionConfig, JsonCollectionStore, JsonSingletonStore,
+    PersistedPinnedQuery, ProjectState, QueryEngine, QueryRequest, QueryResult,
+    RUN_PREVIEW_MAX_ROWS, RunPreview, RunRecord, RunSource, RunStatus, SchemaNode,
+    ScopedConnection, StoreError,
 };
 use axum::extract::State;
 use axum::extract::rejection::JsonRejection;
@@ -24,13 +27,19 @@ use super::{
     ConnectionRequestCreateRequest, ConnectionRequestCreateResponse, ConnectionRequestIdRequest,
     ConnectionRequestResolvedPayload, ConnectionRequestStatus, ConnectionSaveRequest,
     ConnectionTestRequest, EmptyResponse, HISTORY_DEFAULT_LIMIT, HISTORY_LIST_ROUTE,
-    HistoryListRequest, OkResponse, PIN_ADD_ROUTE, PIN_LIST_ROUTE, PIN_REMOVE_ROUTE,
-    PIN_RENAME_ROUTE, PROJECT_HEADER, PROJECT_LIST_ROUTE, PROJECT_QUERY_PARAM, PinAddRequest,
-    PIN_SAVE_ROUTE, PinRemoveRequest, PinRenameRequest, PinSaveRequest, QUERY_DEFAULT_LIMIT, QUERY_DEFAULT_SOURCE,
-    QUERY_FIRST_PAGE, QUERY_RUN_ROUTE, QueryRunRequest, QueryRunResponse, REQUEST_QUERY_PARAM,
-    RUN_GET_ROUTE, RUN_PAGE_MAX_LIMIT, RUN_PAGE_ROUTE, RUN_RESULTS_BOARD, RunGetResponse,
+    HistoryListRequest, OBJECT_DEFINITION_ROUTE, ObjectDefinitionRequest, OkResponse,
+    PIN_ADD_ROUTE, PIN_LIST_ROUTE, PIN_REMOVE_ROUTE, PIN_RENAME_ROUTE, PIN_SAVE_ROUTE,
+    PROJECT_HEADER, PROJECT_LIST_ROUTE, PROJECT_QUERY_PARAM, PinAddRequest, PinRemoveRequest,
+    PinRenameRequest, PinSaveRequest, QUERY_DEFAULT_LIMIT, QUERY_DEFAULT_SOURCE, QUERY_FIRST_PAGE,
+    QUERY_HANDOFF_TAKE_ROUTE, QUERY_OPEN_POLL_MS, QUERY_OPEN_ROUTE, QUERY_OPEN_WAIT_MS,
+    QUERY_PAGE_ROUTE, QUERY_RUN_ROUTE, QueryHandoff, QueryOpenRequest, QueryOpenResponse,
+    QueryPageRequest, QueryRunRequest, QueryRunResponse, REQUEST_QUERY_PARAM, RUN_GET_ROUTE,
+    RUN_PAGE_MAX_LIMIT, RUN_PAGE_ROUTE, RUN_RESULTS_BOARD, ReadOnlySql, RunGetResponse,
     RunIdRequest, RunPageRequest, SCHEMA_LIST_ROUTE, SchemaListRequest, Server, ServerEvent,
-    ServerEventKind, ServerState, ToolRunRoutes,
+    ServerEventKind, ServerState, TABLE_BROWSE_DEFAULT_LIMIT, TABLE_BROWSE_QUERY_ROUTE,
+    TableBrowseQueryRequest, ToolRunRoutes, WORKSPACE_LAYOUT_SAVE_ROUTE, WORKSPACE_LOAD_ROUTE,
+    WORKSPACE_TABS_SAVE_ROUTE, WorkspaceLayoutSaveRequest, WorkspaceResponse,
+    WorkspaceTabsSaveRequest,
 };
 
 pub(super) type ApiState = State<Arc<ServerState>>;
@@ -48,7 +57,12 @@ impl ApiRoutes {
             .route(CONNECTION_TEST_ROUTE, post(Self::connection_test))
             .route(CONNECTION_REMOVE_ROUTE, post(Self::connection_remove))
             .route(SCHEMA_LIST_ROUTE, post(Self::schema_list))
+            .route(OBJECT_DEFINITION_ROUTE, post(Self::object_definition))
+            .route(TABLE_BROWSE_QUERY_ROUTE, post(Self::table_browse_query))
             .route(QUERY_RUN_ROUTE, post(Self::query_run))
+            .route(QUERY_PAGE_ROUTE, post(Self::query_page))
+            .route(QUERY_OPEN_ROUTE, post(Self::query_open))
+            .route(QUERY_HANDOFF_TAKE_ROUTE, post(Self::query_handoff_take))
             .route(HISTORY_LIST_ROUTE, post(Self::history_list))
             .route(RUN_GET_ROUTE, post(Self::run_get))
             .route(RUN_PAGE_ROUTE, post(Self::run_page))
@@ -56,6 +70,12 @@ impl ApiRoutes {
             .route(PIN_ADD_ROUTE, post(Self::pin_add))
             .route(PIN_REMOVE_ROUTE, post(Self::pin_remove))
             .route(PIN_SAVE_ROUTE, post(Self::pin_save))
+            .route(WORKSPACE_LOAD_ROUTE, post(Self::workspace_load))
+            .route(WORKSPACE_TABS_SAVE_ROUTE, post(Self::workspace_tabs_save))
+            .route(
+                WORKSPACE_LAYOUT_SAVE_ROUTE,
+                post(Self::workspace_layout_save),
+            )
             .route(PIN_LIST_ROUTE, post(Self::pin_list))
             .route(PROJECT_LIST_ROUTE, post(Self::project_list))
             .merge(CanvasRoutes::router())
@@ -124,7 +144,13 @@ impl ApiRoutes {
         connection: &str,
     ) -> Result<ConnectionConfig, ApiError> {
         let by_id = match Uuid::parse_str(connection) {
-            Ok(id) => state.env.connection.find_connection(id, Some(project)).await,
+            Ok(id) => {
+                state
+                    .env
+                    .connection
+                    .find_connection(id, Some(project))
+                    .await
+            }
             Err(_) => None,
         };
         match by_id {
@@ -166,10 +192,7 @@ impl ApiRoutes {
         });
     }
 
-    fn finish_run(
-        run: &mut RunRecord,
-        outcome: &Result<QueryResult, arris_engines::query::QueryError>,
-    ) {
+    fn finish_run(run: &mut RunRecord, outcome: &Result<QueryResult, QueryError>) {
         run.finished_at = Some(Utc::now());
         match outcome {
             Ok(result) => {
@@ -339,6 +362,45 @@ impl ApiRoutes {
         };
         Ok(Json(nodes))
     }
+
+    async fn table_browse_query(
+        State(state): ApiState,
+        headers: HeaderMap,
+        body: Body<TableBrowseQueryRequest>,
+    ) -> ApiResult<String> {
+        let Json(req) = body?;
+        let project = Self::project(&state, &headers).await?;
+        let guard = project.read().await;
+        let config = Self::resolve_connection(&state, &guard, &req.connection).await?;
+        let limit = req.limit.unwrap_or(TABLE_BROWSE_DEFAULT_LIMIT);
+        let sql = QueryEngine::table_browse_query(
+            config.id,
+            &state.env.connection,
+            Some(&guard),
+            &req.table,
+            limit,
+        )
+        .await?;
+        Ok(Json(sql))
+    }
+
+    async fn object_definition(
+        State(state): ApiState,
+        headers: HeaderMap,
+        body: Body<ObjectDefinitionRequest>,
+    ) -> ApiResult<String> {
+        let Json(req) = body?;
+        let project = Self::project(&state, &headers).await?;
+        let config =
+            Self::resolve_connection(&state, &*project.read().await, &req.connection).await?;
+        let driver = state.env.connection.open_connection(&config).await?;
+        Ok(Json(
+            driver
+                .object_definition(&req.object)
+                .await
+                .map_err(QueryError::from)?,
+        ))
+    }
 }
 
 // Browser connection-request commands.
@@ -351,7 +413,9 @@ impl ApiRoutes {
         let Json(req) = body?;
         let root = Self::project_root(&state, &headers).await?;
         let project = root.to_string_lossy().into_owned();
-        let request = state.connection_requests.create(root, req.kind, req.prefill);
+        let request = state
+            .connection_requests
+            .create(root, req.kind, req.prefill);
         let url = Server::page_path(
             CONNECTION_NEW_PAGE,
             &[
@@ -420,9 +484,17 @@ impl ApiRoutes {
     ) -> ApiResult<QueryRunResponse> {
         let Json(req) = body?;
         let project = Self::project(&state, &headers).await?;
+        Ok(Json(Self::run_and_record(&state, &project, req).await?))
+    }
+
+    async fn run_and_record(
+        state: &ServerState,
+        project: &RwLock<ProjectState>,
+        req: QueryRunRequest,
+    ) -> Result<QueryRunResponse, ApiError> {
         // Project lock only brackets setup and the final update; the query itself runs unlocked.
         let guard = project.read().await;
-        let config = Self::resolve_connection(&state, &guard, &req.connection).await?;
+        let config = Self::resolve_connection(state, &guard, &req.connection).await?;
         let mut run = RunRecord {
             id: Uuid::new_v4().to_string(),
             connection_id: config.id,
@@ -437,28 +509,15 @@ impl ApiRoutes {
         };
         guard.query_run_store.append(run.clone()).await?;
         drop(guard);
-        let driver = state.env.connection.open_connection(&config).await;
-        let outcome = match driver {
-            Ok(driver) => {
-                state
-                    .env
-                    .query
-                    .run_query_on(
-                        driver,
-                        state.env.connection.transaction_config(config.id).await,
-                        QueryRequest {
-                            sql: req.sql,
-                            params: Vec::new(),
-                            language: None,
-                            page_size: Some(req.limit.unwrap_or(QUERY_DEFAULT_LIMIT)),
-                            page: Some(QUERY_FIRST_PAGE),
-                            query_id: Some(run.id.clone()),
-                        },
-                    )
-                    .await
-            }
-            Err(e) => Err(e.into()),
+        let request = QueryRequest {
+            sql: req.sql,
+            params: Vec::new(),
+            language: req.language,
+            page_size: Some(req.limit.unwrap_or(QUERY_DEFAULT_LIMIT)),
+            page: Some(QUERY_FIRST_PAGE),
+            query_id: Some(req.query_id.unwrap_or_else(|| run.id.clone())),
         };
+        let outcome = Self::execute(state, &config, request).await;
         Self::finish_run(&mut run, &outcome);
         if let Ok(result) = &outcome
             && let Err(e) = state
@@ -470,12 +529,100 @@ impl ApiRoutes {
         }
         let guard = project.read().await;
         let recorded = guard.query_run_store.update(run.clone()).await;
-        Self::emit(&state, ServerEventKind::HistoryChanged, &guard, &run);
+        Self::emit(state, ServerEventKind::HistoryChanged, &guard, &run);
         recorded?;
-        Ok(Json(QueryRunResponse {
+        Ok(QueryRunResponse {
             run,
             result: outcome?,
-        }))
+        })
+    }
+
+    /// Queues SQL for a console tab. Reads run here once, so a warehouse is not billed twice.
+    async fn query_open(
+        State(state): ApiState,
+        headers: HeaderMap,
+        body: Body<QueryOpenRequest>,
+    ) -> ApiResult<QueryOpenResponse> {
+        let Json(req) = body?;
+        let project = Self::project(&state, &headers).await?;
+        let (config, root) = {
+            let guard = project.read().await;
+            let config = Self::resolve_connection(&state, &guard, &req.connection).await?;
+            (config, guard.root.clone())
+        };
+        let run = if ReadOnlySql::check(&req.sql) {
+            let run_req = QueryRunRequest {
+                connection: config.id.to_string(),
+                sql: req.sql.clone(),
+                limit: req.limit,
+                source: Some(RunSource::Ui),
+                language: None,
+                query_id: None,
+            };
+            Some(Self::run_and_record(&state, &project, run_req).await?)
+        } else {
+            None
+        };
+        let handoff = QueryHandoff {
+            id: Uuid::new_v4().to_string(),
+            connection_id: config.id.to_string(),
+            sql: req.sql,
+            run_id: run.as_ref().map(|r| r.run.id.clone()),
+        };
+        let id = handoff.id.clone();
+        state.query_handoffs.push(&root, handoff);
+        Self::emit(
+            &state,
+            ServerEventKind::QueryOpenRequested,
+            &*project.read().await,
+            EmptyResponse {},
+        );
+        let mut waited = 0;
+        while state.query_handoffs.is_pending(&root, &id) && waited < QUERY_OPEN_WAIT_MS {
+            tokio::time::sleep(Duration::from_millis(QUERY_OPEN_POLL_MS)).await;
+            waited += QUERY_OPEN_POLL_MS;
+        }
+        let opened = !state.query_handoffs.is_pending(&root, &id);
+        Ok(Json(QueryOpenResponse { opened, run }))
+    }
+
+    async fn query_handoff_take(
+        State(state): ApiState,
+        headers: HeaderMap,
+    ) -> ApiResult<Vec<QueryHandoff>> {
+        let project = Self::project(&state, &headers).await?;
+        let root = project.read().await.root.clone();
+        Ok(Json(state.query_handoffs.take(&root)))
+    }
+
+    async fn query_page(
+        State(state): ApiState,
+        headers: HeaderMap,
+        body: Body<QueryPageRequest>,
+    ) -> ApiResult<QueryResult> {
+        let Json(req) = body?;
+        let project = Self::project(&state, &headers).await?;
+        let config =
+            Self::resolve_connection(&state, &*project.read().await, &req.connection).await?;
+        let request = QueryRequest {
+            sql: req.sql,
+            params: Vec::new(),
+            language: req.language,
+            page_size: req.page_size,
+            page: req.page,
+            query_id: None,
+        };
+        Ok(Json(Self::execute(&state, &config, request).await?))
+    }
+
+    async fn execute(
+        state: &ServerState,
+        config: &ConnectionConfig,
+        request: QueryRequest,
+    ) -> Result<QueryResult, QueryError> {
+        let driver = state.env.connection.open_connection(config).await?;
+        let tx = state.env.connection.transaction_config(config.id).await;
+        state.env.query.run_query_on(driver, tx, request).await
     }
 
     async fn history_list(
@@ -612,6 +759,45 @@ impl ApiRoutes {
         Ok(Json(EmptyResponse {}))
     }
 
+    async fn workspace_load(
+        State(state): ApiState,
+        headers: HeaderMap,
+    ) -> ApiResult<WorkspaceResponse> {
+        let project = Self::project(&state, &headers).await?;
+        let guard = project.read().await;
+        Ok(Json(WorkspaceResponse {
+            tabs: guard.tabs_store.load().await?,
+            pane_layout: guard.pane_layout_store.load().await?,
+        }))
+    }
+
+    async fn workspace_tabs_save(
+        State(state): ApiState,
+        headers: HeaderMap,
+        body: Body<WorkspaceTabsSaveRequest>,
+    ) -> ApiResult<EmptyResponse> {
+        let Json(req) = body?;
+        let project = Self::project(&state, &headers).await?;
+        project.read().await.tabs_store.save(&req.tabs).await?;
+        Ok(Json(EmptyResponse {}))
+    }
+
+    async fn workspace_layout_save(
+        State(state): ApiState,
+        headers: HeaderMap,
+        body: Body<WorkspaceLayoutSaveRequest>,
+    ) -> ApiResult<EmptyResponse> {
+        let Json(req) = body?;
+        let project = Self::project(&state, &headers).await?;
+        project
+            .read()
+            .await
+            .pane_layout_store
+            .save(&req.layout)
+            .await?;
+        Ok(Json(EmptyResponse {}))
+    }
+
     async fn pin_save(
         State(state): ApiState,
         headers: HeaderMap,
@@ -625,7 +811,10 @@ impl ApiRoutes {
         Ok(Json(EmptyResponse {}))
     }
 
-    async fn pin_list(State(state): ApiState, headers: HeaderMap) -> ApiResult<Vec<PersistedPinnedQuery>> {
+    async fn pin_list(
+        State(state): ApiState,
+        headers: HeaderMap,
+    ) -> ApiResult<Vec<PersistedPinnedQuery>> {
         let project = Self::project(&state, &headers).await?;
         Ok(Json(
             project.read().await.pinned_queries_store.load().await?,
@@ -653,6 +842,7 @@ pub(super) mod tests {
     use crate::server::{
         CONNECTION_NEW_PAGE, PROJECT_HEADER, PROJECT_QUERY_PARAM, REQUEST_QUERY_PARAM,
         RUN_PAGE_MAX_LIMIT, RUN_RESULTS_BOARD, Server, ServerEvent, ServerEventKind, ServerState,
+        TABLE_BROWSE_DEFAULT_LIMIT,
     };
 
     const EVENT_TIMEOUT: Duration = Duration::from_secs(5);
@@ -927,6 +1117,66 @@ pub(super) mod tests {
     }
 
     #[tokio::test]
+    async fn query_page_skips_history_and_pages() {
+        let h = Harness::start().await;
+        let cfg = h.save_sqlite("local").await;
+        h.seed_rows(&cfg, 3).await;
+        let before = h.ok("history_list", json!({})).await;
+        let body = json!({
+            "connection": cfg.id.to_string(),
+            "sql": "SELECT x FROM t ORDER BY x",
+            "pageSize": 1,
+            "page": 1,
+        });
+        let page = h.ok("query_page", body).await;
+        assert_eq!(page["rows"].as_array().unwrap().len(), 1);
+        assert_eq!(page["has_more"], json!(true));
+        assert_eq!(h.ok("history_list", json!({})).await, before);
+    }
+
+    #[tokio::test]
+    async fn query_open_runs_reads_once_and_leaves_writes_to_the_user() {
+        let h = Harness::start().await;
+        let cfg = h.save_sqlite("local").await;
+        h.seed_rows(&cfg, 2).await;
+        let id = cfg.id.to_string();
+
+        let read = json!({ "connection": id, "sql": "SELECT x FROM t" });
+        let opened = h.ok("query_open", read).await;
+        assert_eq!(opened["opened"], json!(false));
+        let run_id = opened["run"]["run"]["id"].clone();
+
+        let write = json!({ "connection": id, "sql": "DELETE FROM t" });
+        assert!(h.ok("query_open", write).await["run"].is_null());
+
+        let taken = h.ok("query_handoff_take", json!({})).await;
+        assert_eq!(taken[0]["runId"], run_id);
+        assert_eq!(taken[0]["connectionId"], json!(id));
+        assert!(taken[1]["runId"].is_null());
+        assert_eq!(h.ok("query_handoff_take", json!({})).await, json!([]));
+
+        let count = json!({ "connection": id, "sql": "SELECT count(*) FROM t" });
+        let rows = h.ok("query_run", count).await;
+        assert_eq!(rows["result"]["rows"][0][0]["value"], json!(2));
+    }
+
+    #[tokio::test]
+    async fn workspace_round_trips_console_text_across_a_restart_of_the_page() {
+        let h = Harness::start().await;
+        let tab = json!({
+            "id": "t1", "title": "Console 1", "text": "SELECT 1", "kind": "sql", "cursor": 0,
+        });
+        h.ok("workspace_tabs_save", json!({ "tabs": [tab] })).await;
+        let layout = json!({ "layout": null, "focusedPaneGroupId": "g1" });
+        h.ok("workspace_layout_save", json!({ "layout": layout }))
+            .await;
+
+        let loaded = h.ok("workspace_load", json!({})).await;
+        assert_eq!(loaded["tabs"][0]["text"], json!("SELECT 1"));
+        assert_eq!(loaded["paneLayout"]["focusedPaneGroupId"], json!("g1"));
+    }
+
+    #[tokio::test]
     async fn query_run_by_connection_name() {
         let h = Harness::start().await;
         let cfg = h.save_sqlite("Local DB").await;
@@ -1184,9 +1434,18 @@ pub(super) mod tests {
         let list = h.ok("pin_list", json!({})).await;
         assert_eq!(list.as_array().unwrap().len(), 1);
         assert_eq!(list[0]["text"], "SELECT 2");
-        assert_eq!(next_kind(&mut events).await.kind, ServerEventKind::PinsChanged);
+        assert_eq!(
+            next_kind(&mut events).await.kind,
+            ServerEventKind::PinsChanged
+        );
         h.ok("pin_save", json!({ "queries": [] })).await;
-        assert!(h.ok("pin_list", json!({})).await.as_array().unwrap().is_empty());
+        assert!(
+            h.ok("pin_list", json!({}))
+                .await
+                .as_array()
+                .unwrap()
+                .is_empty()
+        );
     }
 
     #[tokio::test]
@@ -1239,6 +1498,36 @@ pub(super) mod tests {
             next_kind(&mut events).await.kind,
             ServerEventKind::PinsChanged
         );
+    }
+
+    #[tokio::test]
+    async fn table_browse_query_selects_the_table() {
+        let h = Harness::start().await;
+        let cfg = h.save_sqlite("local").await;
+        h.seed_rows(&cfg, 1).await;
+        let sql = h
+            .ok(
+                "table_browse_query",
+                json!({ "connection": "local", "table": { "name": "t" } }),
+            )
+            .await;
+        let sql = sql.as_str().unwrap();
+        assert!(sql.contains("t") && sql.contains(&TABLE_BROWSE_DEFAULT_LIMIT.to_string()));
+    }
+
+    #[tokio::test]
+    async fn object_definition_returns_the_table_ddl() {
+        let h = Harness::start().await;
+        let cfg = h.save_sqlite("local").await;
+        h.seed_rows(&cfg, 1).await;
+        let object = json!({ "kind": "table", "name": "t" });
+        let ddl = h
+            .ok(
+                "object_definition",
+                json!({ "connection": "local", "object": object }),
+            )
+            .await;
+        assert!(ddl.as_str().unwrap().contains("CREATE TABLE"));
     }
 
     #[tokio::test]

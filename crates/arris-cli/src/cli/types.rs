@@ -57,6 +57,9 @@ pub enum Command {
         file: Option<PathBuf>,
         #[arg(long, default_value_t = QUERY_DEFAULT_LIMIT)]
         limit: u32,
+        /// Show the query in an Arris console tab. Writes wait there for the user to press Run.
+        #[arg(long)]
+        open: bool,
     },
     /// List recent query runs, newest first.
     History {
@@ -270,7 +273,17 @@ pub struct QueryOutput {
     pub rows: Vec<Vec<serde_json::Value>>,
     pub row_count: u64,
     pub truncated: bool,
-    pub ui_url: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ui_url: Option<String>,
+}
+
+/// `query --open` output; no URL, so the login token stays out of the transcript.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct QueryOpenOutput {
+    pub awaiting_run: bool,
+    #[serde(flatten)]
+    pub query: Option<QueryOutput>,
 }
 
 #[derive(Debug, Clone, Serialize)]

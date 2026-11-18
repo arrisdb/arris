@@ -45,8 +45,6 @@ function registerCanvasSection(): void {
   });
 }
 
-export { CanvasListView } from "./components/CanvasListView";
-export { SendToCanvasMenu } from "./components/SendToCanvasMenu";
 export {
   CanvasView,
   CanvasSection,

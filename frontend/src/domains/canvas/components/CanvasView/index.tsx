@@ -1,3 +1,4 @@
+import { isWebShell } from "@shared/api";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 import ReactFlow, { Background, Controls } from "reactflow";
 import type { Edge, Node } from "reactflow";
@@ -22,7 +23,7 @@ import type { CanvasViewProps } from "./types";
 import { buildEdgeMenuItems, buildNodeMenuItems, edgeTypes, nodeTypes } from "./utils";
 
 /// One stored canvas: an infinite ReactFlow board of objects (text/query/chart/
-/// shape) plus a floating add-toolbar, with the agent chat beside it on desktop.
+/// shape) plus a floating add-toolbar, with the agent chat beside it on desktop only.
 function CanvasView({ canvasId, tab }: CanvasViewProps) {
   const canvas = useCanvas(canvasId, tab?.connectionId);
 
@@ -92,7 +93,7 @@ function CanvasView({ canvasId, tab }: CanvasViewProps) {
         </div>
       )}
       <PanelGroup className="mdbc-canvas-panels" id="canvas-horizontal" direction="horizontal">
-        {tab && (
+        {tab && !isWebShell() && (
           <>
             <Panel id="canvas-agent" order={1} defaultSize={18} minSize={12} maxSize={40}>
               {/* Key by tab id so each canvas gets its own chat instance instead

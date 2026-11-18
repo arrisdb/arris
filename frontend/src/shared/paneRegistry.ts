@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { useMemo } from "react";
 import type { ComponentType } from "react";
+import { isWebShell } from "./api";
 
 // The rails (left/right sidebars) are generic frames. Every pane that can live
 // in a rail is contributed here by its owning domain instead of being wired
@@ -28,6 +29,8 @@ interface PaneContribution {
   // stable order, so it must obey the Rules of Hooks like any other hook.
   useActive: () => boolean;
   Component: ComponentType;
+  // Needs the desktop app (local files, shells, git); never shown in the browser.
+  nativeOnly?: boolean;
 }
 
 interface PaneRegistryState {
@@ -54,6 +57,7 @@ const usePaneRegistry = create<PaneRegistryState>((set) => ({
 }));
 
 function registerPane(pane: PaneContribution): void {
+  if (pane.nativeOnly && isWebShell()) return;
   usePaneRegistry.getState().register(pane);
 }
 

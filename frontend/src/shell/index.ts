@@ -1,3 +1,7 @@
+import { registerTabView } from "@shared";
+import { isWebShell } from "@shared/api";
+import { AnalyticsTabView } from "./components/AnalyticsTabView";
+import type { EditorTab } from "./types";
 import { registerAgentPane } from "@domains/agent";
 import { registerCanvasSection, registerCanvasTabView } from "@domains/canvas";
 import { registerConnectionsPane, registerDefinitionTabView } from "@domains/connection";
@@ -40,6 +44,7 @@ function registerPanes(): void {
   registerGitTabViews();
   registerMediaTabView();
   registerDefinitionTabView();
+  if (isWebShell()) registerTabView<EditorTab>({ tabType: "analytics", Component: AnalyticsTabView });
 }
 
 registerPanes();

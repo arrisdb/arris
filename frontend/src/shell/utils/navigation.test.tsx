@@ -6,11 +6,11 @@ describe("navigation", () => {
   it("navigate keeps project param", () => {
     window.history.replaceState(null, "", "/?project=%2Fp");
     const { result } = renderHook(() => useRoute());
-    expect(result.current).toEqual({ kind: "history" });
-    act(() => navigate("/pinned"));
-    expect(window.location.pathname).toBe("/pinned");
+    expect(result.current).toEqual({ kind: "shell" });
+    act(() => navigate("/runs/r1"));
+    expect(window.location.pathname).toBe("/runs/r1");
     expect(new URLSearchParams(window.location.search).get("project")).toBe("/p");
-    expect(result.current).toEqual({ kind: "pinned" });
+    expect(result.current).toEqual({ kind: "run", runId: "r1" });
   });
 
   it("navigate keeps the analytics dir param and drops others", () => {
@@ -26,12 +26,12 @@ describe("navigation", () => {
   });
 
   it("follows popstate", () => {
-    window.history.replaceState(null, "", "/pinned");
+    window.history.replaceState(null, "", "/runs/r1");
     const { result } = renderHook(() => useRoute());
-    window.history.replaceState(null, "", "/connections");
+    window.history.replaceState(null, "", "/connections/new");
     act(() => {
       window.dispatchEvent(new PopStateEvent("popstate"));
     });
-    expect(result.current).toEqual({ kind: "connections" });
+    expect(result.current).toEqual({ kind: "connectionRequest" });
   });
 });

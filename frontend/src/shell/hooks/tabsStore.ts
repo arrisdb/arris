@@ -9,6 +9,9 @@ import type {
   TableRef,
 } from "@shared";
 import { useSettingsStore } from "@shared/settings";
+import { ANALYTICS_TAB_ID_PREFIX } from "../constants";
+import { TOOL_LABELS } from "@domains/analytics/constants";
+import type { AnalyticsTool } from "@domains/analytics/types";
 import type { EditorTab, PaneNode, SplitDirection } from "../types";
 import {
   findLeaf,
@@ -64,6 +67,8 @@ interface TabsState {
   openUntitledNotebookTab: () => EditorTab;
   /// Focus the tab of a stored canvas, opening one (tab id = canvas id) if absent.
   openCanvasTab: (canvas: { id: string; title: string }, connectionId?: string) => EditorTab;
+  /// Focus the tool's single dbt or SQLMesh tab on `path`, opening it if absent.
+  openAnalyticsTab: (tool: AnalyticsTool, path: string) => EditorTab;
   /// Open (or refocus) the single "Uncommitted Changes" git diff tab. Only one
   /// can ever exist; a second call refocuses the existing one.
   openGitDiffTab: () => EditorTab;
@@ -214,21 +219,7 @@ const useTabsStore = create<TabsState>((set, get) => ({
     }),
   setLayout: (layout, focusedId) =>
     set((s) => {
-      // Hydration call (`s.tabs` may be empty when pane layout loads from
-      // localStorage *before* `setTabs` runs). Skip reconciliation so the
-      // persisted layout survives until `setTabs` reconciles against the
-      // real tab list.
-      if (s.tabs.length === 0) {
-        const validFocused =
-          focusedId && findLeaf(layout, focusedId)
-            ? focusedId
-            : firstLeaf(layout)?.id ?? null;
-        return {
-          layout,
-          focusedPaneGroupId: validFocused,
-          activeId: null,
-        };
-      }
+      // Tabs load first, so ids of tabs that were never saved drop out here.
       const r = reconcileLayout(s.tabs, layout, focusedId);
       return {
         layout: r.layout,
@@ -583,6 +574,28 @@ const useTabsStore = create<TabsState>((set, get) => ({
       connectionId,
       cursor: 0,
       tabType: "canvas",
+      createdAt: Date.now(),
+    };
+    set((s) => appendTabToFocusedGroup(s, tab));
+    useSettingsStore.getState().hideBottomPane();
+    return tab;
+  },
+  openAnalyticsTab: (tool, path) => {
+    const id = `${ANALYTICS_TAB_ID_PREFIX}${tool}`;
+    const existing = get().tabs.find((t) => t.id === id);
+    if (existing) {
+      get().updateTab(id, { analyticsPath: path });
+      get().focusTab(id);
+      return existing;
+    }
+    const tab: EditorTab = {
+      id,
+      title: TOOL_LABELS[tool],
+      text: "",
+      kind: "analytics",
+      cursor: 0,
+      tabType: "analytics",
+      analyticsPath: path,
       createdAt: Date.now(),
     };
     set((s) => appendTabToFocusedGroup(s, tab));

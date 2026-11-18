@@ -1,4 +1,5 @@
 import { Suspense, useMemo } from "react";
+import { isWebShell } from "@shared/api";
 import { IconButton, SectionedSelect, Select, Tooltip } from "@shared/ui";
 import { ContextMenu } from "@shared/ui/ContextMenu";
 import { DatabaseKindIcon } from "@domains/connection";
@@ -135,6 +136,7 @@ function ConsoleTabView({
   const txIsolation: IsolationLevel = txState?.isolation ?? "default";
   const txDirty = txState?.dirty ?? false;
   const txSupported =
+    !isWebShell() &&
     !!tabConnectionId &&
     !isFederation &&
     !isMarkdown &&
@@ -406,28 +408,32 @@ function ConsoleTabView({
         <div className="mdbc-flex-spacer" />
         {!isMarkdown && (
           <div className="mdbc-fed-bar" data-testid="federation-bar">
-            <label
-              className={`mdbc-fed-toggle${connections.length < 2 ? " disabled" : ""}`}
-              data-testid="federation-toggle"
-            >
-              <span className="mdbc-fed-toggle-label">DataFusion</span>
-              <span className="mdbc-settings-toggle">
-                <input
-                  type="checkbox"
-                  checked={isFederation}
-                  disabled={connections.length < 2}
-                  onChange={onToggleFederation}
-                />
-                <span className="mdbc-settings-toggle-track">
-                  <span className="mdbc-settings-toggle-thumb" />
-                </span>
-              </span>
-            </label>
-            <Tooltip label="Query across all connections at once. Needs 2+ connections.">
-              <span className="mdbc-fed-info" data-testid="federation-info">
-                <Icon name="info" size={13} />
-              </span>
-            </Tooltip>
+            {!isWebShell() && (
+              <>
+                <label
+                  className={`mdbc-fed-toggle${connections.length < 2 ? " disabled" : ""}`}
+                  data-testid="federation-toggle"
+                >
+                  <span className="mdbc-fed-toggle-label">DataFusion</span>
+                  <span className="mdbc-settings-toggle">
+                    <input
+                      type="checkbox"
+                      checked={isFederation}
+                      disabled={connections.length < 2}
+                      onChange={onToggleFederation}
+                    />
+                    <span className="mdbc-settings-toggle-track">
+                      <span className="mdbc-settings-toggle-thumb" />
+                    </span>
+                  </span>
+                </label>
+                <Tooltip label="Query across all connections at once. Needs 2+ connections.">
+                  <span className="mdbc-fed-info" data-testid="federation-info">
+                    <Icon name="info" size={13} />
+                  </span>
+                </Tooltip>
+              </>
+            )}
             <Select
               value={isFederation ? "__all__" : (tabConnectionId ?? "")}
               options={

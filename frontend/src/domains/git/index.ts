@@ -21,6 +21,7 @@ const GitConflictView = lazy(() =>
 function registerGitPane(): void {
   registerPane({
     id: "git",
+    nativeOnly: true,
     side: "left",
     kind: "primary",
     priority: 10,

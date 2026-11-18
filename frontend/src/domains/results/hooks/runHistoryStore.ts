@@ -19,6 +19,7 @@ function sqlRunSummary(run: QueryRunResult): string {
     const summary = `+${d.addedCount} added / −${d.removedCount} removed vs prod (${elapsed} ms)`;
     return `${d.sql}\n\n${summary}`;
   }
+  if (!run.result) return `completed in ${elapsed} ms`;
   const affected = run.result?.rows_affected;
   if (affected != null) return `${affected} row(s) affected (${elapsed} ms)`;
   const rowCount = run.result?.rows?.length ?? 0;

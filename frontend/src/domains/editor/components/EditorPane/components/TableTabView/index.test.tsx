@@ -1,5 +1,6 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, fireEvent, render, screen } from "@testing-library/react";
+import { useTabsStore } from "@shell/hooks/tabsStore";
 import type { EditorTab } from "@shell/types";
 import { TableTabView } from "./index";
 
@@ -18,6 +19,10 @@ function tableTab(overrides?: Partial<EditorTab>): EditorTab {
 }
 
 describe("TableTabView", () => {
+  afterEach(() => {
+    useTabsStore.getState().setTabs([]);
+  });
+
   it("auto-runs a table browse query once when unloaded", async () => {
     const runActiveTab = vi.fn();
     render(
@@ -33,6 +38,23 @@ describe("TableTabView", () => {
       await Promise.resolve();
     });
 
+    expect(runActiveTab).toHaveBeenCalledTimes(1);
+  });
+
+  it("auto-runs once the browse SQL lands after the tab opened empty", async () => {
+    const runActiveTab = vi.fn();
+    const empty = tableTab({ text: "" });
+    useTabsStore.getState().setTabs([empty]);
+    render(
+      <TableTabView
+        activeTab={empty}
+        tabConnectionId="c1"
+        connections={[{ id: "c1", name: "pg", kind: "postgres" }]}
+        runActiveTab={runActiveTab}
+      />,
+    );
+    expect(runActiveTab).not.toHaveBeenCalled();
+    act(() => useTabsStore.getState().updateTab(empty.id, { text: tableTab().text }));
     expect(runActiveTab).toHaveBeenCalledTimes(1);
   });
 

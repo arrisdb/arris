@@ -1,14 +1,11 @@
 import { ANALYTICS_TOOLS } from "@domains/analytics";
 import type { AnalyticsSection, AnalyticsTool } from "@domains/analytics";
 import {
-  CANVASES_PATH,
   CANVAS_PATH_PREFIX,
-  CONNECTIONS_PATH,
   CONNECTION_REQUEST_PATH,
   LINEAGE_SEGMENT,
   MODELS_SEGMENT,
   PATH_SEPARATOR,
-  PINNED_PATH,
   RUNS_SEGMENT,
   RUN_PATH_PREFIX,
 } from "./constants";
@@ -48,23 +45,12 @@ function analyticsRoute(pathname: string): WebRoute | null {
 }
 
 function routeForPath(pathname: string): WebRoute {
-  if (pathname === PINNED_PATH) return { kind: "pinned" };
-  if (pathname === CONNECTIONS_PATH) return { kind: "connections" };
   if (pathname === CONNECTION_REQUEST_PATH) return { kind: "connectionRequest" };
-  if (pathname === CANVASES_PATH) return { kind: "canvases" };
   const runId = idSegment(pathname, RUN_PATH_PREFIX);
   if (runId) return { kind: "run", runId };
   const canvasId = idSegment(pathname, CANVAS_PATH_PREFIX);
   if (canvasId) return { kind: "canvas", canvasId };
-  return analyticsRoute(pathname) ?? { kind: "history" };
-}
-
-function runPath(runId: string): string {
-  return `${RUN_PATH_PREFIX}${encodeURIComponent(runId)}`;
-}
-
-function canvasPath(canvasId: string): string {
-  return `${CANVAS_PATH_PREFIX}${encodeURIComponent(canvasId)}`;
+  return analyticsRoute(pathname) ?? { kind: "shell" };
 }
 
 const SECTION_SEGMENTS: Record<AnalyticsSection, string> = {
@@ -79,4 +65,4 @@ function analyticsPath(tool: AnalyticsTool, section: AnalyticsSection, id?: stri
   return id ? `${base}${PATH_SEPARATOR}${encodeURIComponent(id)}` : base;
 }
 
-export { analyticsPath, canvasPath, routeForPath, runPath };
+export { analyticsPath, routeForPath };

@@ -4,9 +4,8 @@ use arris_engines::dbt::{ColumnLineageGraph, DbtColumnDoc, LineageGraph};
 use arris_engines::sqlmesh::SqlMeshColumnDoc;
 use arris_engines::{
     CanvasCellSpec, CanvasSummary, ConnectionConfig, ConnectionPrefill, DatabaseKind,
-    PersistedPinnedQuery, QueryResult,
-    RunRecord,
-    RunSource, ToolKind, ToolRunRecord, ToolRunSummary,
+    PersistedConsoleTab, PersistedPaneLayout, PersistedPinnedQuery, QueryLanguage, QueryResult,
+    RunRecord, RunSource, ToolKind, ToolRunRecord, ToolRunSummary,
 };
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -43,6 +42,7 @@ pub enum ServerEventKind {
     CanvasChanged,
     CanvasCellIngested,
     ToolRunsChanged,
+    QueryOpenRequested,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -137,18 +137,87 @@ pub struct SchemaListRequest {
     pub schema: Option<String>,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+pub struct ObjectDefinitionRequest {
+    pub connection: String,
+    pub object: arris_engines::ObjectRef,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct TableBrowseQueryRequest {
+    pub connection: String,
+    pub table: arris_engines::TableRef,
+    pub limit: Option<u32>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct QueryRunRequest {
     pub connection: String,
     pub sql: String,
     pub limit: Option<u32>,
     pub source: Option<RunSource>,
+    pub language: Option<QueryLanguage>,
+    pub query_id: Option<String>,
+}
+
+/// A results-grid fetch (page, sort, count): runs like a query but is not a history entry.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct QueryPageRequest {
+    pub connection: String,
+    pub sql: String,
+    pub language: Option<QueryLanguage>,
+    pub page_size: Option<u32>,
+    pub page: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct QueryRunResponse {
     pub run: RunRecord,
     pub result: QueryResult,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct QueryOpenRequest {
+    pub connection: String,
+    pub sql: String,
+    pub limit: Option<u32>,
+}
+
+/// `run` is set when the SQL was read-only and already ran; writes wait for the user.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct QueryOpenResponse {
+    pub opened: bool,
+    pub run: Option<QueryRunResponse>,
+}
+
+/// A query waiting to appear in a browser console tab.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct QueryHandoff {
+    pub id: String,
+    pub connection_id: String,
+    pub sql: String,
+    pub run_id: Option<String>,
+}
+
+/// The project's open tabs and pane layout, shared with the desktop app.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkspaceResponse {
+    pub tabs: Vec<PersistedConsoleTab>,
+    pub pane_layout: PersistedPaneLayout,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct WorkspaceTabsSaveRequest {
+    pub tabs: Vec<PersistedConsoleTab>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct WorkspaceLayoutSaveRequest {
+    pub layout: PersistedPaneLayout,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]

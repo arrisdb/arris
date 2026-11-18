@@ -423,7 +423,7 @@ describe("pane groups", () => {
     expect(s.activeId).toBe(b.id);
   });
 
-  it("setTabs reconciles persisted pane groups against the new tab list", () => {
+  it("setLayout reconciles persisted pane groups against the loaded tab list", () => {
     const tA = {
       id: "a",
       title: "A",
@@ -438,6 +438,7 @@ describe("pane groups", () => {
       kind: "sql",
       cursor: 0,
     };
+    useTabsStore.getState().setTabs([tA, tB]);
     useTabsStore.getState().setLayout(
       {
         kind: "split",
@@ -451,7 +452,6 @@ describe("pane groups", () => {
       },
       "g2",
     );
-    useTabsStore.getState().setTabs([tA, tB]);
     const s = useTabsStore.getState();
     // Stale ghost id stripped, empty group dropped, g2 stays focused.
     expect(leavesOf(s.layout)).toHaveLength(2);
@@ -461,6 +461,17 @@ describe("pane groups", () => {
     expect(leavesOf(s.layout)[1].id).toBe("g2");
     expect(s.focusedPaneGroupId).toBe("g2");
     expect(s.activeId).toBe("b");
+  });
+
+  it("setLayout drops a saved pane whose tabs were never persisted", () => {
+    useTabsStore.getState().setTabs([]);
+    useTabsStore.getState().setLayout(
+      { kind: "leaf", id: "g1", tabIds: ["analytics:dbt"], selectedTabId: "analytics:dbt" },
+      "g1",
+    );
+    expect(useTabsStore.getState().layout).toBeNull();
+    useTabsStore.getState().openAnalyticsTab("dbt", "/dbt/models");
+    expect(leavesOf(useTabsStore.getState().layout)[0].tabIds).toEqual(["analytics:dbt"]);
   });
 
   it("setTabs seeds a single group when no pane groups are persisted", () => {

@@ -2,6 +2,7 @@ import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
+import { apiCall, currentProject, isWebShell, setCurrentProject } from "@shared/api";
 import type {
   AppPreferences,
   FileTreeEntry,
@@ -9,7 +10,13 @@ import type {
   ProjectOpenResult,
   ScopedConnection,
 } from "@shared";
+import { DESKTOP_ONLY_TAB_TYPES } from "./constants";
 import type { PaneNode } from "./types";
+
+type PersistedPaneLayout = ProjectOpenResult["paneLayout"];
+
+// Tabs only the desktop can show stay out of the browser but must survive its saves.
+let desktopOnlyTabs: PersistedTab[] = [];
 
 function appPreferencesLoadIPC(): Promise<AppPreferences> {
   return invoke("cmd_app_preferences_load");
@@ -20,11 +27,12 @@ function closeFileIndexIPC(): Promise<void> {
 }
 
 function closeProjectIPC(): Promise<void> {
-  return invoke("cmd_close_project");
+  return isWebShell() ? Promise.resolve() : invoke("cmd_close_project");
 }
 
 function listConnectionsIPC(): Promise<ScopedConnection[]> {
-  return invoke("cmd_list_connections");
+  if (!isWebShell()) return invoke("cmd_list_connections");
+  return currentProject() ? apiCall("connection_list") : Promise.resolve([]);
 }
 
 function listFolderTreeIPC(root: string, skipDirs: string[]): Promise<FileTreeEntry> {
@@ -35,8 +43,22 @@ function openFileIndexIPC(root: string): Promise<void> {
   return invoke("cmd_open_file_index", { root });
 }
 
-function openProjectIPC(root: string): Promise<ProjectOpenResult> {
-  return invoke("cmd_open_project", { root });
+async function openProjectIPC(root: string): Promise<ProjectOpenResult> {
+  if (!isWebShell()) return invoke("cmd_open_project", { root });
+  setCurrentProject(root);
+  const [connections, workspace] = await Promise.all([
+    apiCall<ScopedConnection[]>("connection_list"),
+    apiCall<{ tabs: PersistedTab[]; paneLayout: PersistedPaneLayout }>("workspace_load"),
+  ]);
+  const isDesktopOnly = (tab: PersistedTab) => DESKTOP_ONLY_TAB_TYPES.has(tab.tabType ?? "");
+  desktopOnlyTabs = workspace.tabs.filter(isDesktopOnly);
+  return {
+    root,
+    connections,
+    tabs: workspace.tabs.filter((tab) => !isDesktopOnly(tab)),
+    federationTabs: [],
+    paneLayout: workspace.paneLayout,
+  };
 }
 
 function openProjectInNewWindowIPC(path: string): Promise<void> {
@@ -44,24 +66,27 @@ function openProjectInNewWindowIPC(path: string): Promise<void> {
 }
 
 // This process's launch project path (set by "open in new window"), returned
-// once then cleared so a later reload does not reopen it.
+// once then cleared so a later reload does not reopen it. The browser opens the URL's project.
 function takePendingLaunchIPC(): Promise<string | null> {
-  return invoke("cmd_take_pending_launch");
+  return isWebShell() ? Promise.resolve(currentProject()) : invoke("cmd_take_pending_launch");
 }
 
 function readTextFileIPC(path: string): Promise<string> {
   return invoke("cmd_read_text_file", { path });
 }
 
-function saveTabsIPC(tabs: PersistedTab[]): Promise<void> {
-  return invoke("cmd_save_console_tabs", { tabs });
+async function saveTabsIPC(tabs: PersistedTab[]): Promise<void> {
+  if (!isWebShell()) return invoke("cmd_save_console_tabs", { tabs });
+  await apiCall("workspace_tabs_save", { tabs: [...desktopOnlyTabs, ...tabs] });
 }
 
-function savePaneLayoutIPC(
+async function savePaneLayoutIPC(
   layout: PaneNode | null,
   focusedPaneGroupId: string | null,
 ): Promise<void> {
-  return invoke("cmd_save_pane_layout", { layout: { layout, focusedPaneGroupId } });
+  const paneLayout: PersistedPaneLayout = { layout, focusedPaneGroupId };
+  if (!isWebShell()) return invoke("cmd_save_pane_layout", { layout: paneLayout });
+  await apiCall("workspace_layout_save", { layout: paneLayout });
 }
 
 // Move a virtual console/notebook's sidecar file out of `.arris/files/` to the
