@@ -1,12 +1,10 @@
 import { create } from "zustand";
 
 import type {
-  AgentCanvasSpec,
   CanvasComponent,
   CanvasDoc,
   CanvasEdge,
   CanvasViewport,
-  ChatEntry,
   QueryComponent,
   QueryRunState,
   ReorderOp,
@@ -22,7 +20,6 @@ import {
   genId,
   makeComponent,
   makeEdge,
-  planAgentChanges,
 } from "../utils";
 import { cancelCanvasCellIPC, runCanvasCellIPC } from "../ipc";
 
@@ -68,24 +65,6 @@ interface CanvasStore {
   /// Remove arrows by id (deleting one from its right-click menu).
   removeEdges: (boardId: string, ids: string[]) => void;
   setViewport: (boardId: string, viewport: CanvasViewport) => void;
-  /// Set the connections the agent may use for this board (persisted in the doc).
-  /// The first id is the board's primary connection (the default for new query
-  /// objects); the agent reads every listed connection's schema.
-  setConnectionIds: (boardId: string, ids: string[]) => void;
-  /// Persist the agent chat log into the board doc (so it survives close/reopen
-  /// and restart). The hook keeps the live, per-token entries in local state and
-  /// calls this only at turn boundaries, so streaming never thrashes the doc.
-  setChat: (boardId: string, chat: ChatEntry[]) => void;
-  /// Wipe the board's chat log (the Clear button). Empties the persisted history.
-  clearChat: (boardId: string) => void;
-  /// Apply one agent turn against the board: add new objects, patch objects the
-  /// agent re-addressed by id, and remove the ids it listed. New query objects
-  /// bind to `connectionId`. Returns the ids of query objects to (re)run.
-  applyAgentSpec: (
-    boardId: string,
-    spec: AgentCanvasSpec,
-    connectionId: string | null,
-  ) => string[];
   setRun: (boardId: string, id: string, run: QueryRunState) => void;
   /// Land a cell's full-ingest totals from the `canvas://cell-ingested` event,
   /// clearing the spinner the early page left running.
@@ -307,24 +286,6 @@ const useCanvasStore = create<CanvasStore>((set, get) => ({
       boards: withDoc(s.boards, boardId, (doc) => ({ ...doc, viewport })),
     })),
 
-  setConnectionIds: (boardId, ids) =>
-    set((s) => ({
-      boards: withDoc(s.boards, boardId, (doc) => ({ ...doc, connectionIds: ids })),
-    })),
-
-  // `withDoc` keeps the `components`/`edges` array references intact, so writing
-  // chat never re-renders the board nodes (their selectors read those arrays),
-  // only the chat panel and the persistence effect.
-  setChat: (boardId, chat) =>
-    set((s) => ({
-      boards: withDoc(s.boards, boardId, (doc) => ({ ...doc, chat })),
-    })),
-
-  clearChat: (boardId) =>
-    set((s) => ({
-      boards: withDoc(s.boards, boardId, (doc) => ({ ...doc, chat: [] })),
-    })),
-
   addEdge: (boardId, source, target) =>
     set((s) => {
       const board = s.boards[boardId];
@@ -352,55 +313,6 @@ const useCanvasStore = create<CanvasStore>((set, get) => ({
         })),
       };
     }),
-
-  applyAgentSpec: (boardId, spec, connectionId) => {
-    const board = get().boards[boardId];
-    if (!board) return [];
-    const { created, updates, removeIds, edges } = planAgentChanges(
-      spec,
-      board.doc.components,
-      connectionId,
-    );
-    const removed = new Set(removeIds);
-    const patchById = new Map(updates.map((u) => [u.id, u.patch]));
-    set((s) => {
-      const cur = s.boards[boardId];
-      if (!cur) return s;
-      const runs = { ...cur.runs };
-      for (const id of removeIds) delete runs[id];
-      const components = cur.doc.components
-        .filter((c) => !removed.has(c.id))
-        .map((c) => {
-          const patch = patchById.get(c.id);
-          return patch ? ({ ...c, ...patch } as CanvasComponent) : c;
-        })
-        .concat(created);
-      const existingEdgeKeys = new Set(
-        cur.doc.edges.map((e) => `${e.source}->${e.target}`),
-      );
-      const edgesNext = cur.doc.edges
-        .filter((e) => !removed.has(e.source) && !removed.has(e.target))
-        .concat(edges.filter((e) => !existingEdgeKeys.has(`${e.source}->${e.target}`)));
-      return {
-        boards: {
-          ...s.boards,
-          [boardId]: { ...cur, doc: { ...cur.doc, components, edges: edgesNext }, runs },
-        },
-      };
-    });
-    // Re-run query objects the turn created or whose SQL or connection it changed;
-    // charts read their source's cached result, so they need no run of their own.
-    const createdQueryIds = created
-      .filter((c) => c.kind === "query")
-      .map((c) => c.id);
-    const changedQueryIds = updates
-      .filter((u) => "sql" in u.patch || "connectionId" in u.patch)
-      .map((u) => u.id)
-      .filter((id) =>
-        board.doc.components.some((c) => c.id === id && c.kind === "query"),
-      );
-    return [...createdQueryIds, ...changedQueryIds];
-  },
 
   setRun: (boardId, id, run) =>
     set((s) => {

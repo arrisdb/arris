@@ -71,8 +71,7 @@ function fallbackChartSpec(): ChartSpec {
 }
 
 /// Build a fully-formed `CanvasComponent` from a loose input, filling defaults.
-/// The single place object shape + defaults live; the toolbar and the agent-spec
-/// converter both go through here.
+/// The single place object shape + defaults live; the toolbar goes through here.
 function makeComponent(input: ComponentInput): CanvasComponent {
   const id = input.id ?? genId(input.kind);
   const geom = geometry(input);

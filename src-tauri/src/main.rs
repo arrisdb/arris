@@ -36,7 +36,6 @@ fn main() {
                 eprintln!("failed to initialize logging: {err}");
             }
             app.manage(env);
-            app.manage(AgentRuns::default());
             app.manage(watcher::ProjectWatcher::default());
             app.manage(PendingLaunch::from_args(std::env::args()));
             ArrisServer::spawn(app.handle().clone());
@@ -294,10 +293,6 @@ fn main() {
             cmd_search_files,
             cmd_search_content,
             cmd_arris_api,
-            cmd_agent_send,
-            cmd_agent_check,
-            cmd_agent_cancel,
-            cmd_agent_schema_context,
             cmd_python_list_interpreters,
             cmd_python_add_interpreter,
             cmd_python_create_venv,

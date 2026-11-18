@@ -2,7 +2,6 @@ import { registerTabView } from "@shared";
 import { isWebShell } from "@shared/api";
 import { AnalyticsTabView } from "./components/AnalyticsTabView";
 import type { EditorTab } from "./types";
-import { registerAgentPane } from "@domains/agent";
 import { registerCanvasSection, registerCanvasTabView } from "@domains/canvas";
 import { registerConnectionsPane, registerDefinitionTabView } from "@domains/connection";
 import { registerChartPane } from "@domains/chart";
@@ -26,7 +25,6 @@ let registered = false;
 function registerPanes(): void {
   if (registered) return;
   registered = true;
-  registerAgentPane();
   registerConnectionsPane();
   registerChartPane();
   registerPinnedQueriesPane();

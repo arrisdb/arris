@@ -212,8 +212,7 @@ function buildEdgeMenuItems(
 
 /// True when the user has a real (non-collapsed, non-empty) text selection in
 /// the document. The board's ⌘C shortcut clones the selected object, but when
-/// the user has actually selected text (e.g. an agent reply in the side chat),
-/// ⌘C must fall through to the browser's native copy instead.
+/// the user has actually selected text, ⌘C must fall through to the browser's native copy instead.
 function hasActiveTextSelection(): boolean {
   const sel = window.getSelection();
   return Boolean(sel && !sel.isCollapsed && sel.toString().trim().length > 0);
@@ -221,8 +220,7 @@ function hasActiveTextSelection(): boolean {
 
 /// True when a keyboard event targets a text-entry surface (an input, textarea,
 /// contenteditable, or a CodeMirror editor). The board's bare-key tool shortcuts
-/// must not fire while the user is typing into a query cell, text block, or the
-/// agent chat, so letters keep typing normally there.
+/// must not fire while the user is typing into a query cell or text block.
 function isEditableTarget(target: EventTarget | null): boolean {
   const el = target as HTMLElement | null;
   if (!el) return false;

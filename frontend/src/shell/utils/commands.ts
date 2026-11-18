@@ -29,7 +29,6 @@ import {
 } from "@domains/connection/components/CombinedConnectionsTree/utils";
 import { useSettingsStore } from "@shared/settings";
 import type { KeymapAction } from "@shared/settings";
-import { useAgentStore } from "@domains/agent/hooks";
 import { useChartEditorStore } from "@domains/chart/hooks";
 import { useCommandRegistryStore } from "../hooks/commandRegistryStore";
 import { useFileSearchStore } from "@domains/files/hooks";
@@ -128,7 +127,7 @@ function closeFocusedPaneTab(): void {
 
 function togglePinnedQueries(): void {
   const prefs = useSettingsStore.getState();
-  // `togglePane`/`openPane` already close the chart editor and agent panel so
+  // `togglePane`/`openPane` already close the chart editor so
   // the right rail stays mutually exclusive.
   usePinnedQueriesStore.getState().togglePane();
   if (!prefs.sidebarRightVisible) prefs.toggleSidebarRightVisible();
@@ -146,7 +145,6 @@ function toggleChartEditor(): void {
   const activeId = useTabsStore.getState().activeId;
   if (!activeId) return;
   if (useResultsTableStore.getState().modeByTab[activeId] !== "chart") return;
-  useAgentStore.getState().closePane();
   usePinnedQueriesStore.getState().closePane();
   chartEditor.open(activeId);
   if (!useSettingsStore.getState().sidebarRightVisible) {
@@ -179,32 +177,14 @@ function toggleConnections(): void {
   const prefs = useSettingsStore.getState();
   const chartEditor = useChartEditorStore.getState();
   const pinnedStore = usePinnedQueriesStore.getState();
-  const agentPanel = useAgentStore.getState();
-  const switchingRightPane = !!chartEditor.targetTabId || pinnedStore.paneOpen || agentPanel.paneOpen;
+  const switchingRightPane = !!chartEditor.targetTabId || pinnedStore.paneOpen;
   if (chartEditor.targetTabId) chartEditor.close();
   if (pinnedStore.paneOpen) pinnedStore.closePane();
-  if (agentPanel.paneOpen) agentPanel.closePane();
   if (!prefs.sidebarRightVisible) {
     prefs.toggleSidebarRightVisible();
     return;
   }
   if (!switchingRightPane) prefs.toggleSidebarRightVisible();
-}
-
-function openAgentPanel(): void {
-  const prefs = useSettingsStore.getState();
-  if (useChartEditorStore.getState().targetTabId) useChartEditorStore.getState().close();
-  usePinnedQueriesStore.getState().closePane();
-  useAgentStore.getState().openPane();
-  if (!prefs.sidebarRightVisible) prefs.toggleSidebarRightVisible();
-}
-
-function toggleAgentPanel(): void {
-  if (useAgentStore.getState().paneOpen) {
-    useAgentStore.getState().closePane();
-    return;
-  }
-  openAgentPanel();
 }
 
 // Registers the app-level commands that don't depend on a single React
@@ -220,7 +200,6 @@ function useGlobalCommands(): void {
     findInEditor: { run: findInEditor },
     replaceInEditor: { run: replaceInEditor },
     saveFile: { run: () => saveActiveFile() },
-    aiGenerate: { run: openAgentPanel },
     openTab: { run: () => openNewConsoleTab() },
     closeTab: { run: closeFocusedPaneTab },
     openSettings: { run: () => useSettingsStore.getState().open(), isEnabled: isDesktop },
@@ -240,7 +219,6 @@ function useGlobalCommands(): void {
       },
       isEnabled: isDesktop,
     },
-    showAgentPanel: { run: toggleAgentPanel, isEnabled: isDesktop },
     showPinnedQueries: { run: togglePinnedQueries },
     showChartEditor: { run: toggleChartEditor },
     showConnections: { run: toggleConnections },

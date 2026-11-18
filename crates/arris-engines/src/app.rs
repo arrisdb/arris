@@ -26,7 +26,6 @@ pub enum AppEnvironmentError {
 }
 
 pub struct AppEnvironment {
-    pub agent: crate::agent::AgentEngine,
     pub canvas: crate::canvas::CanvasEngine,
     pub connection: crate::connection::ConnectionEngine,
     pub dbt: crate::dbt::DbtEngine,
@@ -77,7 +76,6 @@ impl AppEnvironment {
         let debug_log = DebugLogHandle::new(logs_dir, preferences.debug_mode);
 
         Ok(Arc::new(Self {
-            agent: crate::agent::AgentEngine::new(),
             canvas: crate::canvas::CanvasEngine::new(cell_cache),
             connection,
             dbt: crate::dbt::DbtEngine::new(),

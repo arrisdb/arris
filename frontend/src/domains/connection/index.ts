@@ -11,8 +11,8 @@ const DefinitionTabView = lazy(() =>
 );
 
 // The connections tree is the right rail's default: lowest priority and always
-// eligible, so it shows whenever no higher-priority pane (agent, chart editor,
-// pinned queries) is open.
+// eligible, so it shows whenever no higher-priority pane (chart editor, pinned
+// queries) is open.
 function registerConnectionsPane(): void {
   registerPane({
     id: "connections",

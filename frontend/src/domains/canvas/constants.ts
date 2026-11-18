@@ -4,26 +4,7 @@ import type { ComponentKind } from "./types";
 /// changes; `parseDoc` rejects unknown versions and falls back to an empty board.
 const CANVAS_DOC_VERSION = 1;
 
-/// The fenced-block language tag the agent emits and `parseAgentCanvas` reads.
-const CANVAS_SPEC_FENCE = "arris-canvas";
-
-/// The fenced-block language tag the agent emits to ASK the user something
-/// (instead of changing the board), read by `parseAgentQuestion`.
-const CANVAS_ASK_FENCE = "arris-ask";
-
-/// Every object kind the agent-spec parser accepts inside an `arris-canvas`
-/// block. Adding a kind to the union means adding it here too.
-const KNOWN_KINDS: ComponentKind[] = [
-  "text",
-  "sticky",
-  "query",
-  "chart",
-  "table",
-  "shape",
-];
-
-/// Default object sizes (canvas units), per kind. Used by the object factory and
-/// when the agent omits geometry.
+/// Default object sizes (canvas units), per kind, used by the object factory.
 const DEFAULT_SIZE: Record<ComponentKind, { w: number; h: number }> = {
   text: { w: 320, h: 120 },
   sticky: { w: 220, h: 200 },
@@ -88,7 +69,6 @@ const DEFAULT_CANVAS_TITLE = "Untitled canvas";
 const CANVAS_TITLE_PREFIX = "Canvas";
 
 export {
-  CANVAS_ASK_FENCE,
   CANVAS_CELL_INGESTED_EVENT,
   CANVAS_CELL_INGESTED_SERVER_EVENT,
   CANVAS_CHANGED_EVENT,
@@ -97,7 +77,6 @@ export {
   CANVAS_DOC_VERSION,
   CANVAS_QUERY_ID_PREFIX,
   CANVAS_SAVE_DEBOUNCE_MS,
-  CANVAS_SPEC_FENCE,
   CANVAS_TITLE_PREFIX,
   CELL_IDENT_FALLBACK,
   CELL_REF_QUOTE,
@@ -105,7 +84,6 @@ export {
   DEFAULT_CHART_MAX_ROWS,
   DEFAULT_QUERY_LIMIT,
   DEFAULT_SIZE,
-  KNOWN_KINDS,
   LAYOUT_GAP,
   LAYOUT_ORIGIN,
   NEW_CANVAS_PROMPT,

@@ -5,7 +5,7 @@
   min-height: 0;
 }
 
-/* The horizontal split: agent | board | properties. Each pane lives in a Panel
+/* The horizontal split: board | properties. Each pane lives in a Panel
    so the dividers drag to resize, matching the app's sidebar UX. */
 .mdbc-canvas-panels {
   height: 100%;

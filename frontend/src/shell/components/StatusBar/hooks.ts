@@ -3,7 +3,6 @@ import { useResultsTableStore } from "@domains/results/hooks";
 import { usePinnedQueriesStore } from "@domains/pinnedQueries/hooks";
 import { useSettingsStore, type KeymapAction } from "@shared/settings";
 import { runCommand, shortcutDisplay } from "@shell/utils";
-import { useAgentStore } from "@domains/agent/hooks";
 import { useBackgroundTasksStore } from "../../hooks/backgroundTasksStore";
 import { useChartEditorStore } from "@domains/chart/hooks";
 import { useTabsStore } from "../../hooks/tabsStore";
@@ -18,7 +17,6 @@ function useStatusBar(): StatusBarViewModel {
   const setTab = useSettingsStore((state) => state.setSidebarLeftTab);
   const shortcuts = useSettingsStore((state) => state.shortcuts);
   const bgTasks = useBackgroundTasksStore((state) => state.tasks);
-  const agentPanelOpen = useAgentStore((state) => state.paneOpen);
   const pinnedQueriesOpen = usePinnedQueriesStore((state) => state.paneOpen);
   const chartEditorTabId = useChartEditorStore((state) => state.targetTabId);
   const activeId = useTabsStore((state) => state.activeId);
@@ -35,7 +33,7 @@ function useStatusBar(): StatusBarViewModel {
   // otherwise it stays visible but disabled.
   const canChart = activeResultsMode === "chart" || chartEditorOpen;
   const connectionsOpen =
-    rightVisible && !chartEditorOpen && !pinnedQueriesOpen && !agentPanelOpen;
+    rightVisible && !chartEditorOpen && !pinnedQueriesOpen;
 
   function key(action: KeymapAction): string | undefined {
     return shortcutDisplay(shortcuts[action]) ?? undefined;
@@ -43,11 +41,7 @@ function useStatusBar(): StatusBarViewModel {
 
   // Every right-rail button routes through the command registry, the same
   // handler the keyboard shortcut runs. Each toggle command closes the other
-  // right panes (including the agent panel), so switching panes always works.
-  function onClickAgentPanel() {
-    runCommand("showAgentPanel");
-  }
-
+  // right panes, so switching panes always works.
   function onClickChartEditor() {
     runCommand("showChartEditor");
   }
@@ -69,7 +63,6 @@ function useStatusBar(): StatusBarViewModel {
   }
 
   return {
-    agentPanelOpen,
     bgLabel,
     canChart,
     chartEditorOpen,
@@ -79,7 +72,6 @@ function useStatusBar(): StatusBarViewModel {
       ? LEFT_RAIL_ITEMS.filter((item) => !WEB_HIDDEN_RAIL_ITEMS.has(item.key))
       : LEFT_RAIL_ITEMS,
     leftVisible,
-    onClickAgentPanel,
     onClickChartEditor,
     onClickConnections,
     onClickLeftRail,

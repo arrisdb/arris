@@ -1,5 +1,5 @@
 import { CANVAS_DOC_VERSION } from "../constants";
-import type { CanvasComponent, CanvasDoc, CanvasEdge, ChatEntry } from "../types";
+import type { CanvasComponent, CanvasDoc, CanvasEdge } from "../types";
 import { sanitizeChartSpec } from "./chartSpec";
 
 /// A fresh, empty board document.
@@ -30,19 +30,6 @@ function isEdge(value: unknown): value is CanvasEdge {
   );
 }
 
-/// True when a parsed value looks like a settled chat entry. `pending` is forced
-/// off on load so a half-streamed entry (should never persist) can't read as
-/// stuck, and the streaming refs that drive it are gone after a reload anyway.
-function isChatEntry(value: unknown): value is ChatEntry {
-  if (!value || typeof value !== "object") return false;
-  const e = value as Record<string, unknown>;
-  return (
-    typeof e.id === "string" &&
-    (e.role === "user" || e.role === "agent") &&
-    typeof e.text === "string"
-  );
-}
-
 /// Normalize a stored canvas doc into a board. Tolerant by design: a hand-edited
 /// or unknown-version doc yields what is renderable, never a throw.
 function parseDoc(raw: unknown): CanvasDoc {
@@ -54,8 +41,7 @@ function parseDoc(raw: unknown): CanvasDoc {
       ? (doc.components.filter(isComponent) as CanvasComponent[])
       : []
   ).map((c) =>
-    // Heal a persisted-but-stale chart spec (e.g. one a prior agent turn left
-    // without `yColumns`) on load, so reopening a board can never crash the
+    // Heal a persisted-but-stale chart spec (e.g. one missing `yColumns`) on load, so reopening a board can never crash the
     // renderer with a malformed spec.
     c.kind === "chart" ? { ...c, spec: sanitizeChartSpec(c.spec) } : c,
   );
@@ -68,22 +54,11 @@ function parseDoc(raw: unknown): CanvasDoc {
     typeof (doc.viewport as Record<string, unknown>).zoom === "number"
       ? (doc.viewport as CanvasDoc["viewport"])
       : undefined;
-  const connectionIds = Array.isArray(doc.connectionIds)
-    ? doc.connectionIds.filter((id): id is string => typeof id === "string")
-    : undefined;
-  const chat = Array.isArray(doc.chat)
-    ? (doc.chat.filter(isChatEntry) as ChatEntry[]).map((e) => ({
-        ...e,
-        pending: false,
-      }))
-    : undefined;
   return {
     version: CANVAS_DOC_VERSION,
     components,
     edges,
     viewport,
-    connectionIds,
-    chat,
   };
 }
 
