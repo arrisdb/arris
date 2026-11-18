@@ -1,5 +1,12 @@
+import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
+
 import {
   API_BASE,
+  BRIDGE_ERROR_CODE,
+  DESKTOP_API_COMMAND,
+  DESKTOP_SERVER_EVENT,
+  SERVER_CONNECTED_KIND,
   CONTENT_TYPE_HEADER,
   EVENTS_PATH,
   HTTP_ERROR_CODE,
@@ -86,7 +93,17 @@ function setCurrentProject(project: string | null): void {
   }
 }
 
+async function desktopApiCall<T>(cmd: string, args: Record<string, unknown>): Promise<T> {
+  try {
+    return await invoke<T>(DESKTOP_API_COMMAND, { project: currentProject(), cmd, args });
+  } catch (e) {
+    if (isErrorBody(e)) throw new ApiError(e.error.code, e.error.message, 0);
+    throw new ApiError(BRIDGE_ERROR_CODE, String(e), 0);
+  }
+}
+
 async function apiCall<T>(cmd: string, args: Record<string, unknown> = {}): Promise<T> {
+  if (!webShell) return desktopApiCall<T>(cmd, args);
   const response = await fetch(`${API_BASE}/${cmd}`, requestInit(args));
   if (!response.ok) throw await toApiError(response);
   return (await response.json()) as T;
@@ -97,24 +114,34 @@ function apiBeacon(cmd: string, args: Record<string, unknown> = {}): void {
   void fetch(`${API_BASE}/${cmd}`, { ...requestInit(args), keepalive: true }).catch(() => {});
 }
 
-// One EventSource shared by all subscribers to stay under the browser per-origin connection limit.
-let sharedSource: EventSource | null = null;
+// One stream shared by all subscribers: an EventSource in the browser, the Tauri bridge on desktop.
+let closeSource: (() => void) | null = null;
 const handlers = new Set<(event: ServerEvent) => void>();
+const CONNECTED: ServerEvent = { kind: SERVER_CONNECTED_KIND, project: null, payload: null };
+
+function dispatch(event: ServerEvent): void {
+  handlers.forEach((h) => h(event));
+}
+
+function openSource(): () => void {
+  if (!webShell) {
+    const unlisten = listen<ServerEvent>(DESKTOP_SERVER_EVENT, (e) => dispatch(e.payload));
+    return () => void unlisten.then((stop) => stop()).catch(() => {});
+  }
+  const source = new EventSource(`${API_BASE}/${EVENTS_PATH}`);
+  source.onopen = () => dispatch(CONNECTED);
+  source.onmessage = (message) => dispatch(JSON.parse(message.data) as ServerEvent);
+  return () => source.close();
+}
 
 function subscribe(handler: (event: ServerEvent) => void): () => void {
-  if (!sharedSource) {
-    sharedSource = new EventSource(`${API_BASE}/${EVENTS_PATH}`);
-    sharedSource.onmessage = (message) => {
-      const event = JSON.parse(message.data) as ServerEvent;
-      handlers.forEach((h) => h(event));
-    };
-  }
+  closeSource ??= openSource();
   handlers.add(handler);
   return () => {
     handlers.delete(handler);
     if (handlers.size === 0) {
-      sharedSource?.close();
-      sharedSource = null;
+      closeSource?.();
+      closeSource = null;
     }
   };
 }

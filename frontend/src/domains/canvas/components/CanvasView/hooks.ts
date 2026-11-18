@@ -4,7 +4,7 @@ import type { Node, NodeChange, Viewport } from "reactflow";
 
 
 import { extractIpcError, ipcErrorMessage } from "@shared";
-import { currentProject, isWebShell, subscribe } from "@shared/api";
+import { currentProject, subscribe } from "@shared/api";
 
 import {
   CANVAS_CELL_INGESTED_SERVER_EVENT,
@@ -107,9 +107,8 @@ function useCanvasPersistence(boardId: string) {
     return () => clearTimeout(timer);
   }, [doc, save]);
 
-  // The desktop gets ingest totals from a Tauri event registered by the domain.
+  // Server events: CLI edits to this board, and ingest totals for cells the server ran.
   useEffect(() => {
-    if (!isWebShell()) return;
     return subscribe((event) => {
       if (event.project !== currentProject()) return;
       if (event.kind === CANVAS_CHANGED_EVENT) {

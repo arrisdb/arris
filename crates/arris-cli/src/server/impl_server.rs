@@ -63,6 +63,7 @@ impl Server {
             events,
             connection_requests: ConnectionRequests::default(),
             query_handoffs: QueryHandoffs::default(),
+            ui_contexts: Default::default(),
         });
         Ok(Self {
             state,

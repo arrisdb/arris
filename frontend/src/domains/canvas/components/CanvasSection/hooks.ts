@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { ipcErrorMessage } from "@shared";
-import { currentProject, isWebShell, subscribe } from "@shared/api";
+import { currentProject, subscribe } from "@shared/api";
 import { useSnackbarStore } from "@shell/hooks/snackbarStore";
 import { useTabsStore } from "@shell/hooks/tabsStore";
 
@@ -42,7 +42,6 @@ function useCanvasSummaries() {
 
   // The CLI adds and deletes canvases too; re-list when one changes.
   useEffect(() => {
-    if (!isWebShell()) return;
     return subscribe((event) => {
       if (event.project !== currentProject() || event.kind !== CANVAS_CHANGED_EVENT) return;
       void run(async () => {});

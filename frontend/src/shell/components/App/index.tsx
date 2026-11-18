@@ -7,6 +7,7 @@ import { ProjectLoadingScreen } from "@shell/components/ProjectLoadingScreen";
 import { QueryHandoffHost } from "@shell/components/QueryHandoffHost";
 import { ServerEventsHost } from "@shell/components/ServerEventsHost";
 import { SnackbarHost } from "@shell/components/SnackbarHost";
+import { UiContextHost } from "@shell/components/UiContextHost";
 import { WelcomeScreen } from "@shell/components/WelcomeScreen";
 import { useAppState } from "@shell/hooks";
 
@@ -42,8 +43,9 @@ function App() {
       <ContentView />
       <FileSearchPopover />
       <SnackbarHost />
-      {isWebShell() && <QueryHandoffHost />}
-      {isWebShell() && <ServerEventsHost />}
+      <QueryHandoffHost />
+      <ServerEventsHost />
+      <UiContextHost />
       {isWebShell() && <DeepLinkHost />}
     </>
   );

@@ -2,9 +2,8 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use arris_engines::{
-    QueryRequest,
     AppEnvironment, Completion, CreatedVenv, IpcError, KernelOutput, PythonInterpreter,
-    QueryLanguage,
+    QueryLanguage, QueryRequest,
 };
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, State};
@@ -104,10 +103,7 @@ pub async fn cmd_python_execute(
     code: String,
 ) -> Result<String, IpcError> {
     let env = env.inner().clone();
-    env.python
-        .execute(&console_id, code)
-        .await
-        .map_err(ipc_err)
+    env.python.execute(&console_id, code).await.map_err(ipc_err)
 }
 
 #[tauri::command]

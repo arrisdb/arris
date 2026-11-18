@@ -83,7 +83,7 @@ function useQueryHandoffs(): void {
     };
     pull();
     return subscribe((event) => {
-      if (event.kind === "query_open_requested") pull();
+      if (event.kind === "query_open_requested" || event.kind === "server_connected") pull();
     });
   }, []);
 }

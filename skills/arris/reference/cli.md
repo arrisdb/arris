@@ -87,6 +87,9 @@ JSON array of the UI's open tabs: `id`, `title`, `tabType` (`console`, `canvas`,
 ### `arris tab close (<id>... | --all-except <id>)`
 Closes tabs like their close button; consoles stay in the sidebar. Prints `{closed, applied}`; `applied` is false when no browser tab is open, and the close then runs when the UI next opens. An id that is not an open tab exits 1 with `tab_not_found`.
 
+### `arris context`
+What the user is looking at in the UI: `{context: {tab: {id, title, tabType, connectionId?, text?, selection?: {from, to, text}}, updatedAt}}`. `context` is null until a UI has opened; `tab` is null when no tab is active. `text` is the editor content of a console tab.
+
 ### `arris dbt models [--dir D]` and `arris sqlmesh models [--dir D]`
 Lists models without SQL. dbt prints `{projectName, root, models}`; each model has `uniqueId`, `name`, `schema`, `materialized`, `dependsOn`, `path`. sqlmesh prints `{root, models}`; each has `name`, `kind`, `cron`, `owner`, `dependsOn`, `path`. `--dir` is the tool project folder relative to the project root (default: the root); a folder outside it fails with `forbidden`.
 

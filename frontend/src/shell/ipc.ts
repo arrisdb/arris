@@ -47,8 +47,8 @@ function openFileIndexIPC(root: string): Promise<void> {
 }
 
 async function openProjectIPC(root: string): Promise<ProjectOpenResult> {
-  if (!isWebShell()) return invoke("cmd_open_project", { root });
   setCurrentProject(root);
+  if (!isWebShell()) return invoke("cmd_open_project", { root });
   const [connections, workspace] = await Promise.all([
     apiCall<ScopedConnection[]>("connection_list"),
     apiCall<{ tabs: PersistedTab[]; paneLayout: PersistedPaneLayout }>("workspace_load"),

@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex};
 use arris_engines::{AppEnvironment, IpcError, ProjectOpenResult};
 use tauri::{Emitter, State};
 
-use crate::commands::constants::{ARGV_PROGRAM_SKIP, ARG_FLAG_PREFIX};
+use crate::commands::constants::{ARG_FLAG_PREFIX, ARGV_PROGRAM_SKIP};
 use crate::helpers::ipc_err;
 use crate::watcher::ProjectWatcher;
 
@@ -95,7 +95,8 @@ mod tests {
 
     #[test]
     fn from_args_skips_leading_flags() {
-        let pending = PendingLaunch::from_args(args(&["/bin/arris", "-psn_0_123", "/home/me/proj"]));
+        let pending =
+            PendingLaunch::from_args(args(&["/bin/arris", "-psn_0_123", "/home/me/proj"]));
         assert_eq!(pending.take(), Some("/home/me/proj".to_string()));
     }
 

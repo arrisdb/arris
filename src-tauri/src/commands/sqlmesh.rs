@@ -81,12 +81,10 @@ pub async fn cmd_sqlmesh_test(
     sqlmesh_binary: Option<String>,
 ) -> Result<SqlMeshCommandResult, IpcError> {
     let env = env.inner().clone();
-    tokio::task::spawn_blocking(move || {
-        env.sqlmesh.test_model(root, select, args, sqlmesh_binary)
-    })
-    .await
-    .map_err(ipc_err)?
-    .map_err(ipc_err)
+    tokio::task::spawn_blocking(move || env.sqlmesh.test_model(root, select, args, sqlmesh_binary))
+        .await
+        .map_err(ipc_err)?
+        .map_err(ipc_err)
 }
 
 #[tauri::command]
@@ -98,12 +96,10 @@ pub async fn cmd_sqlmesh_test_target(
     sqlmesh_binary: Option<String>,
 ) -> Result<SqlMeshCommandResult, IpcError> {
     let env = env.inner().clone();
-    tokio::task::spawn_blocking(move || {
-        env.sqlmesh.test_target(root, target, args, sqlmesh_binary)
-    })
-    .await
-    .map_err(ipc_err)?
-    .map_err(ipc_err)
+    tokio::task::spawn_blocking(move || env.sqlmesh.test_target(root, target, args, sqlmesh_binary))
+        .await
+        .map_err(ipc_err)?
+        .map_err(ipc_err)
 }
 
 #[tauri::command]
@@ -158,13 +154,10 @@ pub async fn cmd_sqlmesh_render(
     sqlmesh_binary: Option<String>,
 ) -> Result<SqlMeshRenderResult, IpcError> {
     let env = env.inner().clone();
-    tokio::task::spawn_blocking(move || {
-        env.sqlmesh
-            .render_model(root, model_name, sqlmesh_binary)
-    })
-    .await
-    .map_err(ipc_err)?
-    .map_err(ipc_err)
+    tokio::task::spawn_blocking(move || env.sqlmesh.render_model(root, model_name, sqlmesh_binary))
+        .await
+        .map_err(ipc_err)?
+        .map_err(ipc_err)
 }
 
 #[tauri::command]

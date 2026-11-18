@@ -255,7 +255,9 @@ name = "arris-tauri"
 version = "0.15.0"
 dependencies = [
  "arris-engines",
+ "futures-util",
  "notify-debouncer-full",
+ "reqwest 0.13.5",
  "serde",
  "serde_json",
  "sha2 0.10.9",

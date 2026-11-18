@@ -6,7 +6,8 @@ type ServerEventKind =
   | "canvas_changed"
   | "canvas_cell_ingested"
   | "tool_runs_changed"
-  | "query_open_requested";
+  | "query_open_requested"
+  | "server_connected";
 
 interface ServerEvent {
   kind: ServerEventKind;

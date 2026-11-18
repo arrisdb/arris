@@ -146,7 +146,8 @@ pub async fn cmd_git_restore_change(
 ) -> Result<(), IpcError> {
     let env = env.inner().clone();
     tokio::task::spawn_blocking(move || {
-        env.git.restore_change_blocks(&repo, &file_path, start_line, end_line)
+        env.git
+            .restore_change_blocks(&repo, &file_path, start_line, end_line)
     })
     .await
     .map_err(ipc_err)?

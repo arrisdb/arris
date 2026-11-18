@@ -94,6 +94,8 @@ pub enum Command {
     /// Manage canvases (boards of queries and charts).
     #[command(subcommand)]
     Canvas(CanvasCommand),
+    /// What the open Arris UI shows: active tab, its text and selection.
+    Context,
     /// List or close the Arris UI's open tabs.
     #[command(subcommand)]
     Tab(TabCommand),
