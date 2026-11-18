@@ -11,10 +11,8 @@ import { WEB_PROJECT_TITLE } from "./constants";
 import { useLeftSidebarState } from "./hooks";
 import { leftPaneContextMenuItems } from "./utils";
 
-// The browser swaps the file tree for the server's model lists; the project view
-// is just the sections, so it renders no body at all.
-function WebModels({ view }: { view: string }) {
-  if (view !== "dbt" && view !== "sqlmesh") return null;
+// The browser's dbt and SQLMesh views list the server's models, not the desktop scan.
+function WebModels({ view }: { view: "dbt" | "sqlmesh" }) {
   return (
     <div className="mdbc-pane-body" data-testid="left-sidebar-body">
       <ModelsView
@@ -83,7 +81,7 @@ export function LeftSidebar() {
           <span className="mdbc-pane-title">{isWebShell() ? WEB_PROJECT_TITLE : primary?.title}</span>
         )}
       </div>
-      {isWebShell() ? (
+      {isWebShell() && filesPaneView !== "project" ? (
         <WebModels view={filesPaneView} />
       ) : (
         <div className="mdbc-pane-body" data-testid="left-sidebar-body">

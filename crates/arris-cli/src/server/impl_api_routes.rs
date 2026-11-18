@@ -26,7 +26,7 @@ use super::{
     CONNECTION_TEST_ROUTE, CanvasRoutes, CanvasRunRoutes, ConnectionRefRequest, ConnectionRequest,
     ConnectionRequestCreateRequest, ConnectionRequestCreateResponse, ConnectionRequestIdRequest,
     ConnectionRequestResolvedPayload, ConnectionRequestStatus, ConnectionSaveRequest,
-    ConnectionTestRequest, EmptyResponse, HISTORY_DEFAULT_LIMIT, HISTORY_LIST_ROUTE,
+    ConnectionTestRequest, EmptyResponse, FileRoutes, HISTORY_DEFAULT_LIMIT, HISTORY_LIST_ROUTE,
     HistoryListRequest, OBJECT_DEFINITION_ROUTE, ObjectDefinitionRequest, OkResponse,
     PIN_ADD_ROUTE, PIN_LIST_ROUTE, PIN_REMOVE_ROUTE, PIN_RENAME_ROUTE, PIN_SAVE_ROUTE,
     PROJECT_HEADER, PROJECT_LIST_ROUTE, PROJECT_QUERY_PARAM, PinAddRequest, PinRemoveRequest,
@@ -82,6 +82,7 @@ impl ApiRoutes {
             .merge(CanvasRunRoutes::router())
             .merge(AnalyticsRoutes::router())
             .merge(ToolRunRoutes::router())
+            .merge(FileRoutes::router())
             .route(
                 CONNECTION_REQUEST_CREATE_ROUTE,
                 post(Self::connection_request_create),

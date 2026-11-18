@@ -1,11 +1,10 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use arris_engines::{AppEnvironment, FileTreeEntry, IpcError};
+use arris_engines::{AppEnvironment, FileTreeEntry, IpcError, SystemClipboard};
 use tauri::State;
 use tauri_plugin_opener::OpenerExt;
 
-use crate::clipboard::{ClipboardFiles, SystemClipboard};
 use crate::helpers::ipc_err;
 
 #[tauri::command]
@@ -62,16 +61,13 @@ pub async fn cmd_read_file_base64(
 /// Empty when the clipboard holds no files or the platform has no implementation.
 #[tauri::command]
 pub async fn cmd_read_clipboard_file_paths() -> Result<Vec<String>, IpcError> {
-    Ok(SystemClipboard.read_file_paths())
+    Ok(SystemClipboard::file_paths())
 }
 
 /// Open a path with the operating system's default application (e.g. mp3 in the
 /// default media player). Used for media files the in-app viewer can't preview.
 #[tauri::command]
-pub async fn cmd_open_in_default_app(
-    app: tauri::AppHandle,
-    path: String,
-) -> Result<(), IpcError> {
+pub async fn cmd_open_in_default_app(app: tauri::AppHandle, path: String) -> Result<(), IpcError> {
     app.opener().open_path(path, None::<&str>).map_err(ipc_err)
 }
 

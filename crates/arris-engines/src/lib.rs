@@ -31,7 +31,7 @@ pub use connection::{
 };
 pub use dbt::{DbtEngine, ProfileConnectionMapper};
 pub use federation::FederationEngine;
-pub use file::{FileEngine, FileTreeEntry, DEFAULT_SKIP_DIRS};
+pub use file::{FileEngine, FileTreeEntry, SystemClipboard, DEFAULT_SKIP_DIRS};
 pub use git::GitEngine;
 pub use logging::{DebugLog, DebugLogHandle, DebugLogging, DEBUG_LOGS_DIR_NAME};
 pub use python::{

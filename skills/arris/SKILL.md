@@ -34,7 +34,7 @@ Run `arris ui --open`. It opens the project's Arris UI in the browser. Tell the 
 
 ## init-connection
 
-1. Run `arris connection new` (add `--kind <kind>` if the user named a database type, e.g. `postgres`).
+1. Run `arris connection new` (add `--kind <kind>` if the user named a database type, e.g. `postgres`). If the user gave a connection URI, pass it as `--url <uri>` instead of `--kind`; the form opens with host, port, user, database and options filled in. Remove any password from the URI first; the user types it in the form.
 2. Tell the user a browser form opened and to fill it in there. Do not ask for credentials in chat.
 3. After the user saves, macOS may show a Keychain access prompt for `arris`. Tell them to approve it (Always Allow); the command waits until the form is saved and they approve. On success it prints `{"connectionId","name"}`; confirm the connection name to the user.
 4. Exit code 3 means the form was cancelled or timed out: report that it was cancelled and offer to try again. Exit code 2 means the server could not start (see the reference).

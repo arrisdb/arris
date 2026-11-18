@@ -224,8 +224,8 @@ function useGlobalCommands(): void {
     openTab: { run: () => openNewConsoleTab() },
     closeTab: { run: closeFocusedPaneTab },
     openSettings: { run: () => useSettingsStore.getState().open(), isEnabled: isDesktop },
-    searchFiles: { run: () => useFileSearchStore.getState().show("file"), isEnabled: isDesktop },
-    searchContent: { run: () => useFileSearchStore.getState().show("content"), isEnabled: isDesktop },
+    searchFiles: { run: () => useFileSearchStore.getState().show("file") },
+    searchContent: { run: () => useFileSearchStore.getState().show("content") },
     openProject: { run: () => { openProjectFromMenu().catch(() => {}); }, isEnabled: isDesktop },
     openProjectNewWindow: {
       run: () => { pickAndOpenFolderInNewWindow().catch(() => {}); },

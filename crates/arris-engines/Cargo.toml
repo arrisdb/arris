@@ -30,6 +30,9 @@ clickhouse = ["dep:clickhouse"]
 dynamodb = ["dep:aws-config", "dep:aws-sdk-dynamodb"]
 # StarRocks speaks the MySQL wire protocol, so it reuses mysql_async + rustls.
 starrocks = ["dep:mysql_async", "dep:rustls", "dep:async-stream"]
+# Opt-in: these suites start a container per test and dominate `cargo test` time.
+elasticsearch-tests = ["elasticsearch"]
+mssql-tests = ["mssql"]
 
 [dependencies]
 # shared
@@ -136,6 +139,11 @@ aws-sdk-dynamodb = { version = "1.116", default-features = false, features = ["d
 [target.'cfg(unix)'.dependencies]
 nix = { version = "0.31", features = ["signal"] }
 
+# Clipboard file-list access (NSPasteboard file URLs), matching Tauri's objc2 versions.
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2-app-kit = { version = "0.3", features = ["NSPasteboard", "NSPasteboardItem"] }
+objc2-foundation = { version = "0.3", features = ["NSString", "NSURL", "NSArray"] }
+
 [dev-dependencies]
 tempfile = "3.27"
 rcgen = "0.13"
@@ -146,3 +154,15 @@ tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 tokio-util = "0.7"
 testcontainers = "0.27"
 testcontainers-modules = { version = "0.15", features = ["postgres", "mysql", "mariadb", "mongo", "redis", "elastic_search", "kafka", "mssql_server", "clickhouse"] }
+
+[[test]]
+name = "elasticsearch_integration"
+required-features = ["elasticsearch-tests"]
+
+[[test]]
+name = "elasticsearch_federation_integration"
+required-features = ["elasticsearch-tests"]
+
+[[test]]
+name = "mssql_integration"
+required-features = ["mssql-tests"]
