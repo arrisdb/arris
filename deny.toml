@@ -20,18 +20,17 @@ ignore = [
     # rsa: Marvin timing side-channel. No fixed release exists (still RC). Pulled
     # transitively by a SQL driver; risk is local-timing only.
     "RUSTSEC-2023-0071",
-    # paste 1.0.15: unmaintained. Deep transitive (proc-macro helper). No fix.
-    "RUSTSEC-2024-0436",
     # serde_yml 0.0.12: unmaintained serde_yaml fork (direct dep). No safe
     # upgrade; replace with a maintained YAML crate. Tracked as follow-up.
     "RUSTSEC-2025-0068",
     # rustls-pemfile: advisory on a version pinned by an older TLS dep. Constrained.
     "RUSTSEC-2025-0134",
-    # rustls-webpki 0.101.7 — old version pinned transitively. Constrained until
-    # the pinning dep updates.
-    "RUSTSEC-2026-0098",
-    "RUSTSEC-2026-0099",
-    "RUSTSEC-2026-0104",
+    # astral-tokio-tar: unmaintained, dev-only via testcontainers (0.28 still
+    # uses it). No fix.
+    "RUSTSEC-2026-0440",
+    # pin-utils: unmaintained, via aws-smithy 0.63. Dropped by aws-config 1.13,
+    # which needs Rust 1.94.1; remove after the toolchain bump.
+    "RUSTSEC-2026-0441",
 ]
 
 [licenses]
@@ -66,6 +65,8 @@ private = { ignore = true }
 multiple-versions = "warn"
 # A wildcard ("*") version requirement defeats reproducible builds.
 wildcards = "deny"
+# Workspace path deps between unpublished crates carry no version.
+allow-wildcard-paths = true
 
 [sources]
 # Dependencies may only come from crates.io. An unknown registry or a crate

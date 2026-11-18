@@ -259,7 +259,7 @@ mod tests {
 
     #[test]
     fn unsupported_expr_returns_none() {
-        let expr = Expr::Wildcard { qualifier: None, options: Default::default() };
+        let expr = Expr::IsTrue(Box::new(col("flag")));
         assert!(FilterTranslator::expr_to_sql(&expr, DatabaseKind::Postgres).is_none());
     }
 
@@ -290,7 +290,7 @@ mod tests {
                 Operator::Eq,
                 Box::new(lit_i64(1)),
             )),
-            Expr::Wildcard { qualifier: None, options: Default::default() },
+            Expr::IsTrue(Box::new(col("flag"))),
         ];
         let (clause, indices) = FilterTranslator::exprs_to_where_clause(&filters, DatabaseKind::Postgres);
         assert_eq!(clause, "\"id\" = 1");

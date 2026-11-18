@@ -18,7 +18,7 @@ use tokio_util::sync::CancellationToken;
 use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::catalog::TableProvider;
 use datafusion::execution::session_state::SessionStateBuilder;
-use datafusion::sql::TableReference;
+use datafusion::common::TableReference;
 use datafusion_federation::sql::{RemoteTableRef, SQLFederationProvider, SQLTableSource};
 use datafusion_federation::{FederatedQueryPlanner, FederatedTableProviderAdaptor};
 

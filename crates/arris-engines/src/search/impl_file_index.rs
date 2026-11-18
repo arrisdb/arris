@@ -309,12 +309,12 @@ impl FileIndex {
     }
 
     fn stats(&self) -> Result<super::IndexStats, SearchError> {
-        let file_count: usize = self
+        let file_count = self
             .db
-            .query_row("SELECT COUNT(*) FROM files", [], |row| row.get(0))?;
-        let line_count: usize = self
+            .query_row("SELECT COUNT(*) FROM files", [], |row| row.get::<_, i64>(0))? as usize;
+        let line_count = self
             .db
-            .query_row("SELECT COUNT(*) FROM lines", [], |row| row.get(0))?;
+            .query_row("SELECT COUNT(*) FROM lines", [], |row| row.get::<_, i64>(0))? as usize;
 
         let db_path = self.root.join(".arris/search.db");
         let db_size_bytes = fs::metadata(&db_path).map(|m| m.len()).unwrap_or(0);

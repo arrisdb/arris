@@ -65,7 +65,7 @@
     "esbuild": "^0.28.1",
     "eslint": "^10.5.0",
     "eslint-import-resolver-typescript": "^4.4.5",
-    "eslint-plugin-boundaries": "^6.0.2",
+    "eslint-plugin-boundaries": "^7.4.3",
     "eslint-plugin-react-hooks": "^7.1.1",
     "jsdom": "^25.0.1",
     "knip": "^6.15.0",
