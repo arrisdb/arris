@@ -76,6 +76,8 @@ interface QueryComponent extends BaseComponent {
   limit?: number;
   /// Fetch the full result instead of `limit` rows.
   selectAll?: boolean;
+  /// Set by the CLI on reads: the board runs it once on open, then clears it.
+  autoRun?: boolean;
 }
 
 /// A chart bound to a query object's data by `sourceQueryId`. Renders through the

@@ -13,24 +13,29 @@ use serde_json::Value;
 
 use super::{
     AnalyticsCommand, AnalyticsTool, CONNECTION_NEW_RETRY_MS, CONNECTION_NEW_TIMEOUT_SECS,
-    CURRENT_DIR_LABEL, CanvasAddOutput, CanvasCommand, CanvasNewOutput, CanvasShowDoc,
-    CanvasShowOutput, Cli, CliError, Command, ConnectionCommand, ConnectionListEntry,
-    ConnectionNewOutput, DBT_TOOL, ENV_DATA_DIR, EXIT_API_ERROR, KIND_LIST_SEPARATOR,
-    LineageOutput, QueryOpenOutput, QueryOutput, SERVER_LISTENING_PREFIX, SQLMESH_TOOL,
-    ServerClient, SyncOutput, ToolRunOutput, ToolRunner, UrlOutput,
+    CURRENT_DIR_LABEL, CanvasAddOutput, CanvasCommand, CanvasDeleteOutput, CanvasNewOutput,
+    CanvasShowDoc, CanvasShowOutput, Cli, CliError, Command, ConnectionCommand,
+    ConnectionListEntry, ConnectionNewOutput, DBT_TOOL, ENV_DATA_DIR, EXIT_API_ERROR,
+    KIND_LIST_SEPARATOR, LineageOutput, QueryOpenOutput, QueryOutput, ResultOutput,
+    SERVER_LISTENING_PREFIX, SQLMESH_TOOL, ServerClient, SyncOutput, TabCommand, ToolRunOutput,
+    ToolRunner, UrlOutput,
 };
 use crate::server::{
     AnalyticsDirRequest, AnalyticsLineageRequest, AnalyticsLineageResponse, AnalyticsModelRequest,
-    AnalyticsRoutes, CANVAS_ADD_ROUTE, CANVAS_CREATE_ROUTE, CANVAS_GET_ROUTE, CANVAS_LIST_ROUTE,
+    AnalyticsRoutes, CANVAS_ADD_ROUTE, CANVAS_CHART_ROUTE, CANVAS_CREATE_ROUTE,
+    CANVAS_DELETE_ROUTE, CANVAS_GET_ROUTE, CANVAS_LIST_ROUTE, CANVAS_REMOVE_ROUTE,
     CONNECTION_LIST_ROUTE, CONNECTION_REMOVE_ROUTE, CONNECTION_REQUEST_CANCEL_ROUTE,
     CONNECTION_REQUEST_CREATE_ROUTE, CONNECTION_REQUEST_WAIT_ROUTE, CONNECTION_TEST_ROUTE,
-    CanvasAddRequest, CanvasAddResponse, CanvasAddSource, CanvasCreateRequest, CanvasRefRequest,
-    ConnectionRefRequest, ConnectionRequestCreateRequest, ConnectionRequestCreateResponse,
-    ConnectionRequestIdRequest, ConnectionRequestStatus, ConnectionTestRequest, EmptyResponse,
-    HISTORY_LIST_ROUTE, HistoryListRequest, PIN_ADD_ROUTE, PIN_LIST_ROUTE, PIN_REMOVE_ROUTE,
-    PinAddRequest, PinRemoveRequest, QUERY_OPEN_ROUTE, QUERY_RUN_ROUTE, QueryOpenRequest,
-    QueryOpenResponse, QueryRunRequest, QueryRunResponse, SCHEMA_LIST_ROUTE, SchemaListRequest,
-    Server, TOOL_RUN_RECORD_ROUTE, ToolRunIdPayload, ToolRunRecordRequest,
+    CanvasAddRequest, CanvasAddResponse, CanvasAddSource, CanvasChartRequest, CanvasCreateRequest,
+    CanvasIdRequest, CanvasObjectRequest, CanvasRefRequest, ChartSpecDoc, ConnectionRefRequest,
+    ConnectionRequestCreateRequest, ConnectionRequestCreateResponse, ConnectionRequestIdRequest,
+    ConnectionRequestStatus, ConnectionTestRequest, EmptyResponse, HISTORY_LIST_ROUTE,
+    HistoryListRequest, PIN_ADD_ROUTE, PIN_LIST_ROUTE, PIN_REMOVE_ROUTE, PinAddRequest,
+    PinRemoveRequest, QUERY_OPEN_ROUTE, QUERY_RUN_ROUTE, QueryOpenRequest, QueryOpenResponse,
+    QueryRunRequest, QueryRunResponse, RUN_GET_ROUTE, RUN_PAGE_ROUTE, RunGetResponse, RunIdRequest,
+    RunPageRequest, SCHEMA_LIST_ROUTE, SchemaListRequest, Server, TAB_CLOSE_ROUTE, TAB_LIST_ROUTE,
+    TOOL_RUN_RECORD_ROUTE, TabCloseRequest, TabCloseResponse, TabSummary, ToolRunIdPayload,
+    ToolRunRecordRequest,
 };
 
 impl Cli {
@@ -69,9 +74,31 @@ impl Cli {
                     .map(ConnectionPrefill::from_url)
                     .transpose()?;
                 let (client, project) = self.connect(&data_dir).await?;
+                let body = ConnectionRequestCreateRequest {
+                    kind,
+                    prefill,
+                    connection: None,
+                };
                 let out =
-                    Self::connection_new(&data_dir, client, &project, kind, prefill, *no_open)
-                        .await?;
+                    Self::connection_form(&data_dir, client, &project, body, *no_open).await?;
+                serde_json::to_value(out)?
+            }
+            Command::Connection(ConnectionCommand::Edit {
+                connection,
+                no_open,
+            }) => {
+                let (client, project) = self.connect(&data_dir).await?;
+                let out = Self::connection_form(
+                    &data_dir,
+                    client,
+                    &project,
+                    ConnectionRequestCreateRequest {
+                        connection: Some(connection.clone()),
+                        ..Default::default()
+                    },
+                    *no_open,
+                )
+                .await?;
                 serde_json::to_value(out)?
             }
             Command::Connection(ConnectionCommand::List) => {
@@ -95,6 +122,25 @@ impl Cli {
                     .call(CONNECTION_REMOVE_ROUTE, &project, &body)
                     .await?
             }
+            Command::Result {
+                run_id,
+                offset,
+                limit,
+            } => {
+                let (client, project) = self.connect(&data_dir).await?;
+                let body = RunPageRequest {
+                    run_id: run_id.clone(),
+                    offset: *offset,
+                    limit: *limit as usize,
+                };
+                let page: QueryResult = client.call(RUN_PAGE_ROUTE, &project, &body).await?;
+                let id = RunIdRequest {
+                    run_id: run_id.clone(),
+                };
+                let got: RunGetResponse = client.call(RUN_GET_ROUTE, &project, &id).await?;
+                let total = got.run.row_count.unwrap_or_default();
+                serde_json::to_value(Self::result_output(run_id.clone(), *offset, total, page))?
+            }
             Command::Schema { connection, schema } => {
                 let (client, project) = self.connect(&data_dir).await?;
                 let body = SchemaListRequest {
@@ -109,6 +155,8 @@ impl Cli {
                 file,
                 limit,
                 open,
+                new_tab,
+                note,
             } => {
                 // clap's `source` group guarantees exactly one of `--sql` / `--file`.
                 let sql = match file {
@@ -121,11 +169,14 @@ impl Cli {
                         connection: connection.clone(),
                         sql,
                         limit: Some(*limit),
+                        new_tab: *new_tab,
+                        note: note.clone(),
+                        session: Self::agent_session(),
                     };
                     let resp: QueryOpenResponse =
                         client.call(QUERY_OPEN_ROUTE, &project, &body).await?;
-                    if !resp.opened {
-                        webbrowser::open(&client.ui_url(&Server::project_page(&project)))?;
+                    if resp.launch_browser {
+                        Self::open_browser(&client.ui_url(&Server::project_page(&project)))?;
                     }
                     let out = QueryOpenOutput {
                         awaiting_run: resp.run.is_none(),
@@ -176,6 +227,10 @@ impl Cli {
                 let (client, project) = self.connect(&data_dir).await?;
                 Self::canvas(&client, &project, cmd).await?
             }
+            Command::Tab(cmd) => {
+                let (client, project) = self.connect(&data_dir).await?;
+                Self::tab(&client, &project, cmd).await?
+            }
             Command::Dbt(cmd) => {
                 let (client, project) = self.connect(&data_dir).await?;
                 Self::analytics(&data_dir, client, &project, &DBT_TOOL, cmd).await?
@@ -188,7 +243,7 @@ impl Cli {
                 let (client, project) = self.connect(&data_dir).await?;
                 let url = client.ui_url(&Server::project_page(&project));
                 if *open {
-                    webbrowser::open(&url)?;
+                    Self::open_browser(&url)?;
                 }
                 serde_json::to_value(UrlOutput { url })?
             }
@@ -216,6 +271,22 @@ impl Cli {
             serde_json::to_string(value)
         };
         println!("{}", text.unwrap_or_default());
+    }
+
+    fn result_output(run_id: String, offset: usize, total: u64, page: QueryResult) -> ResultOutput {
+        let has_more = ((offset + page.rows.len()) as u64) < total;
+        ResultOutput {
+            run_id,
+            offset,
+            total_rows: total,
+            columns: page.columns,
+            rows: page
+                .rows
+                .into_iter()
+                .map(|row| row.into_iter().map(Self::plain_value).collect())
+                .collect(),
+            has_more,
+        }
     }
 
     fn query_output(resp: QueryRunResponse, limit: u32, ui_url: String) -> QueryOutput {
@@ -326,6 +397,34 @@ impl Cli {
         })
     }
 
+    async fn tab(
+        client: &ServerClient,
+        project: &Path,
+        cmd: &TabCommand,
+    ) -> Result<Value, CliError> {
+        let tabs: Vec<TabSummary> = client
+            .call(TAB_LIST_ROUTE, project, &EmptyResponse {})
+            .await?;
+        Ok(match cmd {
+            TabCommand::List => serde_json::to_value(tabs)?,
+            TabCommand::Close { ids, all_except } => {
+                let ids = match all_except {
+                    // An unknown kept id goes alone so the server reports it as not found.
+                    Some(keep) if !tabs.iter().any(|t| &t.id == keep) => vec![keep.clone()],
+                    Some(keep) => tabs
+                        .into_iter()
+                        .map(|t| t.id)
+                        .filter(|id| id != keep)
+                        .collect(),
+                    None => ids.clone(),
+                };
+                let body = TabCloseRequest { ids };
+                let closed: TabCloseResponse = client.call(TAB_CLOSE_ROUTE, project, &body).await?;
+                serde_json::to_value(closed)?
+            }
+        })
+    }
+
     async fn canvas(
         client: &ServerClient,
         project: &Path,
@@ -348,6 +447,46 @@ impl Cli {
                     .call(CANVAS_LIST_ROUTE, project, &EmptyResponse {})
                     .await?
             }
+            CanvasCommand::Remove { canvas, object } => {
+                let body = CanvasObjectRequest {
+                    canvas: canvas.clone(),
+                    id: object.clone(),
+                };
+                client.call(CANVAS_REMOVE_ROUTE, project, &body).await?
+            }
+            CanvasCommand::Chart {
+                canvas,
+                chart_id,
+                chart,
+                x,
+                y,
+            } => {
+                let body = CanvasChartRequest {
+                    canvas: canvas.clone(),
+                    id: chart_id.clone(),
+                    spec: ChartSpecDoc {
+                        kind: *chart,
+                        x_column: x.clone(),
+                        y_columns: y.clone(),
+                    },
+                };
+                client.call(CANVAS_CHART_ROUTE, project, &body).await?
+            }
+            CanvasCommand::Delete { canvas } => {
+                let body = CanvasRefRequest {
+                    canvas: canvas.clone(),
+                };
+                // Resolves a title to its id first; delete takes ids only.
+                let record: CanvasRecord = client.call(CANVAS_GET_ROUTE, project, &body).await?;
+                let id = CanvasIdRequest {
+                    id: record.id.clone(),
+                };
+                let _: EmptyResponse = client.call(CANVAS_DELETE_ROUTE, project, &id).await?;
+                serde_json::to_value(CanvasDeleteOutput {
+                    id: record.id,
+                    title: record.title,
+                })?
+            }
             CanvasCommand::Show { canvas } => {
                 let body = CanvasRefRequest {
                     canvas: canvas.clone(),
@@ -368,6 +507,8 @@ impl Cli {
                 connection,
                 title,
                 chart,
+                x,
+                y,
             } => {
                 // clap's `from` group guarantees `--run` or `--sql` with `--connection`.
                 let source = match (run, sql, connection) {
@@ -383,12 +524,21 @@ impl Cli {
                     canvas: canvas.clone(),
                     source,
                     title: title.clone(),
-                    chart: *chart,
+                    // clap requires --x and --y with --chart.
+                    chart: chart.map(|kind| ChartSpecDoc {
+                        kind,
+                        x_column: x.clone().unwrap_or_default(),
+                        y_columns: y.clone(),
+                    }),
                 };
                 let added: CanvasAddResponse =
                     client.call(CANVAS_ADD_ROUTE, project, &body).await?;
+                let ui_url = client.ui_url(&Server::canvas_page(project, &added.canvas.id));
+                if added.launch_browser {
+                    Self::open_browser(&ui_url)?;
+                }
                 serde_json::to_value(CanvasAddOutput {
-                    ui_url: client.ui_url(&Server::canvas_page(project, &added.canvas.id)),
+                    ui_url,
                     canvas_id: added.canvas.id,
                     query_id: added.query_id,
                     chart_id: added.chart_id,
@@ -437,8 +587,18 @@ impl Cli {
             });
         }
         let kind = Some(prefill.kind);
-        let made =
-            Self::connection_new(data_dir, client, project, kind, Some(prefill), no_open).await?;
+        let made = Self::connection_form(
+            data_dir,
+            client,
+            project,
+            ConnectionRequestCreateRequest {
+                kind,
+                prefill: Some(prefill),
+                connection: None,
+            },
+            no_open,
+        )
+        .await?;
         Ok(SyncOutput {
             connection_id: made.connection_id,
             name: made.name,
@@ -447,15 +607,13 @@ impl Cli {
     }
 
     /// Prints the form URL to stderr, then long-polls until the form resolves.
-    async fn connection_new(
+    async fn connection_form(
         data_dir: &Path,
         mut client: ServerClient,
         project: &Path,
-        kind: Option<DatabaseKind>,
-        prefill: Option<ConnectionPrefill>,
+        body: ConnectionRequestCreateRequest,
         no_open: bool,
     ) -> Result<ConnectionNewOutput, CliError> {
-        let body = ConnectionRequestCreateRequest { kind, prefill };
         let created: ConnectionRequestCreateResponse = client
             .call(CONNECTION_REQUEST_CREATE_ROUTE, project, &body)
             .await?;
@@ -464,7 +622,7 @@ impl Cli {
             "{}",
             serde_json::to_string(&UrlOutput { url: url.clone() })?
         );
-        if !no_open && let Err(e) = webbrowser::open(&url) {
+        if !no_open && let Err(e) = Self::open_browser(&url) {
             eprintln!("{e}");
         }
         let id = ConnectionRequestIdRequest { id: created.id };
@@ -550,10 +708,24 @@ impl Cli {
         } else {
             println!("{url}");
         }
-        if open && let Err(e) = webbrowser::open(&url) {
+        if open && let Err(e) = Self::open_browser(&url) {
             eprintln!("{e}");
         }
         Ok(server.serve().await?)
+    }
+
+    /// The calling Claude Code session's id, shortened; None outside Claude Code.
+    fn agent_session() -> Option<String> {
+        let id = std::env::var(super::ENV_AGENT_SESSION_ID).ok()?;
+        Some(id.chars().take(super::AGENT_SESSION_SHORT_LEN).collect())
+    }
+
+    fn open_browser(url: &str) -> std::io::Result<()> {
+        #[cfg(feature = "test-support")]
+        if std::env::var_os(super::ENV_TEST_NO_BROWSER).is_some() {
+            return Ok(());
+        }
+        webbrowser::open(url)
     }
 
     fn secrets() -> Arc<dyn SecretStore> {

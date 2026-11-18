@@ -74,6 +74,7 @@ pub enum ApiErrorCode {
     ConnectionNotFound,
     RunNotFound,
     PinNotFound,
+    TabNotFound,
     ResultNotCached,
     ConnectionFailed,
     QueryFailed,
@@ -220,23 +221,81 @@ pub struct QueryOpenRequest {
     pub connection: String,
     pub sql: String,
     pub limit: Option<u32>,
+    /// Skips the connection's shared console tab.
+    #[serde(default)]
+    pub new_tab: bool,
+    /// What the query answers; shown as a comment above it.
+    #[serde(default)]
+    pub note: Option<String>,
+    /// Short id of the agent session, so each session gets its own console.
+    #[serde(default)]
+    pub session: Option<String>,
 }
 
 /// `run` is set when the SQL was read-only and already ran; writes wait for the user.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct QueryOpenResponse {
     pub opened: bool,
+    /// No tab took the query and no browser is already on its way: the caller opens one.
+    pub launch_browser: bool,
     pub run: Option<QueryRunResponse>,
 }
 
-/// A query waiting to appear in a browser console tab.
+/// A query or canvas waiting to appear in the open browser tab.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct QueryHandoff {
     pub id: String,
-    pub connection_id: String,
-    pub sql: String,
-    pub run_id: Option<String>,
+    #[serde(flatten)]
+    pub target: HandoffTarget,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+pub enum HandoffTarget {
+    /// Appended to the connection's shared Claude console, or a new tab.
+    Query {
+        connection_id: String,
+        sql: String,
+        run_id: Option<String>,
+        new_tab: bool,
+        note: Option<String>,
+        session: Option<String>,
+    },
+    /// Focused as a canvas tab.
+    Canvas { canvas_id: String, title: String },
+    /// Closed like the tab's own close button.
+    CloseTabs { tab_ids: Vec<String> },
+}
+
+/// One open tab, as `arris tab list` prints it.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TabSummary {
+    pub id: String,
+    pub title: String,
+    pub tab_type: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub connection_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub created_at: Option<f64>,
+}
+
+/// Tab ids from `tab_list`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TabCloseRequest {
+    pub ids: Vec<String>,
+}
+
+/// `applied` is false when no browser tab is open; the close then waits for the next one.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TabCloseResponse {
+    pub closed: Vec<String>,
+    pub applied: bool,
 }
 
 /// The project's open tabs and pane layout, shared with the desktop app.
@@ -282,13 +341,13 @@ pub struct PinRemoveRequest {
     pub id: String,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RunIdRequest {
     pub run_id: String,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RunPageRequest {
     pub run_id: String,
@@ -335,6 +394,9 @@ pub struct ConnectionRequest {
     pub kind: Option<DatabaseKind>,
     /// Non-secret fields from a dbt profile or sqlmesh gateway, shown in the form.
     pub prefill: Option<ConnectionPrefill>,
+    /// The saved connection being edited, secrets scrubbed; the form saves over it.
+    #[serde(default)]
+    pub editing: Option<ConnectionConfig>,
     pub status: ConnectionRequestStatus,
 }
 
@@ -343,6 +405,9 @@ pub struct ConnectionRequestCreateRequest {
     pub kind: Option<DatabaseKind>,
     #[serde(default)]
     pub prefill: Option<ConnectionPrefill>,
+    /// Saved connection (id or name) to edit instead of creating one.
+    #[serde(default)]
+    pub connection: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -393,7 +458,24 @@ pub struct CanvasRenameRequest {
     pub title: String,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+/// One object of a canvas, for `canvas_remove`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CanvasObjectRequest {
+    /// Canvas id or exact title.
+    pub canvas: String,
+    pub id: String,
+}
+
+/// Redraws a chart object with a new spec.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CanvasChartRequest {
+    /// Canvas id or exact title.
+    pub canvas: String,
+    pub id: String,
+    pub spec: ChartSpecDoc,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CanvasIdRequest {
     pub id: String,
 }
@@ -460,8 +542,37 @@ pub struct CanvasAddRequest {
     pub source: CanvasAddSource,
     /// Defaults to the first SQL line.
     pub title: Option<String>,
+    /// Adds a chart bound to the query, drawn with this spec.
     #[serde(default)]
-    pub chart: bool,
+    pub chart: Option<ChartSpecDoc>,
+}
+
+/// Frontend `ChartKind`.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, clap::ValueEnum)]
+#[serde(rename_all = "lowercase")]
+pub enum ChartKindDoc {
+    Bar,
+    Line,
+    Area,
+    Pie,
+    Scatter,
+    Bubble,
+    Combo,
+    Histogram,
+    Donut,
+    Radar,
+    Treemap,
+    Funnel,
+    Kpi,
+}
+
+/// Frontend `ChartSpec` axes; the board fills style defaults.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChartSpecDoc {
+    pub kind: ChartKindDoc,
+    pub x_column: String,
+    pub y_columns: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -471,6 +582,8 @@ pub struct CanvasAddResponse {
     pub query_id: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub chart_id: Option<String>,
+    /// No tab showed the canvas and no browser is on its way: the caller opens one.
+    pub launch_browser: bool,
 }
 
 /// Only the geometry `canvas_add` needs from the frontend-owned doc.
@@ -511,15 +624,18 @@ pub struct QueryComponentDoc {
     pub connection_id: Uuid,
     pub sql: String,
     pub title: String,
+    /// The board runs it once on open; set only for reads.
+    pub auto_run: bool,
 }
 
-/// Frontend `ChartComponent` without a spec; the board fills a default on first result.
+/// Frontend `ChartComponent`.
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ChartComponentDoc {
     #[serde(flatten)]
     pub frame: ComponentFrame,
     pub source_query_id: String,
+    pub spec: ChartSpecDoc,
 }
 
 /// Frontend `CanvasEdge`.

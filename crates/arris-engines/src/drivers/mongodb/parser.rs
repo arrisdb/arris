@@ -122,7 +122,7 @@ pub fn parse(input: &str) -> Result<MongoRequest, ParseError> {
                 return Err(ParseError::Shape(format!(
                     "expected `.` or `(` at: {}",
                     p.tail()
-                )))
+                )));
             }
         }
     }
@@ -145,7 +145,7 @@ pub fn parse(input: &str) -> Result<MongoRequest, ParseError> {
             return Err(ParseError::Shape(format!(
                 "expected `[db.][<database>.]<collection>.<verb>` — too many path segments: {}",
                 idents.join(".")
-            )))
+            )));
         }
     };
     let verb = parse_verb(&verb_name)?;

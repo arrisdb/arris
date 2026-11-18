@@ -80,6 +80,37 @@ describe("ConnectionRequestPage", () => {
     expect(config).toMatchObject({ name: "shop-dev", host: "db.local", port: 5433, user: "analyst" });
   });
 
+  it("edits the saved connection the request names, keeping its id", async () => {
+    const editing = {
+      id: "saved-1",
+      name: "test-mongo",
+      kind: "postgres",
+      host: "db.local",
+      port: 5432,
+      database: "",
+      user: "analyst",
+      password: "",
+    };
+    const fetchMock = stubApi({
+      connection_request_get: () => ({
+        status: 200,
+        body: { id: "r1", project: PROJECT, kind: "postgres", prefill: null, editing, status: { status: "pending" } },
+      }),
+      connection_save: (body) => ({
+        status: 200,
+        body: { ...(body.config as object), isConnected: false },
+      }),
+    });
+    render(<ConnectionRequestPage />);
+    fireEvent.click(await screen.findByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(callsTo(fetchMock, "connection_save")).toHaveLength(1));
+    const [, init] = callsTo(fetchMock, "connection_save")[0];
+    const body = JSON.parse(String(init.body));
+    expect(body.config).toMatchObject({ id: "saved-1", name: "test-mongo", host: "db.local" });
+    expect(body.requestId).toBe("r1");
+  });
+
   it("loads the request under the URL's project when storage is empty or stale", async () => {
     const params = new URLSearchParams({ request: "r1", project: PROJECT });
     for (const stored of [null, "/stale/proj"]) {

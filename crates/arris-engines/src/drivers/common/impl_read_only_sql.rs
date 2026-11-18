@@ -1,4 +1,4 @@
-use super::{READ_ONLY_FIRST_KEYWORDS, WRITE_KEYWORDS};
+use super::constants::{READ_ONLY_FIRST_KEYWORDS, WRITE_KEYWORDS};
 
 /// Decides whether SQL may run without a click. Errs towards "no": a false negative
 /// costs one click, a false positive writes to a database nobody approved.

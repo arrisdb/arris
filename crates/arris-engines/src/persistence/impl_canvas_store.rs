@@ -6,8 +6,9 @@ use tokio::fs;
 use uuid::Uuid;
 
 use super::constants::{
-    CANVAS_COMPONENTS_KEY, CANVAS_DIR_NAME, CANVAS_DOC_VERSION, CANVAS_EDGES_KEY, CANVAS_FILE_EXT,
-    CANVAS_INITIAL_REVISION, CANVAS_REVISION_STEP, CANVAS_VERSION_KEY,
+    CANVAS_COMPONENTS_KEY, CANVAS_DIR_NAME, CANVAS_DOC_VERSION, CANVAS_EDGE_ENDS, CANVAS_EDGES_KEY,
+    CANVAS_FILE_EXT, CANVAS_ID_KEY, CANVAS_INITIAL_REVISION, CANVAS_REVISION_STEP,
+    CANVAS_VERSION_KEY,
 };
 use super::impl_json_store::JsonFile;
 use super::{CanvasRecord, CanvasSummary, StoreError};
@@ -182,6 +183,62 @@ impl CanvasStore {
     }
 }
 
+// Single-object edits for the CLI; the browser saves whole docs instead.
+impl CanvasStore {
+    /// Drops one object and every edge touching it, as the board's delete does.
+    pub async fn remove_component(
+        &self,
+        id: &str,
+        component_id: &str,
+    ) -> Result<CanvasRecord, StoreError> {
+        let file = self.path(id)?;
+        self.update(id, |r| {
+            let touches = |item: &Value, keys: &[&str]| {
+                keys.iter()
+                    .any(|k| item.get(*k).and_then(Value::as_str) == Some(component_id))
+            };
+            for (key, ends) in [
+                (CANVAS_COMPONENTS_KEY, &[CANVAS_ID_KEY][..]),
+                (CANVAS_EDGES_KEY, &CANVAS_EDGE_ENDS[..]),
+            ] {
+                if let Some(list) = r.doc.get_mut(key) {
+                    list.as_array_mut()
+                        .ok_or_else(|| Self::corrupt(&file, format!("`{key}` is not an array")))?
+                        .retain(|item| !touches(item, ends));
+                }
+            }
+            Ok(())
+        })
+        .await
+    }
+
+    /// Overwrites the given fields of one object; other fields are kept.
+    pub async fn patch_component(
+        &self,
+        id: &str,
+        component_id: &str,
+        patch: serde_json::Map<String, Value>,
+    ) -> Result<CanvasRecord, StoreError> {
+        self.update(id, |r| {
+            let target = r
+                .doc
+                .get_mut(CANVAS_COMPONENTS_KEY)
+                .and_then(Value::as_array_mut)
+                .and_then(|list| {
+                    list.iter_mut().find(|c| {
+                        c.get(CANVAS_ID_KEY).and_then(Value::as_str) == Some(component_id)
+                    })
+                })
+                .and_then(Value::as_object_mut);
+            if let Some(target) = target {
+                target.extend(patch);
+            }
+            Ok(())
+        })
+        .await
+    }
+}
+
 impl From<CanvasRecord> for CanvasSummary {
     fn from(r: CanvasRecord) -> Self {
         Self {
@@ -293,6 +350,30 @@ mod tests {
         assert_eq!(out.revision, made.revision + CANVAS_REVISION_STEP);
         assert_eq!(out.doc[CANVAS_COMPONENTS_KEY], json!([{"id": "c1"}]));
         assert_eq!(out.doc[CANVAS_EDGES_KEY], json!([{"id": "e1"}]));
+    }
+
+    #[tokio::test]
+    async fn remove_component_drops_its_edges_and_patch_merges_fields() {
+        let (_tmp, store) = store();
+        let made = store.create("a".into()).await.unwrap();
+        let q = json!({"id": "q", "kind": "query"});
+        let c = json!({"id": "c", "kind": "chart", "spec": {"xColumn": ""}});
+        let edge = json!({"id": "e", "source": "q", "target": "c"});
+        store
+            .append_components(&made.id, vec![q, c], vec![edge])
+            .await
+            .unwrap();
+        let mut patch = serde_json::Map::new();
+        patch.insert("spec".into(), json!({"xColumn": "k"}));
+        let patched = store.patch_component(&made.id, "c", patch).await.unwrap();
+        assert_eq!(
+            patched.doc[CANVAS_COMPONENTS_KEY][1]["spec"]["xColumn"],
+            "k"
+        );
+        assert_eq!(patched.doc[CANVAS_COMPONENTS_KEY][1]["kind"], "chart");
+        let out = store.remove_component(&made.id, "q").await.unwrap();
+        assert_eq!(out.doc[CANVAS_COMPONENTS_KEY].as_array().unwrap().len(), 1);
+        assert_eq!(out.doc[CANVAS_EDGES_KEY], json!([]));
     }
 
     #[tokio::test]

@@ -19,6 +19,8 @@ interface ConnectionRequest {
   project: string;
   kind: DatabaseKind | null;
   prefill: ConnectionPrefill | null;
+  /// The saved connection `arris connection edit` opened, secrets scrubbed.
+  editing: ConnectionConfig | null;
   status: ConnectionRequestStatus;
 }
 
@@ -30,6 +32,8 @@ interface ConnectionRequestPageViewModel {
   requestId: string | null;
   kind: DatabaseKind | null;
   prefill: ConnectionConfig | null;
+  /// Set when editing a saved connection; the form saves over it.
+  initial: ConnectionConfig | null;
   error: string | null;
   onSelectKind: (kind: DatabaseKind) => void;
   onSaved: () => void;

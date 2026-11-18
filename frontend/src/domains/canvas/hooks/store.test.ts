@@ -145,6 +145,24 @@ describe("useCanvasStore", () => {
     expect(targets).toEqual(["q2", "q3"]);
   });
 
+  it("runAutoRunQueries runs only marked queries once and clears the mark", async () => {
+    vi.mocked(runCanvasCellIPC).mockResolvedValue([]);
+    get().loadBoard(TAB, { version: 1, components: [], edges: [] }, 0);
+    get().addComponent(
+      TAB,
+      makeComponent({ kind: "query", id: "a", sql: "select 1", connectionId: "c" }),
+    );
+    get().addComponent(
+      TAB,
+      makeComponent({ kind: "query", id: "b", sql: "select 2", connectionId: "c" }),
+    );
+    get().updateComponent(TAB, "a", { autoRun: true });
+    await get().runAutoRunQueries(TAB);
+    await get().runAutoRunQueries(TAB);
+    expect(vi.mocked(runCanvasCellIPC).mock.calls.map((c) => c[1])).toEqual(["a"]);
+    expect(get().boards[TAB].doc.components[0]).not.toHaveProperty("autoRun", true);
+  });
+
   it("runQueryComponent maps each cell's limit and null for select-all", async () => {
     vi.mocked(runCanvasCellIPC).mockResolvedValue([]);
     get().loadBoard(TAB, { version: 1, components: [], edges: [] }, 0);

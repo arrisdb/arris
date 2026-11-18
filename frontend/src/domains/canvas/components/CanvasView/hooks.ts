@@ -47,6 +47,7 @@ const DEFAULT_VIEWPORT: Viewport = { x: 0, y: 0, zoom: 1 };
 /// save conflicts or (in the browser) another writer such as the CLI changes it.
 function useCanvasPersistence(boardId: string) {
   const loadBoard = useCanvasStore((s) => s.loadBoard);
+  const runAutoRunQueries = useCanvasStore((s) => s.runAutoRunQueries);
   const setRevision = useCanvasStore((s) => s.setRevision);
   const applyIngestDone = useCanvasStore((s) => s.applyIngestDone);
   const doc = useCanvasStore((s) => s.boards[boardId]?.doc);
@@ -65,10 +66,11 @@ function useCanvasPersistence(boardId: string) {
       const next = parseDoc(record.doc);
       savedDocRef.current = next;
       loadBoard(boardId, next, record.revision);
+      void runAutoRunQueries(boardId);
       setTitle(record.title);
       if (droppedEdits) setNotice(CANVAS_RELOADED_MESSAGE);
     },
-    [boardId, loadBoard],
+    [boardId, loadBoard, runAutoRunQueries],
   );
 
   useEffect(() => {

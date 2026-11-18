@@ -43,15 +43,13 @@ pub const WORKSPACE_TABS_SAVE_ROUTE: &str = "/api/workspace_tabs_save";
 pub const WORKSPACE_LAYOUT_SAVE_ROUTE: &str = "/api/workspace_layout_save";
 pub const QUERY_OPEN_ROUTE: &str = "/api/query_open";
 pub const QUERY_HANDOFF_TAKE_ROUTE: &str = "/api/query_handoff_take";
+pub const TAB_LIST_ROUTE: &str = "/api/tab_list";
+pub const TAB_CLOSE_ROUTE: &str = "/api/tab_close";
+/// Saved tabs without a `tabType` are SQL consoles.
+pub const DEFAULT_TAB_TYPE: &str = "console";
 /// How long `query_open` waits for an open tab to claim the query before reporting none did.
 pub const QUERY_OPEN_WAIT_MS: u64 = 1500;
 pub const QUERY_OPEN_POLL_MS: u64 = 50;
-pub const READ_ONLY_FIRST_KEYWORDS: [&str; 6] =
-    ["SELECT", "WITH", "SHOW", "DESCRIBE", "DESC", "VALUES"];
-pub const WRITE_KEYWORDS: [&str; 19] = [
-    "INSERT", "UPDATE", "DELETE", "MERGE", "UPSERT", "REPLACE", "DROP", "ALTER", "CREATE",
-    "TRUNCATE", "GRANT", "REVOKE", "INTO", "CALL", "EXEC", "EXECUTE", "COPY", "VACUUM", "SET",
-];
 pub const HISTORY_LIST_ROUTE: &str = "/api/history_list";
 pub const PIN_ADD_ROUTE: &str = "/api/pin_add";
 pub const PIN_REMOVE_ROUTE: &str = "/api/pin_remove";
@@ -68,6 +66,13 @@ pub const CANVAS_SAVE_ROUTE: &str = "/api/canvas_save";
 pub const CANVAS_RENAME_ROUTE: &str = "/api/canvas_rename";
 pub const CANVAS_DELETE_ROUTE: &str = "/api/canvas_delete";
 pub const CANVAS_ADD_ROUTE: &str = "/api/canvas_add";
+pub const CANVAS_REMOVE_ROUTE: &str = "/api/canvas_remove";
+pub const CANVAS_CHART_ROUTE: &str = "/api/canvas_chart";
+/// Doc keys `canvas_remove` and `canvas_chart` read and write.
+pub const CANVAS_DOC_COMPONENTS: &str = "components";
+pub const CANVAS_DOC_ID: &str = "id";
+pub const CANVAS_DOC_KIND: &str = "kind";
+pub const CANVAS_DOC_SPEC: &str = "spec";
 pub const TOOL_RUN_RECORD_ROUTE: &str = "/api/tool_run_record";
 pub const TOOL_RUN_LIST_ROUTE: &str = "/api/tool_run_list";
 pub const TOOL_RUN_GET_ROUTE: &str = "/api/tool_run_get";
@@ -177,3 +182,5 @@ pub const OPEN_DEFAULT_COMMAND: &str = "open";
 pub const OPEN_DEFAULT_COMMAND: &str = "xdg-open";
 #[cfg(windows)]
 pub const OPEN_DEFAULT_COMMAND: &str = "explorer";
+/// After one CLI call opens the browser, later calls wait this long for that tab instead.
+pub const BROWSER_LAUNCH_GRACE_SECS: u64 = 30;

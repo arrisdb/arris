@@ -18,6 +18,11 @@ pub const VERSION_STRING: &str = concat!(
 pub const ENV_DATA_DIR: &str = "ARRIS_DATA_DIR";
 pub const ENV_TEST_SECRETS: &str = "ARRIS_TEST_SECRETS";
 pub const TEST_SECRETS_MEMORY: &str = "memory";
+/// Set by Claude Code in every Bash call; names the console the session's queries go to.
+pub const ENV_AGENT_SESSION_ID: &str = "CLAUDE_CODE_SESSION_ID";
+pub const AGENT_SESSION_SHORT_LEN: usize = 8;
+/// Set by tests so CLI runs never open the developer's browser.
+pub const ENV_TEST_NO_BROWSER: &str = "ARRIS_TEST_NO_BROWSER";
 
 pub const SERVER_LOG_FILE: &str = "server.log";
 pub const SERVER_START_POLL_MS: u64 = 100;

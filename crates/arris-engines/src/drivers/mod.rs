@@ -108,6 +108,12 @@ pub trait DatabaseDriver: Send + Sync {
         language: QueryLanguage,
     ) -> Result<QueryResult>;
 
+    /// Whether `text` can only read, so it may run without the user's click.
+    /// SQL drivers share the keyword check; drivers with their own language override it.
+    fn is_read_only(&self, text: &str, _language: QueryLanguage) -> bool {
+        common::ReadOnlySql::check(text)
+    }
+
     /// Streamed variant of `run_query`: schema up front, then row (or Arrow)
     /// chunks. Default materializes via `run_query`; drivers override per PR.
     async fn run_query_stream(
