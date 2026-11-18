@@ -70,6 +70,16 @@ test("installs skill and binary", async () => {
   assert.match(c.logs.at(-1), /Restart Claude Code/);
 });
 
+test("reinstall replaces the binary with a new file", async () => {
+  const box = sandbox();
+  assert.equal(await Cli.main([], ctx(box)), 0);
+  const installed = join(box.home, ".arris", "bin", "arris");
+  const before = statSync(installed).ino;
+  assert.equal(await Cli.main([], ctx(box)), 0);
+  assert.notEqual(statSync(installed).ino, before);
+  assert.deepEqual(readdirSync(dirname(installed)), ["arris"]);
+});
+
 test("installer refuses dev binary", async () => {
   const box = sandbox();
   writeFileSync(box.binary, DEV_BINARY);
@@ -103,7 +113,8 @@ test("backs up existing skill dir", () => {
     skillSource: box.skill,
     now: new Date("2026-10-26T01:02:03.004Z"),
   });
-  assert.equal(out.backup, join(box.home, ".claude", "skills", ".arris-backup-2026-10-26T01-02-03-004Z"));
+  assert.equal(out.backup, join(box.home, ".arris", "skill-backups", "arris-2026-10-26T01-02-03-004Z"));
+  assert.deepEqual(readdirSync(join(box.home, ".claude", "skills")), ["arris"]);
   assert.equal(readFileSync(join(out.backup, "SKILL.md"), "utf8"), "my edits\n");
   assert.equal(readFileSync(join(skillDir, "SKILL.md"), "utf8"), "# Arris\n");
 });

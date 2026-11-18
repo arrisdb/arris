@@ -16,12 +16,12 @@ const TAB = "tab-1";
 
 function seed(component: CanvasComponent) {
   useCanvasStore.setState({ boards: {} });
-  useCanvasStore.getState().ensureBoard(TAB, "");
+  useCanvasStore.getState().loadBoard(TAB, { version: 1, components: [], edges: [] }, 0);
   useCanvasStore.getState().addComponent(TAB, component);
 }
 
 const nodeProps = (id: string) =>
-  ({ id, data: { tabId: TAB }, selected: false }) as unknown as NodeProps<CanvasNodeData>;
+  ({ id, data: { boardId: TAB }, selected: false }) as unknown as NodeProps<CanvasNodeData>;
 
 function renderNode(id: string) {
   return render(
@@ -121,7 +121,7 @@ describe("QueryNode", () => {
     useCanvasStore.getState().setRun(TAB, "q", { running: true });
     const calls: Array<[string, string]> = [];
     useCanvasStore.setState({
-      cancelQueryComponent: (tabId: string, id: string) => calls.push([tabId, id]),
+      cancelQueryComponent: (boardId: string, id: string) => calls.push([boardId, id]),
     });
     renderNode("q");
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));

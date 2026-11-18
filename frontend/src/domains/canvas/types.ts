@@ -157,8 +157,7 @@ interface ChatEntry {
   answered?: boolean;
 }
 
-/// The persisted board document. Serialized into `EditorTab.text` (the same trick
-/// the notebook uses for nbformat), so a board survives close/reopen and restart.
+/// The persisted board document, stored as one canvas record.
 interface CanvasDoc {
   version: number;
   components: CanvasComponent[];
@@ -177,6 +176,39 @@ interface CanvasDoc {
 
 /// Payload of the `canvas://cell-ingested` event: a terminal cell's full-ingest
 /// totals, emitted once its background drain completes.
+/// A stored canvas as the backend returns it; `doc` is normalized by `parseDoc`.
+interface CanvasRecord {
+  id: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+  revision: number;
+  doc: unknown;
+}
+
+/// A canvas list row.
+interface CanvasSummary {
+  id: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+  revision: number;
+  componentCount: number;
+}
+
+/// What `canvas_add` returns: the updated canvas and the new object ids.
+interface CanvasAddResponse {
+  canvas: CanvasSummary;
+  queryId: string;
+  chartId?: string;
+}
+
+/// Payload of the `canvas_changed` server event.
+interface CanvasChangedEvent {
+  id: string;
+  revision: number;
+}
+
 interface CellIngestedEvent {
   boardId: string;
   cellId: string;
@@ -268,9 +300,13 @@ export type {
   ShareResultsAnswer,
   ShareResultsQuestion,
   BaseComponent,
+  CanvasAddResponse,
+  CanvasChangedEvent,
   CanvasComponent,
   CanvasDoc,
   CanvasEdge,
+  CanvasRecord,
+  CanvasSummary,
   CanvasViewport,
   CellIngestedEvent,
   ChatEntry,

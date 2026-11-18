@@ -11,11 +11,11 @@ import { CanvasResizer } from "../CanvasResizer";
 /// events, so the click falls through to the node); double-click starts editing.
 /// Selection persists until the board is clicked, so the resize anchors stay up.
 function TextNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
-  const { tabId } = data;
+  const { boardId } = data;
   const [editing, setEditing] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const component = useCanvasStore((s) =>
-    s.boards[tabId]?.doc.components.find((c) => c.id === id),
+    s.boards[boardId]?.doc.components.find((c) => c.id === id),
   );
   const updateComponent = useCanvasStore((s) => s.updateComponent);
 
@@ -52,7 +52,7 @@ function TextNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
     .join(" ");
   return (
     <>
-      <CanvasResizer tabId={tabId} id={id} visible={selected} />
+      <CanvasResizer boardId={boardId} id={id} visible={selected} />
       <div
         className={`mdbc-canvas-node mdbc-canvas-text${selected ? " selected" : ""}`}
         onDoubleClick={() => setEditing(true)}
@@ -65,7 +65,7 @@ function TextNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
           placeholder="Double-click to edit"
           readOnly={!editing}
           onBlur={() => setEditing(false)}
-          onChange={(e) => updateComponent(tabId, id, { text: e.target.value })}
+          onChange={(e) => updateComponent(boardId, id, { text: e.target.value })}
         />
       </div>
     </>

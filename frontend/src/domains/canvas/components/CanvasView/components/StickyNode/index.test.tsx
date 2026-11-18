@@ -11,7 +11,7 @@ import { StickyNode } from "./index";
 const TAB = "tab-1";
 
 const nodeProps = (id: string) =>
-  ({ id, data: { tabId: TAB }, selected: false }) as unknown as NodeProps<CanvasNodeData>;
+  ({ id, data: { boardId: TAB }, selected: false }) as unknown as NodeProps<CanvasNodeData>;
 
 function renderNode(id: string) {
   return render(
@@ -25,7 +25,7 @@ describe("StickyNode", () => {
   beforeEach(() => useCanvasStore.setState({ boards: {} }));
 
   it("renders the note's text and writes edits back to the store", () => {
-    useCanvasStore.getState().ensureBoard(TAB, "");
+    useCanvasStore.getState().loadBoard(TAB, { version: 1, components: [], edges: [] }, 0);
     useCanvasStore
       .getState()
       .addComponent(TAB, makeComponent({ kind: "sticky", id: "s", text: "todo" }));
@@ -41,7 +41,7 @@ describe("StickyNode", () => {
   });
 
   it("applies the note's colour class", () => {
-    useCanvasStore.getState().ensureBoard(TAB, "");
+    useCanvasStore.getState().loadBoard(TAB, { version: 1, components: [], edges: [] }, 0);
     useCanvasStore
       .getState()
       .addComponent(TAB, makeComponent({ kind: "sticky", id: "s", color: "green" }));
@@ -50,7 +50,7 @@ describe("StickyNode", () => {
   });
 
   it("renders nothing for an unknown object", () => {
-    useCanvasStore.getState().ensureBoard(TAB, "");
+    useCanvasStore.getState().loadBoard(TAB, { version: 1, components: [], edges: [] }, 0);
     const { container } = renderNode("missing");
     expect(container.querySelector(".mdbc-canvas-sticky")).toBeNull();
   });

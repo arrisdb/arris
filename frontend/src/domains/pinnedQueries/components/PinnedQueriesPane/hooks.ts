@@ -1,14 +1,16 @@
 import { usePinnedQueriesStore } from "../../hooks";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTabsStore } from "@shell/hooks/tabsStore";
-import type { PinnedQueriesPaneViewModel } from "./types";
+import type { PinnedQueriesPaneProps, PinnedQueriesPaneViewModel } from "./types";
 import { openPinnedQuery } from "./utils";
 
 // How long the "Copied" confirmation stays on the copy button after a successful
 // clipboard write.
 const COPIED_FEEDBACK_MS = 1500;
 
-function usePinnedQueriesPane(): PinnedQueriesPaneViewModel {
+function usePinnedQueriesPane(
+  onOpenQuery: PinnedQueriesPaneProps["onOpenQuery"] = openPinnedQuery,
+): PinnedQueriesPaneViewModel {
   const queries = usePinnedQueriesStore((state) => state.queries);
   const patchQuery = usePinnedQueriesStore((state) => state.patchQuery);
   const removeQuery = usePinnedQueriesStore((state) => state.removeQuery);
@@ -25,8 +27,8 @@ function usePinnedQueriesPane(): PinnedQueriesPaneViewModel {
 
   const onDoubleClickQuery = useCallback((queryId: string) => {
     const query = usePinnedQueriesStore.getState().queries.find((item) => item.id === queryId);
-    if (query) openPinnedQuery(query);
-  }, []);
+    if (query) onOpenQuery(query);
+  }, [onOpenQuery]);
 
   const onCopyQuery = useCallback((queryId: string) => {
     const query = usePinnedQueriesStore.getState().queries.find((item) => item.id === queryId);

@@ -108,11 +108,12 @@ const useConnectionsStore = create<ConnectionsState>((set, get) => {
 
   return {
   connections: [],
+  connectionsLoaded: false,
   selectedId: null,
   schemaCache: {},
   refreshing: new Set<string>(),
   connErrors: {},
-  setConnections: (rows) => set({ connections: rows }),
+  setConnections: (rows) => set({ connections: rows, connectionsLoaded: true }),
   upsertConnection: async (row) => {
     const updated = await saveConnectionIPC(row, row.scope);
     set({ connections: updated });

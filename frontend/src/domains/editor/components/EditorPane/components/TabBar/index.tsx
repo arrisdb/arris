@@ -37,7 +37,8 @@ interface Props {
   onRename?: (id: string, newTitle: string) => void;
 }
 
-const RENAMEABLE_TAB_TYPES: TabType[] = ["console", "pinned", "terminal", "notebook", "canvas"];
+// Canvas tabs are renamed from the canvas section so the stored title follows.
+const RENAMEABLE_TAB_TYPES: TabType[] = ["console", "pinned", "terminal", "notebook"];
 
 function isRenameable(tabType?: TabType): boolean {
   return !!tabType && RENAMEABLE_TAB_TYPES.includes(tabType);

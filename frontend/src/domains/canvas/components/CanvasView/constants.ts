@@ -1,0 +1,6 @@
+const CANVAS_LOADING_MESSAGE = "Loading canvas...";
+const CANVAS_NOTICE_TEST_ID = "canvas-notice";
+const CANVAS_ERROR_TEST_ID = "canvas-error";
+const CANVAS_DISMISS_LABEL = "Dismiss";
+
+export { CANVAS_DISMISS_LABEL, CANVAS_ERROR_TEST_ID, CANVAS_LOADING_MESSAGE, CANVAS_NOTICE_TEST_ID };

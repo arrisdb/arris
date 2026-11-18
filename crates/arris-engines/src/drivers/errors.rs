@@ -77,6 +77,8 @@ pub enum ErrorCode {
     Cancelled,
     TransactionUnsupported,
     Unsupported,
+    /// A save carried a stale revision; the caller should reload.
+    Conflict,
     Other,
 }
 

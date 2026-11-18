@@ -17,3 +17,6 @@ pub const CANVAS_CELL_INGESTED_EVENT: &str = "canvas://cell-ingested";
 /// A canvas cell beginning with this is a native Mongo shell statement
 /// (`db.<coll>.<verb>(...)`); no SQL frontend parses it. Everything else is SQL.
 pub const MONGO_SHELL_STMT_PREFIX: &str = "db.";
+
+/// Error for project-scoped commands called before a project is open.
+pub const NO_PROJECT_OPEN_MESSAGE: &str = "no project open";

@@ -24,8 +24,8 @@ interface ChartData {
 /// A chart bound to a query by `sourceQueryId`: it aggregates (or samples) the
 /// source's FULL cached result in the backend, never just the 500-row page.
 function ChartNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
-  const { tabId } = data;
-  const board = useCanvasStore((s) => s.boards[tabId]);
+  const { boardId } = data;
+  const board = useCanvasStore((s) => s.boards[boardId]);
   const updateComponent = useCanvasStore((s) => s.updateComponent);
   const runQueryComponent = useCanvasStore((s) => s.runQueryComponent);
   const component = board?.doc.components.find((c) => c.id === id);
@@ -67,9 +67,9 @@ function ChartNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
   useEffect(() => {
     if (!spec || !effectiveSpec) return;
     if (JSON.stringify(effectiveSpec) !== JSON.stringify(spec)) {
-      updateComponent(tabId, id, { spec: effectiveSpec as ChartSpec });
+      updateComponent(boardId, id, { spec: effectiveSpec as ChartSpec });
     }
-  }, [tabId, id, spec, effectiveSpec, updateComponent]);
+  }, [boardId, id, spec, effectiveSpec, updateComponent]);
 
   useEffect(() => {
     // Aggregate only once the source's full result is registered and queryable.
@@ -79,7 +79,7 @@ function ChartNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
     }
     let cancelled = false;
     setAgg({ loading: true });
-    queryCanvasCacheIPC(tabId, query.sql)
+    queryCanvasCacheIPC(boardId, query.sql)
       .then((result) => {
         if (!cancelled) setAgg({ loading: false, result });
       })
@@ -91,7 +91,7 @@ function ChartNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
     return () => {
       cancelled = true;
     };
-  }, [tabId, query, sourceSettled]);
+  }, [boardId, query, sourceSettled]);
 
   if (!component || component.kind !== "chart") return null;
 
@@ -116,7 +116,7 @@ function ChartNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
 
   return (
     <>
-      <CanvasResizer tabId={tabId} id={id} visible={selected} />
+      <CanvasResizer boardId={boardId} id={id} visible={selected} />
       <div className={`mdbc-canvas-node mdbc-canvas-chart nowheel${selected ? " selected" : ""}`}>
         <div className="mdbc-canvas-node-head">
           <span className="mdbc-canvas-node-title">{title}</span>
@@ -128,7 +128,7 @@ function ChartNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
                 size={14}
                 className="mdbc-canvas-run"
                 disabled={sourceRun?.running}
-                onClick={() => void runQueryComponent(tabId, chart.sourceQueryId!)}
+                onClick={() => void runQueryComponent(boardId, chart.sourceQueryId!)}
               />
             </div>
           )}

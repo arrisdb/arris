@@ -13,12 +13,12 @@ const TAB = "tab-1";
 
 function seed(component: CanvasComponent) {
   useCanvasStore.setState({ boards: {} });
-  useCanvasStore.getState().ensureBoard(TAB, "");
+  useCanvasStore.getState().loadBoard(TAB, { version: 1, components: [], edges: [] }, 0);
   useCanvasStore.getState().addComponent(TAB, component);
 }
 
 const nodeProps = (id: string, selected = false) =>
-  ({ id, data: { tabId: TAB }, selected }) as unknown as NodeProps<CanvasNodeData>;
+  ({ id, data: { boardId: TAB }, selected }) as unknown as NodeProps<CanvasNodeData>;
 
 function renderNode(id: string, selected = false) {
   return render(
@@ -38,7 +38,7 @@ describe("ShapeNode", () => {
   });
 
   it("renders nothing for an unknown object", () => {
-    useCanvasStore.getState().ensureBoard(TAB, "");
+    useCanvasStore.getState().loadBoard(TAB, { version: 1, components: [], edges: [] }, 0);
     const { container } = renderNode("missing");
     expect(container.querySelector(".mdbc-canvas-shape")).toBeNull();
   });

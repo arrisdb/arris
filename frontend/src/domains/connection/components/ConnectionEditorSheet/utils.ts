@@ -1,3 +1,5 @@
+import { ApiError } from "@shared/api";
+import { CONFLICT_ERROR_CODE, REQUEST_CLOSED_MESSAGE } from "./constants";
 import type {
   ConnectionConfig,
   DatabaseKind,
@@ -79,8 +81,9 @@ function blankConfig(kind: DatabaseKind): ConnectionConfig {
 function initialConfig(
   initial: ConnectionConfig | null,
   kind: DatabaseKind,
+  prefill?: ConnectionConfig | null,
 ): ConnectionConfig {
-  return initial ?? blankConfig(kind);
+  return initial ?? { ...blankConfig(kind), ...prefill };
 }
 
 function initialUri(config: ConnectionConfig): string {
@@ -146,6 +149,12 @@ function setOption(opts: string, key: string, val: string): string {
   return pairs.join("&");
 }
 
+// A conflict means the browser request was settled elsewhere; explain how to retry.
+function saveErrorMessage(error: unknown): string {
+  if (error instanceof ApiError && error.code === CONFLICT_ERROR_CODE) return REQUEST_CLOSED_MESSAGE;
+  return ipcErrorMessage(error);
+}
+
 export {
   blankConfig,
   buildUri,
@@ -155,5 +164,6 @@ export {
   initialUri,
   ipcErrorMessage,
   parseUri,
+  saveErrorMessage,
   setOption,
 };

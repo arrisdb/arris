@@ -43,23 +43,9 @@ function isChatEntry(value: unknown): value is ChatEntry {
   );
 }
 
-/// Serialize a board to the string stored in `EditorTab.text`.
-function serializeDoc(doc: CanvasDoc): string {
-  return JSON.stringify(doc);
-}
-
-/// Parse a tab's text back into a board. Tolerant by design: blank text, invalid
-/// JSON, or a doc from an unknown version all yield an empty board rather than
-/// throwing, so a corrupt tab never breaks the workspace.
-function parseDoc(text: string): CanvasDoc {
-  const trimmed = (text ?? "").trim();
-  if (!trimmed) return emptyDoc();
-  let raw: unknown;
-  try {
-    raw = JSON.parse(trimmed);
-  } catch {
-    return emptyDoc();
-  }
+/// Normalize a stored canvas doc into a board. Tolerant by design: a hand-edited
+/// or unknown-version doc yields what is renderable, never a throw.
+function parseDoc(raw: unknown): CanvasDoc {
   if (!raw || typeof raw !== "object") return emptyDoc();
   const doc = raw as Record<string, unknown>;
   if (doc.version !== CANVAS_DOC_VERSION) return emptyDoc();
@@ -101,4 +87,4 @@ function parseDoc(text: string): CanvasDoc {
   };
 }
 
-export { emptyDoc, parseDoc, serializeDoc };
+export { emptyDoc, parseDoc };

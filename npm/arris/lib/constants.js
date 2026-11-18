@@ -20,8 +20,10 @@ export const SKILLS_DIR = "skills";
 export const SKILL_NAME = "arris";
 export const ARRIS_HOME_DIR = ".arris";
 export const BIN_DIR = "bin";
-export const BACKUP_PREFIX = ".arris-backup-";
+export const BACKUP_PREFIX = "arris-";
+export const SKILL_BACKUPS_DIR = "skill-backups";
 export const BINARY_MODE = 0o755;
+export const STAGING_SUFFIX = ".new";
 
 // Bundled at pack time; the repo copy is the fallback when run from a checkout.
 export const BUNDLED_SKILL_DIR = "skill";

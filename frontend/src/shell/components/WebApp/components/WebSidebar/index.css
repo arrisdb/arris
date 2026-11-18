@@ -1,0 +1,32 @@
+.mdbc-web-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 200px;
+  flex-shrink: 0;
+  padding: 12px 8px;
+  border-right: 1px solid var(--m-sep);
+  background: var(--m-bg-card);
+  font-family: var(--m-font);
+}
+
+.mdbc-web-sidebar-switcher {
+  margin-bottom: 8px;
+}
+
+.mdbc-web-sidebar-link {
+  padding: 6px 10px;
+  border-radius: var(--m-r-control);
+  color: var(--m-fg-2);
+  font-size: var(--m-fs-sm);
+  text-decoration: none;
+}
+
+.mdbc-web-sidebar-link:hover {
+  color: var(--m-fg);
+}
+
+.mdbc-web-sidebar-link[aria-current="page"] {
+  background: rgba(var(--m-accent-rgb), 0.12);
+  color: var(--m-accent);
+}

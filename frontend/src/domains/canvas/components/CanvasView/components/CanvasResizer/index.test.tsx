@@ -7,7 +7,7 @@ import { CanvasResizer } from "./index";
 function renderResizer(visible: boolean) {
   return render(
     <ReactFlowProvider>
-      <CanvasResizer tabId="t" id="n" visible={visible} />
+      <CanvasResizer boardId="t" id="n" visible={visible} />
     </ReactFlowProvider>,
   );
 }

@@ -76,13 +76,13 @@ const nodeTypes: NodeTypes = {
 /// the owning tab.
 function toFlowNodes(
   components: CanvasComponent[],
-  tabId: string,
+  boardId: string,
 ): Node<CanvasNodeData>[] {
   return components.map((c) => ({
     id: c.id,
     type: c.kind,
     position: { x: c.x, y: c.y },
-    data: { tabId },
+    data: { boardId },
     // A locked object can't be dragged (the resizer self-hides too).
     draggable: !c.locked,
     style: { width: c.w, height: c.h, zIndex: c.z },

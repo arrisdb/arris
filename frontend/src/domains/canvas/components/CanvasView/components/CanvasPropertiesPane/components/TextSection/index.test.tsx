@@ -9,7 +9,7 @@ describe("TextSection", () => {
     const onChange = vi.fn();
     const comp = makeComponent({ kind: "text", id: "t" });
     const { container, getByLabelText } = render(
-      <TextSection tabId="t" component={comp} onChange={onChange} />,
+      <TextSection boardId="t" component={comp} onChange={onChange} />,
     );
     const size = container.querySelector('input[type="number"]') as HTMLInputElement;
     fireEvent.change(size, { target: { value: "24" } });
@@ -23,7 +23,7 @@ describe("TextSection", () => {
     const onChange = vi.fn();
     const comp = makeComponent({ kind: "text", id: "t" });
     const { getByLabelText } = render(
-      <TextSection tabId="t" component={comp} onChange={onChange} />,
+      <TextSection boardId="t" component={comp} onChange={onChange} />,
     );
     fireEvent.click(getByLabelText("Italic"));
     expect(onChange).toHaveBeenCalledWith({ style: { italic: true } });
@@ -38,7 +38,7 @@ describe("TextSection", () => {
     const comp = makeComponent({ kind: "text", id: "t" });
     if (comp.kind === "text") comp.style = { bold: true };
     const { getByLabelText } = render(
-      <TextSection tabId="t" component={comp} onChange={onChange} />,
+      <TextSection boardId="t" component={comp} onChange={onChange} />,
     );
     fireEvent.click(getByLabelText("Bold"));
     expect(onChange).toHaveBeenCalledWith({ style: { bold: false } });
@@ -48,7 +48,7 @@ describe("TextSection", () => {
     const onChange = vi.fn();
     const comp = makeComponent({ kind: "text", id: "t" });
     const { getByLabelText } = render(
-      <TextSection tabId="t" component={comp} onChange={onChange} />,
+      <TextSection boardId="t" component={comp} onChange={onChange} />,
     );
     fireEvent.click(getByLabelText("Align center"));
     expect(onChange).toHaveBeenCalledWith({ style: { align: "center" } });
@@ -58,7 +58,7 @@ describe("TextSection", () => {
     const onChange = vi.fn();
     const comp = makeComponent({ kind: "text", id: "t" });
     const { getByLabelText } = render(
-      <TextSection tabId="t" component={comp} onChange={onChange} />,
+      <TextSection boardId="t" component={comp} onChange={onChange} />,
     );
     fireEvent.change(getByLabelText("Text colour"), { target: { value: "#112233" } });
     expect(onChange).toHaveBeenCalledWith({ style: { color: "#112233" } });
@@ -69,7 +69,7 @@ describe("TextSection", () => {
   it("renders nothing for a non-text object", () => {
     const comp = makeComponent({ kind: "shape", id: "s", shape: "rect" });
     const { container } = render(
-      <TextSection tabId="t" component={comp} onChange={vi.fn()} />,
+      <TextSection boardId="t" component={comp} onChange={vi.fn()} />,
     );
     expect(container.querySelector(".mdbc-pane-form")).toBeNull();
   });
@@ -77,7 +77,7 @@ describe("TextSection", () => {
   it("uses compact colour swatches for text and background", () => {
     const comp = makeComponent({ kind: "text", id: "t" });
     const { container } = render(
-      <TextSection tabId="t" component={comp} onChange={vi.fn()} />,
+      <TextSection boardId="t" component={comp} onChange={vi.fn()} />,
     );
     expect(container.querySelectorAll(".mdbc-canvas-color")).toHaveLength(2);
   });

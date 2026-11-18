@@ -11,22 +11,22 @@ import { useCanvasChartEditor } from "./hooks";
 /// to one of the board's query objects; everything else (chart type, axes,
 /// appearance, legend, colours) is the shared chart-editor surface, identical to
 /// the results-pane editor, driven from the bound query's last run.
-function ChartSection({ tabId, component, onChange }: SectionProps) {
+function ChartSection({ boardId, component, onChange }: SectionProps) {
   if (component.kind !== "chart") return null;
-  return <ChartSectionBody tabId={tabId} component={component} onChange={onChange} />;
+  return <ChartSectionBody boardId={boardId} component={component} onChange={onChange} />;
 }
 
 function ChartSectionBody({
-  tabId,
+  boardId,
   component,
   onChange,
 }: {
-  tabId: string;
+  boardId: string;
   component: ChartComponent;
   onChange: (patch: Partial<ChartComponent>) => void;
 }) {
-  const components = useCanvasStore((s) => s.boards[tabId]?.doc.components);
-  const pane = useCanvasChartEditor(tabId, component, onChange);
+  const components = useCanvasStore((s) => s.boards[boardId]?.doc.components);
+  const pane = useCanvasChartEditor(boardId, component, onChange);
 
   const sourceOptions = (components ?? [])
     .filter((c) => c.kind === "query")

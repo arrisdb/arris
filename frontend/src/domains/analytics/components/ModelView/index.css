@@ -1,0 +1,80 @@
+.mdbc-analytics-model {
+  padding: 10px 14px 24px;
+}
+
+.mdbc-analytics-model-head h2 {
+  margin: 0 0 2px;
+  font-size: var(--m-fs-lg);
+}
+
+.mdbc-analytics-model-section {
+  margin-top: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  align-items: baseline;
+}
+.mdbc-analytics-model-section h3 {
+  width: 100%;
+  margin: 0 0 4px;
+  font-size: var(--m-fs-sm);
+  color: var(--m-fg-2);
+}
+.mdbc-analytics-model-section > .mdbc-analytics-lineage,
+.mdbc-analytics-model-section > table {
+  width: 100%;
+}
+
+.mdbc-analytics-sql-tabs {
+  display: flex;
+  gap: 4px;
+  margin-top: 12px;
+}
+.mdbc-analytics-sql-tabs [aria-selected="true"] {
+  background: rgb(var(--m-overlay-rgb) / 0.08);
+  color: var(--m-fg-1);
+}
+
+.mdbc-analytics-code {
+  margin: 6px 0 0;
+  padding: 10px;
+  max-height: 360px;
+  overflow: auto;
+  border-radius: 6px;
+  background: rgb(var(--m-overlay-rgb) / 0.04);
+  font-family: var(--m-font-mono);
+  font-size: var(--m-fs-sm);
+  white-space: pre;
+}
+
+.mdbc-analytics-columns {
+  border-collapse: collapse;
+  font-size: var(--m-fs-sm);
+}
+.mdbc-analytics-columns td {
+  padding: 4px 8px 4px 0;
+  border-bottom: 0.5px solid var(--m-sep);
+  vertical-align: top;
+}
+.mdbc-analytics-columns tr {
+  cursor: pointer;
+}
+.mdbc-analytics-columns tr:hover,
+.mdbc-analytics-columns tr[aria-selected="true"] {
+  background: rgb(var(--m-overlay-rgb) / 0.05);
+}
+
+.mdbc-analytics-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--m-accent);
+  font: inherit;
+  font-size: var(--m-fs-sm);
+  cursor: pointer;
+}
+
+.mdbc-analytics-muted {
+  color: var(--m-fg-3);
+  font-size: var(--m-fs-sm);
+}

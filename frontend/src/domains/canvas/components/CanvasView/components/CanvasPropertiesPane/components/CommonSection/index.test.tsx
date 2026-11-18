@@ -10,7 +10,7 @@ describe("CommonSection", () => {
   it("writes geometry edits back through onChange", () => {
     const onChange = vi.fn();
     const { container } = render(
-      <CommonSection tabId="t" component={comp} onChange={onChange} />,
+      <CommonSection boardId="t" component={comp} onChange={onChange} />,
     );
     const numbers = container.querySelectorAll('input[type="number"]');
     expect(numbers).toHaveLength(4);
@@ -23,7 +23,7 @@ describe("CommonSection", () => {
   it("clamps width/height to at least 1", () => {
     const onChange = vi.fn();
     const { container } = render(
-      <CommonSection tabId="t" component={comp} onChange={onChange} />,
+      <CommonSection boardId="t" component={comp} onChange={onChange} />,
     );
     const numbers = container.querySelectorAll('input[type="number"]');
     fireEvent.change(numbers[3], { target: { value: "-5" } });
@@ -33,7 +33,7 @@ describe("CommonSection", () => {
   it("toggles the lock flag", () => {
     const onChange = vi.fn();
     const { container } = render(
-      <CommonSection tabId="t" component={comp} onChange={onChange} />,
+      <CommonSection boardId="t" component={comp} onChange={onChange} />,
     );
     const check = container.querySelector('input[type="checkbox"]') as HTMLInputElement;
     fireEvent.click(check);
@@ -42,7 +42,7 @@ describe("CommonSection", () => {
 
   it("uses the shared app checkbox for the lock toggle", () => {
     const { container } = render(
-      <CommonSection tabId="t" component={comp} onChange={vi.fn()} />,
+      <CommonSection boardId="t" component={comp} onChange={vi.fn()} />,
     );
     expect(
       container.querySelector('input[type="checkbox"]')?.classList.contains("mdbc-checkbox"),

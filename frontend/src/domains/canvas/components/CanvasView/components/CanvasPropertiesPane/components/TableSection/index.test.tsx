@@ -11,7 +11,7 @@ const table = makeComponent({ kind: "table", id: "tbl", sourceQueryId: "q1" });
 describe("TableSection", () => {
   beforeEach(() => {
     useCanvasStore.setState({ boards: {} });
-    useCanvasStore.getState().ensureBoard(TAB, "");
+    useCanvasStore.getState().loadBoard(TAB, { version: 1, components: [], edges: [] }, 0);
     useCanvasStore
       .getState()
       .addComponent(TAB, makeComponent({ kind: "query", id: "q1", title: "Orders", connectionId: null }));
@@ -20,7 +20,7 @@ describe("TableSection", () => {
   it("offers the board's query objects as the source", () => {
     const onChange = vi.fn();
     const { getByTestId, getByRole } = render(
-      <TableSection tabId={TAB} component={table} onChange={onChange} />,
+      <TableSection boardId={TAB} component={table} onChange={onChange} />,
     );
     fireEvent.click(getByTestId("table-source-select"));
     fireEvent.click(getByRole("option", { name: "Orders" }));
@@ -30,7 +30,7 @@ describe("TableSection", () => {
   it("sets a numeric preview-row cap", () => {
     const onChange = vi.fn();
     const { getByTestId } = render(
-      <TableSection tabId={TAB} component={table} onChange={onChange} />,
+      <TableSection boardId={TAB} component={table} onChange={onChange} />,
     );
     fireEvent.change(getByTestId("table-preview-rows"), { target: { value: "25" } });
     expect(onChange).toHaveBeenCalledWith({ previewRows: 25 });
@@ -40,7 +40,7 @@ describe("TableSection", () => {
     const onChange = vi.fn();
     const capped = makeComponent({ kind: "table", id: "tbl", sourceQueryId: "q1", previewRows: 25 });
     const { getByTestId } = render(
-      <TableSection tabId={TAB} component={capped} onChange={onChange} />,
+      <TableSection boardId={TAB} component={capped} onChange={onChange} />,
     );
     fireEvent.change(getByTestId("table-preview-rows"), { target: { value: "" } });
     expect(onChange).toHaveBeenCalledWith({ previewRows: undefined });
@@ -49,7 +49,7 @@ describe("TableSection", () => {
   it("renders nothing for a non-table object", () => {
     const other = makeComponent({ kind: "shape", id: "s", shape: "rect" });
     const { container } = render(
-      <TableSection tabId={TAB} component={other} onChange={vi.fn()} />,
+      <TableSection boardId={TAB} component={other} onChange={vi.fn()} />,
     );
     expect(container.querySelector(".mdbc-pane-form")).toBeNull();
   });

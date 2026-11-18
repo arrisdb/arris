@@ -26,7 +26,7 @@ use super::{
     ConnectionTestRequest, EmptyResponse, HISTORY_DEFAULT_LIMIT, HISTORY_LIST_ROUTE,
     HistoryListRequest, OkResponse, PIN_ADD_ROUTE, PIN_LIST_ROUTE, PIN_REMOVE_ROUTE,
     PIN_RENAME_ROUTE, PROJECT_HEADER, PROJECT_LIST_ROUTE, PROJECT_QUERY_PARAM, PinAddRequest,
-    PinRemoveRequest, PinRenameRequest, QUERY_DEFAULT_LIMIT, QUERY_DEFAULT_SOURCE,
+    PIN_SAVE_ROUTE, PinRemoveRequest, PinRenameRequest, PinSaveRequest, QUERY_DEFAULT_LIMIT, QUERY_DEFAULT_SOURCE,
     QUERY_FIRST_PAGE, QUERY_RUN_ROUTE, QueryRunRequest, QueryRunResponse, REQUEST_QUERY_PARAM,
     RUN_GET_ROUTE, RUN_PAGE_MAX_LIMIT, RUN_PAGE_ROUTE, RUN_RESULTS_BOARD, RunGetResponse,
     RunIdRequest, RunPageRequest, SCHEMA_LIST_ROUTE, SchemaListRequest, Server, ServerEvent,
@@ -55,6 +55,7 @@ impl ApiRoutes {
             .route(PIN_RENAME_ROUTE, post(Self::pin_rename))
             .route(PIN_ADD_ROUTE, post(Self::pin_add))
             .route(PIN_REMOVE_ROUTE, post(Self::pin_remove))
+            .route(PIN_SAVE_ROUTE, post(Self::pin_save))
             .route(PIN_LIST_ROUTE, post(Self::pin_list))
             .route(PROJECT_LIST_ROUTE, post(Self::project_list))
             .merge(CanvasRoutes::router())
@@ -611,6 +612,19 @@ impl ApiRoutes {
         Ok(Json(EmptyResponse {}))
     }
 
+    async fn pin_save(
+        State(state): ApiState,
+        headers: HeaderMap,
+        body: Body<PinSaveRequest>,
+    ) -> ApiResult<EmptyResponse> {
+        let Json(req) = body?;
+        let project = Self::project(&state, &headers).await?;
+        let project = project.write().await;
+        project.pinned_queries_store.save(&req.queries).await?;
+        Self::emit(&state, ServerEventKind::PinsChanged, &project, &req.queries);
+        Ok(Json(EmptyResponse {}))
+    }
+
     async fn pin_list(State(state): ApiState, headers: HeaderMap) -> ApiResult<Vec<PersistedPinnedQuery>> {
         let project = Self::project(&state, &headers).await?;
         Ok(Json(
@@ -1151,6 +1165,28 @@ pub(super) mod tests {
             .await
             .unwrap()
             .unwrap()
+    }
+
+    #[tokio::test]
+    async fn pin_save_replaces_the_list_and_emits_pins_changed() {
+        let h = Harness::start().await;
+        let cfg = h.save_sqlite("local").await;
+        let first = h
+            .ok(
+                "pin_add",
+                json!({ "title": "a", "sql": "SELECT 1", "connection": cfg.id.to_string() }),
+            )
+            .await;
+        let mut events = h.state.events.subscribe();
+        let mut edited = first.clone();
+        edited["text"] = json!("SELECT 2");
+        h.ok("pin_save", json!({ "queries": [edited] })).await;
+        let list = h.ok("pin_list", json!({})).await;
+        assert_eq!(list.as_array().unwrap().len(), 1);
+        assert_eq!(list[0]["text"], "SELECT 2");
+        assert_eq!(next_kind(&mut events).await.kind, ServerEventKind::PinsChanged);
+        h.ok("pin_save", json!({ "queries": [] })).await;
+        assert!(h.ok("pin_list", json!({})).await.as_array().unwrap().is_empty());
     }
 
     #[tokio::test]

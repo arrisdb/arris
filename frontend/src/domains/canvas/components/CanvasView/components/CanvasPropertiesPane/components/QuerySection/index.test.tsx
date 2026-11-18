@@ -18,7 +18,7 @@ describe("QuerySection", () => {
   it("writes the title", () => {
     const onChange = vi.fn();
     const { container } = render(
-      <QuerySection tabId="t" component={comp} onChange={onChange} />,
+      <QuerySection boardId="t" component={comp} onChange={onChange} />,
     );
     const title = container.querySelector('input[type="text"], input:not([type])') as HTMLInputElement;
     fireEvent.change(title, { target: { value: "Sales" } });
@@ -28,7 +28,7 @@ describe("QuerySection", () => {
   it("picks a connection from the store", () => {
     const onChange = vi.fn();
     const { getByTestId, getByText } = render(
-      <QuerySection tabId="t" component={comp} onChange={onChange} />,
+      <QuerySection boardId="t" component={comp} onChange={onChange} />,
     );
     fireEvent.click(getByTestId("query-connection-select"));
     fireEvent.click(getByText("Local"));
@@ -37,7 +37,7 @@ describe("QuerySection", () => {
 
   it("shows the database logo next to each connection option", () => {
     const { getByTestId, container } = render(
-      <QuerySection tabId="t" component={comp} onChange={vi.fn()} />,
+      <QuerySection boardId="t" component={comp} onChange={vi.fn()} />,
     );
     fireEvent.click(getByTestId("query-connection-select"));
     const logo = document.querySelector("img.mdbc-db-kind-logo") as HTMLImageElement;
@@ -49,7 +49,7 @@ describe("QuerySection", () => {
   it("shows the default limit and patches edits", () => {
     const onChange = vi.fn();
     const { getByLabelText } = render(
-      <QuerySection tabId="t" component={comp} onChange={onChange} />,
+      <QuerySection boardId="t" component={comp} onChange={onChange} />,
     );
     const limit = getByLabelText("Limit") as HTMLInputElement;
     expect(limit.value).toBe("500");
@@ -61,19 +61,19 @@ describe("QuerySection", () => {
   it("select-all patches and disables the limit input", () => {
     const onChange = vi.fn();
     const { getByLabelText, rerender } = render(
-      <QuerySection tabId="t" component={comp} onChange={onChange} />,
+      <QuerySection boardId="t" component={comp} onChange={onChange} />,
     );
     fireEvent.click(getByLabelText("Select all rows"));
     expect(onChange).toHaveBeenCalledWith({ selectAll: true });
     const checked = { ...comp, selectAll: true };
-    rerender(<QuerySection tabId="t" component={checked} onChange={onChange} />);
+    rerender(<QuerySection boardId="t" component={checked} onChange={onChange} />);
     expect((getByLabelText("Limit") as HTMLInputElement).disabled).toBe(true);
   });
 
   it("renders nothing for a non-query object", () => {
     const other = makeComponent({ kind: "shape", id: "s", shape: "rect" });
     const { container } = render(
-      <QuerySection tabId="t" component={other} onChange={vi.fn()} />,
+      <QuerySection boardId="t" component={other} onChange={vi.fn()} />,
     );
     expect(container.querySelector(".mdbc-pane-form")).toBeNull();
   });

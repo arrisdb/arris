@@ -18,6 +18,7 @@ import {
   initialUri,
   ipcErrorMessage,
   parseUri,
+  saveErrorMessage,
 } from "./utils";
 
 function useConnectionEditorSheet({
@@ -26,11 +27,15 @@ function useConnectionEditorSheet({
   initial,
   kind,
   onSaved,
+  requestId,
+  prefill,
 }: ConnectionEditorSheetProps): ConnectionEditorSheetViewModel {
   const setConnections = useConnectionsStore((state) => state.setConnections);
   const remove = useConnectionsStore((state) => state.removeConnection);
   const activeProjectPath = useProjectStore((state) => state.activeProjectPath);
-  const [config, setConfig] = useState<ConnectionConfig>(() => initialConfig(initial, kind));
+  const [config, setConfig] = useState<ConnectionConfig>(() =>
+    initialConfig(initial, kind, prefill),
+  );
   const [uri, setUri] = useState(() => initialUri(config));
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -41,13 +46,13 @@ function useConnectionEditorSheet({
 
   useEffect(() => {
     if (!open) return;
-    const nextConfig = initialConfig(initial, kind);
+    const nextConfig = initialConfig(initial, kind, prefill);
     setConfig(nextConfig);
     setUri(buildUri(nextConfig));
     setError(null);
     setTestResult(null);
     setShowSsh(Boolean(nextConfig.sshHost));
-  }, [open, initial, kind]);
+  }, [open, initial, kind, prefill]);
 
   useEffect(() => {
     setTestResult(null);
@@ -133,17 +138,14 @@ function useConnectionEditorSheet({
       // nowhere to persist them (backend rejects with "no project open"), so
       // fall back to a global, app-wide connection.
       const scope = activeProjectPath ? "local" : "global";
-      const connections = await saveConnectionIPC(config, scope);
+      const { saved, connections } = await saveConnectionIPC(config, scope, requestId);
       setConnections(connections);
-      const saved = connections.find((connection) => connection.id === config.id);
-      onClose();
-      // Always notify the owner of a successful save. Gating on `isConnected`
-      // here meant edits to a connection whose live link had dropped silently
-      // skipped the schema reload; the owner now decides whether a reload is
-      // warranted (e.g. only for connections currently open).
+      // Notify before closing so an owner that treats close as cancel (the
+      // connection request page) sees the save first. The owner decides on reloads.
       if (saved) onSaved?.(saved);
+      onClose();
     } catch (saveError) {
-      setError(ipcErrorMessage(saveError));
+      setError(saveErrorMessage(saveError));
     } finally {
       setBusy(false);
     }

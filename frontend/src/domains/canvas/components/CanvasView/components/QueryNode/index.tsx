@@ -20,34 +20,34 @@ import { useQueryEditor } from "./hooks";
 /// writes the SQL to the store, never re-renders the node: the editor is
 /// uncontrolled and owns the live doc (see `useQueryEditor`).
 function QueryNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
-  const { tabId } = data;
+  const { boardId } = data;
   const isQuery = useCanvasStore((s) => {
-    const c = s.boards[tabId]?.doc.components.find((c) => c.id === id);
+    const c = s.boards[boardId]?.doc.components.find((c) => c.id === id);
     return c?.kind === "query";
   });
   const title = useCanvasStore((s) => {
-    const c = s.boards[tabId]?.doc.components.find((c) => c.id === id);
+    const c = s.boards[boardId]?.doc.components.find((c) => c.id === id);
     return c?.kind === "query" ? c.title ?? "Query" : null;
   });
   const connectionId = useCanvasStore((s) => {
-    const c = s.boards[tabId]?.doc.components.find((c) => c.id === id);
+    const c = s.boards[boardId]?.doc.components.find((c) => c.id === id);
     return c?.kind === "query" ? c.connectionId : null;
   });
   const connection = useConnectionsStore((s) =>
     connectionId ? s.connections.find((c) => c.id === connectionId) ?? null : null,
   );
-  const run = useCanvasStore((s) => s.boards[tabId]?.runs[id]);
+  const run = useCanvasStore((s) => s.boards[boardId]?.runs[id]);
   const runQueryComponent = useCanvasStore((s) => s.runQueryComponent);
   const cancelQueryComponent = useCanvasStore((s) => s.cancelQueryComponent);
 
   const hostRef = useRef<HTMLDivElement | null>(null);
-  useQueryEditor(hostRef, { tabId, id, connectionId });
+  useQueryEditor(hostRef, { boardId, id, connectionId });
 
   if (!isQuery) return null;
 
   return (
     <>
-      <CanvasResizer tabId={tabId} id={id} visible={selected} />
+      <CanvasResizer boardId={boardId} id={id} visible={selected} />
       <div className={`mdbc-canvas-node mdbc-canvas-query${selected ? " selected" : ""}`}>
         <div className="mdbc-canvas-node-head">
           <span className="mdbc-canvas-node-title">{title}</span>
@@ -66,7 +66,7 @@ function QueryNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
                 variant="danger"
                 size={14}
                 className="mdbc-canvas-run"
-                onClick={() => cancelQueryComponent(tabId, id)}
+                onClick={() => cancelQueryComponent(boardId, id)}
               />
             ) : (
               <IconButton
@@ -75,7 +75,7 @@ function QueryNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
                 variant="primary"
                 size={14}
                 className="mdbc-canvas-run"
-                onClick={() => void runQueryComponent(tabId, id)}
+                onClick={() => void runQueryComponent(boardId, id)}
               />
             )}
           </div>

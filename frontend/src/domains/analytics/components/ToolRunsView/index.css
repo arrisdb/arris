@@ -1,0 +1,40 @@
+.mdbc-analytics-runs-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.mdbc-analytics-run-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 12px;
+  padding: 8px 10px;
+  border: 0;
+  border-bottom: 0.5px solid var(--m-sep);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.mdbc-analytics-run-row:hover,
+.mdbc-analytics-run-row[aria-current="page"] {
+  background: rgb(var(--m-overlay-rgb) / 0.05);
+}
+.mdbc-analytics-run-row code {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mdbc-analytics-failed {
+  color: var(--m-danger);
+  font-size: var(--m-fs-sm);
+}
+
+.mdbc-analytics-run-detail {
+  padding: 12px 14px 24px;
+}
+.mdbc-analytics-run-detail h2 {
+  margin: 0 0 4px;
+  font-size: var(--m-fs-md);
+}
