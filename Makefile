@@ -55,7 +55,7 @@ VERSION ?=
 # target triple and returns its bundle output directory.
 PRELUDE := set -euo pipefail; if [ -f "$(REPO_ROOT)/.env" ]; then set -a; . "$(REPO_ROOT)/.env"; set +a; fi; die() { echo "error: $$*" >&2; exit 1; }; require_env() { for v in "$$@"; do [ -n "$${!v:-}" ] || die "required env var '$$v' is not set (see RELEASE.md)"; done; }; require_cmd() { for c in "$$@"; do command -v "$$c" >/dev/null 2>&1 || die "required command '$$c' not found"; done; }; bundle_dir() { local td; td="$$(cd "$(REPO_ROOT)/src-tauri" && cargo metadata --format-version 1 --no-deps | jq -r .target_directory)"; echo "$$td/$$1/release/bundle"; }; arch_label() { case "$$1" in aarch64-*) echo aarch64 ;; x86_64-*) echo x64 ;; *) echo "$$1" ;; esac; }
 
-.PHONY: help deny build build-unsigned publish release bump verify docs-deploy clean
+.PHONY: help deny build build-unsigned publish release bump verify docs-deploy clean cli npm-package
 
 help:
 	@echo "Arris release targets:"
@@ -66,10 +66,24 @@ help:
 	@echo "  make release [VERSION=x] Build then publish, end to end."
 	@echo "  make bump VERSION=x      Bump version in tauri.conf.json, both Cargo.tomls, frontend + docs package.json."
 	@echo "  make verify              Re-run the Gatekeeper check on the built .dmgs."
+	@echo "  make cli                 Build the frontend and the release arris CLI with it embedded."
+	@echo "  make npm-package         Stage the npm launcher and this host's CLI package under npm/dist."
 	@echo "  make docs-deploy         Build docs/ and direct-upload dist/ to Cloudflare Pages."
 	@echo "  make clean               Remove the build bundle directories."
 
 # --- deny (supply-chain audit; gates the build) -----------------------------
+# --- cli (frontend first: the CLI's build.rs embeds frontend/dist) ---------
+cli:
+	npm --prefix frontend ci && npm --prefix frontend run build && cargo build -p arris-cli --release
+
+# --- npm-package (run after `make cli`; host platform only) -----------------
+NPM_HOST_PLATFORM = $(shell node -p 'process.platform + "-" + process.arch')
+CLI_RELEASE_BINARY := $(REPO_ROOT)/target/release/arris
+
+npm-package:
+	node scripts/package-npm.mjs --main
+	node scripts/package-npm.mjs --binary "$(CLI_RELEASE_BINARY)" --platform "$(NPM_HOST_PLATFORM)"
+
 deny:
 	@$(PRELUDE); \
 	require_cmd cargo cargo-deny; \

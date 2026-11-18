@@ -26,7 +26,9 @@ pub use canvas::{
     CanvasCellRun, CanvasCellSpec, CanvasEngine, CanvasError, CellCacheWriter, CellIngestContinuation,
     CellIngestDone, CellResultCache, IngestedCell, CELL_INGEST_BYTE_BUDGET, CELL_RESULT_PAGE_ROWS,
 };
-pub use connection::{ConnectionEngine, PrefillError, ScopedConnection};
+pub use connection::{
+    CONNECTION_SCOPE_GLOBAL, CONNECTION_SCOPE_LOCAL, ConnectionEngine, PrefillError, ScopedConnection,
+};
 pub use dbt::{DbtEngine, ProfileConnectionMapper};
 pub use federation::FederationEngine;
 pub use file::{FileEngine, FileTreeEntry, DEFAULT_SKIP_DIRS};

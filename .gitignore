@@ -8,6 +8,7 @@ target/
 node_modules
 frontend/dist/
 frontend/dist-ssr/
+npm/dist/
 *.local
 .vite/
 
@@ -60,3 +61,4 @@ release/
 
 # Marketing site — maintained in a separate private repo
 /marketing/
+.playwright-mcp/

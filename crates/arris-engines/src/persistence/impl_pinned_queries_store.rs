@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use super::{JsonCollectionStore, PersistedPinnedQuery};
+use super::{JsonCollectionStore, PersistedPinnedQuery, StoreError};
 
 pub struct PinnedQueriesStore {
     file: PathBuf,
@@ -11,6 +11,18 @@ impl PinnedQueriesStore {
         Self {
             file: dir.join("pinned_queries.json"),
         }
+    }
+
+    /// Renames one pin; an unknown id errors and leaves the file untouched.
+    pub async fn rename(&self, id: &str, name: String) -> Result<PersistedPinnedQuery, StoreError> {
+        let mut all = self.load().await?;
+        let Some(pin) = all.iter_mut().find(|p| p.id == id) else {
+            return Err(StoreError::NotFound(id.to_owned()));
+        };
+        pin.name = name;
+        let renamed = pin.clone();
+        self.save(&all).await?;
+        Ok(renamed)
     }
 }
 
@@ -34,6 +46,28 @@ mod tests {
             connection_id: Some("conn-1".into()),
             kind: "postgres".into(),
         }
+    }
+
+    #[tokio::test]
+    async fn rename_updates_only_the_target() {
+        let tmp = tempfile::tempdir().unwrap();
+        let store = PinnedQueriesStore::new(tmp.path().into());
+        let mut other = sample_query();
+        other.id = "pq2".into();
+        store.save(&[sample_query(), other.clone()]).await.unwrap();
+        let renamed = store.rename("pq1", "Margin".into()).await.unwrap();
+        assert_eq!(renamed.name, "Margin");
+        assert_eq!(store.load().await.unwrap(), vec![renamed, other]);
+    }
+
+    #[tokio::test]
+    async fn rename_unknown_id_is_not_found() {
+        let tmp = tempfile::tempdir().unwrap();
+        let store = PinnedQueriesStore::new(tmp.path().into());
+        store.save(&[sample_query()]).await.unwrap();
+        let err = store.rename("missing", "x".into()).await.unwrap_err();
+        assert!(matches!(err, StoreError::NotFound(id) if id == "missing"));
+        assert_eq!(store.load().await.unwrap(), vec![sample_query()]);
     }
 
     #[tokio::test]
