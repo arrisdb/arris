@@ -128,7 +128,9 @@ function openSource(): () => void {
     const unlisten = listen<ServerEvent>(DESKTOP_SERVER_EVENT, (e) => dispatch(e.payload));
     return () => void unlisten.then((stop) => stop()).catch(() => {});
   }
-  const source = new EventSource(`${API_BASE}/${EVENTS_PATH}`);
+  // The project lets the server know a page shows it, so the CLI opens no second one.
+  const query = new URLSearchParams({ [PROJECT_QUERY_PARAM]: currentProject() ?? "" });
+  const source = new EventSource(`${API_BASE}/${EVENTS_PATH}?${query}`);
   source.onopen = () => dispatch(CONNECTED);
   source.onmessage = (message) => dispatch(JSON.parse(message.data) as ServerEvent);
   return () => source.close();

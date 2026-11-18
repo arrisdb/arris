@@ -17,8 +17,8 @@ Run the local server in the foreground. `--port` picks the port (OS chooses if o
 ### `arris connection list`
 Prints a JSON array of saved connections (`id`, `name`, `kind`, host/database fields; secrets are never included).
 
-### `arris connection new [--kind K] [--no-open]`
-Opens a browser form and waits (up to 10 minutes) until it is saved or cancelled. `--kind` preselects a database type (an invalid kind prints the valid ones). `--no-open` prints the form URL without opening a browser. The form URL is printed on stderr as `{"url": "..."}`. On save, stdout is `{"connectionId": "<uuid>", "name": "<name>"}`.
+### `arris connection new [--kind K | --url URI] [--no-open]`
+Opens a browser form and waits (up to 10 minutes) until it is saved or cancelled. `--kind` preselects a database type (an invalid kind prints the valid ones). `--url` prefills the form from a connection URI instead; any password in it is dropped. `--no-open` prints the form URL without opening a browser. The form URL is printed on stderr as `{"url": "..."}`. On save, stdout is `{"connectionId": "<uuid>", "name": "<name>"}`.
 
 ### `arris connection edit <conn> [--no-open]`
 Opens the same form filled with the saved connection (secrets left blank; a blank password keeps the stored one) and waits like `connection new`. On save, stdout is `{"connectionId", "name"}` with the same id.
@@ -32,7 +32,7 @@ Deletes a saved connection.
 ### `arris schema <conn> [--schema S]`
 Prints a JSON tree of nodes `{name, kind, path, detail, children}`. `kind` is `database`, `schema`, `table` or `column`; for columns `detail` is the data type. Without `--schema` it lists the top levels with their tables and columns where the engine provides them; `--schema S` narrows to one schema (engines without schemas, such as SQLite, return `[]`, so omit the flag there).
 
-### `arris query <conn> (--sql SQL | --file PATH) [--limit N] [--open [--note N] [--new-tab]]`
+### `arris query <conn> (--sql SQL | --file PATH) [--limit N] [--open [--note N] [--new-tab] [--allow-write]]`
 Exactly one of `--sql` or `--file` is required. `--limit` caps returned rows (default 1000). Output:
 
 ```json
@@ -41,7 +41,7 @@ Exactly one of `--sql` or `--file` is required. `--limit` caps returned rows (de
 
 Rows are arrays of plain JSON values, in column order. `rowCount` is the number of rows returned, capped at `--limit`. `truncated` is true when more rows exist than were returned; the total is then unknown. `uiUrl` opens this run's result page in the Arris UI (the rows the query fetched, up to `--limit`).
 
-With `--open`, the query also appears in an Arris console tab, opening the browser if no tab is open. Read-only SQL runs once and prints the fields above, without `uiUrl`. Anything else, or anything the check cannot prove read-only, does not run and prints `{"awaitingRun": true}`; the user presses Run in the tab. `--note` adds a comment line above the query; `--new-tab` opens a separate console instead of this session's.
+With `--open`, the query also appears in an Arris console tab. A browser opens only when no Arris page or desktop app shows the project; a page in the background takes the query once the user switches to it. Read-only SQL runs once and prints the fields above, without `uiUrl`. Anything else, or anything the check cannot prove read-only, does not run and prints `{"awaitingRun": true}`; the user presses Run in the tab. `--allow-write` runs it anyway and prints the fields above, for a write the user explicitly asked for. `--note` adds a comment line above the query; `--new-tab` opens a separate console instead of this session's.
 
 ### `arris result <run-id> [--offset N] [--limit N]`
 Reads a saved run's rows without re-running it: `{runId, offset, totalRows, columns, rows, hasMore}`.

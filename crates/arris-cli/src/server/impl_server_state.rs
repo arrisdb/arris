@@ -5,7 +5,7 @@ use std::sync::{Arc, Mutex};
 use arris_engines::AppEnvironment;
 use tokio::sync::broadcast;
 
-use super::{ConnectionRequests, QueryHandoffs, ServerEvent, UiContext};
+use super::{ConnectionRequests, QueryHandoffs, ServerEvent, UiContext, UiPages};
 
 pub struct ServerState {
     pub env: Arc<AppEnvironment>,
@@ -16,6 +16,8 @@ pub struct ServerState {
     pub query_handoffs: QueryHandoffs,
     /// Latest UI context per project root, kept in memory only.
     pub ui_contexts: Mutex<HashMap<PathBuf, UiContext>>,
+    /// Open UI pages, so the CLI opens a browser only when none shows the project.
+    pub ui_pages: UiPages,
 }
 
 impl ServerState {

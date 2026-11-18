@@ -561,7 +561,8 @@ impl ApiRoutes {
         })
     }
 
-    /// Queues SQL for a console tab. Reads run here once, so a warehouse is not billed twice.
+    /// Queues SQL for a console tab. Reads (and allowed writes) run here once, so the
+    /// tab shows the result without running it again.
     async fn query_open(
         State(state): ApiState,
         headers: HeaderMap,
@@ -575,7 +576,7 @@ impl ApiRoutes {
             (config, guard.root.clone())
         };
         let driver = state.env.connection.open_connection(&config).await?;
-        let run = if driver.is_read_only(&req.sql, QueryLanguage::default()) {
+        let run = if req.allow_write || driver.is_read_only(&req.sql, QueryLanguage::default()) {
             let run_req = QueryRunRequest {
                 connection: config.id.to_string(),
                 sql: req.sql.clone(),
@@ -638,7 +639,9 @@ impl ApiRoutes {
         handoff: QueryHandoff,
     ) -> (bool, bool) {
         let opened = Self::deliver(state, project, root, handoff).await;
-        (opened, !opened && state.query_handoffs.claim_launch(root))
+        let launch =
+            !opened && !state.ui_pages.is_open(root) && state.query_handoffs.claim_launch(root);
+        (opened, launch)
     }
 
     fn open_tabs(tabs: Vec<PersistedConsoleTab>) -> Vec<TabSummary> {
@@ -971,7 +974,7 @@ pub(super) mod tests {
     use crate::server::{
         CONNECTION_NEW_PAGE, PROJECT_HEADER, PROJECT_QUERY_PARAM, REQUEST_QUERY_PARAM,
         RUN_PAGE_MAX_LIMIT, RUN_RESULTS_BOARD, Server, ServerEvent, ServerEventKind, ServerState,
-        TABLE_BROWSE_DEFAULT_LIMIT,
+        TABLE_BROWSE_DEFAULT_LIMIT, UiPage,
     };
 
     const EVENT_TIMEOUT: Duration = Duration::from_secs(5);
@@ -1264,7 +1267,7 @@ pub(super) mod tests {
     }
 
     #[tokio::test]
-    async fn query_open_runs_reads_once_and_leaves_writes_to_the_user() {
+    async fn query_open_runs_reads_and_allowed_writes_and_leaves_other_writes_to_the_user() {
         let h = Harness::start().await;
         let cfg = h.save_sqlite("local").await;
         h.seed_rows(&cfg, 2).await;
@@ -1285,8 +1288,33 @@ pub(super) mod tests {
         assert_eq!(h.ok("query_handoff_take", json!({})).await, json!([]));
 
         let count = json!({ "connection": id, "sql": "SELECT count(*) FROM t" });
-        let rows = h.ok("query_run", count).await;
+        let rows = h.ok("query_run", count.clone()).await;
         assert_eq!(rows["result"]["rows"][0][0]["value"], json!(2));
+
+        let allowed = json!({ "connection": id, "sql": "DELETE FROM t", "allow_write": true });
+        assert!(h.ok("query_open", allowed).await["run"]["run"]["id"].is_string());
+        let rows = h.ok("query_run", count).await;
+        assert_eq!(rows["result"]["rows"][0][0]["value"], json!(0));
+    }
+
+    #[tokio::test]
+    async fn query_open_launches_a_browser_only_when_no_page_shows_the_project() {
+        let h = Harness::start().await;
+        let cfg = h.save_sqlite("local").await;
+        let write = json!({ "connection": cfg.id.to_string(), "sql": "DELETE FROM t" });
+        let project = h.state.env.project(h.project.path()).await.unwrap();
+        let root = project.read().await.root.clone();
+
+        let page = UiPage::open(h.state.clone(), Some(root));
+        let shown = h.ok("query_open", write.clone()).await;
+        assert_eq!(shown["opened"], json!(false));
+        assert_eq!(shown["launch_browser"], json!(false));
+
+        drop(page);
+        assert_eq!(
+            h.ok("query_open", write).await["launch_browser"],
+            json!(true)
+        );
     }
 
     #[tokio::test]

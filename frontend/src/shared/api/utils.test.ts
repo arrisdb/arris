@@ -126,6 +126,7 @@ describe("shared/api", () => {
       }
     }
     vi.stubGlobal("EventSource", FakeEventSource);
+    setCurrentProject("/p");
     const first = vi.fn();
     const second = vi.fn();
 
@@ -138,7 +139,7 @@ describe("shared/api", () => {
     const event = { kind: "connections_changed", project: "/p", payload: {} };
     source.onmessage?.(new MessageEvent("message", { data: JSON.stringify(event) }));
 
-    expect(source.url).toBe(`${API_BASE}/events`);
+    expect(source.url).toBe(`${API_BASE}/events?project=%2Fp`);
     expect(first).toHaveBeenCalledWith(event);
     expect(second).toHaveBeenCalledWith(event);
     unsubscribeFirst();

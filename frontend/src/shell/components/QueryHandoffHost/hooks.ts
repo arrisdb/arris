@@ -11,6 +11,8 @@ import {
   HANDOFF_SQL_SEPARATOR,
   HANDOFF_STATEMENT_END,
   HANDOFF_TAB_TITLE,
+  HANDOFF_VISIBLE_STATE,
+  VISIBILITY_CHANGE_EVENT,
 } from "./constants";
 import { fetchRunPageIPC, takeQueryHandoffsIPC } from "./ipc";
 import type { QueryHandoff, QueryTarget } from "./types";
@@ -77,14 +79,21 @@ async function openHandoff(handoff: QueryHandoff): Promise<void> {
 function useQueryHandoffs(): void {
   useEffect(() => {
     const pull = () => {
+      if (document.visibilityState !== HANDOFF_VISIBLE_STATE) return;
       takeQueryHandoffsIPC()
         .then((handoffs) => Promise.all(handoffs.map(openHandoff)))
         .catch(() => {});
     };
     pull();
-    return subscribe((event) => {
+    // A hidden page leaves queries queued and takes them once it is shown.
+    document.addEventListener(VISIBILITY_CHANGE_EVENT, pull);
+    const unsubscribe = subscribe((event) => {
       if (event.kind === "query_open_requested" || event.kind === "server_connected") pull();
     });
+    return () => {
+      document.removeEventListener(VISIBILITY_CHANGE_EVENT, pull);
+      unsubscribe();
+    };
   }, []);
 }
 

@@ -48,7 +48,7 @@ To change a saved connection (host, database, user, options, password), run `arr
 2. Run `arris schema <conn>` to see schemas, tables and columns, then `arris schema <conn> --schema <name>` to drill into one schema when the output is large or truncated (skip the flag for engines without schemas, e.g. SQLite). Always inspect the schema before writing SQL; never guess table or column names.
 3. Run `arris query <conn> --sql "<SQL>" --limit 100 --open --note "<what this query answers, under 10 words>"`. It appends the query, under a comment with the note, to this session's console tab for the connection (titled "Claude" plus a short session id), opening the browser if needed; every query of this session lands in that tab. Add `--new-tab` only when the user asks for a separate tab. For long SQL, write it to a file and use `--file <path>`. For MongoDB, write one mongo shell statement per query in strict JSON (quoted keys), not SQL. Always name the database from `arris schema`, e.g. `db.appdb.orders.countDocuments({})` or `db.appdb.orders.aggregate([{"$group": ...}])`; a bare `db.orders` reads the connection's default database, which may be empty. `getSiblingDB` and shell helpers like `ISODate()` are not supported.
 4. Read-only queries (SELECT-style SQL, and MongoDB `find`, `countDocuments`, `distinct` or `aggregate` without `$out`/`$merge`) run and come back with `rows`; the tab shows the same result. Answer the question in plain words, in a short note. Do not repeat the rows as a table or print a link; the user sees them in Arris. If `truncated` is true, say the result was cut off at the limit.
-5. Anything else returns `awaitingRun: true` and has not run. Tell the user the query is in Arris and to press Run there. Do not run it another way, and do not assume it ran.
+5. Anything else is a write. When the user explicitly asked for that change, add `--allow-write`: it runs, the tab shows the result, and you report what changed. Without the flag it returns `awaitingRun: true` and has not run; tell the user to press Run in Arris. Do not run it another way, and do not assume it ran.
 6. On a SQL error (`query_failed`), read the message, fix the SQL, and retry. Retry at most 2 times, then show the user the error and what you tried.
 
 Failures (also for `connection list` and `schema`):
@@ -99,7 +99,7 @@ Same flow as dbt with `arris sqlmesh`: `models` (fails with `sqlmesh_project_not
 
 ## Read-only by default
 
-Do not run INSERT, UPDATE, DELETE or DDL (CREATE, ALTER, DROP, TRUNCATE) unless the user explicitly asked for that change. When they did, show the exact SQL and get confirmation before running it.
+Do not run INSERT, UPDATE, DELETE or DDL (CREATE, ALTER, DROP, TRUNCATE), or MongoDB inserts, updates and deletes, unless the user explicitly asked for that change. When they did, run it with `--allow-write` and say what it changed. If the request is ambiguous, or the statement would change much more than they described (e.g. a DELETE or UPDATE with no WHERE), show the SQL and ask first.
 
 ## Other commands
 

@@ -9,4 +9,8 @@ const HANDOFF_DEFAULT_COMMENT = "--";
 // Ends each query so the console runs only the statement under the cursor.
 const HANDOFF_STATEMENT_END = ";";
 
-export { HANDOFF_DEFAULT_COMMENT, HANDOFF_STATEMENT_END, HANDOFF_PAGE_SIZE, HANDOFF_SQL_SEPARATOR, HANDOFF_TAB_TITLE };
+// Only a page in view takes queries, so a background tab cannot swallow them.
+const HANDOFF_VISIBLE_STATE: DocumentVisibilityState = "visible";
+const VISIBILITY_CHANGE_EVENT = "visibilitychange";
+
+export { HANDOFF_VISIBLE_STATE, VISIBILITY_CHANGE_EVENT, HANDOFF_DEFAULT_COMMENT, HANDOFF_STATEMENT_END, HANDOFF_PAGE_SIZE, HANDOFF_SQL_SEPARATOR, HANDOFF_TAB_TITLE };

@@ -157,6 +157,7 @@ impl Cli {
                 open,
                 new_tab,
                 note,
+                allow_write,
             } => {
                 // clap's `source` group guarantees exactly one of `--sql` / `--file`.
                 let sql = match file {
@@ -172,6 +173,7 @@ impl Cli {
                         new_tab: *new_tab,
                         note: note.clone(),
                         session: Self::agent_session(),
+                        allow_write: *allow_write,
                     };
                     let resp: QueryOpenResponse =
                         client.call(QUERY_OPEN_ROUTE, &project, &body).await?;

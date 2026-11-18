@@ -69,6 +69,23 @@ describe("QueryHandoffHost", () => {
     await waitFor(() => expect(useTabsStore.getState().tabs).toHaveLength(2));
     expect(lastTab()?.text).toBe("SELECT 2;");
   });
+  it("leaves queries queued while the page is hidden and takes them once shown", async () => {
+    let state: DocumentVisibilityState = "hidden";
+    const spy = vi.spyOn(document, "visibilityState", "get").mockImplementation(() => state);
+    vi.mocked(takeQueryHandoffsIPC).mockResolvedValue([
+      { kind: "query" as const, id: "a", connectionId: "c1", sql: "SELECT 1", runId: null, newTab: false, note: null, session: null },
+    ]);
+    render(<QueryHandoffHost />);
+    act(() => emit({ kind: "query_open_requested" }));
+    expect(takeQueryHandoffsIPC).not.toHaveBeenCalled();
+    state = "visible";
+    act(() => {
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+    await waitFor(() => expect(lastTab()?.text).toBe("SELECT 1;"));
+    spy.mockRestore();
+  });
+
   it("focuses a canvas the CLI added to", async () => {
     vi.mocked(takeQueryHandoffsIPC).mockResolvedValueOnce([
       { kind: "query" as const, id: "a", connectionId: "c1", sql: "SELECT 1", runId: null, newTab: false, note: null, session: null },
