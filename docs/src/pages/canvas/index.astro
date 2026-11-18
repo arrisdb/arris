@@ -9,12 +9,12 @@ import Screenshot from "../../components/docs/Screenshot/Screenshot.astro";
   title="Canvas - Arris Docs"
   breadcrumbs={[{ label: "Docs", href: "/" }, { label: "Canvas" }]}
   heading="Canvas"
-  lede="An infinite board that holds an analysis as connected objects: SQL queries that run, charts bound to their results, and the notes that frame them. Build each object by hand, or ask Claude Code to assemble it."
+  lede="An infinite board that holds an analysis as connected objects: SQL queries that run, charts bound to their results, and the notes that frame them. Build each object by hand, or ask a coding agent to assemble it."
   tocItems={[
     { label: "Why use it", href: "#why" },
     { label: "Open a canvas", href: "#open" },
     { label: "Connections", href: "#connections" },
-    { label: "Build with Claude Code", href: "#claude-code" },
+    { label: "Build with a coding agent", href: "#coding-agents" },
     { label: "Build it by hand", href: "#manual" },
     { label: "Object kinds", href: "#objects" },
     { label: "The properties pane", href: "#properties" },
@@ -34,7 +34,7 @@ import Screenshot from "../../components/docs/Screenshot/Screenshot.astro";
   </p>
 
   <ul>
-    <li><strong>Go from a question to a chart fast.</strong> Ask Claude Code for "monthly sales by category" and it writes the query, adds the chart, and both run on the board.</li>
+    <li><strong>Go from a question to a chart fast.</strong> Ask Claude Code or Codex for "monthly sales by category" and it writes the query, adds the chart, and both run on the board.</li>
     <li><strong>Assemble a dashboard-style view.</strong> Several queries, charts, and tables laid out together and refreshed on demand.</li>
     <li><strong>Explore step by step.</strong> Chain one query off another's results, branch into variants, and annotate as you go.</li>
     <li><strong>Work across databases.</strong> Give each query cell its own connection and combine their results with <code>FROM &lt;cell title&gt;</code>.</li>
@@ -67,20 +67,20 @@ import Screenshot from "../../components/docs/Screenshot/Screenshot.astro";
     the newest query cell's, else the connection the editor had selected when the board opened.
   </p>
 
-  <h2 id="claude-code">Build with Claude Code</h2>
+  <h2 id="coding-agents">Build with a coding agent</h2>
 
   <p>
-    With <a href="/ai/claude-code">Claude Code</a>, ask for a dashboard or for a result on a board,
-    for example <em>"put monthly sales by category on a canvas as a line chart"</em>. Claude runs the
+    With a <a href="/ai/coding-agents">coding agent</a> (Claude Code or Codex), ask for a dashboard or for a result on a board,
+    for example <em>"put monthly sales by category on a canvas as a line chart"</em>. The agent runs the
     query, then adds it to a new or existing board below its lowest object, with a chart bound to it
     when you asked for one. The open Arris tab switches to the board, which runs its read queries and
     draws the chart; a write waits for you to press Run.
   </p>
 
   <p>
-    Follow-ups change the board in place: Claude can redraw a chart with another type or axes, remove
+    Follow-ups change the board in place: the agent can redraw a chart with another type or axes, remove
     an object and its arrows, or delete the whole canvas when you ask. Under the hood these are the
-    <code>arris canvas</code> commands, listed in the <a href="/ai/claude-code#cli">CLI reference</a>.
+    <code>arris canvas</code> commands, listed in the <a href="/ai/coding-agents#cli">CLI reference</a>.
   </p>
 
   <h2 id="manual">Build it by hand</h2>

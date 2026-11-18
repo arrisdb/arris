@@ -7,10 +7,10 @@ import Callout from "../../components/docs/Callout/Callout.astro";
 ---
 
 <DocsLayout
-  title="Claude Code - Arris Docs"
-  breadcrumbs={[{ label: "Docs", href: "/" }, { label: "AI" }, { label: "Claude Code" }]}
-  heading="Claude Code"
-  lede="Ask Claude Code data questions in your terminal. It works through the arris CLI: it reads your schema, writes the query, and puts it in an Arris console tab where you see the same result."
+  title="Coding agents - Arris Docs"
+  breadcrumbs={[{ label: "Docs", href: "/" }, { label: "AI" }, { label: "Coding agents" }]}
+  heading="Coding agents"
+  lede="Ask Claude Code or Codex data questions. They work through the arris CLI: the agent reads your schema, writes the query, and puts it in an Arris console tab where you see the same result."
   tocItems={[
     { label: "Install", href: "#install" },
     { label: "How it works", href: "#how" },
@@ -23,7 +23,7 @@ import Callout from "../../components/docs/Callout/Callout.astro";
     { label: "Security", href: "#security" },
     { label: "CLI reference", href: "#cli" },
   ]}
-  currentPath="/ai/claude-code"
+  currentPath="/ai/coding-agents"
   prev={{ label: "SQLMesh", href: "/analytics-engineering/sqlmesh", section: "Analytics engineering" }}
   next={{ label: "Keyboard shortcuts", href: "/reference/shortcuts", section: "Reference" }}
 >
@@ -36,23 +36,51 @@ import Callout from "../../components/docs/Callout/Callout.astro";
   </CodeBlock>
 
   <p>
-    It installs the <code>arris</code> skill to <code>~/.claude/skills/arris</code> and the
-    <code>arris</code> binary to <code>~/.arris/bin/arris</code>. Restart Claude Code, then type
-    <code>/arris</code>. Run it again to upgrade; <code>npx arris --project</code> installs the skill
-    for the current project only. It runs on macOS and Linux.
+    It installs the <code>arris</code> binary to <code>~/.arris/bin/arris</code> and the
+    <code>arris</code> skill to one folder per agent:
   </p>
+
+  <DocTable>
+    <thead>
+      <tr>
+        <th>Agent</th>
+        <th>Reads the skill from</th>
+        <th>Invoke it with</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="font-medium text-fg">Claude Code</td>
+        <td><code>~/.claude/skills/arris</code></td>
+        <td><code>/arris</code></td>
+      </tr>
+      <tr>
+        <td class="font-medium text-fg">Codex</td>
+        <td><code>~/.agents/skills/arris</code></td>
+        <td><code>$arris</code></td>
+      </tr>
+    </tbody>
+  </DocTable>
+
+  <p>
+    Restart your agent after installing. Run <code>npx arris</code> again to upgrade; the previous
+    copy is moved to <code>~/.arris/skill-backups</code>. <code>npx arris --project</code> installs the
+    skill into the current project's <code>.claude/skills</code> and <code>.agents/skills</code>
+    instead. It runs on macOS and Linux.
+  </p>
+
 
   <h2 id="how">How it works</h2>
 
   <p>
-    Claude Code never talks to your databases directly. It runs <code>arris</code> commands, which
+    The agent never talks to your databases directly. It runs <code>arris</code> commands, which
     print JSON. The first command starts a small Arris server on your machine (bound to
     <code>127.0.0.1</code> and protected by a login token). The same server serves the Arris UI in
-    your browser, and the desktop app follows it too, so whatever Claude does shows up in the Arris
+    your browser, and the desktop app follows it too, so whatever the agent does shows up in the Arris
     window you have open.
   </p>
 
-  <p>Type <code>/arris</code> with an optional first word:</p>
+  <p>Type <code>/arris</code> (<code>$arris</code> in Codex) with an optional first word:</p>
 
   <DocTable>
     <thead>
@@ -83,16 +111,16 @@ import Callout from "../../components/docs/Callout/Callout.astro";
 
   <p>
     You can also just ask in plain words, for example <em>"how many orders shipped last week?"</em>;
-    Claude picks up the skill on its own.
+    the agent picks up the skill on its own.
   </p>
 
   <h2 id="connect">Connect a database</h2>
 
   <p>
     <code>/arris init-connection</code> opens the connection form in your browser. You fill it in
-    there, including the password; Claude only learns the connection's name. If you give Claude a
+    there, including the password; the agent only learns the connection's name. If you give it a
     connection URI, the form opens with host, port, user, database, and options filled in, and you
-    type the password yourself. To change a saved connection, ask Claude to edit it: the same form
+    type the password yourself. To change a saved connection, ask the agent to edit it: the same form
     opens with the saved values.
   </p>
 
@@ -104,29 +132,33 @@ import Callout from "../../components/docs/Callout/Callout.astro";
   <h2 id="query">Ask a question</h2>
 
   <p>
-    Claude lists your connections, reads the schema, and writes the query. Every query from one
-    Claude Code session goes to that session's console tab for the connection, titled
-    <strong>Claude</strong> plus a short session id, under a comment saying what it answers. Ask for
-    a separate tab if you want one.
+    The agent lists your connections, reads the schema, and writes the query. Every query from one
+    agent session goes to that session's console tab for the connection, under a comment saying what
+    it answers. Ask for a separate tab if you want one. The tab is named after the agent:
   </p>
 
   <ul>
-    <li><strong>Reads run right away.</strong> The tab shows the result, and Claude answers in a short note instead of repeating the rows.</li>
+    <li><strong>Claude Code</strong> and <strong>Codex</strong>: the agent plus a short session id, such as <code>Claude 1a2b3c4d</code> or <code>Codex 1a2b3c4d</code>, so two sessions never share a tab.</li>
+    <li>Anything else running the CLI: <code>Agent</code>.</li>
+  </ul>
+
+  <ul>
+    <li><strong>Reads run right away.</strong> The tab shows the result, and the agent answers in a short note instead of repeating the rows.</li>
     <li><strong>One Arris tab is enough.</strong> If no Arris window is open, the first query opens one; later queries reuse it.</li>
     <li><strong>Only the window you are looking at takes a query.</strong> A tab in the background keeps it queued and shows it as soon as you switch to it.</li>
-    <li><strong>Large results stay in Arris.</strong> Claude reads further pages of an earlier run from its saved result instead of running the query again.</li>
+    <li><strong>Large results stay in Arris.</strong> The agent reads further pages of an earlier run from its saved result instead of running the query again.</li>
   </ul>
 
   <h2 id="writes">Changing data</h2>
 
   <p>
-    Claude does not run <code>INSERT</code>, <code>UPDATE</code>, <code>DELETE</code>, DDL, or MongoDB
+    The agent does not run <code>INSERT</code>, <code>UPDATE</code>, <code>DELETE</code>, DDL, or MongoDB
     writes unless you asked for that change:
   </p>
 
   <ul>
-    <li><strong>You asked for it</strong> (for example, <em>"delete the 3 test orders"</em>): it runs, the tab shows the result, and Claude tells you what changed.</li>
-    <li><strong>The request is unclear, or the statement would change much more than you described</strong> (such as a <code>DELETE</code> with no <code>WHERE</code>): Claude shows the SQL and asks first.</li>
+    <li><strong>You asked for it</strong> (for example, <em>"delete the 3 test orders"</em>): it runs, the tab shows the result, and the agent tells you what changed.</li>
+    <li><strong>The request is unclear, or the statement would change much more than you described</strong> (such as a <code>DELETE</code> with no <code>WHERE</code>): the agent shows the SQL and asks first.</li>
     <li><strong>Anything else</strong> lands in the console without running. Press <strong>Run</strong> in Arris if you want it.</li>
   </ul>
 
@@ -138,7 +170,7 @@ import Callout from "../../components/docs/Callout/Callout.astro";
   <h2 id="context">Point at what you see</h2>
 
   <p>
-    Claude can read what the Arris window shows: the active tab, its text, and your selection. So you
+    The agent can read what the Arris window shows: the active tab, its text, and your selection. So you
     can say <em>"explain this query"</em> or <em>"why is the selected part slow?"</em> without pasting
     anything. It can also list the open tabs and close them, for example <em>"close every tab but
     this one"</em>.
@@ -147,9 +179,9 @@ import Callout from "../../components/docs/Callout/Callout.astro";
   <h2 id="canvas">Canvases</h2>
 
   <p>
-    Ask for a dashboard, or to put a result on a <a href="/canvas">canvas</a>. Claude runs the query,
+    Ask for a dashboard, or to put a result on a <a href="/canvas">canvas</a>. The agent runs the query,
     then adds it to a new or existing board, with a chart when you asked for one. The open Arris tab
-    switches to the board, which runs its read queries and draws the chart. Claude can also redraw a
+    switches to the board, which runs its read queries and draws the chart. It can also redraw a
     chart with another type or axes, remove an object, or delete a whole canvas when you ask.
   </p>
 
@@ -157,7 +189,7 @@ import Callout from "../../components/docs/Callout/Callout.astro";
 
   <p>
     In a <a href="/analytics-engineering/dbt">dbt</a> or <a href="/analytics-engineering/sqlmesh">SQLMesh</a>
-    project, Claude reads models, their SQL and columns, and model or column lineage. It runs tool
+    project, the agent reads models, their SQL and columns, and model or column lineage. It runs tool
     commands as <code>arris dbt cli -- &lt;args&gt;</code> (or <code>arris sqlmesh cli</code>), so each
     run is logged and shows up in Arris. It asks before commands that write to the warehouse unless
     you asked for them. To query a model's table without a connection yet, it creates one from the
@@ -167,10 +199,10 @@ import Callout from "../../components/docs/Callout/Callout.astro";
   <h2 id="security">Security</h2>
 
   <ul>
-    <li>Passwords and keys are typed only into the browser form and kept in the system keychain. They never appear in Claude's output, in commands, or in what the CLI prints.</li>
-    <li>Never paste a password into the chat; Claude will not ask for one.</li>
+    <li>Passwords and keys are typed only into the browser form and kept in the system keychain. They never appear in the agent's output, in commands, or in what the CLI prints.</li>
+    <li>Never paste a password into the chat; the skill tells the agent never to ask for one.</li>
     <li>The server listens only on <code>127.0.0.1</code> and needs its login token. Some commands print a URL that contains the token: keep it on your machine.</li>
-    <li>Claude sees the rows its own queries return, as with any tool it runs. Use <code>--limit</code> or aggregate queries to keep that small.</li>
+    <li>The agent sees the rows its own queries return, as with any tool it runs. Use <code>--limit</code> or aggregate queries to keep that small.</li>
   </ul>
 
   <h2 id="cli">CLI reference</h2>

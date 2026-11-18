@@ -6,7 +6,7 @@ interface QueryTarget {
   newTab: boolean;
   /// What the query answers, from `--note`.
   note: string | null;
-  /// Short agent session id; each session gets its own console.
+  /// The agent session's console name, e.g. "Codex 1a2b3c4d"; each session gets its own.
   session: string | null;
 }
 

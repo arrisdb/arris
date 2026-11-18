@@ -39,7 +39,7 @@ const EXPECTED_DOCS_PAGES = [
   "git/version-control/index.html",
   "analytics-engineering/dbt/index.html",
   "analytics-engineering/sqlmesh/index.html",
-  "ai/claude-code/index.html",
+  "ai/coding-agents/index.html",
   "reference/shortcuts/index.html",
   "reference/debug-logs/index.html",
 ];
@@ -269,13 +269,16 @@ describe("docs output content", () => {
     expect(html).not.toMatch(/New: a board/i);
   });
 
-  it("Claude Code page documents install and explicit writes", () => {
+  it("coding agents page documents install, each agent, and explicit writes", () => {
     const html = readFileSync(
-      join(DIST, "ai/claude-code/index.html"),
+      join(DIST, "ai/coding-agents/index.html"),
       "utf-8"
     );
     expect(html).toContain("npx arris");
     expect(html).toContain("--allow-write");
+    for (const agent of ["Claude Code", "Codex", "~/.agents/skills"]) expect(html).toContain(agent);
+    expect(html).not.toContain("Cursor");
+    expect(html).not.toContain("Copilot");
   });
 
   it("no page links to the removed agent page", () => {

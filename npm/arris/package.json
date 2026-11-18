@@ -1,7 +1,7 @@
 {
   "name": "arris",
   "version": "0.15.0",
-  "description": "Arris for Claude Code: query your databases, explore dbt and SQLMesh projects, and build canvases from the /arris skill.",
+  "description": "Arris for Claude Code and Codex: query your databases, explore dbt and SQLMesh projects, and build canvases from the /arris skill.",
   "license": "AGPL-3.0-only",
   "type": "module",
   "bin": {

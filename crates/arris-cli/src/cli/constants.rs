@@ -18,8 +18,13 @@ pub const VERSION_STRING: &str = concat!(
 pub const ENV_DATA_DIR: &str = "ARRIS_DATA_DIR";
 pub const ENV_TEST_SECRETS: &str = "ARRIS_TEST_SECRETS";
 pub const TEST_SECRETS_MEMORY: &str = "memory";
-/// Set by Claude Code in every Bash call; names the console the session's queries go to.
-pub const ENV_AGENT_SESSION_ID: &str = "CLAUDE_CODE_SESSION_ID";
+/// Session id env var each agent sets for its shell commands, and its console's name.
+/// Codex comes first: it can run inside a Claude Code session and inherit its id.
+pub const AGENT_SESSION_ENVS: [(&str, &str); 2] = [
+    ("CODEX_THREAD_ID", "Codex"),
+    ("CLAUDE_CODE_SESSION_ID", "Claude"),
+];
+/// Trailing chars kept; a Codex UUIDv7 thread id starts with its creation time.
 pub const AGENT_SESSION_SHORT_LEN: usize = 8;
 /// Set by tests so CLI runs never open the developer's browser.
 pub const ENV_TEST_NO_BROWSER: &str = "ARRIS_TEST_NO_BROWSER";

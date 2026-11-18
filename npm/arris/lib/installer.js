@@ -3,13 +3,14 @@ import { chmodSync, copyFileSync, cpSync, existsSync, mkdirSync, renameSync } fr
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  AGENT_DIRS,
   ARRIS_HOME_DIR,
   BACKUP_PREFIX,
   BINARY_MODE,
   BINARY_NAME,
   BIN_DIR,
   BUNDLED_SKILL_DIR,
-  CLAUDE_DIR,
+  HIDDEN_DIR_PREFIX,
   ENV_ALLOW_DEV,
   ENV_ALLOW_DEV_ON,
   MSG_DEV_BINARY,
@@ -26,7 +27,7 @@ import {
 
 const PACKAGE_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 
-/// Copies the skill into Claude Code's skills dir and the binary to `~/.arris/bin`.
+/// Copies the skill into each agent's skills dir and the binary to `~/.arris/bin`.
 export class Installer {
   /// The bundled skill, or the repo's `skills/arris` when run from a checkout.
   static skillSource(packageRoot = PACKAGE_ROOT) {
@@ -46,18 +47,24 @@ export class Installer {
 
   /// Returns the written paths; an existing skill dir is moved aside, never deleted.
   static run({ home, cwd, project, binary, skillSource = Installer.skillSource(), now = new Date() }) {
-    const skillsDir = join(project ? cwd : home, CLAUDE_DIR, SKILLS_DIR);
-    const skillDir = join(skillsDir, SKILL_NAME);
-    let backup = null;
-    // Backups live outside the skills dir, or Claude Code would load them as extra skills.
-    if (existsSync(skillDir)) {
-      const backupsDir = join(home, ARRIS_HOME_DIR, SKILL_BACKUPS_DIR);
-      mkdirSync(backupsDir, { recursive: true });
-      backup = join(backupsDir, `${BACKUP_PREFIX}${now.toISOString().replace(/[:.]/g, "-")}`);
-      renameSync(skillDir, backup);
+    const stamp = now.toISOString().replace(/[:.]/g, "-");
+    const skillDirs = [];
+    const backups = [];
+    for (const agentDir of AGENT_DIRS) {
+      const skillsDir = join(project ? cwd : home, agentDir, SKILLS_DIR);
+      const skillDir = join(skillsDir, SKILL_NAME);
+      // Backups live outside the skills dir, or the agent would load them as extra skills.
+      if (existsSync(skillDir)) {
+        const backupsDir = join(home, ARRIS_HOME_DIR, SKILL_BACKUPS_DIR);
+        mkdirSync(backupsDir, { recursive: true });
+        const backup = join(backupsDir, `${BACKUP_PREFIX}${agentDir.replace(HIDDEN_DIR_PREFIX, "")}-${stamp}`);
+        renameSync(skillDir, backup);
+        backups.push(backup);
+      }
+      mkdirSync(skillsDir, { recursive: true });
+      cpSync(skillSource, skillDir, { recursive: true });
+      skillDirs.push(skillDir);
     }
-    mkdirSync(skillsDir, { recursive: true });
-    cpSync(skillSource, skillDir, { recursive: true });
 
     const binDir = join(home, ARRIS_HOME_DIR, BIN_DIR);
     const binaryPath = join(binDir, BINARY_NAME);
@@ -67,6 +74,6 @@ export class Installer {
     copyFileSync(binary, staged);
     chmodSync(staged, BINARY_MODE);
     renameSync(staged, binaryPath);
-    return { skillDir, binaryPath, backup };
+    return { skillDirs, binaryPath, backups };
   }
 }

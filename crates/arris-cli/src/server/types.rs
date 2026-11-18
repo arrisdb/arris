@@ -227,7 +227,7 @@ pub struct QueryOpenRequest {
     /// What the query answers; shown as a comment above it.
     #[serde(default)]
     pub note: Option<String>,
-    /// Short id of the agent session, so each session gets its own console.
+    /// The calling agent session's console name, e.g. "Codex 1a2b3c4d".
     #[serde(default)]
     pub session: Option<String>,
     /// Runs a write the user explicitly asked for instead of leaving it for Run.
@@ -260,7 +260,7 @@ pub struct QueryHandoff {
     rename_all_fields = "camelCase"
 )]
 pub enum HandoffTarget {
-    /// Appended to the connection's shared Claude console, or a new tab.
+    /// Appended to the agent session's console for the connection, or a new tab.
     Query {
         connection_id: String,
         sql: String,
