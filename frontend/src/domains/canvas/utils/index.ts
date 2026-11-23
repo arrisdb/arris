@@ -1,16 +1,8 @@
-export { parseAgentCanvas, planAgentChanges } from "./agentSpec";
-export type { BoardChanges, ComponentUpdate } from "./agentSpec";
-export { summarizeAgentChanges } from "./agentSummary";
-export { parseAgentQuestion } from "./agentQuestion";
-export { buildQuestionAnswer } from "./questionAnswer";
-export type { QuestionFollowUp, ShareableQuery } from "./questionAnswer";
-export { describeBoard } from "./boardContext";
 export { sanitizeChartSpec } from "./chartSpec";
 export { buildChartQuery } from "./chartQuery";
 export type { ChartQuery } from "./chartQuery";
 export { cellTableName, deriveDataEdges, sanitizeCellTitle } from "./dependencies";
-export { genId, makeComponent, makeEdge, nextQueryTitle } from "./factory";
+export { genId, makeComponent, makeEdge, nextCanvasTitle, nextQueryTitle } from "./factory";
 export type { ComponentInput } from "./factory";
 export { autoLayout, contentBottom } from "./layout";
-export { serializeResultTable } from "./resultTable";
-export { emptyDoc, parseDoc, serializeDoc } from "./serialize";
+export { emptyDoc, parseDoc } from "./serialize";

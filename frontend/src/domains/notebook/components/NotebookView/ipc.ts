@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { apiCall, isWebShell } from "@shared/api";
 
 import type { Completion, CreatedVenv, PythonInterpreter } from "./types";
 
@@ -60,6 +61,7 @@ function shutdownIPC(notebookId: string): Promise<void> {
 }
 
 function writeNotebookFileIPC(path: string, content: string): Promise<void> {
+  if (isWebShell()) return apiCall("file_write", { path, content });
   return invoke("cmd_write_text_file", { path, content });
 }
 

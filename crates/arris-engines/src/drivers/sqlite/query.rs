@@ -17,7 +17,6 @@ pub(super) fn run_select(conn: &Connection, sql: &str, params: &[QueryValue]) ->
 
     let cols_meta: Vec<(String, String)> = stmt
         .columns()
-        .iter()
         .map(|c| {
             (
                 c.name().to_owned(),
@@ -79,7 +78,6 @@ pub(super) fn stream_select(
     };
     let columns: Vec<ColumnSpec> = stmt
         .columns()
-        .iter()
         .map(|c| ColumnSpec::new(c.name().to_owned(), c.decl_type().unwrap_or("").to_owned()))
         .collect();
     let col_count = columns.len();

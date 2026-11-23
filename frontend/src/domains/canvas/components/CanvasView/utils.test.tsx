@@ -34,7 +34,7 @@ describe("toFlowNodes", () => {
       id: "t",
       type: "text",
       position: { x: 10, y: 20 },
-      data: { tabId: "tab-1" },
+      data: { boardId: "tab-1" },
       draggable: true,
       style: { width: 30, height: 40, zIndex: 2 },
     });

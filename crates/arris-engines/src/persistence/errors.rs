@@ -8,6 +8,12 @@ pub enum StoreError {
     Serde(#[from] serde_json::Error),
     #[error("not found: {0}")]
     NotFound(String),
+    #[error("canvas revision conflict: current revision is {current}")]
+    RevisionConflict { current: u64 },
+    #[error("invalid canvas doc: {0}")]
+    InvalidDoc(String),
+    #[error("corrupt canvas file {file}: {reason}")]
+    Corrupt { file: String, reason: String },
 }
 
 #[derive(Debug, Error)]
@@ -22,6 +28,10 @@ pub enum KeychainError {
 pub enum PathError {
     #[error("could not resolve OS data directory")]
     NotResolvable,
+    #[error("io: {0}")]
+    Io(#[from] std::io::Error),
+    #[error("serde: {0}")]
+    Serde(#[from] serde_json::Error),
 }
 
 #[derive(Debug, Error)]

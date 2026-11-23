@@ -8,8 +8,8 @@ import type { SectionProps } from "../../types";
 /// the board's query objects (unbound by default); "Rows per page" sets how many
 /// rows each page shows (blank = the default). The table pages through the query's
 /// full cached result, so it refreshes whenever the query re-runs.
-function TableSection({ tabId, component, onChange }: SectionProps) {
-  const components = useCanvasStore((s) => s.boards[tabId]?.doc.components);
+function TableSection({ boardId, component, onChange }: SectionProps) {
+  const components = useCanvasStore((s) => s.boards[boardId]?.doc.components);
   if (component.kind !== "table") return null;
 
   const sourceOptions = (components ?? [])

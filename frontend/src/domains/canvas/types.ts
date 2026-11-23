@@ -4,7 +4,7 @@ import type { ChartSpec, QueryResult } from "@shared";
 /// board: it carries its own position, size, and stacking order, and objects may
 /// overlap. This discriminated union is the extension seam: a future object kind
 /// (e.g. a Python cell or a static-file table import) is added here, gains one
-/// renderer-registry entry, and one agent-spec arm. Nothing nests.
+/// renderer-registry entry. Nothing nests.
 type ComponentKind = "text" | "sticky" | "query" | "chart" | "table" | "shape"; // future: "python" | "tableImport"
 
 type ShapeKind = "rect" | "ellipse" | "line";
@@ -76,6 +76,8 @@ interface QueryComponent extends BaseComponent {
   limit?: number;
   /// Fetch the full result instead of `limit` rows.
   selectAll?: boolean;
+  /// Set by the CLI on reads: the board runs it once on open, then clears it.
+  autoRun?: boolean;
 }
 
 /// A chart bound to a query object's data by `sourceQueryId`. Renders through the
@@ -137,46 +139,49 @@ interface CanvasViewport {
   zoom: number;
 }
 
-type ChatRole = "user" | "agent";
-
-/// One turn in the canvas agent chat log. Persisted with the board (in `CanvasDoc`)
-/// so the conversation survives close/reopen and restart until the user clears it.
-/// The agent entry streams (`pending`) then settles into a summary of what it did;
-/// when the agent asks the user something instead of changing the board, the entry
-/// carries a `question` and renders a question card (`answered` once resolved).
-interface ChatEntry {
-  id: string;
-  role: ChatRole;
-  text: string;
-  pending?: boolean;
-  /// The board change the agent made this turn (added/updated/removed objects),
-  /// kept separate from `text` so the reply prose and the action chip render with
-  /// their own styling instead of running together.
-  action?: string;
-  question?: AgentQuestion;
-  answered?: boolean;
-}
-
-/// The persisted board document. Serialized into `EditorTab.text` (the same trick
-/// the notebook uses for nbformat), so a board survives close/reopen and restart.
+/// The persisted board document, stored as one canvas record.
 interface CanvasDoc {
   version: number;
   components: CanvasComponent[];
   edges: CanvasEdge[];
   viewport?: CanvasViewport;
-  /// The connections the agent may use for this board. The agent reads every
-  /// listed connection's schema and may target any of them per query object, so
-  /// one board can mix queries against different databases. Persisted so the set
-  /// survives close/reopen. Absent on older boards (treated as empty).
-  connectionIds?: string[];
-  /// The agent conversation log, persisted so it survives close/reopen and
-  /// restart until the user clears it. Settled entries only (no in-flight
-  /// streaming state). Absent on older boards (treated as empty).
-  chat?: ChatEntry[];
 }
 
 /// Payload of the `canvas://cell-ingested` event: a terminal cell's full-ingest
 /// totals, emitted once its background drain completes.
+/// A stored canvas as the backend returns it; `doc` is normalized by `parseDoc`.
+interface CanvasRecord {
+  id: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+  revision: number;
+  doc: unknown;
+}
+
+/// A canvas list row.
+interface CanvasSummary {
+  id: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+  revision: number;
+  componentCount: number;
+}
+
+/// What `canvas_add` returns: the updated canvas and the new object ids.
+interface CanvasAddResponse {
+  canvas: CanvasSummary;
+  queryId: string;
+  chartId?: string;
+}
+
+/// Payload of the `canvas_changed` server event.
+interface CanvasChangedEvent {
+  id: string;
+  revision: number;
+}
+
 interface CellIngestedEvent {
   boardId: string;
   cellId: string;
@@ -200,81 +205,17 @@ interface QueryRunState {
   endedAt?: number;
 }
 
-// ── agent canvas spec (the `arris-canvas` JSON the agent emits) ───────────────
-
-/// One object in the agent's emitted spec. Loose by design: the agent may omit
-/// geometry (the client lays out), and only the fields for its `kind` are set.
-interface AgentComponentSpec {
-  kind: ComponentKind;
-  id: string;
-  // query
-  sql?: string;
-  connectionId?: string | null;
-  // chart
-  sourceQueryId?: string;
-  spec?: ChartSpec;
-  // text + sticky + shape
-  text?: string;
-  // sticky
-  color?: StickyColor;
-  // shape
-  shape?: ShapeKind;
-  // shared
-  title?: string;
-  x?: number;
-  y?: number;
-  w?: number;
-  h?: number;
-}
-
-interface AgentCanvasSpec {
-  components: AgentComponentSpec[];
-  edges?: CanvasEdge[];
-  /// Ids of objects already on the board that the agent wants removed.
-  remove?: string[];
-}
-
-// ── agent question (the `arris-ask` JSON the agent emits to ask the user) ─────
-
-/// A question the agent asks the user mid-conversation instead of changing the
-/// board, discriminated on `type`. To add a new question type: add a variant
-/// here and a matching `AgentQuestionAnswer` variant, a parse case in
-/// `parseAgentQuestion`, a follow-up builder case in `buildQuestionAnswer`, and a
-/// render case in the `AgentQuestionCard` component.
-
-/// Request the rows of one or more query objects the agent cannot see, so it can
-/// summarize or build on them. The user approves (rows sent) or declines.
-interface ShareResultsQuestion {
-  type: "share_results";
-  queryIds: string[];
-  reason?: string;
-}
-
-type AgentQuestion = ShareResultsQuestion;
-
-/// The user's answer to a `share_results` question: whether to share the rows.
-interface ShareResultsAnswer {
-  type: "share_results";
-  shared: boolean;
-}
-
-type AgentQuestionAnswer = ShareResultsAnswer;
-
 export type {
-  AgentCanvasSpec,
-  AgentComponentSpec,
-  AgentQuestion,
-  AgentQuestionAnswer,
-  ShareResultsAnswer,
-  ShareResultsQuestion,
   BaseComponent,
+  CanvasAddResponse,
+  CanvasChangedEvent,
   CanvasComponent,
   CanvasDoc,
   CanvasEdge,
+  CanvasRecord,
+  CanvasSummary,
   CanvasViewport,
   CellIngestedEvent,
-  ChatEntry,
-  ChatRole,
   ChartComponent,
   ComponentKind,
   QueryComponent,

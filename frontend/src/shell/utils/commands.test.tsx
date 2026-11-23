@@ -66,13 +66,6 @@ vi.mock("@domains/notebook/components/NotebookView/ipc", () => ({
   writeNotebookFileIPC: vi.fn(),
 }));
 
-// CanvasView owns the canvas tool commands. Its agent chat panel reaches the
-// agent CLI over IPC and renders a provider picker; stub it to nothing so the
-// coverage harness only exercises the board's command registration.
-vi.mock("@domains/canvas/components/CanvasAgentChat", () => ({
-  CanvasAgentChat: () => null,
-}));
-
 vi.mock("@tanstack/react-virtual", () => ({
   useVirtualizer: (opts: { count: number }) => ({
     getVirtualItems: () =>
@@ -89,6 +82,7 @@ import { usePinnedQueriesStore } from "@domains/pinnedQueries/hooks";
 import { EditorPane } from "@domains/editor/components/EditorPane";
 import { NotebookView } from "@domains/notebook/components/NotebookView";
 import { CanvasView } from "@domains/canvas/components/CanvasView";
+import { useCanvasStore } from "@domains/canvas/hooks";
 import { ResultsTableView } from "@domains/results/components/ResultsTableView";
 import { useGlobalCommands, useRegisterCommands } from "./commands";
 import { ACTION_ORDER, useSettingsStore } from "@shared/settings";
@@ -156,6 +150,7 @@ function notebookTab(): EditorTab {
 }
 
 function canvasTab(): EditorTab {
+  useCanvasStore.getState().loadBoard("cv1", { version: 1, components: [], edges: [] }, 1);
   return {
     id: "cv1",
     title: "Canvas 1",
@@ -176,7 +171,7 @@ function CoverageHarness() {
     <>
       <EditorPane />
       <NotebookView activeTab={notebookTab()} />
-      <CanvasView activeTab={canvasTab()} />
+      <CanvasView canvasId="cv1" tab={canvasTab()} />
       <ResultsTableView />
     </>
   );

@@ -1,0 +1,70 @@
+.mdbc-analytics-models {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 44px);
+}
+
+.mdbc-analytics-models-search {
+  padding: 8px 10px;
+}
+
+.mdbc-analytics-models-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.mdbc-analytics-models-track {
+  position: relative;
+  height: var(--mdbc-models-height);
+}
+
+/* Height must match MODEL_ROW_HEIGHT, the virtualizer's row estimate. */
+.mdbc-analytics-model-row {
+  position: absolute;
+  height: 44px;
+  transform: translateY(var(--mdbc-model-row-y));
+  top: 0;
+  left: 0;
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-content: center;
+  column-gap: 12px;
+  padding: 0 10px;
+  border: 0;
+  border-bottom: 0.5px solid var(--m-sep);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.mdbc-analytics-model-row:hover {
+  background: rgb(var(--m-overlay-rgb) / 0.05);
+}
+
+.mdbc-analytics-model-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mdbc-analytics-model-badge,
+.mdbc-analytics-model-path {
+  color: var(--m-fg-3);
+  font-size: var(--m-fs-sm);
+}
+
+.mdbc-analytics-model-path {
+  grid-column: 1 / -1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mdbc-analytics-message {
+  padding: 12px 10px;
+  color: var(--m-fg-3);
+  font-size: var(--m-fs-sm);
+}

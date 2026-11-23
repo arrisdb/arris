@@ -18,6 +18,8 @@ import { findLeaf, findLeafWithTab, planTabDrop } from "@shell/utils/paneTree";
 import { recordSelfWrite } from "@shell/utils/selfWrites";
 import { useEditorHandleStore } from "../../hooks/editorHandleStore";
 import { useTabsStore } from "@shell/hooks/tabsStore";
+import { useSnackbarStore } from "@shell/hooks/snackbarStore";
+import { createAndOpenCanvas } from "@domains/canvas";
 import { useTransactionStore } from "../../hooks/transactionStore";
 import type { EditorTab, PaneNode, PaneSplit, SplitDirection } from "@shell/types";
 import {
@@ -29,6 +31,7 @@ import {
   zoomDirectionFromWheel,
   zoomEditor,
 } from "@shell/utils";
+import { isWebShell } from "@shared/api";
 import { useSettingsStore } from "@shared/settings";
 import { useGitStore } from "@domains/git/hooks";
 import { useFilesStore } from "@domains/files/hooks";
@@ -350,7 +353,6 @@ function PaneGroupView({ groupId }: { groupId: string }) {
   const addTab = useTabsStore((s) => s.addTab);
   const openTerminalTab = useTabsStore((s) => s.openTerminalTab);
   const openUntitledNotebookTab = useTabsStore((s) => s.openUntitledNotebookTab);
-  const openUntitledCanvasTab = useTabsStore((s) => s.openUntitledCanvasTab);
   const selectedConnectionId = useConnectionsStore((s) => s.selectedId);
   const selectConnection = useConnectionsStore((s) => s.selectConnection);
   const connections = useConnectionsStore((s) => s.connections);
@@ -659,7 +661,9 @@ function PaneGroupView({ groupId }: { groupId: string }) {
 
   function newCanvasTab() {
     focusGroup(groupId);
-    openUntitledCanvasTab(selectedConnectionId ?? undefined);
+    createAndOpenCanvas(selectedConnectionId ?? undefined).catch((e: unknown) =>
+      useSnackbarStore.getState().enqueue(ipcErrorMessage(e), "error"),
+    );
   }
 
   const tabConnectionId = resolveTabConnectionId({
@@ -1941,8 +1945,8 @@ function PaneGroupView({ groupId }: { groupId: string }) {
         },
         isEnabled: () => !!activeTab?.filePath && diffHunks.length > 0,
       },
-      newTerminalTab: { run: () => newTerminalTab() },
-      newNotebookTab: { run: () => newNotebookTab() },
+      newTerminalTab: { run: () => newTerminalTab(), isEnabled: () => !isWebShell() },
+      newNotebookTab: { run: () => newNotebookTab(), isEnabled: () => !isWebShell() },
       newCanvasTab: { run: () => newCanvasTab() },
       switchTab: {
         run: () => {
@@ -1971,8 +1975,8 @@ function PaneGroupView({ groupId }: { groupId: string }) {
         onFocus={focusTab}
         onClose={closeTab}
         onAdd={newTab}
-        onAddTerminal={newTerminalTab}
-        onAddNotebook={newNotebookTab}
+        onAddTerminal={isWebShell() ? undefined : newTerminalTab}
+        onAddNotebook={isWebShell() ? undefined : newNotebookTab}
         onAddCanvas={newCanvasTab}
         onSplit={handleSplit}
         onRename={handleRename}

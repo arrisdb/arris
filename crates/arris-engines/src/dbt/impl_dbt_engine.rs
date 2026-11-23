@@ -12,8 +12,8 @@ use super::impl_column_lineage_extractor::ColumnLineageExtractor;
 use super::impl_dbt_cli_runner::DbtCliRunner;
 use super::impl_diff_sql_builder::{DiffDialect, DiffSqlBuilder};
 use super::types::*;
-use crate::persistence::ProjectState;
-use crate::{ConnectionEngine, DatabaseKind, Engine, QueryEngine, QueryResult, QueryValue};
+use crate::persistence::{ProjectState, ToolRunSummary};
+use crate::{ConnectionEngine, DatabaseKind, Engine, QueryEngine, QueryRequest, QueryResult, QueryValue};
 
 pub struct DbtEngine;
 
@@ -212,6 +212,7 @@ impl DbtEngine {
         Self::make_runner(root, None).list_profiles()
     }
 
+    /// Compiles the models (best effort), then reads lineage from the compiled SQL.
     pub fn column_lineage(
         &self,
         root: PathBuf,
@@ -220,29 +221,25 @@ impl DbtEngine {
         binary: Option<String>,
         nodes: &[ScannedNode],
     ) -> Result<ColumnLineageGraph, ColumnLineageError> {
-        let runner = Self::make_runner(root, binary);
-
-        // Extract short model names from unique_ids for dbt compile --select
-        let short_names: Vec<String> = model_ids
-            .iter()
-            .filter_map(|id| {
-                if id.starts_with("source.") {
-                    None // sources don't need compilation
-                } else {
-                    Some(id.rsplit('.').next().unwrap_or(id).to_string())
-                }
-            })
-            .collect();
-
-        // Compile models (best-effort; fall through to read cached compiled SQL on failure)
+        let short_names = Self::model_short_names(&model_ids);
         if !short_names.is_empty() {
-            let _ = runner.compile_models(&short_names);
+            let _ = Self::make_runner(root.clone(), binary).compile_models(&short_names);
         }
+        self.cached_column_lineage(root, model_ids, project_name, nodes)
+    }
 
-        // Read compiled SQL
-        let compiled_sqls = runner.find_all_compiled_sql(&project_name, &short_names);
+    /// Column lineage from cached `target/compiled` SQL; never runs dbt.
+    pub fn cached_column_lineage(
+        &self,
+        root: PathBuf,
+        model_ids: Vec<String>,
+        project_name: String,
+        nodes: &[ScannedNode],
+    ) -> Result<ColumnLineageGraph, ColumnLineageError> {
+        let short_names = Self::model_short_names(&model_ids);
+        let compiled_sqls =
+            DbtCliRunner::new(root).find_all_compiled_sql(&project_name, &short_names);
 
-        // Build model dependencies and source columns from ScannedNodes
         let model_deps: Vec<(String, Vec<String>)> = nodes
             .iter()
             .filter(|n| model_ids.contains(&n.unique_id))
@@ -251,13 +248,28 @@ impl DbtEngine {
 
         let source_columns: std::collections::HashMap<String, Vec<String>> = nodes
             .iter()
-            .filter(|n| n.kind == "source")
+            .filter(|n| n.kind == constants::SOURCE_KIND)
             .map(|n| (n.unique_id.clone(), n.columns.iter().map(|c| c.name.clone()).collect()))
             .collect();
 
-        // Extract column lineage
         let mut extractor = ColumnLineageExtractor::new();
         Ok(extractor.extract(&compiled_sqls, &model_deps, &source_columns))
+    }
+
+    /// Short names of the model ids; sources have no compiled SQL and are dropped.
+    fn model_short_names(model_ids: &[String]) -> Vec<String> {
+        model_ids
+            .iter()
+            .filter(|id| !id.starts_with(constants::SOURCE_ID_PREFIX))
+            .map(|id| id.rsplit('.').next().unwrap_or(id).to_string())
+            .collect()
+    }
+
+    /// The model's SQL from the last `dbt compile`, when one was cached.
+    pub fn compiled_sql(&self, root: PathBuf, project_name: &str, model: &str) -> Option<String> {
+        DbtCliRunner::new(root)
+            .find_all_compiled_sql(project_name, &[model.to_owned()])
+            .remove(model)
     }
 
     pub fn docs_generate(
@@ -404,6 +416,30 @@ impl DbtEngine {
 
     /// Read + parse `run_results.json` (written after every `dbt run`/`test`/
     /// `build`), returning per-node status/timing. Used by the test-results pane.
+    /// Where `dbt run` writes `run_results.json`, honoring `target-path`.
+    pub fn run_results_file(&self, root: &Path) -> PathBuf {
+        let target = Self::resolve_target_path(root)
+            .unwrap_or_else(|_| constants::DEFAULT_TARGET_DIR.into());
+        root.join(target).join(constants::RUN_RESULTS_FILE)
+    }
+
+    /// Status counts of one run; `failed` holds the error and fail node ids.
+    pub fn run_summary(&self, results: &DbtRunResults) -> ToolRunSummary {
+        let mut summary = ToolRunSummary::default();
+        for node in &results.results {
+            match node.status.as_str() {
+                constants::STATUS_SUCCESS | constants::STATUS_PASS => summary.success += 1,
+                constants::STATUS_SKIPPED => summary.skipped += 1,
+                constants::STATUS_WARN => summary.warn += 1,
+                _ => {
+                    summary.error += 1;
+                    summary.failed.push(node.unique_id.clone());
+                }
+            }
+        }
+        summary
+    }
+
     pub fn load_run_results(&self, root: PathBuf) -> Result<DbtRunResults, DbtRunResultsError> {
         let target_rel = Self::resolve_target_path(&root).map_err(|e| match e {
             DbtDocsError::Io(io) => DbtRunResultsError::Io(io),
@@ -623,12 +659,14 @@ impl DbtEngine {
                 connection_id,
                 connection,
                 project,
-                sql,
-                Vec::new(),
-                None,
-                None,
-                None,
-                None,
+                QueryRequest {
+                    sql: sql,
+                    params: Vec::new(),
+                    language: None,
+                    page_size: None,
+                    page: None,
+                    query_id: None,
+                },
             )
             .await
             .map_err(|e| SlimDiffError::Query(e.to_string()))
@@ -1770,6 +1808,21 @@ config:
         );
         write_file(&dir.path().join("target").join("run_results.json"), RUN_RESULTS_FIXTURE);
         dir
+    }
+
+    #[test]
+    fn run_summary_counts_statuses_and_lists_failures() {
+        let dir = run_results_project();
+        let e = engine();
+        assert_eq!(
+            e.run_results_file(dir.path()),
+            dir.path().join("target").join("run_results.json")
+        );
+        let rr = e.load_run_results(dir.path().to_path_buf()).unwrap();
+        let summary = e.run_summary(&rr);
+        assert_eq!((summary.success, summary.error, summary.skipped, summary.warn), (2, 2, 0, 0));
+        assert_eq!(summary.failed.len(), 2);
+        assert!(summary.failed.contains(&"model.jaffle_shop.broken_model".to_string()));
     }
 
     #[test]

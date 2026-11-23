@@ -1,5 +1,4 @@
 import type { EditorTab } from "../types";
-import { useAgentStore } from "@domains/agent/hooks";
 import { useTabsStore } from "../hooks/tabsStore";
 import { useFilesStore } from "@domains/files/hooks";
 import { useGitStore } from "@domains/git/hooks";
@@ -13,15 +12,15 @@ import {
   readTextFileIPC,
 } from "../ipc";
 import { isSelfWrite } from "./selfWrites";
+import { TRANSIENT_TAB_TYPES } from "../constants";
 
 function toPersisted(tabs: EditorTab[]): PersistedTab[] {
-  // The "Uncommitted Changes" git-diff tab is transient: never restore it on
-  // launch; it's reopened on demand from the Git rail.
+  // Transient tabs reopen on demand (Git rail, analytics links, Show Definition).
   // NOTE: terminal tabs MUST stay persisted here. The pane layout references
   // tab ids; dropping terminals would make reconcileLayout prune their leaves
   // and silently lose the split on restart.
   return tabs
-    .filter((t) => t.tabType !== "gitdiff")
+    .filter((t) => !TRANSIENT_TAB_TYPES.has(t.tabType ?? ""))
     .map(({ id, title, text, kind, connectionId, cursor, scrollAnchor, tabType, filePath, tableRef, tableEditable, closed, createdAt, chart }) => ({
     id,
     title,
@@ -107,10 +106,6 @@ async function refreshFileTabFromDisk(tab: EditorTab): Promise<void> {
   } catch {
     // File may have been deleted externally.
   }
-}
-
-function hydrateFrontendStores(): void {
-  useAgentStore.getState().checkAgent().catch(() => {});
 }
 
 async function reopenLastProjectIfNeeded(): Promise<void> {
@@ -220,7 +215,6 @@ export {
   FONT_SIZE_STEP,
   clampFontSize,
   handleDroppedPath,
-  hydrateFrontendStores,
   isRunnableQueryKind,
   kindForConnection,
   nextFontSize,

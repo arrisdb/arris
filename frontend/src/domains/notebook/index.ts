@@ -13,6 +13,7 @@ const NotebookView = lazy(() =>
 function registerNotebookSection(): void {
   registerPane({
     id: "notebooks",
+    nativeOnly: true,
     side: "left",
     kind: "section",
     priority: 10,

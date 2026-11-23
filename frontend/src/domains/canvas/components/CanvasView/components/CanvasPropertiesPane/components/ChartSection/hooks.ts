@@ -16,13 +16,13 @@ import type { ChartComponent } from "../../../../../../types";
 /// write, so there is a single visible title and `spec.title` stays empty (the
 /// chart itself draws no second heading inside its body).
 function useCanvasChartEditor(
-  tabId: string,
+  boardId: string,
   component: ChartComponent,
   onChange: (patch: Partial<ChartComponent>) => void,
 ): ChartEditorPanelViewModel {
   const result = useCanvasStore((s) =>
     component.sourceQueryId
-      ? s.boards[tabId]?.runs[component.sourceQueryId]?.result
+      ? s.boards[boardId]?.runs[component.sourceQueryId]?.result
       : undefined,
   );
   const columns = useMemo(

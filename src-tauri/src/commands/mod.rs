@@ -1,7 +1,8 @@
-mod agent;
+mod arris_server;
 mod canvas;
+mod canvas_records;
 mod connection;
-mod constants;
+pub(crate) mod constants;
 mod dbt;
 mod federation;
 mod file;
@@ -14,8 +15,9 @@ mod search;
 mod sqlmesh;
 mod terminal;
 
-pub use agent::*;
+pub use arris_server::*;
 pub use canvas::*;
+pub use canvas_records::*;
 pub use connection::*;
 pub use dbt::*;
 pub use federation::*;

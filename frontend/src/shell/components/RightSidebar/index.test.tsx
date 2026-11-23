@@ -10,19 +10,14 @@ vi.mock("@domains/chart/components/ChartEditorPanel", () => ({
 vi.mock("@domains/pinnedQueries/components/PinnedQueriesPane", () => ({
   PinnedQueriesPane: () => <div data-testid="pinned-queries" />,
 }));
-vi.mock("@domains/agent/components/AgentPane", () => ({
-  AgentPane: () => <div data-testid="agent-pane" />,
-}));
 import { usePinnedQueriesStore } from "@domains/pinnedQueries/hooks";
 
 import { RightSidebar } from ".";
 import { useTabsStore } from "../../hooks/tabsStore";
 import { useChartEditorStore } from "@domains/chart/hooks";
-import { useAgentStore } from "@domains/agent/hooks";
 beforeEach(() => {
   useTabsStore.setState({ tabs: [], activeId: null, layout: null, focusedPaneGroupId: null });
   useChartEditorStore.setState({ targetTabId: null });
-  useAgentStore.setState({ paneOpen: false });
   usePinnedQueriesStore.setState({ paneOpen: false });
 });
 
@@ -53,14 +48,6 @@ describe("RightSidebar (registry-driven)", () => {
     useChartEditorStore.setState({ targetTabId: "t1" });
     render(<RightSidebar />);
     expect(screen.getByTestId("connections-tree")).toBeTruthy();
-  });
-
-  it("prioritizes the agent pane over every other right pane when open", () => {
-    useAgentStore.setState({ paneOpen: true });
-    usePinnedQueriesStore.setState({ paneOpen: true });
-    render(<RightSidebar />);
-    expect(screen.getByTestId("agent-pane")).toBeTruthy();
-    expect(screen.queryByTestId("pinned-queries")).toBeNull();
   });
 
   it("renders pinned queries over the connections default when open", () => {

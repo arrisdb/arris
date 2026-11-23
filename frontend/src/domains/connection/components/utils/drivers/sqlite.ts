@@ -1,5 +1,6 @@
+import type { SchemaNode, TableRef } from "../../CombinedConnectionsTree/types";
 import type { SchemaGrouping } from "./types";
-import { defaultTableRefFromNode, makeExtractSchemaNames, makeGroupSchemaTree } from "./defaults";
+import { makeExtractSchemaNames, makeGroupSchemaTree } from "./defaults";
 import type { ConnectionDriver } from "./types";
 
 const schemaGrouping: SchemaGrouping = [
@@ -8,6 +9,11 @@ const schemaGrouping: SchemaGrouping = [
   { label: "Indexes", kinds: ["index"] },
   { label: "Triggers", kinds: ["trigger"] },
 ];
+
+// The tree's database level is the file name, but SQLite only knows it as `main`.
+function sqliteTableRefFromNode(node: SchemaNode): TableRef {
+  return { name: node.name };
+}
 
 export const sqliteDriver: ConnectionDriver = {
   kind: "sqlite",
@@ -20,7 +26,7 @@ export const sqliteDriver: ConnectionDriver = {
   hideDetailKinds: new Set(["database", "schema", "group", "table", "view"]),
   defaultPort: undefined,
   uriScheme: "sqlite",
-  tableRefFromNode: defaultTableRefFromNode,
+  tableRefFromNode: sqliteTableRefFromNode,
   extractSchemaNames: makeExtractSchemaNames(true),
   groupSchemaTree: makeGroupSchemaTree(true, schemaGrouping),
 };

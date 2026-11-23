@@ -24,7 +24,7 @@ import { ChartNode } from "./index";
 const TAB = "tab-1";
 
 const nodeProps = (id: string) =>
-  ({ id, data: { tabId: TAB }, selected: false }) as unknown as NodeProps<CanvasNodeData>;
+  ({ id, data: { boardId: TAB }, selected: false }) as unknown as NodeProps<CanvasNodeData>;
 
 describe("ChartNode", () => {
   beforeEach(() => {
@@ -33,7 +33,7 @@ describe("ChartNode", () => {
   });
 
   it("renders the chart view for its bound source", () => {
-    useCanvasStore.getState().ensureBoard(TAB, "");
+    useCanvasStore.getState().loadBoard(TAB, { version: 1, components: [], edges: [] }, 0);
     useCanvasStore.getState().addComponent(
       TAB,
       makeComponent({
@@ -53,7 +53,7 @@ describe("ChartNode", () => {
   });
 
   it("aggregates over the source cell's full cached result, not the page", async () => {
-    useCanvasStore.getState().ensureBoard(TAB, "");
+    useCanvasStore.getState().loadBoard(TAB, { version: 1, components: [], edges: [] }, 0);
     useCanvasStore
       .getState()
       .addComponent(TAB, makeComponent({ kind: "query", id: "q", title: "Sales" }));
@@ -91,7 +91,7 @@ describe("ChartNode", () => {
   });
 
   it("charts a source query that has no title", async () => {
-    useCanvasStore.getState().ensureBoard(TAB, "");
+    useCanvasStore.getState().loadBoard(TAB, { version: 1, components: [], edges: [] }, 0);
     useCanvasStore.getState().addComponent(TAB, makeComponent({ kind: "query", id: "q" }));
     useCanvasStore.getState().addComponent(
       TAB,
@@ -123,7 +123,7 @@ describe("ChartNode", () => {
   });
 
   it("drops a stale axis column the source no longer has instead of querying it", async () => {
-    useCanvasStore.getState().ensureBoard(TAB, "");
+    useCanvasStore.getState().loadBoard(TAB, { version: 1, components: [], edges: [] }, 0);
     useCanvasStore
       .getState()
       .addComponent(TAB, makeComponent({ kind: "query", id: "q", title: "Sales" }));
@@ -164,7 +164,7 @@ describe("ChartNode", () => {
   });
 
   it("defaults the top-bar title to the bound query's name", () => {
-    useCanvasStore.getState().ensureBoard(TAB, "");
+    useCanvasStore.getState().loadBoard(TAB, { version: 1, components: [], edges: [] }, 0);
     useCanvasStore
       .getState()
       .addComponent(TAB, makeComponent({ kind: "query", id: "q", title: "Sales" }));
@@ -186,7 +186,7 @@ describe("ChartNode", () => {
   });
 
   it("shows the source run error in the bottom status bar", () => {
-    useCanvasStore.getState().ensureBoard(TAB, "");
+    useCanvasStore.getState().loadBoard(TAB, { version: 1, components: [], edges: [] }, 0);
     useCanvasStore
       .getState()
       .addComponent(TAB, makeComponent({ kind: "query", id: "q", title: "Sales" }));
@@ -211,7 +211,7 @@ describe("ChartNode", () => {
   });
 
   it("shows a sample-size and refresh status once the source has run", async () => {
-    useCanvasStore.getState().ensureBoard(TAB, "");
+    useCanvasStore.getState().loadBoard(TAB, { version: 1, components: [], edges: [] }, 0);
     useCanvasStore
       .getState()
       .addComponent(TAB, makeComponent({ kind: "query", id: "q", title: "Sales" }));
@@ -241,7 +241,7 @@ describe("ChartNode", () => {
   });
 
   it("waits for the source's full result to settle before querying the cache", async () => {
-    useCanvasStore.getState().ensureBoard(TAB, "");
+    useCanvasStore.getState().loadBoard(TAB, { version: 1, components: [], edges: [] }, 0);
     useCanvasStore
       .getState()
       .addComponent(TAB, makeComponent({ kind: "query", id: "q", title: "Sales" }));
@@ -280,7 +280,7 @@ describe("ChartNode", () => {
   });
 
   it("re-runs the bound source query when the refresh button is clicked", () => {
-    useCanvasStore.getState().ensureBoard(TAB, "");
+    useCanvasStore.getState().loadBoard(TAB, { version: 1, components: [], edges: [] }, 0);
     useCanvasStore
       .getState()
       .addComponent(TAB, makeComponent({ kind: "query", id: "q", title: "Sales" }));
@@ -307,7 +307,7 @@ describe("ChartNode", () => {
   });
 
   it("does not query when the source has not produced a result", () => {
-    useCanvasStore.getState().ensureBoard(TAB, "");
+    useCanvasStore.getState().loadBoard(TAB, { version: 1, components: [], edges: [] }, 0);
     useCanvasStore
       .getState()
       .addComponent(TAB, makeComponent({ kind: "query", id: "q", title: "Sales" }));

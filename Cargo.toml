@@ -2,11 +2,12 @@
 resolver = "3"
 members = [
     "crates/arris-engines",
+    "crates/arris-cli",
 ]
 exclude = ["src-tauri", ".claude"]
 
 [workspace.package]
-version = "0.15.0"
+version = "0.16.0"
 edition = "2024"
 rust-version = "1.92"
 license = "AGPL-3.0-only"
@@ -36,3 +37,10 @@ opt-level = 3
 lto = "thin"
 codegen-units = 1
 strip = "symbols"
+
+# Local `make install-skill-dev`: optimized but incremental, no LTO, all cores.
+[profile.dev-install]
+inherits = "release"
+lto = false
+codegen-units = 16
+incremental = true

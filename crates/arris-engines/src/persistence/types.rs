@@ -1,9 +1,13 @@
 use std::collections::HashMap;
+use std::path::PathBuf;
 
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 use crate::TableRef;
 use crate::connection::ScopedConnection;
+use crate::drivers::types::{ColumnSpec, QueryValue};
 
 #[derive(Copy, Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -427,4 +431,112 @@ pub struct ProjectOpenResult {
     pub tabs: Vec<PersistedConsoleTab>,
     pub federation_tabs: Vec<PersistedFederationTab>,
     pub pane_layout: PersistedPaneLayout,
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum RunSource {
+    Cli,
+    Ui,
+    Canvas,
+    Dbt,
+    Sqlmesh,
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum RunStatus {
+    Running,
+    Success,
+    Error,
+    Cancelled,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RunPreview {
+    pub columns: Vec<ColumnSpec>,
+    pub rows: Vec<Vec<QueryValue>>,
+    pub truncated: bool,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RunRecord {
+    pub id: String,
+    pub connection_id: Uuid,
+    pub sql: String,
+    pub source: RunSource,
+    pub started_at: DateTime<Utc>,
+    pub finished_at: Option<DateTime<Utc>>,
+    pub status: RunStatus,
+    pub row_count: Option<u64>,
+    pub error: Option<String>,
+    pub preview: Option<RunPreview>,
+}
+
+/// One saved canvas; `doc` is the frontend-owned board JSON.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasRecord {
+    pub id: String,
+    pub title: String,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+    pub revision: u64,
+    pub doc: serde_json::Value,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasSummary {
+    pub id: String,
+    pub title: String,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+    pub revision: u64,
+    pub component_count: usize,
+}
+
+/// Written to each project's data dir so `list_projects` can map keys back to roots.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectManifest {
+    pub root: PathBuf,
+    pub key: String,
+}
+
+/// Native analytics tool whose commands `arris <tool> cli` runs and logs.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ToolKind {
+    Dbt,
+    Sqlmesh,
+}
+
+/// Node status counts from dbt's `run_results.json`; `failed` lists error node ids.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct ToolRunSummary {
+    pub success: u32,
+    pub error: u32,
+    pub skipped: u32,
+    pub warn: u32,
+    pub failed: Vec<String>,
+}
+
+/// One logged `arris <tool> cli` run; `output_tail` keeps the end of combined output.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ToolRunRecord {
+    #[serde(default)]
+    pub id: String,
+    pub tool: ToolKind,
+    pub args: Vec<String>,
+    pub dir: String,
+    pub started_at: DateTime<Utc>,
+    pub finished_at: Option<DateTime<Utc>>,
+    pub exit_code: Option<i32>,
+    #[serde(default)]
+    pub output_tail: String,
+    pub summary: Option<ToolRunSummary>,
 }

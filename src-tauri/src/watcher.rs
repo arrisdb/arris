@@ -13,7 +13,7 @@ use std::time::Duration;
 use notify_debouncer_full::notify::{
     Config, RecommendedWatcher, RecursiveMode, Result as NotifyResult,
 };
-use notify_debouncer_full::{new_debouncer_opt, DebounceEventResult, Debouncer, NoCache};
+use notify_debouncer_full::{DebounceEventResult, Debouncer, NoCache, new_debouncer_opt};
 
 /// Coalesce bursts of filesystem events (an editor save or a git operation
 /// touches many files at once) into a single notification.
@@ -31,11 +31,8 @@ const IGNORED_DIRS: [&str; 2] = [".git", ".arris"];
 
 /// Whether a path lives inside one of the `IGNORED_DIRS`.
 fn is_internal_churn(path: &Path) -> bool {
-    path.components().any(|component| {
-        IGNORED_DIRS
-            .iter()
-            .any(|dir| component.as_os_str() == *dir)
-    })
+    path.components()
+        .any(|component| IGNORED_DIRS.iter().any(|dir| component.as_os_str() == *dir))
 }
 
 /// Managed Tauri state holding the debouncer for the currently open project.
@@ -92,8 +89,8 @@ impl ProjectWatcher {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::Arc;
+    use std::sync::atomic::{AtomicUsize, Ordering};
     use std::time::Instant;
 
     fn unique_dir(tag: &str) -> std::path::PathBuf {
@@ -141,7 +138,9 @@ mod tests {
         assert!(is_internal_churn(Path::new("/repo/.git/index")));
         assert!(is_internal_churn(Path::new("/repo/.git/refs/heads/main")));
         assert!(is_internal_churn(Path::new("/repo/.git/objects/ab/cdef")));
-        assert!(is_internal_churn(Path::new("/repo/.arris/console_tabs.json")));
+        assert!(is_internal_churn(Path::new(
+            "/repo/.arris/console_tabs.json"
+        )));
         assert!(is_internal_churn(Path::new("/repo/.arris/files/abc.sql")));
         assert!(!is_internal_churn(Path::new("/repo/src/main.rs")));
         assert!(!is_internal_churn(Path::new("/repo/Cargo.toml")));

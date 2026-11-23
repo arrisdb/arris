@@ -252,6 +252,43 @@ pub struct ScopedConnection {
     pub is_connected: bool,
 }
 
+impl ScopedConnection {
+    /// Clears secrets so the connection is safe to hand to a browser client.
+    pub fn scrubbed(mut self) -> Self {
+        self.config.password.clear();
+        self.config.ssh_password = None;
+        self
+    }
+}
+
+// ── ConnectionPrefill ───────────────────────────────────────────────────────
+
+/// Non-secret connection fields read from a dbt profile or sqlmesh gateway.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ConnectionPrefill {
+    pub name: String,
+    pub kind: DatabaseKind,
+    pub fields: ConnectionConfig,
+}
+
+/// Where a profile or gateway key lands in a [`ConnectionConfig`].
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub enum PrefillField {
+    Host,
+    Port,
+    Database,
+    User,
+    FilePath,
+    CredentialsFile,
+    Location,
+    /// One `key=value` pair of the `options` string.
+    Option(&'static str),
+}
+
+/// Profile or gateway keys and the field each one fills, in alias priority order.
+pub type PrefillKeys = &'static [(&'static str, PrefillField)];
+
 // ── Tests ───────────────────────────────────────────────────────────────────
 
 #[cfg(test)]

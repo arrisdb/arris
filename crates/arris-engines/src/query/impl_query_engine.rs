@@ -5,7 +5,7 @@ use uuid::Uuid;
 
 use crate::connection::ConnectionEngine;
 use crate::persistence::ProjectState;
-use crate::{DatabaseDriver, PaginationStrategy};
+use crate::{DatabaseDriver, PaginationStrategy, TransactionConfig};
 use crate::{
     DatabaseKind, DriverError, ExplainMode, MutationResult, ObjectRef, PlanResult, QueryLanguage,
     QueryResult, QueryStream, QueryValue, SchemaNode, StatementType, TableMutationBatch, TableRef,
@@ -32,6 +32,14 @@ impl QueryEngine {
         project: Option<&ProjectState>,
     ) -> Result<Vec<SchemaNode>, QueryError> {
         let driver = connection.driver_for(connection_id, project).await?;
+        self.list_schemas_on(driver).await
+    }
+
+    /// Lists schemas on an already-opened driver, so callers need not hold project state.
+    pub async fn list_schemas_on(
+        &self,
+        driver: Arc<dyn DatabaseDriver>,
+    ) -> Result<Vec<SchemaNode>, QueryError> {
         Ok(driver.list_schemas().await?)
     }
 
@@ -43,6 +51,15 @@ impl QueryEngine {
         schema: &str,
     ) -> Result<Vec<SchemaNode>, QueryError> {
         let driver = connection.driver_for(connection_id, project).await?;
+        self.list_schema_on(driver, schema).await
+    }
+
+    /// Lists one schema's children on an already-opened driver.
+    pub async fn list_schema_on(
+        &self,
+        driver: Arc<dyn DatabaseDriver>,
+        schema: &str,
+    ) -> Result<Vec<SchemaNode>, QueryError> {
         Ok(driver.list_schema(schema).await?)
     }
 
@@ -51,38 +68,25 @@ impl QueryEngine {
         connection_id: Uuid,
         connection: &ConnectionEngine,
         project: Option<&ProjectState>,
-        sql: String,
-        params: Vec<QueryValue>,
-        language: Option<QueryLanguage>,
-        page_size: Option<u32>,
-        page: Option<u32>,
-        query_id: Option<String>,
+        req: QueryRequest,
     ) -> Result<QueryResult, QueryError> {
         let driver = connection.driver_for(connection_id, project).await?;
+        let tx = connection.transaction_config(connection_id).await;
+        self.run_query_on(driver, tx, req).await
+    }
+
+    /// Runs on an already-resolved driver under the connection's `tx` settings.
+    pub async fn run_query_on(
+        &self,
+        driver: Arc<dyn DatabaseDriver>,
+        tx: TransactionConfig,
+        req: QueryRequest,
+    ) -> Result<QueryResult, QueryError> {
+        let QueryRequest { sql, params, language, page_size, page, query_id } = req;
         let lang = language.unwrap_or_default();
         let sql = Self::trim_trailing_sql_semicolon(&sql);
-
-        // In manual mode, lazily open a transaction on the first statement so
-        // subsequent statements join it until an explicit commit/rollback.
-        let txcfg = connection.transaction_config(connection_id).await;
-        if matches!(txcfg.mode, crate::TransactionMode::Manual)
-            && driver.supports_transactions()
-            && !driver.in_transaction().await
-        {
-            driver.begin_transaction(txcfg.isolation).await?;
-        }
-
-        let cancel_token = query_id.as_ref().map(|qid| {
-            let token = CancellationToken::new();
-            self.running_queries.insert(
-                qid.clone(),
-                RunningQuery {
-                    cancel_token: token.clone(),
-                    driver: Some(driver.clone()),
-                },
-            );
-            token
-        });
+        Self::begin_manual_transaction(&driver, tx).await?;
+        let cancel_token = self.register_running(query_id.as_deref(), &driver);
 
         let result =
             Self::run_query_inner(&driver, sql, &params, lang, page_size, page, cancel_token.as_ref())
@@ -110,31 +114,27 @@ impl QueryEngine {
         query_id: Option<String>,
     ) -> Result<(QueryStream, Option<CancellationToken>, Option<u64>), QueryError> {
         let driver = connection.driver_for(connection_id, project).await?;
+        let tx = connection.transaction_config(connection_id).await;
+        self.run_query_stream_on(driver, tx, sql, limit, language, query_id).await
+    }
+
+    /// Streamed query on a resolved driver; same contract as `run_query_stream`.
+    pub async fn run_query_stream_on(
+        &self,
+        driver: Arc<dyn DatabaseDriver>,
+        tx: TransactionConfig,
+        sql: String,
+        limit: Option<u64>,
+        language: Option<QueryLanguage>,
+        query_id: Option<String>,
+    ) -> Result<(QueryStream, Option<CancellationToken>, Option<u64>), QueryError> {
         let lang = language.unwrap_or_default();
         let trimmed = Self::trim_trailing_sql_semicolon(&sql);
         // Apply the per-cell LIMIT: wrap the SQL for dialects that support it,
         // otherwise fall back to an ingest row cap the caller enforces.
         let (sql, row_cap) = Self::apply_cell_limit(trimmed, &driver.pagination_strategy(), limit);
-
-        let txcfg = connection.transaction_config(connection_id).await;
-        if matches!(txcfg.mode, crate::TransactionMode::Manual)
-            && driver.supports_transactions()
-            && !driver.in_transaction().await
-        {
-            driver.begin_transaction(txcfg.isolation).await?;
-        }
-
-        let cancel_token = query_id.as_ref().map(|qid| {
-            let token = CancellationToken::new();
-            self.running_queries.insert(
-                qid.clone(),
-                RunningQuery {
-                    cancel_token: token.clone(),
-                    driver: Some(driver.clone()),
-                },
-            );
-            token
-        });
+        Self::begin_manual_transaction(&driver, tx).await?;
+        let cancel_token = self.register_running(query_id.as_deref(), &driver);
 
         let opened = match cancel_token.as_ref() {
             Some(token) => {
@@ -157,6 +157,40 @@ impl QueryEngine {
                 Err(e.into())
             }
         }
+    }
+
+    /// In manual mode, lazily open a transaction on the first statement so
+    /// subsequent statements join it until an explicit commit/rollback.
+    async fn begin_manual_transaction(
+        driver: &Arc<dyn DatabaseDriver>,
+        tx: TransactionConfig,
+    ) -> Result<(), QueryError> {
+        if matches!(tx.mode, crate::TransactionMode::Manual)
+            && driver.supports_transactions()
+            && !driver.in_transaction().await
+        {
+            driver.begin_transaction(tx.isolation).await?;
+        }
+        Ok(())
+    }
+
+    /// Registers `query_id` (token + driver kill) so `cancel_query` can stop it.
+    fn register_running(
+        &self,
+        query_id: Option<&str>,
+        driver: &Arc<dyn DatabaseDriver>,
+    ) -> Option<CancellationToken> {
+        query_id.map(|qid| {
+            let token = CancellationToken::new();
+            self.running_queries.insert(
+                qid.to_owned(),
+                RunningQuery {
+                    cancel_token: token.clone(),
+                    driver: Some(driver.clone()),
+                },
+            );
+            token
+        })
     }
 
     pub async fn cancel_query(&self, query_id: String) -> Result<(), QueryError> {
@@ -570,12 +604,14 @@ mod tests {
                 id,
                 &conn,
                 None,
-                "SELECT 7 AS n".into(),
-                vec![],
-                None,
-                None,
-                None,
-                None,
+                QueryRequest {
+                    sql: "SELECT 7 AS n".into(),
+                    params: vec![],
+                    language: None,
+                    page_size: None,
+                    page: None,
+                    query_id: None,
+                },
             )
             .await
             .unwrap();
@@ -591,12 +627,14 @@ mod tests {
                 id,
                 &conn,
                 None,
-                "SELECT 7 AS n;".into(),
-                vec![],
-                None,
-                Some(10),
-                Some(0),
-                None,
+                QueryRequest {
+                    sql: "SELECT 7 AS n;".into(),
+                    params: vec![],
+                    language: None,
+                    page_size: Some(10),
+                    page: Some(0),
+                    query_id: None,
+                },
             )
             .await
             .unwrap();
@@ -666,12 +704,14 @@ mod tests {
                 id,
                 &conn,
                 None,
-                "SELECT ';' AS semi;".into(),
-                vec![],
-                None,
-                None,
-                None,
-                None,
+                QueryRequest {
+                    sql: "SELECT ';' AS semi;".into(),
+                    params: vec![],
+                    language: None,
+                    page_size: None,
+                    page: None,
+                    query_id: None,
+                },
             )
             .await
             .unwrap();
@@ -688,12 +728,14 @@ mod tests {
                 id,
                 &conn,
                 None,
-                "CREATE TABLE t (id INTEGER PRIMARY KEY, name TEXT)".into(),
-                vec![],
-                None,
-                None,
-                None,
-                None,
+                QueryRequest {
+                    sql: "CREATE TABLE t (id INTEGER PRIMARY KEY, name TEXT)".into(),
+                    params: vec![],
+                    language: None,
+                    page_size: None,
+                    page: None,
+                    query_id: None,
+                },
             )
             .await
             .unwrap();
@@ -703,28 +745,14 @@ mod tests {
                 id,
                 &conn,
                 None,
-                "INSERT INTO t VALUES (1, 'alice')".into(),
-                vec![],
-                None,
-                None,
-                None,
-                None,
-            )
-            .await
-            .unwrap();
-        assert_eq!(r.statement_type, StatementType::Mutation);
-
-        let r = engine
-            .run_query(
-                id,
-                &conn,
-                None,
-                "UPDATE t SET name = 'bob' WHERE id = 1".into(),
-                vec![],
-                None,
-                None,
-                None,
-                None,
+                QueryRequest {
+                    sql: "INSERT INTO t VALUES (1, 'alice')".into(),
+                    params: vec![],
+                    language: None,
+                    page_size: None,
+                    page: None,
+                    query_id: None,
+                },
             )
             .await
             .unwrap();
@@ -735,12 +763,32 @@ mod tests {
                 id,
                 &conn,
                 None,
-                "DELETE FROM t WHERE id = 1".into(),
-                vec![],
+                QueryRequest {
+                    sql: "UPDATE t SET name = 'bob' WHERE id = 1".into(),
+                    params: vec![],
+                    language: None,
+                    page_size: None,
+                    page: None,
+                    query_id: None,
+                },
+            )
+            .await
+            .unwrap();
+        assert_eq!(r.statement_type, StatementType::Mutation);
+
+        let r = engine
+            .run_query(
+                id,
+                &conn,
                 None,
-                None,
-                None,
-                None,
+                QueryRequest {
+                    sql: "DELETE FROM t WHERE id = 1".into(),
+                    params: vec![],
+                    language: None,
+                    page_size: None,
+                    page: None,
+                    query_id: None,
+                },
             )
             .await
             .unwrap();
@@ -756,12 +804,14 @@ mod tests {
                 id,
                 &conn,
                 None,
-                "SELECT 1 AS n".into(),
-                vec![],
-                None,
-                None,
-                None,
-                None,
+                QueryRequest {
+                    sql: "SELECT 1 AS n".into(),
+                    params: vec![],
+                    language: None,
+                    page_size: None,
+                    page: None,
+                    query_id: None,
+                },
             )
             .await
             .unwrap();
@@ -836,7 +886,7 @@ mod tests {
     async fn engine_with_mock_secrets(dir: &std::path::Path) -> ConnectionEngine {
         ConnectionEngine::new_with_secrets(
             dir.to_path_buf(),
-            std::sync::Arc::new(crate::persistence::MockSecretStore::new()),
+            std::sync::Arc::new(crate::persistence::MemorySecretStore::new()),
         )
         .await
     }

@@ -1,0 +1,25 @@
+.mdbc-analytics-nav {
+  gap: 4px;
+}
+
+.mdbc-analytics-nav .mdbc-pane-title {
+  margin-right: 12px;
+}
+
+.mdbc-analytics-nav-tab {
+  padding: 3px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--m-fg-2);
+  font: inherit;
+  font-size: var(--m-fs-sm);
+  cursor: pointer;
+}
+.mdbc-analytics-nav-tab:hover {
+  background: rgb(var(--m-overlay-rgb) / 0.05);
+}
+.mdbc-analytics-nav-tab[aria-current="page"] {
+  background: rgb(var(--m-overlay-rgb) / 0.08);
+  color: var(--m-fg-1);
+}

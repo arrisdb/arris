@@ -9,12 +9,12 @@ import Screenshot from "../../components/docs/Screenshot/Screenshot.astro";
   title="Canvas - Arris Docs"
   breadcrumbs={[{ label: "Docs", href: "/" }, { label: "Canvas" }]}
   heading="Canvas"
-  lede="An infinite board that holds an analysis as connected objects: SQL queries that run, charts bound to their results, and the notes that frame them. Assemble it through an AI agent that works from your schema, or build each object by hand."
+  lede="An infinite board that holds an analysis as connected objects: SQL queries that run, charts bound to their results, and the notes that frame them. Build each object by hand, or ask a coding agent to assemble it."
   tocItems={[
     { label: "Why use it", href: "#why" },
     { label: "Open a canvas", href: "#open" },
     { label: "Connections", href: "#connections" },
-    { label: "Build with the agent", href: "#agent" },
+    { label: "Build with a coding agent", href: "#coding-agents" },
     { label: "Build it by hand", href: "#manual" },
     { label: "Object kinds", href: "#objects" },
     { label: "The properties pane", href: "#properties" },
@@ -34,10 +34,10 @@ import Screenshot from "../../components/docs/Screenshot/Screenshot.astro";
   </p>
 
   <ul>
-    <li><strong>Go from a question to a chart fast.</strong> Type "monthly sales by category" and the agent writes the query, builds the chart, and runs both.</li>
+    <li><strong>Go from a question to a chart fast.</strong> Ask Claude Code or Codex for "monthly sales by category" and it writes the query, adds the chart, and both run on the board.</li>
     <li><strong>Assemble a dashboard-style view.</strong> Several queries, charts, and tables laid out together and refreshed on demand.</li>
     <li><strong>Explore step by step.</strong> Chain one query off another's results, branch into variants, and annotate as you go.</li>
-    <li><strong>Work across databases.</strong> Put a query on each connection and have the agent reference them together.</li>
+    <li><strong>Work across databases.</strong> Give each query cell its own connection and combine their results with <code>FROM &lt;cell title&gt;</code>.</li>
   </ul>
 
   <h2 id="open">Open a canvas</h2>
@@ -55,122 +55,38 @@ import Screenshot from "../../components/docs/Screenshot/Screenshot.astro";
 
   <p>
     A canvas opens as an ordinary editor tab (not a separate window), auto-titled <code>Canvas 1</code>,
-    <code>Canvas 2</code>, and so on. The tab splits into a resizable <strong>agent chat</strong> pane on
-    the left and the board on the right. Rename a board by double-clicking its row in the sidebar
+    <code>Canvas 2</code>, and so on, with the board filling the tab. Rename a board by double-clicking its row in the sidebar
     Canvas list, or right-click the row and choose <strong>Rename</strong>.
   </p>
 
   <h2 id="connections">Connections</h2>
 
   <p>
-    A new board adopts whatever connection the editor currently has selected. To change or add to that,
-    use the <strong>Connection</strong> picker at the top of the agent pane. It is a
-    <strong>multi-select</strong>: add several databases and the agent reads every one's schema, so a
-    single board can mix sources. Picking a database that is not connected yet connects and loads it
-    automatically.
+    Every query cell stores its own connection, which you change in the properties pane, so one
+    board can mix databases. A new query cell uses the connection you last picked on the board, else
+    the newest query cell's, else the connection the editor had selected when the board opened.
   </p>
 
-  <Screenshot
-    src="/screenshots/canvas-connections.png"
-    alt="The Connection picker at the top of the agent pane, open as a checklist of databases (test_postgres, prod_mysql, prod_mongodb, prod_bigquery, and more) so several can be selected at once."
-    caption="The Connection picker is a multi-select: tick every database the board should use. The first one ticked becomes the board's primary connection."
-  />
+  <h2 id="coding-agents">Build with a coding agent</h2>
 
   <p>
-    The <strong>first</strong> connection in the set is the board's <strong>primary</strong>: it is the
-    default for query cells you add by hand. Every query cell also stores its own connection, which you
-    can change in the properties pane, so different cells on one board can run against different
-    databases. The connection set is saved with the board.
+    With a <a href="/ai/coding-agents">coding agent</a> (Claude Code or Codex), ask for a dashboard or for a result on a board,
+    for example <em>"put monthly sales by category on a canvas as a line chart"</em>. The agent runs the
+    query, then adds it to a new or existing board below its lowest object, with a chart bound to it
+    when you asked for one. The open Arris tab switches to the board, which runs its read queries and
+    draws the chart; a write waits for you to press Run.
   </p>
 
-  <h2 id="agent">Build with the agent</h2>
-
   <p>
-    The agent pane runs down the left of the board. Describe what you want, for example
-    <em>"monthly sales by category"</em>, and the agent reads your schema and replies with objects to
-    add: usually a query that aggregates the data, a chart bound to it, and a one-line summary. Arris
-    places them on the board, runs the query, and renders the chart from the result. A green check chip
-    under each reply summarizes exactly what changed ("Added / Updated / Removed ...").
-  </p>
-
-  <Screenshot
-    src="/screenshots/canvas-board.png"
-    alt="A canvas board with the agent pane on the left, two query cells, a preview table of monthly sales, a multi-series line chart bound to a query, and a sticky note. A dependency arrow connects the query to its chart."
-    caption="A board the agent built and refined turn by turn: a query and its preview table, a chart re-pointed to a filtered query, and a sticky-note annotation. The arrow shows the chart bound to its source query."
-  />
-
-  <h3>Sending a turn</h3>
-
-  <ul>
-    <li><strong>Pick the provider</strong> (<strong>Codex</strong> or <strong>Claude</strong>) in the chat header.</li>
-    <li><strong>You must have a connection selected.</strong> Without one the agent cannot write correct SQL, so it replies asking you to connect a database first.</li>
-    <li>Type your request and press <kbd>&#8984;&#8629;</kbd> to send. Replies stream in as markdown; a <strong>Stop</strong> control appears while the agent is working.</li>
-    <li>Each turn also sees the current board, so follow-ups <strong>refine it in place</strong> rather than only adding to it. Ask the agent to switch a chart to a line, set axis bounds, rewrite a query, retitle a cell, move a query to another connection, or remove objects you no longer want. It can add, modify, or remove any object kind. Any query it adds or changes runs automatically, and the charts and tables bound to that query update.</li>
-  </ul>
-
-  <h3>What the agent sees</h3>
-
-  <p>
-    While schemas load, the pane shows a <strong>Fetching schema &amp; table info</strong> spinner.
-    Expand the collapsible <strong>Context</strong> section to read the <em>exact</em> text handed to the
-    agent: the schema (one labeled block per connection, headed with the connection's name and dialect)
-    followed by a one-line-per-object summary of the board.
-  </p>
-
-  <Screenshot
-    src="/screenshots/canvas-context.png"
-    alt="The expanded Context section showing the schema sent to the agent: a heading, the connection labeled with its id and dialect, and the CREATE TABLE DDL for a customers table."
-    caption="The Context section reveals the exact text handed to the agent: the schema DDL per connection, then a summary of the board."
-  />
-
-  <p>
-    The agent runs the provider's CLI locally in read-only mode, with no database access and no file or
-    shell tools. By default it receives only your prompt, each connection's <strong>schema</strong> (as
-    DDL and dialect), and a short <strong>summary</strong> of the objects already on the board (their
-    kinds, ids, titles, and SQL). Your query results stay on your machine and never leave it unless you
-    explicitly share them: when a request needs the actual rows (for example, a written analysis of the
-    data), the agent asks for permission to access those results first, and you can deny. The schema is
-    size-capped, and a slow database is skipped after 15 seconds so a turn is never blocked.
-  </p>
-
-  <h3>Building on existing results</h3>
-
-  <p>
-    When the answer can come from a query already on the board, the agent does not re-query the
-    database. It writes a new query that selects <code>FROM</code> an existing cell (referenced by that
-    cell's title), which runs in an in-memory engine (Apache DataFusion). This is the same cell-chaining
-    you can write by hand. The agent falls back to a fresh database query only when no cell has the
-    columns or grain it needs.
-  </p>
-
-  <h3>Sharing results when the agent asks</h3>
-
-  <p>
-    Because the agent cannot see row data, it <strong>asks</strong> when it needs it. Instead of
-    changing the board, it posts a <strong>Share results with the agent?</strong> card listing the cells
-    it wants (each with its row and column count) and why. You choose:
-  </p>
-
-  <ul>
-    <li><strong>Share results</strong> sends those rows in the next turn so the agent can write commentary or follow-ups grounded in real data. The button is disabled until at least one listed cell has actually been run.</li>
-    <li><strong>Decline</strong> tells the agent to continue without them.</li>
-  </ul>
-
-  <p>Nothing leaves your machine until you click Share results. After you answer, the card is marked as answered and takes no further input.</p>
-
-  <h3>The conversation</h3>
-
-  <p>
-    The chat log is saved with the board, so closing and reopening a canvas (or restarting Arris) brings
-    back the full history and the agent picks up where it left off. The <strong>Clear conversation</strong>
-    button (the trash icon in the header) stops any in-flight turn, drops the agent session so the next
-    message starts fresh, and wipes the saved history.
+    Follow-ups change the board in place: the agent can redraw a chart with another type or axes, remove
+    an object and its arrows, or delete the whole canvas when you ask. Under the hood these are the
+    <code>arris canvas</code> commands, listed in the <a href="/ai/coding-agents#cli">CLI reference</a>.
   </p>
 
   <h2 id="manual">Build it by hand</h2>
 
   <p>
-    Every object can also be added directly, without the agent. The toolbar at the bottom of the board
+    Every object can be added directly. The toolbar at the bottom of the board
     has a button for each kind; selecting one places a new object in the center of your current view, so
     it stays in sight however far you have panned.
   </p>
@@ -327,7 +243,7 @@ import Screenshot from "../../components/docs/Screenshot/Screenshot.astro";
   <p>
     A board is saved with your workspace shortly after each change, and survives closing the tab or
     restarting the app. It stores the objects (their geometry, z-order, lock state, and per-kind
-    settings), the dependency arrows, the pan and zoom, the connection set, and the agent conversation.
+    settings), the dependency arrows, and the pan and zoom.
     <strong>Query results are not saved.</strong> After reopening, query cells show their "Run the
     query..." state, and tables and charts stay blank until you re-run their source query (or use
     <strong>Run all</strong>).

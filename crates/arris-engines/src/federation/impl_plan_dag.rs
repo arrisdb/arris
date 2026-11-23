@@ -301,7 +301,8 @@ impl PlanDag {
 mod tests {
     use super::*;
     use datafusion::arrow::datatypes::{Field, Schema, SchemaRef};
-    use datafusion::physical_expr::EquivalenceProperties;
+    use datafusion::common::tree_node::TreeNodeRecursion;
+    use datafusion::physical_expr::{EquivalenceProperties, PhysicalExpr};
     use datafusion::physical_plan::execution_plan::{Boundedness, EmissionType};
     use datafusion::physical_plan::{
         DisplayAs, DisplayFormatType, PlanProperties, SendableRecordBatchStream,
@@ -358,6 +359,12 @@ mod tests {
         }
         fn children(&self) -> Vec<&Arc<dyn ExecutionPlan>> {
             self.children.iter().collect()
+        }
+        fn apply_expressions(
+            &self,
+            _f: &mut dyn FnMut(&Arc<dyn PhysicalExpr>) -> datafusion::error::Result<TreeNodeRecursion>,
+        ) -> datafusion::error::Result<TreeNodeRecursion> {
+            Ok(TreeNodeRecursion::Continue)
         }
         fn with_new_children(self: Arc<Self>, _children: Vec<Arc<dyn ExecutionPlan>>) -> datafusion::error::Result<Arc<dyn ExecutionPlan>> {
             Ok(self)

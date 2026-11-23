@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { isWebShell } from "@shared/api";
 import {
   closeFileIndexIPC,
   closeProjectIPC,
@@ -10,7 +11,7 @@ import { findAllProjectRoots } from "@domains/files/components/FileTreeView/util
 import { useConnectionsStore } from "@domains/connection/hooks";
 import { useTabsStore } from "./tabsStore";
 import { useSettingsStore } from "@shared/settings";
-import { useFederationStore, useRunHistoryStore } from "@domains/results/hooks";
+import { hydrateServerRuns, useFederationStore, useRunHistoryStore } from "@domains/results/hooks";
 import { usePinnedQueriesStore } from "@domains/pinnedQueries/hooks";
 import { DBT_PROJECT_MARKERS } from "@domains/dbt/constants";
 import { SQLMESH_PROJECT_MARKERS } from "@domains/sqlmesh/constants";
@@ -55,7 +56,7 @@ const useProjectStore = create<ProjectState>((set) => ({
         );
       useFederationStore.getState().setTabs(result.federationTabs);
       usePinnedQueriesStore.getState().hydrate().catch(() => {});
-      useRunHistoryStore.getState().hydrate().catch(() => {});
+      (isWebShell() ? hydrateServerRuns() : useRunHistoryStore.getState().hydrate()).catch(() => {});
 
       const name = path.split("/").pop() || path;
       useRecentsStore.getState().add({

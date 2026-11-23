@@ -1,6 +1,6 @@
 import type { ChartSpec } from "@shared";
 
-import { DEFAULT_SIZE, QUERY_TITLE_PREFIX } from "../constants";
+import { DEFAULT_SIZE, CANVAS_TITLE_PREFIX, QUERY_TITLE_PREFIX } from "../constants";
 import type {
   CanvasComponent,
   CanvasEdge,
@@ -71,8 +71,7 @@ function fallbackChartSpec(): ChartSpec {
 }
 
 /// Build a fully-formed `CanvasComponent` from a loose input, filling defaults.
-/// The single place object shape + defaults live; the toolbar and the agent-spec
-/// converter both go through here.
+/// The single place object shape + defaults live; the toolbar goes through here.
 function makeComponent(input: ComponentInput): CanvasComponent {
   const id = input.id ?? genId(input.kind);
   const geom = geometry(input);
@@ -145,5 +144,14 @@ function nextQueryTitle(components: CanvasComponent[]): string {
   }
 }
 
-export { genId, makeComponent, makeEdge, nextQueryTitle };
+/// The first free numbered canvas title (`Canvas 1`, `Canvas 2`, ...).
+function nextCanvasTitle(titles: string[]): string {
+  const taken = new Set(titles);
+  for (let n = 1; ; n += 1) {
+    const title = `${CANVAS_TITLE_PREFIX} ${n}`;
+    if (!taken.has(title)) return title;
+  }
+}
+
+export { genId, makeComponent, makeEdge, nextCanvasTitle, nextQueryTitle };
 export type { ComponentInput };

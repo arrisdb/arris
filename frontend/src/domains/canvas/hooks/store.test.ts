@@ -5,7 +5,6 @@ vi.mock("../ipc", () => ({
   cancelCanvasCellIPC: vi.fn(),
 }));
 
-import type { AgentCanvasSpec } from "../types";
 import { makeComponent } from "../utils";
 import { cancelCanvasCellIPC, runCanvasCellIPC } from "../ipc";
 import { useCanvasStore } from "./store";
@@ -19,16 +18,20 @@ describe("useCanvasStore", () => {
     vi.clearAllMocks();
   });
 
-  it("ensureBoard parses once and never clobbers live edits", () => {
-    get().ensureBoard(TAB, "");
+  it("loadBoard replaces the doc but keeps runs; setRevision keeps the doc", () => {
+    get().loadBoard(TAB, { version: 1, components: [], edges: [] }, 1);
+    get().setRun(TAB, "q", { running: true });
     get().addComponent(TAB, makeComponent({ kind: "text", id: "t", text: "x" }));
-    // A second ensure (e.g. a re-mount) must not reset the board.
-    get().ensureBoard(TAB, JSON.stringify({ version: 1, components: [], edges: [] }));
+    get().setRevision(TAB, 2);
+    expect(get().boards[TAB].revision).toBe(2);
     expect(get().boards[TAB].doc.components).toHaveLength(1);
+    get().loadBoard(TAB, { version: 1, components: [], edges: [] }, 3);
+    expect(get().boards[TAB]).toMatchObject({ revision: 3, runs: { q: { running: true } } });
+    expect(get().boards[TAB].doc.components).toHaveLength(0);
   });
 
   it("adds, updates, and removes an object", () => {
-    get().ensureBoard(TAB, "");
+    get().loadBoard(TAB, { version: 1, components: [], edges: [] }, 0);
     get().addComponent(TAB, makeComponent({ kind: "text", id: "t", text: "a" }));
     get().updateComponent(TAB, "t", { x: 50 });
     expect(get().boards[TAB].doc.components[0]).toMatchObject({ x: 50 });
@@ -37,7 +40,7 @@ describe("useCanvasStore", () => {
   });
 
   it("remembers the connection last picked for a query object", () => {
-    get().ensureBoard(TAB, "");
+    get().loadBoard(TAB, { version: 1, components: [], edges: [] }, 0);
     get().addComponent(TAB, makeComponent({ kind: "query", id: "q", sql: "" }));
     get().addComponent(TAB, makeComponent({ kind: "table", id: "t" }));
     get().updateComponent(TAB, "q", { connectionId: "conn-a" });
@@ -48,7 +51,7 @@ describe("useCanvasStore", () => {
   });
 
   it("removing an object also drops its edges and run state", () => {
-    get().ensureBoard(TAB, "");
+    get().loadBoard(TAB, { version: 1, components: [], edges: [] }, 0);
     get().addComponent(TAB, makeComponent({ kind: "query", id: "q1", sql: "s" }));
     get().addComponent(TAB, makeComponent({ kind: "chart", id: "c1", sourceQueryId: "q1" }));
     get().setEdges(TAB, [{ id: "e", source: "q1", target: "c1" }]);
@@ -59,69 +62,14 @@ describe("useCanvasStore", () => {
   });
 
   it("setViewport persists the viewport", () => {
-    get().ensureBoard(TAB, "");
+    get().loadBoard(TAB, { version: 1, components: [], edges: [] }, 0);
     get().setViewport(TAB, { x: 1, y: 2, zoom: 1.5 });
     expect(get().boards[TAB].doc.viewport).toEqual({ x: 1, y: 2, zoom: 1.5 });
   });
 
-  it("applyAgentSpec appends objects and returns the query ids to run", () => {
-    get().ensureBoard(TAB, "");
-    const spec: AgentCanvasSpec = {
-      components: [
-        { kind: "query", id: "q1", sql: "s" },
-        {
-          kind: "chart",
-          id: "c1",
-          sourceQueryId: "q1",
-          spec: { kind: "bar", xColumn: "a", yColumns: ["b"] },
-        },
-      ],
-      edges: [],
-    };
-    const ids = get().applyAgentSpec(TAB, spec, "conn");
-    expect(ids).toEqual(["q1"]);
-    expect(get().boards[TAB].doc.components).toHaveLength(2);
-    expect(get().boards[TAB].doc.edges).toHaveLength(1);
-  });
-
-  it("applyAgentSpec patches an existing object by id and re-runs a changed query", () => {
-    get().ensureBoard(TAB, "");
-    get().addComponent(
-      TAB,
-      makeComponent({ kind: "query", id: "q1", sql: "select 1", connectionId: "conn" }),
-    );
-    const ids = get().applyAgentSpec(
-      TAB,
-      { components: [{ kind: "query", id: "q1", sql: "select 2" }], edges: [] },
-      "conn",
-    );
-    // No duplicate object; the existing one is patched; the changed query re-runs.
-    expect(get().boards[TAB].doc.components).toHaveLength(1);
-    expect(get().boards[TAB].doc.components[0]).toMatchObject({ id: "q1", sql: "select 2" });
-    expect(ids).toEqual(["q1"]);
-  });
-
-  it("applyAgentSpec re-runs a query whose connection changed even without an sql edit", () => {
-    get().ensureBoard(TAB, "");
-    get().addComponent(
-      TAB,
-      makeComponent({ kind: "query", id: "q1", sql: "select 1", connectionId: "conn-a" }),
-    );
-    const ids = get().applyAgentSpec(
-      TAB,
-      { components: [{ kind: "query", id: "q1", connectionId: "conn-b" }], edges: [] },
-      "conn-a",
-    );
-    expect(get().boards[TAB].doc.components[0]).toMatchObject({
-      id: "q1",
-      connectionId: "conn-b",
-    });
-    expect(ids).toEqual(["q1"]);
-  });
-
   it("runAllQueries dispatches only sink cells, letting the backend run upstreams", async () => {
     vi.mocked(runCanvasCellIPC).mockResolvedValue([]);
-    get().ensureBoard(TAB, "");
+    get().loadBoard(TAB, { version: 1, components: [], edges: [] }, 0);
     get().addComponent(
       TAB,
       makeComponent({ kind: "query", id: "abc", title: "abc", sql: "select 1", connectionId: "c" }),
@@ -141,9 +89,27 @@ describe("useCanvasStore", () => {
     expect(targets).toEqual(["q2", "q3"]);
   });
 
+  it("runAutoRunQueries runs only marked queries once and clears the mark", async () => {
+    vi.mocked(runCanvasCellIPC).mockResolvedValue([]);
+    get().loadBoard(TAB, { version: 1, components: [], edges: [] }, 0);
+    get().addComponent(
+      TAB,
+      makeComponent({ kind: "query", id: "a", sql: "select 1", connectionId: "c" }),
+    );
+    get().addComponent(
+      TAB,
+      makeComponent({ kind: "query", id: "b", sql: "select 2", connectionId: "c" }),
+    );
+    get().updateComponent(TAB, "a", { autoRun: true });
+    await get().runAutoRunQueries(TAB);
+    await get().runAutoRunQueries(TAB);
+    expect(vi.mocked(runCanvasCellIPC).mock.calls.map((c) => c[1])).toEqual(["a"]);
+    expect(get().boards[TAB].doc.components[0]).not.toHaveProperty("autoRun", true);
+  });
+
   it("runQueryComponent maps each cell's limit and null for select-all", async () => {
     vi.mocked(runCanvasCellIPC).mockResolvedValue([]);
-    get().ensureBoard(TAB, "");
+    get().loadBoard(TAB, { version: 1, components: [], edges: [] }, 0);
     get().addComponent(
       TAB,
       makeComponent({ kind: "query", id: "c1", sql: "select 1", connectionId: "c" }),
@@ -164,7 +130,7 @@ describe("useCanvasStore", () => {
     vi.mocked(runCanvasCellIPC).mockResolvedValue([
       { id: "c1", result: { columns: [], rows: [], elapsed: 0 } },
     ]);
-    get().ensureBoard(TAB, "");
+    get().loadBoard(TAB, { version: 1, components: [], edges: [] }, 0);
     get().addComponent(
       TAB,
       makeComponent({ kind: "query", id: "c1", sql: "select 1", connectionId: "c" }),
@@ -186,7 +152,7 @@ describe("useCanvasStore", () => {
     vi.mocked(runCanvasCellIPC).mockResolvedValue([
       { id: "c1", result: { columns: [], rows: [], elapsed: 0 }, totalRows: 7, complete: true },
     ]);
-    get().ensureBoard(TAB, "");
+    get().loadBoard(TAB, { version: 1, components: [], edges: [] }, 0);
     get().addComponent(
       TAB,
       makeComponent({ kind: "query", id: "c1", sql: "select 1", connectionId: "c" }),
@@ -201,7 +167,7 @@ describe("useCanvasStore", () => {
     vi.mocked(runCanvasCellIPC).mockResolvedValue([
       { id: "c1", result: { columns: [], rows: [], elapsed: 0 }, totalRows: 3, complete: true },
     ]);
-    get().ensureBoard(TAB, "");
+    get().loadBoard(TAB, { version: 1, components: [], edges: [] }, 0);
     get().addComponent(
       TAB,
       makeComponent({ kind: "query", id: "c1", sql: "select 1", connectionId: "c" }),
@@ -217,7 +183,7 @@ describe("useCanvasStore", () => {
     vi.mocked(runCanvasCellIPC).mockResolvedValue([
       { id: "c1", result: { columns: [], rows: [], elapsed: 0 } },
     ]);
-    get().ensureBoard(TAB, "");
+    get().loadBoard(TAB, { version: 1, components: [], edges: [] }, 0);
     get().addComponent(
       TAB,
       makeComponent({ kind: "query", id: "c1", sql: "select 1", connectionId: "c" }),
@@ -233,7 +199,7 @@ describe("useCanvasStore", () => {
   });
 
   it("applyIngestDone keeps event totals when it beats the run response", async () => {
-    get().ensureBoard(TAB, "");
+    get().loadBoard(TAB, { version: 1, components: [], edges: [] }, 0);
     get().addComponent(
       TAB,
       makeComponent({ kind: "query", id: "c1", sql: "select 1", connectionId: "c" }),
@@ -251,34 +217,8 @@ describe("useCanvasStore", () => {
     expect(run.result).toBeTruthy();
   });
 
-  it("applyAgentSpec removes the ids in the remove list, with their edges and runs", () => {
-    get().ensureBoard(TAB, "");
-    get().applyAgentSpec(
-      TAB,
-      {
-        components: [
-          { kind: "query", id: "q1", sql: "s" },
-          {
-            kind: "chart",
-            id: "c1",
-            sourceQueryId: "q1",
-            spec: { kind: "bar", xColumn: "a", yColumns: ["b"] },
-          },
-        ],
-        edges: [],
-      },
-      "conn",
-    );
-    get().setRun(TAB, "q1", { result: { columns: [], rows: [], elapsed: 0 } });
-    get().applyAgentSpec(TAB, { components: [], edges: [], remove: ["q1"] }, "conn");
-    const board = get().boards[TAB];
-    expect(board.doc.components.map((c) => c.id)).toEqual(["c1"]);
-    expect(board.doc.edges).toHaveLength(0);
-    expect(board.runs.q1).toBeUndefined();
-  });
-
   it("copy then paste clones with a new id, an offset, and raised z", () => {
-    get().ensureBoard(TAB, "");
+    get().loadBoard(TAB, { version: 1, components: [], edges: [] }, 0);
     get().addComponent(
       TAB,
       makeComponent({ kind: "shape", id: "s", shape: "rect", x: 10, y: 20, z: 0 }),
@@ -294,20 +234,14 @@ describe("useCanvasStore", () => {
   });
 
   it("pasteComponent is a no-op when the clipboard is empty", () => {
-    get().ensureBoard(TAB, "");
+    get().loadBoard(TAB, { version: 1, components: [], edges: [] }, 0);
     get().addComponent(TAB, makeComponent({ kind: "shape", id: "s", shape: "rect" }));
     get().pasteComponent(TAB);
     expect(get().boards[TAB].doc.components).toHaveLength(1);
   });
 
-  it("setConnectionIds persists the board's connection set", () => {
-    get().ensureBoard(TAB, "");
-    get().setConnectionIds(TAB, ["conn-a", "conn-b"]);
-    expect(get().boards[TAB].doc.connectionIds).toEqual(["conn-a", "conn-b"]);
-  });
-
   it("addEdge connects two objects, ignoring self-links and duplicates", () => {
-    get().ensureBoard(TAB, "");
+    get().loadBoard(TAB, { version: 1, components: [], edges: [] }, 0);
     get().addComponent(TAB, makeComponent({ kind: "shape", id: "a", shape: "rect" }));
     get().addComponent(TAB, makeComponent({ kind: "shape", id: "b", shape: "rect" }));
     get().addEdge(TAB, "a", "b");
@@ -319,7 +253,7 @@ describe("useCanvasStore", () => {
   });
 
   it("removeEdges drops arrows by id", () => {
-    get().ensureBoard(TAB, "");
+    get().loadBoard(TAB, { version: 1, components: [], edges: [] }, 0);
     get().addComponent(TAB, makeComponent({ kind: "shape", id: "a", shape: "rect" }));
     get().addComponent(TAB, makeComponent({ kind: "shape", id: "b", shape: "rect" }));
     get().addEdge(TAB, "a", "b");
@@ -329,7 +263,7 @@ describe("useCanvasStore", () => {
   });
 
   it("reorderComponent restacks objects by z", () => {
-    get().ensureBoard(TAB, "");
+    get().loadBoard(TAB, { version: 1, components: [], edges: [] }, 0);
     get().addComponent(TAB, makeComponent({ kind: "shape", id: "a", shape: "rect", z: 0 }));
     get().addComponent(TAB, makeComponent({ kind: "shape", id: "b", shape: "rect", z: 1 }));
     get().addComponent(TAB, makeComponent({ kind: "shape", id: "c", shape: "rect", z: 2 }));
@@ -349,7 +283,7 @@ describe("useCanvasStore", () => {
   });
 
   it("updateComponent toggles the locked flag", () => {
-    get().ensureBoard(TAB, "");
+    get().loadBoard(TAB, { version: 1, components: [], edges: [] }, 0);
     get().addComponent(TAB, makeComponent({ kind: "shape", id: "s", shape: "rect" }));
     get().updateComponent(TAB, "s", { locked: true });
     expect(get().boards[TAB].doc.components[0].locked).toBe(true);
@@ -359,7 +293,7 @@ describe("useCanvasStore", () => {
     vi.mocked(runCanvasCellIPC).mockResolvedValue([
       { id: "q1", result: { columns: [], rows: [], elapsed: 1 }, totalRows: 0, complete: true },
     ]);
-    get().ensureBoard(TAB, "");
+    get().loadBoard(TAB, { version: 1, components: [], edges: [] }, 0);
     get().addComponent(
       TAB,
       makeComponent({ kind: "query", id: "q1", sql: "select 1", connectionId: "conn" }),
@@ -373,7 +307,7 @@ describe("useCanvasStore", () => {
     vi.mocked(runCanvasCellIPC).mockResolvedValue([
       { id: "q1", result: { columns: [], rows: [], elapsed: 1 } },
     ]);
-    get().ensureBoard(TAB, "");
+    get().loadBoard(TAB, { version: 1, components: [], edges: [] }, 0);
     get().addComponent(
       TAB,
       makeComponent({ kind: "query", id: "q1", sql: "select 1", connectionId: "conn" }),
@@ -393,7 +327,7 @@ describe("useCanvasStore", () => {
       }),
     );
     vi.mocked(cancelCanvasCellIPC).mockResolvedValue(undefined);
-    get().ensureBoard(TAB, "");
+    get().loadBoard(TAB, { version: 1, components: [], edges: [] }, 0);
     get().addComponent(
       TAB,
       makeComponent({ kind: "query", id: "q1", sql: "select 1", connectionId: "conn" }),
@@ -409,7 +343,7 @@ describe("useCanvasStore", () => {
   });
 
   it("cancelQueryComponent is a no-op when the cell is not running", () => {
-    get().ensureBoard(TAB, "");
+    get().loadBoard(TAB, { version: 1, components: [], edges: [] }, 0);
     get().addComponent(
       TAB,
       makeComponent({ kind: "query", id: "q1", sql: "select 1", connectionId: "conn" }),
@@ -424,7 +358,7 @@ describe("useCanvasStore", () => {
       { id: "abc", result: { columns: [], rows: [], elapsed: 1 } },
       { id: "query", result: { columns: [], rows: [], elapsed: 1 } },
     ]);
-    get().ensureBoard(TAB, "");
+    get().loadBoard(TAB, { version: 1, components: [], edges: [] }, 0);
     get().addComponent(
       TAB,
       makeComponent({ kind: "query", id: "abc", title: "abc", sql: "SELECT 1", connectionId: "conn" }),
@@ -446,7 +380,7 @@ describe("useCanvasStore", () => {
     vi.mocked(runCanvasCellIPC).mockResolvedValue([
       { id: "q1", error: "pick a connection for this query cell" },
     ]);
-    get().ensureBoard(TAB, "");
+    get().loadBoard(TAB, { version: 1, components: [], edges: [] }, 0);
     get().addComponent(
       TAB,
       makeComponent({ kind: "query", id: "q1", sql: "select 1", connectionId: null }),
@@ -456,7 +390,7 @@ describe("useCanvasStore", () => {
   });
 
   it("runQueryComponent errors (without calling IPC) on an empty query", async () => {
-    get().ensureBoard(TAB, "");
+    get().loadBoard(TAB, { version: 1, components: [], edges: [] }, 0);
     get().addComponent(
       TAB,
       makeComponent({ kind: "query", id: "q1", sql: "   ", connectionId: "conn" }),
@@ -470,7 +404,7 @@ describe("useCanvasStore", () => {
     vi.mocked(runCanvasCellIPC).mockResolvedValue([
       { id: "q1", result: { columns: [], rows: [], elapsed: 1 } },
     ]);
-    get().ensureBoard(TAB, "");
+    get().loadBoard(TAB, { version: 1, components: [], edges: [] }, 0);
     get().addComponent(
       TAB,
       makeComponent({ kind: "query", id: "q1", sql: "select 1", connectionId: "conn" }),
@@ -489,7 +423,7 @@ describe("useCanvasStore", () => {
     vi.mocked(runCanvasCellIPC).mockResolvedValue([
       { id: "q1", result: { columns: [], rows: [], elapsed: 1 } },
     ]);
-    get().ensureBoard(TAB, "");
+    get().loadBoard(TAB, { version: 1, components: [], edges: [] }, 0);
     get().addComponent(
       TAB,
       makeComponent({ kind: "query", id: "q1", sql: "select 1", connectionId: "conn" }),
@@ -500,34 +434,4 @@ describe("useCanvasStore", () => {
     expect(tables).toHaveLength(1);
   });
 
-  it("setChat persists the chat log into the doc", () => {
-    get().ensureBoard(TAB, "");
-    get().setChat(TAB, [
-      { id: "u1", role: "user", text: "hi" },
-      { id: "a1", role: "agent", text: "done", action: "Added query" },
-    ]);
-    expect(get().boards[TAB].doc.chat).toEqual([
-      { id: "u1", role: "user", text: "hi" },
-      { id: "a1", role: "agent", text: "done", action: "Added query" },
-    ]);
-  });
-
-  it("clearChat empties the persisted chat log", () => {
-    get().ensureBoard(TAB, "");
-    get().setChat(TAB, [{ id: "u1", role: "user", text: "hi" }]);
-    get().clearChat(TAB);
-    expect(get().boards[TAB].doc.chat).toEqual([]);
-  });
-
-  it("writing chat keeps the components/edges array references stable", () => {
-    // Board nodes subscribe to `doc.components`/`doc.edges`; writing chat must not
-    // swap those arrays, or every node would needlessly re-render per token.
-    get().ensureBoard(TAB, "");
-    get().addComponent(TAB, makeComponent({ kind: "text", id: "t", text: "x" }));
-    const beforeComps = get().boards[TAB].doc.components;
-    const beforeEdges = get().boards[TAB].doc.edges;
-    get().setChat(TAB, [{ id: "u1", role: "user", text: "hi" }]);
-    expect(get().boards[TAB].doc.components).toBe(beforeComps);
-    expect(get().boards[TAB].doc.edges).toBe(beforeEdges);
-  });
 });

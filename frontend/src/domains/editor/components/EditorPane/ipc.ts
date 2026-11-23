@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { apiCall, isWebShell } from "@shared/api";
 import type {
   DbtCommandResult,
   DbtCompileResult,
@@ -12,12 +13,16 @@ import type {
   SqlMeshCommandResult,
   SqlMeshRenderResult,
 } from "@shared";
+import { WEB_RUN_SOURCE } from "./constants";
 
 function cancelQueryIPC(queryId: string): Promise<void> {
+  if (isWebShell()) return apiCall("query_cancel", { queryId });
   return invoke("cmd_cancel_query", { queryId });
 }
 
+// The arris server connects on demand when a query or schema needs it.
 function connectConnectionIPC(connectionId: string): Promise<void> {
+  if (isWebShell()) return Promise.resolve();
   return invoke("cmd_connect", { connectionId });
 }
 
@@ -97,10 +102,12 @@ function gitRestoreChangeIPC(
 }
 
 function listSchemasIPC(connectionId: string): Promise<SchemaNode[]> {
+  if (isWebShell()) return apiCall("schema_list", { connection: connectionId });
   return invoke("cmd_list_schemas", { connectionId });
 }
 
 function readTextFileIPC(path: string): Promise<string> {
+  if (isWebShell()) return apiCall("file_read", { path });
   return invoke("cmd_read_text_file", { path });
 }
 
@@ -117,6 +124,10 @@ function runQueryIPC(
   page?: number,
   queryId?: string,
 ): Promise<QueryResult> {
+  if (isWebShell()) {
+    const body = { connection: connectionId, sql, limit: pageSize, language, queryId, source: WEB_RUN_SOURCE };
+    return apiCall<{ result: QueryResult }>("query_run", body).then(({ result }) => result);
+  }
   return invoke("cmd_run_query", { connectionId, sql, params, language, pageSize, page, queryId });
 }
 
@@ -205,6 +216,7 @@ function sqlmeshAuditIPC(
 }
 
 function writeTextFileIPC(path: string, content: string): Promise<void> {
+  if (isWebShell()) return apiCall("file_write", { path, content });
   return invoke("cmd_write_text_file", { path, content });
 }
 

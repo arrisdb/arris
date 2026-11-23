@@ -8,18 +8,22 @@ import "./index.css";
 import { ContextMenu, useContextMenu } from "@shared/ui/ContextMenu";
 import { useRegisterCommands } from "@shell/utils";
 
-import { CanvasAgentChat } from "../CanvasAgentChat";
 import { CanvasPropertiesPane } from "./components/CanvasPropertiesPane";
 import { CanvasToolbar } from "./components/CanvasToolbar";
+import {
+  CANVAS_DISMISS_LABEL,
+  CANVAS_ERROR_TEST_ID,
+  CANVAS_LOADING_MESSAGE,
+  CANVAS_NOTICE_TEST_ID,
+} from "./constants";
 import { useCanvas } from "./hooks";
 import type { CanvasViewProps } from "./types";
 import { buildEdgeMenuItems, buildNodeMenuItems, edgeTypes, nodeTypes } from "./utils";
 
-/// The canvas thinkboard tab view: an infinite ReactFlow board of objects
-/// (text/query/chart/shape) plus a floating add-toolbar. The agent chat panel is
-/// rendered alongside the board.
-function CanvasView({ activeTab }: CanvasViewProps) {
-  const canvas = useCanvas(activeTab);
+/// One stored canvas: an infinite ReactFlow board of objects (text/query/chart/
+/// shape) plus a floating add-toolbar.
+function CanvasView({ canvasId, tab }: CanvasViewProps) {
+  const canvas = useCanvas(canvasId, tab?.connectionId);
 
   // The board's keyboard shortcuts flow through the command registry (so they
   // show up in Settings -> Keymap and are user-rebindable) rather than a private
@@ -61,16 +65,32 @@ function CanvasView({ activeTab }: CanvasViewProps) {
 
   const menuComponent = menu.state ? canvas.componentById(menu.state.context) : undefined;
 
+  if (!canvas.loaded) {
+    return canvas.error ? (
+      <p className="mdbc-canvas-error" data-testid={CANVAS_ERROR_TEST_ID}>
+        {canvas.error}
+      </p>
+    ) : (
+      <p className="mdbc-canvas-loading">{CANVAS_LOADING_MESSAGE}</p>
+    );
+  }
+
   return (
     <div className="mdbc-canvas-view">
+      {(canvas.notice || canvas.error) && (
+        <div
+          className="mdbc-canvas-notice"
+          data-testid={canvas.notice ? CANVAS_NOTICE_TEST_ID : CANVAS_ERROR_TEST_ID}
+        >
+          <span>{canvas.notice ?? canvas.error}</span>
+          {canvas.notice && (
+            <button type="button" onClick={canvas.dismissNotice}>
+              {CANVAS_DISMISS_LABEL}
+            </button>
+          )}
+        </div>
+      )}
       <PanelGroup className="mdbc-canvas-panels" id="canvas-horizontal" direction="horizontal">
-        <Panel id="canvas-agent" order={1} defaultSize={18} minSize={12} maxSize={40}>
-          {/* Key by tab id so each canvas gets its own chat instance: switching
-              to or creating a canvas remounts the panel with that board's chat
-              instead of carrying over the previous board's conversation. */}
-          <CanvasAgentChat key={activeTab.id} tab={activeTab} />
-        </Panel>
-        <PanelResizeHandle className="mdbc-canvas-pane-resizer" />
         <Panel id="canvas-board" order={2} minSize={30}>
           <div
             ref={canvas.boardRef}
@@ -117,7 +137,7 @@ function CanvasView({ activeTab }: CanvasViewProps) {
             <PanelResizeHandle className="mdbc-canvas-pane-resizer" />
             <Panel id="canvas-props" order={3} defaultSize={18} minSize={12} maxSize={40}>
               <CanvasPropertiesPane
-                tabId={activeTab.id}
+                boardId={canvasId}
                 component={canvas.selectedComponent}
                 onChange={(patch) => canvas.update(canvas.selectedComponent!.id, patch)}
               />

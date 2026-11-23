@@ -1,0 +1,7 @@
+.mdbc-web-message {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  color: var(--m-fg);
+}

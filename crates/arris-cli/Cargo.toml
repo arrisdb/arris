@@ -1,0 +1,46 @@
+[package]
+name = "arris-cli"
+publish = false
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Arris CLI and the local server it drives."
+
+[[bin]]
+name = "arris"
+path = "src/main.rs"
+
+[[test]]
+name = "cli_integration"
+required-features = ["test-support"]
+
+[features]
+test-support = ["arris-engines/test-support"]
+
+[dependencies]
+arris-engines = { path = "../arris-engines" }
+axum = "0.8.9"
+chrono.workspace = true
+clap = { version = "4.6.7", features = ["derive"] }
+rand = "0.10.3"
+reqwest.workspace = true
+rust-embed = { version = "8.13.0", features = ["interpolate-folder-path", "mime-guess"] }
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tokio-stream = { version = "0.1.19", features = ["sync"] }
+url.workspace = true
+uuid.workspace = true
+webbrowser = "1.2.5"
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2.191"
+
+[dev-dependencies]
+arris-engines = { path = "../arris-engines", features = ["test-support"] }
+assert_cmd = "2.2.2"
+tempfile = "3.27.0"

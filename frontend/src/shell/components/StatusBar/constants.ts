@@ -8,15 +8,15 @@ const LEFT_RAIL_ITEMS: StatusBarRailItem<SidebarMetaTab>[] = [
   { key: "git", label: "Git", icon: "gitBranch", action: "showGitPane" },
 ];
 
+const WEB_HIDDEN_RAIL_ITEMS: ReadonlySet<SidebarMetaTab> = new Set(["git"]);
+
 const RIGHT_RAIL_ACTIONS = {
-  agentPanel: "showAgentPanel",
   chartEditor: "showChartEditor",
   pinnedQueries: "showPinnedQueries",
   connections: "showConnections",
 } as const satisfies Record<string, KeymapAction>;
 
 const STATUS_BAR_ICONS = {
-  agentPanel: "bot",
   chartEditor: "barChart",
   pinnedQueries: "pin",
   connections: "database",
@@ -27,4 +27,5 @@ export {
   LEFT_RAIL_ITEMS,
   RIGHT_RAIL_ACTIONS,
   STATUS_BAR_ICONS,
+  WEB_HIDDEN_RAIL_ITEMS,
 };

@@ -51,7 +51,9 @@ function ResultsTableView({ tabId: tabIdProp, global: isGlobal = false }: { tabI
   // a terminal/git/table tab (or having no tab open) never changes or hides it.
   const activeId = useTabsStore((s) => s.activeId);
   const globalRunTabId = useRunHistoryStore((s) => (isGlobal ? selectGlobalRun(s)?.tabId ?? null : null));
-  const resolvedTabId = isGlobal ? globalRunTabId : tabIdProp ?? activeId;
+  // A run can outlive its tab (a closed console, a CLI run); show it in the active tab.
+  const globalRunHasTab = useTabsStore((s) => s.tabs.some((t) => t.id === globalRunTabId));
+  const resolvedTabId = isGlobal ? (globalRunHasTab ? globalRunTabId : activeId) : tabIdProp ?? activeId;
   // Subscribe to the tab but ignore `text`-only churn: the editor writes
   // `{ text }` per keystroke and re-rendering the whole results pane (grid,
   // toolbar, detail pane) for it is what makes typing stutter. Live text is

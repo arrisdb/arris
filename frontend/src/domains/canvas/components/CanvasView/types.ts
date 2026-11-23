@@ -9,13 +9,15 @@ import type { ShapeKind } from "../../types";
 type CanvasMode = "move" | "hand";
 
 /// Data carried on every ReactFlow node. Nodes read their live object + run
-/// state from the store by `id` (props.id), so only the owning tab is needed.
+/// state from the store by `id` (props.id), so only the owning board is needed.
 interface CanvasNodeData {
-  tabId: string;
+  boardId: string;
 }
 
 interface CanvasViewProps {
-  activeTab: EditorTab;
+  canvasId: string;
+  /// The tab hosting the board; its connection is the default for new query objects.
+  tab?: EditorTab;
 }
 
 interface CanvasToolbarProps {

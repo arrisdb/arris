@@ -4,8 +4,8 @@ use std::time::Instant;
 use arris_engines::query::QueryEngine;
 use arris_engines::{
     AppEnvironment, DebugLog, ExplainMode, IpcError, IsolationLevel, ObjectRef, PlanResult,
-    QueryLanguage, QueryResult, QueryValue, TableMutationBatch, TableRef, TransactionConfig,
-    TransactionMode,
+    QueryLanguage, QueryRequest, QueryResult, QueryValue, TableMutationBatch, TableRef,
+    TransactionConfig, TransactionMode,
 };
 use tauri::State;
 use uuid::Uuid;
@@ -41,7 +41,13 @@ pub async fn cmd_list_schemas(
         }
         Err(e) => {
             let ipc = IpcError::from(e);
-            DebugLog::schema_load_failed(&conn, &kind, "(top-level)", ipc.code.clone(), &ipc.message);
+            DebugLog::schema_load_failed(
+                &conn,
+                &kind,
+                "(top-level)",
+                ipc.code.clone(),
+                &ipc.message,
+            );
             Err(ipc)
         }
     }
@@ -111,12 +117,14 @@ pub async fn cmd_run_query(
             connection_id,
             &env.connection,
             proj.as_ref(),
-            sql,
-            params,
-            language,
-            page_size,
-            page,
-            query_id,
+            QueryRequest {
+                sql: sql,
+                params: params,
+                language: language,
+                page_size: page_size,
+                page: page,
+                query_id: query_id,
+            },
         )
         .await;
     match result {
@@ -242,7 +250,11 @@ pub async fn cmd_set_transaction_config(
     // work is left open on the connection.
     if matches!(mode, TransactionMode::Auto) {
         let proj = env.project.read().await;
-        if let Ok(driver) = env.connection.driver_for(connection_id, proj.as_ref()).await {
+        if let Ok(driver) = env
+            .connection
+            .driver_for(connection_id, proj.as_ref())
+            .await
+        {
             if driver.in_transaction().await {
                 driver.commit_transaction().await.map_err(IpcError::from)?;
             }

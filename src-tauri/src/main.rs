@@ -1,13 +1,12 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-mod clipboard;
 mod commands;
 mod helpers;
 mod watcher;
 
 use std::sync::Arc;
 
-use arris_engines::{AppEnvironment, DebugLogging};
+use arris_engines::{AppEnvironment, DebugLogging, Keychain};
 use tauri::menu::{AboutMetadataBuilder, MenuBuilder, MenuItemBuilder, SubmenuBuilder};
 use tauri::{Emitter, Manager};
 use tauri_plugin_opener::OpenerExt;
@@ -25,15 +24,21 @@ fn main() {
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             let env = tauri::async_runtime::block_on(async {
-                AppEnvironment::init().await.expect("init AppEnvironment")
+                match std::env::var_os(commands::constants::ENV_DATA_DIR) {
+                    Some(dir) => {
+                        AppEnvironment::init_at(dir.into(), Arc::new(Keychain::default())).await
+                    }
+                    None => AppEnvironment::init().await,
+                }
+                .expect("init AppEnvironment")
             });
             if let Err(err) = DebugLogging::install(&env.debug_log) {
                 eprintln!("failed to initialize logging: {err}");
             }
             app.manage(env);
-            app.manage(AgentRuns::default());
             app.manage(watcher::ProjectWatcher::default());
             app.manage(PendingLaunch::from_args(std::env::args()));
+            ArrisServer::spawn(app.handle().clone());
 
             let mut about = AboutMetadataBuilder::new()
                 .name(Some("Arris".to_string()))
@@ -59,26 +64,22 @@ fn main() {
                 .separator()
                 .quit()
                 .build()?;
-            let new_project_item =
-                MenuItemBuilder::with_id("menu_new_project", "New Project...")
-                    .accelerator("CmdOrCtrl+Shift+N")
-                    .build(app)?;
+            let new_project_item = MenuItemBuilder::with_id("menu_new_project", "New Project...")
+                .accelerator("CmdOrCtrl+Shift+N")
+                .build(app)?;
             let open_project_item = MenuItemBuilder::with_id("menu_open_project", "Open...")
                 .accelerator("CmdOrCtrl+O")
                 .build(app)?;
-            let open_project_new_window_item = MenuItemBuilder::with_id(
-                "menu_open_project_new_window",
-                "Open in New Window...",
-            )
-            .accelerator("CmdOrCtrl+Shift+O")
-            .build(app)?;
+            let open_project_new_window_item =
+                MenuItemBuilder::with_id("menu_open_project_new_window", "Open in New Window...")
+                    .accelerator("CmdOrCtrl+Shift+O")
+                    .build(app)?;
             let save_file_item = MenuItemBuilder::with_id("menu_save_file", "Save")
                 .accelerator("CmdOrCtrl+S")
                 .build(app)?;
-            let close_editor_item =
-                MenuItemBuilder::with_id("menu_close_editor", "Close Editor")
-                    .accelerator("CmdOrCtrl+W")
-                    .build(app)?;
+            let close_editor_item = MenuItemBuilder::with_id("menu_close_editor", "Close Editor")
+                .accelerator("CmdOrCtrl+W")
+                .build(app)?;
             let file_submenu = SubmenuBuilder::new(app, "File")
                 .item(&new_project_item)
                 .item(&open_project_item)
@@ -174,6 +175,12 @@ fn main() {
             cmd_run_canvas_cell,
             cmd_query_canvas_cache,
             cmd_fetch_canvas_cell_page,
+            cmd_canvas_list,
+            cmd_canvas_get,
+            cmd_canvas_create,
+            cmd_canvas_save,
+            cmd_canvas_rename,
+            cmd_canvas_delete,
             cmd_explain_query,
             cmd_primary_key,
             cmd_object_definition,
@@ -186,7 +193,6 @@ fn main() {
             cmd_git_checkout,
             cmd_git_delete_branch,
             cmd_git_remove_worktree,
-
             cmd_load_console_tabs,
             cmd_save_console_tabs,
             cmd_save_pane_layout,
@@ -286,10 +292,7 @@ fn main() {
             cmd_close_file_index,
             cmd_search_files,
             cmd_search_content,
-            cmd_agent_send,
-            cmd_agent_check,
-            cmd_agent_cancel,
-            cmd_agent_schema_context,
+            cmd_arris_api,
             cmd_python_list_interpreters,
             cmd_python_add_interpreter,
             cmd_python_create_venv,

@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use arris_engines::{
     AppEnvironment, Completion, CreatedVenv, IpcError, KernelOutput, PythonInterpreter,
-    QueryLanguage,
+    QueryLanguage, QueryRequest,
 };
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, State};
@@ -103,10 +103,7 @@ pub async fn cmd_python_execute(
     code: String,
 ) -> Result<String, IpcError> {
     let env = env.inner().clone();
-    env.python
-        .execute(&console_id, code)
-        .await
-        .map_err(ipc_err)
+    env.python.execute(&console_id, code).await.map_err(ipc_err)
 }
 
 #[tauri::command]
@@ -160,12 +157,14 @@ pub async fn cmd_notebook_run_sql(
             connection_id,
             &env.connection,
             proj.as_ref(),
-            sql,
-            Vec::new(),
-            language,
-            None,
-            None,
-            None,
+            QueryRequest {
+                sql: sql,
+                params: Vec::new(),
+                language: language,
+                page_size: None,
+                page: None,
+                query_id: None,
+            },
         )
         .await
         .map_err(IpcError::from)?;

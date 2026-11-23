@@ -12,6 +12,7 @@ const TerminalView = lazy(() =>
 function registerTerminalSection(): void {
   registerPane({
     id: "terminals",
+    nativeOnly: true,
     side: "left",
     kind: "section",
     priority: 1,

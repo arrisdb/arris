@@ -1,7 +1,13 @@
+import { DeepLinkHost } from "@shell/components/DeepLinkHost";
+import { NoProjectScreen } from "@shell/components/ProjectSwitcher";
 import { ContentView } from "@shell/components/ContentView";
 import { FileSearchPopover } from "@domains/files/components/FileSearchPopover";
+import { isWebShell } from "@shared/api";
 import { ProjectLoadingScreen } from "@shell/components/ProjectLoadingScreen";
+import { QueryHandoffHost } from "@shell/components/QueryHandoffHost";
+import { ServerEventsHost } from "@shell/components/ServerEventsHost";
 import { SnackbarHost } from "@shell/components/SnackbarHost";
+import { UiContextHost } from "@shell/components/UiContextHost";
 import { WelcomeScreen } from "@shell/components/WelcomeScreen";
 import { useAppState } from "@shell/hooks";
 
@@ -29,7 +35,7 @@ function App() {
   }
 
   if (!app.activeProject) {
-    return <WelcomeScreen />;
+    return isWebShell() ? <NoProjectScreen /> : <WelcomeScreen />;
   }
 
   return (
@@ -37,6 +43,10 @@ function App() {
       <ContentView />
       <FileSearchPopover />
       <SnackbarHost />
+      <QueryHandoffHost />
+      <ServerEventsHost />
+      <UiContextHost />
+      {isWebShell() && <DeepLinkHost />}
     </>
   );
 }

@@ -56,3 +56,14 @@ impl From<ConnectionError> for IpcError {
         }
     }
 }
+
+/// Why a dbt profile or sqlmesh gateway could not become a connection prefill.
+#[derive(Debug, Error)]
+pub enum PrefillError {
+    #[error("adapter `{0}` is not supported; add the connection with `arris connection new`")]
+    UnsupportedAdapter(String),
+    #[error("{0} not found")]
+    NotFound(String),
+    #[error("could not parse {0}")]
+    Invalid(String),
+}

@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
 import { useTabsStore } from "@shell/hooks/tabsStore";
 import { Icon } from "@shared/ui/Icon";
@@ -8,24 +8,15 @@ import {
   useContextMenu,
 } from "@shared/ui/ContextMenu";
 import { useSectionHeight, useSoftDelete } from "@shared/ui/utils/section";
-import { useMoveTabToProject } from "@shell/hooks";
 import { CANVAS_TABS_COLLAPSED_KEY } from "./constants";
+import { useCanvasSummaries } from "./hooks";
 import { canvasContextMenuItems } from "./utils";
 
 function CanvasSection() {
-  const allTabs = useTabsStore((s) => s.tabs);
-  const tabs = useMemo(
-    () => allTabs.filter((t) => t.tabType === "canvas" && !t.filePath),
-    [allTabs],
-  );
+  const { canvases: tabs, open, rename, remove, create } = useCanvasSummaries();
   const activeId = useTabsStore((s) => s.activeId);
-  const focusTab = useTabsStore((s) => s.focusTab);
-  const deleteTab = useTabsStore((s) => s.deleteTab);
-  const updateTab = useTabsStore((s) => s.updateTab);
-  const openUntitledCanvasTab = useTabsStore((s) => s.openUntitledCanvasTab);
-  const moveToProject = useMoveTabToProject();
 
-  const { deleted, softDelete, restore, purgeAll } = useSoftDelete(deleteTab);
+  const { deleted, softDelete, restore, purgeAll } = useSoftDelete(remove);
 
   const [height, setHeight] = useSectionHeight();
   const [collapsed, setCollapsed] = useState<boolean>(() => {
@@ -37,23 +28,9 @@ function CanvasSection() {
   const [renameDraft, setRenameDraft] = useState("");
   const ctxMenu = useContextMenu<string | null>();
 
-  const sortedTabs = useMemo(() => {
-    return tabs
-      .map((tab, index) => ({ tab, index }))
-      .sort((a, b) => {
-        const ta = a.tab.createdAt ?? 0;
-        const tb = b.tab.createdAt ?? 0;
-        if (tb !== ta) return tb - ta;
-        return a.index - b.index;
-      })
-      .map((entry) => entry.tab);
-  }, [tabs]);
-
   function commitRename(id: string) {
     const next = renameDraft.trim();
-    if (next.length > 0) {
-      updateTab(id, { title: next });
-    }
+    if (next.length > 0) void rename(id, next);
     setRenamingId(null);
     setRenameDraft("");
   }
@@ -77,11 +54,10 @@ function CanvasSection() {
 
   const ctxItems: ContextMenuItem[] = ctxMenu.state
     ? canvasContextMenuItems({
-        tabId: ctxMenu.state.context,
+        canvasId: ctxMenu.state.context,
         onRename: startRename,
         onDelete: softDelete,
-        onMoveToProject: moveToProject,
-        onNewCanvas: () => openUntitledCanvasTab(),
+        onNewCanvas: () => void create(),
       })
     : [];
 
@@ -156,7 +132,7 @@ function CanvasSection() {
             ctxMenu.open(e, null);
           }}
         >
-          {sortedTabs.map((t) => {
+          {tabs.map((t) => {
             const isRenaming = renamingId === t.id;
             const isSoftDeleted = deleted.has(t.id);
             if (isSoftDeleted) {
@@ -188,7 +164,7 @@ function CanvasSection() {
                 data-canvas-row
                 onClick={() => {
                   if (isRenaming) return;
-                  focusTab(t.id);
+                  open(t);
                 }}
                 onDoubleClick={(e) => {
                   e.stopPropagation();
@@ -229,8 +205,8 @@ function CanvasSection() {
                     softDelete(t.id);
                   }}
                   className="mdbc-tab-x"
-                  aria-label="Delete tab"
-                  title="Delete tab"
+                  aria-label="Delete canvas"
+                  title="Delete canvas"
                   data-testid={`canvas-section-delete-${t.id}`}
                 >
                   <Icon name="trash" size={11} />

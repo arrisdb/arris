@@ -81,7 +81,7 @@ const docsNav: NavGroup[] = [
   {
     title: "AI",
     items: [
-      { label: "AI Agent", href: "/ai/agent" },
+      { label: "Coding agents", href: "/ai/coding-agents" },
     ],
   },
   {

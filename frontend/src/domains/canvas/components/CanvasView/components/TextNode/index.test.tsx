@@ -13,12 +13,12 @@ const TAB = "tab-1";
 
 function seed(component: CanvasComponent) {
   useCanvasStore.setState({ boards: {} });
-  useCanvasStore.getState().ensureBoard(TAB, "");
+  useCanvasStore.getState().loadBoard(TAB, { version: 1, components: [], edges: [] }, 0);
   useCanvasStore.getState().addComponent(TAB, component);
 }
 
 const nodeProps = (id: string) =>
-  ({ id, data: { tabId: TAB }, selected: false }) as unknown as NodeProps<CanvasNodeData>;
+  ({ id, data: { boardId: TAB }, selected: false }) as unknown as NodeProps<CanvasNodeData>;
 
 function renderNode(id: string) {
   return render(

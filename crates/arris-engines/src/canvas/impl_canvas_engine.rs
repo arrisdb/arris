@@ -139,7 +139,7 @@ impl CanvasEngine {
 
     /// Board-scoped cache key, on the cell id so an untitled or duplicated title
     /// never merges two cells' results.
-    fn key(board: &str, cell_id: &str) -> String {
+    pub fn key(board: &str, cell_id: &str) -> String {
         format!("{board}\u{1}{}", Self::sanitize_ident(cell_id))
     }
 
@@ -293,6 +293,10 @@ impl CanvasEngine {
             &batches,
             start.elapsed().as_secs_f64(),
         ))
+    }
+
+    pub fn has_result(&self, board: &str, cell_id: &str) -> bool {
+        self.cache.contains(&Self::key(board, cell_id))
     }
 
     /// Rows `[offset, offset + limit)` of a cached cell's full result; `None` when

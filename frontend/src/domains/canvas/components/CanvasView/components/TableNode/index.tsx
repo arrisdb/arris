@@ -35,8 +35,8 @@ import { nextSortClauses, tableStatusSummary } from "./utils";
 /// pages through the source's FULL cached result, one page at a time. While the
 /// source is running it shows a spinner, not a partial page.
 function TableNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
-  const { tabId } = data;
-  const board = useCanvasStore((s) => s.boards[tabId]);
+  const { boardId } = data;
+  const board = useCanvasStore((s) => s.boards[boardId]);
   const runQuery = useCanvasStore((s) => s.runQueryComponent);
   const component = board?.doc.components.find((c) => c.id === id);
   const sourceId = component?.kind === "table" ? component.sourceQueryId : null;
@@ -114,7 +114,7 @@ function TableNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
   const goto = useCallback(
     (next: number) => {
       if (!sourceId) return;
-      fetchCanvasCellPageIPC(tabId, sourceId, next, pageSize)
+      fetchCanvasCellPageIPC(boardId, sourceId, next, pageSize)
         .then((result) => {
           if (!result) return;
           setOffset(next);
@@ -123,7 +123,7 @@ function TableNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
         })
         .catch(() => {});
     },
-    [tabId, sourceId, pageSize],
+    [boardId, sourceId, pageSize],
   );
 
   if (!component || component.kind !== "table") return null;
@@ -179,7 +179,7 @@ function TableNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
       let columns = page.columns;
       for (let offset = 0; offset < target; offset += DOWNLOAD_CHUNK_ROWS) {
         if (exportCancelledRef.current) return;
-        const chunk = await fetchCanvasCellPageIPC(tabId, sourceId, offset, DOWNLOAD_CHUNK_ROWS);
+        const chunk = await fetchCanvasCellPageIPC(boardId, sourceId, offset, DOWNLOAD_CHUNK_ROWS);
         if (!chunk || chunk.rows.length === 0) break;
         columns = chunk.columns;
         rows.push(...chunk.rows);
@@ -203,7 +203,7 @@ function TableNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
 
   return (
     <>
-      <CanvasResizer tabId={tabId} id={id} visible={selected} />
+      <CanvasResizer boardId={boardId} id={id} visible={selected} />
       <div className={`mdbc-canvas-node mdbc-canvas-table${selected ? " selected" : ""}`}>
         {component.title ? (
           <div className="mdbc-canvas-node-head">
@@ -221,7 +221,7 @@ function TableNodeImpl({ id, data, selected }: NodeProps<CanvasNodeData>) {
                 variant="ghost"
                 loading={streaming}
                 disabled={streaming}
-                onClick={() => runQuery(tabId, sourceId)}
+                onClick={() => runQuery(boardId, sourceId)}
                 data-testid="table-refresh-btn"
               />
             </Tooltip>

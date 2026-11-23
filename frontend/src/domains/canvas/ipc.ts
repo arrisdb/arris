@@ -1,5 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { QueryResult } from "@shared";
+import { apiCall, isWebShell } from "@shared/api";
+
+import type { CanvasAddResponse, CanvasDoc, CanvasRecord, CanvasSummary } from "./types";
 
 /// One query cell sent to the backend for a chained run. The backend builds the
 /// dependency graph from each cell's `sql` (a `FROM`/`JOIN` reference to another
@@ -36,19 +39,24 @@ function runCanvasCellIPC(
   cells: CanvasCellSpec[],
   queryId: string,
 ): Promise<CanvasCellRun[]> {
-  return invoke("cmd_run_canvas_cell", { boardId, targetId, cells, queryId });
+  const args = { boardId, targetId, cells, queryId };
+  return !isWebShell() ? invoke("cmd_run_canvas_cell", args) : apiCall("canvas_run_cell", args);
 }
 
 /// Cancel an in-flight canvas cell run started with the same `queryId`.
 function cancelCanvasCellIPC(queryId: string): Promise<void> {
-  return invoke("cmd_cancel_query", { queryId });
+  return !isWebShell()
+    ? invoke("cmd_cancel_query", { queryId })
+    : apiCall("query_cancel", { queryId });
 }
 
 /// Aggregate (or sample) a chart's data over a source cell's FULL cached result.
 /// `sql` is built from the chart spec against the source cell's table name;
 /// the backend runs it over the cache and returns the small result.
 function queryCanvasCacheIPC(boardId: string, sql: string): Promise<QueryResult> {
-  return invoke("cmd_query_canvas_cache", { boardId, sql });
+  return !isWebShell()
+    ? invoke("cmd_query_canvas_cache", { boardId, sql })
+    : apiCall("canvas_query_cache", { boardId, sql });
 }
 
 /// One page (`offset`..`offset + limit`) of a cell's full cached result, keyed by
@@ -59,10 +67,58 @@ function fetchCanvasCellPageIPC(
   offset: number,
   limit: number,
 ): Promise<QueryResult | null> {
-  return invoke("cmd_fetch_canvas_cell_page", { boardId, cellId, offset, limit });
+  const args = { boardId, cellId, offset, limit };
+  return !isWebShell()
+    ? invoke("cmd_fetch_canvas_cell_page", args)
+    : apiCall("canvas_fetch_page", args);
+}
+
+/// Adds a run's query to a canvas, placed below its existing objects. Browser only:
+/// runs live in the server's query log.
+function addRunToCanvasIPC(canvas: string, runId: string): Promise<CanvasAddResponse> {
+  return apiCall("canvas_add", { canvas, source: { runId } });
+}
+
+/// Canvases of the current project (newest first).
+function listCanvasesIPC(): Promise<CanvasSummary[]> {
+  return !isWebShell() ? invoke("cmd_canvas_list") : apiCall("canvas_list", {});
+}
+
+/// One canvas by id.
+function getCanvasIPC(canvas: string): Promise<CanvasRecord> {
+  return !isWebShell() ? invoke("cmd_canvas_get", { canvas }) : apiCall("canvas_get", { canvas });
+}
+
+function createCanvasIPC(title: string): Promise<CanvasRecord> {
+  return !isWebShell()
+    ? invoke("cmd_canvas_create", { title })
+    : apiCall("canvas_create", { title });
+}
+
+/// Save a board; a stale `revision` rejects with the `conflict` code.
+function saveCanvasIPC(id: string, doc: CanvasDoc, revision: number): Promise<CanvasRecord> {
+  const args = { id, doc, revision };
+  return !isWebShell() ? invoke("cmd_canvas_save", args) : apiCall("canvas_save", args);
+}
+
+function renameCanvasIPC(id: string, title: string): Promise<CanvasRecord> {
+  return !isWebShell()
+    ? invoke("cmd_canvas_rename", { id, title })
+    : apiCall("canvas_rename", { id, title });
+}
+
+function deleteCanvasIPC(id: string): Promise<void> {
+  return !isWebShell() ? invoke("cmd_canvas_delete", { id }) : apiCall("canvas_delete", { id });
 }
 
 export {
+  addRunToCanvasIPC,
+  createCanvasIPC,
+  deleteCanvasIPC,
+  getCanvasIPC,
+  listCanvasesIPC,
+  renameCanvasIPC,
+  saveCanvasIPC,
   cancelCanvasCellIPC,
   fetchCanvasCellPageIPC,
   queryCanvasCacheIPC,

@@ -65,7 +65,7 @@ const manyRows = (n: number): QueryResult =>
   }) as unknown as QueryResult;
 
 const nodeProps = (id: string) =>
-  ({ id, data: { tabId: TAB }, selected: false }) as unknown as NodeProps<CanvasNodeData>;
+  ({ id, data: { boardId: TAB }, selected: false }) as unknown as NodeProps<CanvasNodeData>;
 
 function renderNode(id: string) {
   return render(
@@ -77,7 +77,7 @@ function renderNode(id: string) {
 
 function seedBound(extra: Record<string, unknown> = {}) {
   useCanvasStore.setState({ boards: {} });
-  useCanvasStore.getState().ensureBoard(TAB, "");
+  useCanvasStore.getState().loadBoard(TAB, { version: 1, components: [], edges: [] }, 0);
   useCanvasStore
     .getState()
     .addComponent(TAB, makeComponent({ kind: "query", id: "q", title: "Sales" }));
@@ -108,7 +108,7 @@ describe("TableNode", () => {
 
   it("prompts to pick a source when the table is unbound", () => {
     useCanvasStore.setState({ boards: {} });
-    useCanvasStore.getState().ensureBoard(TAB, "");
+    useCanvasStore.getState().loadBoard(TAB, { version: 1, components: [], edges: [] }, 0);
     useCanvasStore.getState().addComponent(TAB, makeComponent({ kind: "table", id: "tbl" }));
     renderNode("tbl");
     expect(screen.getByText(/Pick a source query/)).toBeTruthy();
@@ -149,7 +149,7 @@ describe("TableNode", () => {
 
   it("pages a source query that has no title", async () => {
     useCanvasStore.setState({ boards: {} });
-    useCanvasStore.getState().ensureBoard(TAB, "");
+    useCanvasStore.getState().loadBoard(TAB, { version: 1, components: [], edges: [] }, 0);
     useCanvasStore.getState().addComponent(TAB, makeComponent({ kind: "query", id: "q" }));
     useCanvasStore.getState().addComponent(
       TAB,

@@ -9,6 +9,7 @@
 
 use std::collections::HashMap;
 use arris_engines::{
+    QueryRequest,
     CanvasEngine, CanvasError, ConnectionConfig, ConnectionEngine,
     DatabaseDriver, DatabaseKind, ExplainMode, IsolationLevel, ObjectRef, PlanNode, QueryEngine,
     QueryLanguage, QueryResult, QueryValue, SchemaNode, SchemaNodeKind, SslMode,
@@ -1078,7 +1079,19 @@ async fn engine_manual_mode_does_not_autocommit_until_commit() {
         let query = &query;
         async move {
             query
-                .run_query(id, engine, None, sql, vec![], None, None, None, None)
+                .run_query(
+                    id,
+                    engine,
+                    None,
+                    QueryRequest {
+                        sql: sql,
+                        params: vec![],
+                        language: None,
+                        page_size: None,
+                        page: None,
+                        query_id: None,
+                    },
+                )
                 .await
                 .expect("engine run_query")
         }

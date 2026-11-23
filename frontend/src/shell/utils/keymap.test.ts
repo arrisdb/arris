@@ -96,10 +96,6 @@ describe("ACTIONS registry", () => {
     expect(useSettingsStore.getState().shortcuts.reformatCode).toEqual({ key: "Mod-Alt-l" });
   });
 
-  it("aiGenerate has Mod-k binding", () => {
-    expect(useSettingsStore.getState().shortcuts.aiGenerate).toEqual({ key: "Mod-k" });
-  });
-
   it("supports nullable shortcuts for button-only actions", () => {
     expect(defaultShortcutFor("stopQuery")).toBeNull();
     expect(useSettingsStore.getState().shortcuts.exportCsv).toBeNull();

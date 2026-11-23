@@ -20,9 +20,7 @@ pub async fn cmd_open_file_index(
 }
 
 #[tauri::command]
-pub async fn cmd_close_file_index(
-    env: State<'_, Arc<AppEnvironment>>,
-) -> Result<(), IpcError> {
+pub async fn cmd_close_file_index(env: State<'_, Arc<AppEnvironment>>) -> Result<(), IpcError> {
     env.search.close_index().map_err(ipc_err)
 }
 

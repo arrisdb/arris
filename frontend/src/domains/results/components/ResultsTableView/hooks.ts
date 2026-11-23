@@ -246,9 +246,9 @@ function useResultsTableActions({
     try {
       const res = tab.isFederation
         ? await runFederationQueryIPC(wrappedSql)
-        : await runQueryIPC(tab.connectionId!, wrappedSql, [], queryLanguageForEditorKind(tab.kind), pageSize, 0);
+        : await runQueryIPC(activeRun?.connectionId ?? tab.connectionId!, wrappedSql, [], queryLanguageForEditorKind(tab.kind), pageSize, 0);
       if (activeRun?.id && tabId) {
-        patchRun(tabId, activeRun.id, { result: res });
+        patchRun(activeRun.tabId, activeRun.id, { result: res });
       } else {
         updateTab(tabId, { result: res });
       }
@@ -269,9 +269,9 @@ function useResultsTableActions({
     try {
       const res = tab.isFederation
         ? await runFederationQueryIPC(sql)
-        : await runQueryIPC(tab.connectionId!, sql, [], queryLanguageForEditorKind(tab.kind), ps, pg);
+        : await runQueryIPC(activeRun?.connectionId ?? tab.connectionId!, sql, [], queryLanguageForEditorKind(tab.kind), ps, pg);
       if (activeRun?.id && tabId) {
-        patchRun(tabId, activeRun.id, { result: res });
+        patchRun(activeRun.tabId, activeRun.id, { result: res });
       } else {
         updateTab(tabId, { result: res });
       }

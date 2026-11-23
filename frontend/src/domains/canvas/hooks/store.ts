@@ -1,12 +1,10 @@
 import { create } from "zustand";
 
 import type {
-  AgentCanvasSpec,
   CanvasComponent,
   CanvasDoc,
   CanvasEdge,
   CanvasViewport,
-  ChatEntry,
   QueryComponent,
   QueryRunState,
   ReorderOp,
@@ -22,30 +20,31 @@ import {
   genId,
   makeComponent,
   makeEdge,
-  parseDoc,
-  planAgentChanges,
 } from "../utils";
 import { cancelCanvasCellIPC, runCanvasCellIPC } from "../ipc";
 
 interface BoardState {
   doc: CanvasDoc;
+  /// Revision the doc was loaded at or last saved as.
+  revision: number;
   /// Runtime query results, keyed by query-object id. Never serialized.
   runs: Record<string, QueryRunState>;
 }
 
 interface CanvasStore {
   boards: Record<string, BoardState>;
-  /// Parse a tab's text into a board the first time it mounts; a no-op afterward
-  /// so live edits are never clobbered by a re-mount.
-  ensureBoard: (tabId: string, text: string) => void;
-  addComponent: (tabId: string, component: CanvasComponent) => void;
+  /// Install a stored doc (first load or reload), keeping runtime results.
+  loadBoard: (boardId: string, doc: CanvasDoc, revision: number) => void;
+  /// Record the revision a save produced, without touching the doc.
+  setRevision: (boardId: string, revision: number) => void;
+  addComponent: (boardId: string, component: CanvasComponent) => void;
   /// Merge a patch into one object (geometry from drag/resize, or prop edits).
   updateComponent: (
-    tabId: string,
+    boardId: string,
     id: string,
     patch: Partial<CanvasComponent>,
   ) => void;
-  removeComponent: (tabId: string, id: string) => void;
+  removeComponent: (boardId: string, id: string) => void;
   /// The connection last picked for a query object, per board. A new query cell
   /// starts on it so the user picks a connection once, not per cell.
   lastQueryConnection: Record<string, string>;
@@ -53,64 +52,47 @@ interface CanvasStore {
   /// later Paste (⌘V). Held in memory, not the OS clipboard; never serialized.
   clipboard: CanvasComponent | null;
   /// Copy one object onto the clipboard.
-  copyComponent: (tabId: string, id: string) => void;
+  copyComponent: (boardId: string, id: string) => void;
   /// Paste the clipboard object into a board as a new object (new id, offset,
   /// raised to the top). No-op when the clipboard is empty.
-  pasteComponent: (tabId: string) => void;
+  pasteComponent: (boardId: string) => void;
   /// Restack an object relative to its peers (Bring to front / forward, etc.).
-  reorderComponent: (tabId: string, id: string, op: ReorderOp) => void;
-  setEdges: (tabId: string, edges: CanvasEdge[]) => void;
+  reorderComponent: (boardId: string, id: string, op: ReorderOp) => void;
+  setEdges: (boardId: string, edges: CanvasEdge[]) => void;
   /// Connect two objects with a directed arrow (the user draws relationships in
   /// connect mode). No-op for a self-link or a duplicate of an existing arrow.
-  addEdge: (tabId: string, source: string, target: string) => void;
+  addEdge: (boardId: string, source: string, target: string) => void;
   /// Remove arrows by id (deleting one from its right-click menu).
-  removeEdges: (tabId: string, ids: string[]) => void;
-  setViewport: (tabId: string, viewport: CanvasViewport) => void;
-  /// Set the connections the agent may use for this board (persisted in the doc).
-  /// The first id is the board's primary connection (the default for new query
-  /// objects); the agent reads every listed connection's schema.
-  setConnectionIds: (tabId: string, ids: string[]) => void;
-  /// Persist the agent chat log into the board doc (so it survives close/reopen
-  /// and restart). The hook keeps the live, per-token entries in local state and
-  /// calls this only at turn boundaries, so streaming never thrashes the doc.
-  setChat: (tabId: string, chat: ChatEntry[]) => void;
-  /// Wipe the board's chat log (the Clear button). Empties the persisted history.
-  clearChat: (tabId: string) => void;
-  /// Apply one agent turn against the board: add new objects, patch objects the
-  /// agent re-addressed by id, and remove the ids it listed. New query objects
-  /// bind to `connectionId`. Returns the ids of query objects to (re)run.
-  applyAgentSpec: (
-    tabId: string,
-    spec: AgentCanvasSpec,
-    connectionId: string | null,
-  ) => string[];
-  setRun: (tabId: string, id: string, run: QueryRunState) => void;
+  removeEdges: (boardId: string, ids: string[]) => void;
+  setViewport: (boardId: string, viewport: CanvasViewport) => void;
+  setRun: (boardId: string, id: string, run: QueryRunState) => void;
   /// Land a cell's full-ingest totals from the `canvas://cell-ingested` event,
   /// clearing the spinner the early page left running.
   applyIngestDone: (
-    tabId: string,
+    boardId: string,
     id: string,
     totalRows: number,
     complete: boolean,
   ) => void;
   /// Execute a query object and store its result/error in `runs`.
-  runQueryComponent: (tabId: string, id: string) => Promise<void>;
+  runQueryComponent: (boardId: string, id: string) => Promise<void>;
   /// Ask the backend to cancel a query object's in-flight run. The awaited run
   /// call resolves with per-cell "cancelled" errors, which clear the spinner.
-  cancelQueryComponent: (tabId: string, id: string) => void;
+  cancelQueryComponent: (boardId: string, id: string) => void;
   /// Run every query object on the board. Only the sink cells (those no other
   /// cell reads) are dispatched; the backend auto-runs each sink's upstream
   /// dependencies, so a shared upstream runs once rather than once per dependent.
-  runAllQueries: (tabId: string) => Promise<void>;
-  removeBoard: (tabId: string) => void;
+  runAllQueries: (boardId: string) => Promise<void>;
+  /// Run the query objects the CLI marked `autoRun`, once.
+  runAutoRunQueries: (boardId: string) => Promise<void>;
 }
 
 /// Normalize any thrown value into a readable message. Tauri rejects IPC with a
 /// plain `{ code, message }` object (not an Error), so pull `message` out rather
 /// than stringifying the object into a useless "[object Object]".
 /// Backend cancellation handle for a cell's run, derived (never stored).
-function cellQueryId(tabId: string, id: string): string {
-  return `${CANVAS_QUERY_ID_PREFIX}:${tabId}:${id}`;
+function cellQueryId(boardId: string, id: string): string {
+  return `${CANVAS_QUERY_ID_PREFIX}:${boardId}:${id}`;
 }
 
 function errToString(err: unknown): string {
@@ -179,12 +161,12 @@ function withPreviewTable(doc: CanvasDoc, queryId: string): CanvasDoc {
 /// Replace the doc of one board, leaving its runtime results in place.
 function withDoc(
   boards: Record<string, BoardState>,
-  tabId: string,
+  boardId: string,
   next: (doc: CanvasDoc) => CanvasDoc,
 ): Record<string, BoardState> {
-  const board = boards[tabId];
+  const board = boards[boardId];
   if (!board) return boards;
-  return { ...boards, [tabId]: { ...board, doc: next(board.doc) } };
+  return { ...boards, [boardId]: { ...board, doc: next(board.doc) } };
 }
 
 const useCanvasStore = create<CanvasStore>((set, get) => ({
@@ -192,34 +174,41 @@ const useCanvasStore = create<CanvasStore>((set, get) => ({
   clipboard: null,
   lastQueryConnection: {},
 
-  ensureBoard: (tabId, text) =>
-    set((s) =>
-      s.boards[tabId]
-        ? s
-        : { boards: { ...s.boards, [tabId]: { doc: parseDoc(text), runs: {} } } },
-    ),
-
-  addComponent: (tabId, component) =>
+  loadBoard: (boardId, doc, revision) =>
     set((s) => ({
-      boards: withDoc(s.boards, tabId, (doc) => ({
+      boards: {
+        ...s.boards,
+        [boardId]: { doc, revision, runs: s.boards[boardId]?.runs ?? {} },
+      },
+    })),
+
+  setRevision: (boardId, revision) =>
+    set((s) => {
+      const board = s.boards[boardId];
+      return board ? { boards: { ...s.boards, [boardId]: { ...board, revision } } } : s;
+    }),
+
+  addComponent: (boardId, component) =>
+    set((s) => ({
+      boards: withDoc(s.boards, boardId, (doc) => ({
         ...doc,
         components: [...doc.components, component],
       })),
     })),
 
-  updateComponent: (tabId, id, patch) =>
+  updateComponent: (boardId, id, patch) =>
     set((s) => {
-      const target = s.boards[tabId]?.doc.components.find((c) => c.id === id);
+      const target = s.boards[boardId]?.doc.components.find((c) => c.id === id);
       const pickedConnection =
         "connectionId" in patch && typeof patch.connectionId === "string"
           ? patch.connectionId
           : null;
       const picked =
         target?.kind === "query" && pickedConnection
-          ? { [tabId]: pickedConnection }
+          ? { [boardId]: pickedConnection }
           : null;
       return {
-        boards: withDoc(s.boards, tabId, (doc) => ({
+        boards: withDoc(s.boards, boardId, (doc) => ({
           ...doc,
           components: doc.components.map((c) =>
             c.id === id ? ({ ...c, ...patch } as CanvasComponent) : c,
@@ -229,15 +218,16 @@ const useCanvasStore = create<CanvasStore>((set, get) => ({
       };
     }),
 
-  removeComponent: (tabId, id) =>
+  removeComponent: (boardId, id) =>
     set((s) => {
-      const board = s.boards[tabId];
+      const board = s.boards[boardId];
       if (!board) return s;
       const { [id]: _dropped, ...runs } = board.runs;
       return {
         boards: {
           ...s.boards,
-          [tabId]: {
+          [boardId]: {
+            ...board,
             doc: {
               ...board.doc,
               components: board.doc.components.filter((c) => c.id !== id),
@@ -251,16 +241,16 @@ const useCanvasStore = create<CanvasStore>((set, get) => ({
       };
     }),
 
-  copyComponent: (tabId, id) =>
+  copyComponent: (boardId, id) =>
     set((s) => {
-      const src = s.boards[tabId]?.doc.components.find((c) => c.id === id);
+      const src = s.boards[boardId]?.doc.components.find((c) => c.id === id);
       return src ? { clipboard: { ...src } } : s;
     }),
 
-  pasteComponent: (tabId) =>
+  pasteComponent: (boardId) =>
     set((s) => {
       const src = s.clipboard;
-      const board = s.boards[tabId];
+      const board = s.boards[boardId];
       if (!src || !board) return s;
       const maxZ = board.doc.components.reduce((m, c) => Math.max(m, c.z), 0);
       const clone = {
@@ -271,52 +261,34 @@ const useCanvasStore = create<CanvasStore>((set, get) => ({
         z: maxZ + 1,
       } as CanvasComponent;
       return {
-        boards: withDoc(s.boards, tabId, (doc) => ({
+        boards: withDoc(s.boards, boardId, (doc) => ({
           ...doc,
           components: [...doc.components, clone],
         })),
       };
     }),
 
-  reorderComponent: (tabId, id, op) =>
+  reorderComponent: (boardId, id, op) =>
     set((s) => ({
-      boards: withDoc(s.boards, tabId, (doc) => ({
+      boards: withDoc(s.boards, boardId, (doc) => ({
         ...doc,
         components: restack(doc.components, id, op),
       })),
     })),
 
-  setEdges: (tabId, edges) =>
+  setEdges: (boardId, edges) =>
     set((s) => ({
-      boards: withDoc(s.boards, tabId, (doc) => ({ ...doc, edges })),
+      boards: withDoc(s.boards, boardId, (doc) => ({ ...doc, edges })),
     })),
 
-  setViewport: (tabId, viewport) =>
+  setViewport: (boardId, viewport) =>
     set((s) => ({
-      boards: withDoc(s.boards, tabId, (doc) => ({ ...doc, viewport })),
+      boards: withDoc(s.boards, boardId, (doc) => ({ ...doc, viewport })),
     })),
 
-  setConnectionIds: (tabId, ids) =>
-    set((s) => ({
-      boards: withDoc(s.boards, tabId, (doc) => ({ ...doc, connectionIds: ids })),
-    })),
-
-  // `withDoc` keeps the `components`/`edges` array references intact, so writing
-  // chat never re-renders the board nodes (their selectors read those arrays),
-  // only the chat panel and the persistence effect.
-  setChat: (tabId, chat) =>
-    set((s) => ({
-      boards: withDoc(s.boards, tabId, (doc) => ({ ...doc, chat })),
-    })),
-
-  clearChat: (tabId) =>
-    set((s) => ({
-      boards: withDoc(s.boards, tabId, (doc) => ({ ...doc, chat: [] })),
-    })),
-
-  addEdge: (tabId, source, target) =>
+  addEdge: (boardId, source, target) =>
     set((s) => {
-      const board = s.boards[tabId];
+      const board = s.boards[boardId];
       if (!board || source === target) return s;
       const exists = board.doc.edges.some(
         (e) => e.source === source && e.target === target,
@@ -324,89 +296,40 @@ const useCanvasStore = create<CanvasStore>((set, get) => ({
       if (exists) return s;
       const edge: CanvasEdge = { id: genId("edge"), source, target };
       return {
-        boards: withDoc(s.boards, tabId, (doc) => ({
+        boards: withDoc(s.boards, boardId, (doc) => ({
           ...doc,
           edges: [...doc.edges, edge],
         })),
       };
     }),
 
-  removeEdges: (tabId, ids) =>
+  removeEdges: (boardId, ids) =>
     set((s) => {
       const drop = new Set(ids);
       return {
-        boards: withDoc(s.boards, tabId, (doc) => ({
+        boards: withDoc(s.boards, boardId, (doc) => ({
           ...doc,
           edges: doc.edges.filter((e) => !drop.has(e.id)),
         })),
       };
     }),
 
-  applyAgentSpec: (tabId, spec, connectionId) => {
-    const board = get().boards[tabId];
-    if (!board) return [];
-    const { created, updates, removeIds, edges } = planAgentChanges(
-      spec,
-      board.doc.components,
-      connectionId,
-    );
-    const removed = new Set(removeIds);
-    const patchById = new Map(updates.map((u) => [u.id, u.patch]));
+  setRun: (boardId, id, run) =>
     set((s) => {
-      const cur = s.boards[tabId];
-      if (!cur) return s;
-      const runs = { ...cur.runs };
-      for (const id of removeIds) delete runs[id];
-      const components = cur.doc.components
-        .filter((c) => !removed.has(c.id))
-        .map((c) => {
-          const patch = patchById.get(c.id);
-          return patch ? ({ ...c, ...patch } as CanvasComponent) : c;
-        })
-        .concat(created);
-      const existingEdgeKeys = new Set(
-        cur.doc.edges.map((e) => `${e.source}->${e.target}`),
-      );
-      const edgesNext = cur.doc.edges
-        .filter((e) => !removed.has(e.source) && !removed.has(e.target))
-        .concat(edges.filter((e) => !existingEdgeKeys.has(`${e.source}->${e.target}`)));
-      return {
-        boards: {
-          ...s.boards,
-          [tabId]: { doc: { ...cur.doc, components, edges: edgesNext }, runs },
-        },
-      };
-    });
-    // Re-run query objects the turn created or whose SQL or connection it changed;
-    // charts read their source's cached result, so they need no run of their own.
-    const createdQueryIds = created
-      .filter((c) => c.kind === "query")
-      .map((c) => c.id);
-    const changedQueryIds = updates
-      .filter((u) => "sql" in u.patch || "connectionId" in u.patch)
-      .map((u) => u.id)
-      .filter((id) =>
-        board.doc.components.some((c) => c.id === id && c.kind === "query"),
-      );
-    return [...createdQueryIds, ...changedQueryIds];
-  },
-
-  setRun: (tabId, id, run) =>
-    set((s) => {
-      const board = s.boards[tabId];
+      const board = s.boards[boardId];
       if (!board) return s;
       return {
         boards: {
           ...s.boards,
-          [tabId]: { ...board, runs: { ...board.runs, [id]: run } },
+          [boardId]: { ...board, runs: { ...board.runs, [id]: run } },
         },
       };
     }),
 
-  applyIngestDone: (tabId, id, totalRows, complete) => {
-    const run = get().boards[tabId]?.runs[id];
+  applyIngestDone: (boardId, id, totalRows, complete) => {
+    const run = get().boards[boardId]?.runs[id];
     if (!run) return;
-    get().setRun(tabId, id, {
+    get().setRun(boardId, id, {
       ...run,
       totalRows,
       complete,
@@ -415,12 +338,12 @@ const useCanvasStore = create<CanvasStore>((set, get) => ({
     });
   },
 
-  runQueryComponent: async (tabId, id) => {
-    const board = get().boards[tabId];
+  runQueryComponent: async (boardId, id) => {
+    const board = get().boards[boardId];
     const comp = board?.doc.components.find((c) => c.id === id);
     if (!board || !comp || comp.kind !== "query") return;
     if (!comp.sql.trim()) {
-      get().setRun(tabId, id, { error: "This query object is empty." });
+      get().setRun(boardId, id, { error: "This query object is empty." });
       return;
     }
     // Snapshot every query cell so the backend can resolve title references and
@@ -434,19 +357,19 @@ const useCanvasStore = create<CanvasStore>((set, get) => ({
         connectionId: c.connectionId,
         limit: c.selectAll ? null : (c.limit ?? DEFAULT_QUERY_LIMIT),
       }));
-    const queryId = cellQueryId(tabId, id);
-    get().setRun(tabId, id, { running: true, startedAt: Date.now() });
+    const queryId = cellQueryId(boardId, id);
+    get().setRun(boardId, id, { running: true, startedAt: Date.now() });
     try {
-      const runs = await runCanvasCellIPC(tabId, id, cells, queryId);
+      const runs = await runCanvasCellIPC(boardId, id, cells, queryId);
       const now = Date.now();
       // Apply each executed cell's outcome (target + its upstream dependencies).
       // `startedAt` is carried from the running snapshot; `endedAt` stamps the
       // settle so the status can show total time + last-execution timestamp.
       for (const r of runs) {
-        const prev = get().boards[tabId]?.runs[r.id];
+        const prev = get().boards[boardId]?.runs[r.id];
         const startedAt = prev?.startedAt;
         if (r.error) {
-          get().setRun(tabId, r.id, { error: r.error, startedAt, endedAt: now });
+          get().setRun(boardId, r.id, { error: r.error, startedAt, endedAt: now });
           continue;
         }
         if (r.totalRows === undefined) {
@@ -454,7 +377,7 @@ const useCanvasStore = create<CanvasStore>((set, get) => ({
           // spinner unless the event already landed.
           const settled = prev?.running === false && prev.totalRows !== undefined;
           get().setRun(
-            tabId,
+            boardId,
             r.id,
             settled
               ? {
@@ -469,7 +392,7 @@ const useCanvasStore = create<CanvasStore>((set, get) => ({
           );
           continue;
         }
-        get().setRun(tabId, r.id, {
+        get().setRun(boardId, r.id, {
           result: r.result,
           totalRows: r.totalRows,
           complete: r.complete,
@@ -481,14 +404,14 @@ const useCanvasStore = create<CanvasStore>((set, get) => ({
       // The cell the user ran gets a preview table on first success; the
       // query-to-query arrows are re-derived from the current SQL references.
       set((s) => ({
-        boards: withDoc(s.boards, tabId, (doc) => {
+        boards: withDoc(s.boards, boardId, (doc) => {
           const next = targetOk ? withPreviewTable(doc, id) : doc;
           return { ...next, edges: deriveDataEdges(next.components, next.edges) };
         }),
       }));
     } catch (e) {
-      const startedAt = get().boards[tabId]?.runs[id]?.startedAt;
-      get().setRun(tabId, id, {
+      const startedAt = get().boards[boardId]?.runs[id]?.startedAt;
+      get().setRun(boardId, id, {
         running: false,
         error: errToString(e),
         startedAt,
@@ -497,15 +420,15 @@ const useCanvasStore = create<CanvasStore>((set, get) => ({
     }
   },
 
-  cancelQueryComponent: (tabId, id) => {
-    if (!get().boards[tabId]?.runs[id]?.running) return;
+  cancelQueryComponent: (boardId, id) => {
+    if (!get().boards[boardId]?.runs[id]?.running) return;
     // Fire-and-forget: the awaited runQueryComponent call applies the
     // cancelled outcome; a failed cancel changes nothing.
-    cancelCanvasCellIPC(cellQueryId(tabId, id)).catch(() => {});
+    cancelCanvasCellIPC(cellQueryId(boardId, id)).catch(() => {});
   },
 
-  runAllQueries: async (tabId) => {
-    const board = get().boards[tabId];
+  runAllQueries: async (boardId) => {
+    const board = get().boards[boardId];
     if (!board) return;
     const queries = board.doc.components.filter(
       (c): c is QueryComponent => c.kind === "query",
@@ -522,16 +445,17 @@ const useCanvasStore = create<CanvasStore>((set, get) => ({
         .map((e) => e.source),
     );
     const sinks = queries.filter((c) => !upstream.has(c.id));
-    await Promise.all(sinks.map((c) => get().runQueryComponent(tabId, c.id)));
+    await Promise.all(sinks.map((c) => get().runQueryComponent(boardId, c.id)));
   },
 
-  removeBoard: (tabId) =>
-    set((s) => {
-      if (!s.boards[tabId]) return s;
-      const next = { ...s.boards };
-      delete next[tabId];
-      return { boards: next };
-    }),
+  runAutoRunQueries: async (boardId) => {
+    const pending = (get().boards[boardId]?.doc.components ?? []).filter(
+      (c): c is QueryComponent => c.kind === "query" && c.autoRun === true,
+    );
+    // Clear first so the saved doc never re-runs them on the next open.
+    for (const c of pending) get().updateComponent(boardId, c.id, { autoRun: undefined });
+    await Promise.all(pending.map((c) => get().runQueryComponent(boardId, c.id)));
+  },
 }));
 
 export { useCanvasStore };

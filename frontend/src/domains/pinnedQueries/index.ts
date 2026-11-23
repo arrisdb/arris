@@ -19,3 +19,4 @@ function registerPinnedQueriesPane(): void {
 
 export { PinnedQueriesPane, registerPinnedQueriesPane, usePinnedQueriesStore };
 export { usePinnedQueryTabSync } from "./components/PinnedQueriesPane/hooks";
+export type { PinnedQuery } from "./components/PinnedQueriesPane/types";

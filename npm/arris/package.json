@@ -1,0 +1,27 @@
+{
+  "name": "arris",
+  "version": "0.16.0",
+  "description": "Arris for Claude Code and Codex: query your databases, explore dbt and SQLMesh projects, and build canvases from the /arris skill.",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "bin": {
+    "arris": "bin/arris.js"
+  },
+  "files": [
+    "bin",
+    "lib",
+    "skill"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node --test"
+  },
+  "optionalDependencies": {
+    "@arrisdb/arris-darwin-arm64": "0.16.0",
+    "@arrisdb/arris-darwin-x64": "0.16.0",
+    "@arrisdb/arris-linux-arm64": "0.16.0",
+    "@arrisdb/arris-linux-x64": "0.16.0"
+  }
+}

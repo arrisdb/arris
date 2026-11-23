@@ -383,6 +383,14 @@ describe("toPersisted", () => {
     expect(result[0].filePath).toBe("/p/x.sql");
   });
 
+  it("drops Show Definition tabs, which reopen on demand", () => {
+    const result = toPersisted([
+      { ...base, tabType: "console" as const },
+      { ...base, id: "2", tabType: "definition" as const, connectionId: "c1" },
+    ]);
+    expect(result.map((t) => t.id)).toEqual(["1"]);
+  });
+
   it("keeps normal query and table tabs", () => {
     const result = toPersisted([
       { ...base, tabType: "console" as const },

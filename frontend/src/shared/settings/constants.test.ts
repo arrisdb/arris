@@ -162,6 +162,5 @@ describe("preset override tables", () => {
     expect(presetBaseMap("vscode").get("showDefinition")).toBe("F12");
     expect(presetBaseMap("vscode").get("refreshSchema")).toBe("F5");
     expect(presetBaseMap("jetbrains").get("gitCommit")).toBe("Mod-k");
-    expect(presetBaseMap("jetbrains").get("aiGenerate")).toBe("Mod-Alt-k");
   });
 });

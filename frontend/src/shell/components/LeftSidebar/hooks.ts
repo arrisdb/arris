@@ -1,5 +1,7 @@
 import { useEffect, useMemo } from "react";
+import { currentProject, isWebShell } from "@shared/api";
 import { useSettingsStore } from "@shared/settings";
+import { useAnalyticsTools } from "@domains/analytics";
 import { useFilesStore } from "@domains/files/hooks";
 import { findProjectRoot } from "@domains/files/components/FileTreeView/utils";
 import { useDbtStore } from "@domains/dbt/hooks";
@@ -26,12 +28,16 @@ function useLeftSidebarState(): LeftSidebarSelector {
   const sqlmeshIsLoading = useSqlMeshStore((s) => s.isLoading);
   const sqlmeshNotProject = useSqlMeshStore((s) => s.notSqlMeshProject);
 
-  const dbtDetected = hasProjectMetadata(dbtProject, dbtRootPath, dbtIsLoading);
+  // The browser has no file tree; the server reports which tools the project uses.
+  const webTools = useAnalyticsTools(isWebShell() ? currentProject() : null);
+  const dbtLoaded = hasProjectMetadata(dbtProject, dbtRootPath, dbtIsLoading);
+  const dbtDetected = dbtLoaded || webTools.includes("dbt");
   // A candidate root the backend rejected as "not a SQLMesh project" keeps
   // `sqlmeshRootPath` set (so the load doesn't re-fire), so exclude it explicitly
   // otherwise `hasProjectMetadata` would still light up the SQLMesh tab.
-  const sqlmeshDetected =
+  const sqlmeshLoaded =
     hasProjectMetadata(sqlmeshProject, sqlmeshRootPath, sqlmeshIsLoading) && !sqlmeshNotProject;
+  const sqlmeshDetected = sqlmeshLoaded || webTools.includes("sqlmesh");
   const showSelector = tab === "files" && (dbtDetected || sqlmeshDetected);
   const treeDbtRoot = useMemo(
     () => (tree ? findProjectRoot(tree, DBT_PROJECT_MARKERS) : null),
@@ -46,19 +52,19 @@ function useLeftSidebarState(): LeftSidebarSelector {
     if (treeDbtRoot && !dbtProject && !dbtRootPath && !dbtIsLoading) {
       useDbtStore.getState().loadFromPath(treeDbtRoot);
     }
-    if (!treeDbtRoot && dbtDetected) {
+    if (!treeDbtRoot && dbtLoaded) {
       useDbtStore.getState().reset();
     }
-  }, [treeDbtRoot, dbtProject, dbtRootPath, dbtIsLoading, dbtDetected]);
+  }, [treeDbtRoot, dbtProject, dbtRootPath, dbtIsLoading, dbtLoaded]);
 
   useEffect(() => {
     if (treeSqlMeshRoot && !sqlmeshProject && !sqlmeshRootPath && !sqlmeshIsLoading) {
       useSqlMeshStore.getState().loadFromPath(treeSqlMeshRoot);
     }
-    if (!treeSqlMeshRoot && sqlmeshDetected) {
+    if (!treeSqlMeshRoot && sqlmeshLoaded) {
       useSqlMeshStore.getState().reset();
     }
-  }, [treeSqlMeshRoot, sqlmeshProject, sqlmeshRootPath, sqlmeshIsLoading, sqlmeshDetected]);
+  }, [treeSqlMeshRoot, sqlmeshProject, sqlmeshRootPath, sqlmeshIsLoading, sqlmeshLoaded]);
 
   useEffect(() => {
     if (filesPaneView === "dbt" && !dbtDetected) setFilesPaneView("project");

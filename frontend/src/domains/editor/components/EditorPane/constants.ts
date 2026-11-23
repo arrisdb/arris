@@ -4,4 +4,7 @@ const AUTOSAVE_DEBOUNCE_MS = 500;
 // the change bands do not jump around during brief pauses while typing.
 const GIT_GUTTER_REFRESH_PAUSE_MS = 200;
 
-export { AUTOSAVE_DEBOUNCE_MS, GIT_GUTTER_REFRESH_PAUSE_MS };
+// History source of a query run from the browser editor.
+const WEB_RUN_SOURCE = "ui";
+
+export { AUTOSAVE_DEBOUNCE_MS, GIT_GUTTER_REFRESH_PAUSE_MS, WEB_RUN_SOURCE };
