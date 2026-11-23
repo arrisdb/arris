@@ -31,6 +31,13 @@ ignore = [
     # pin-utils: unmaintained, via aws-smithy 0.63. Dropped by aws-config 1.13,
     # which needs Rust 1.94.1; remove after the toolchain bump.
     "RUSTSEC-2026-0441",
+    # chrono: unmaintained, no safe upgrade. Pulled by arrow, datafusion, parquet
+    # and several SQL drivers besides our own crates; cannot be dropped.
+    "RUSTSEC-2026-0543",
+    # humantime, chrono-tz: unmaintained with chrono, no safe upgrade. Transitive
+    # via object_store, arrow-array and datafusion-functions.
+    "RUSTSEC-2026-0542",
+    "RUSTSEC-2026-0555",
 ]
 
 [licenses]
